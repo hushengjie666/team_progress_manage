@@ -21,7 +21,6 @@ import {
   planCapacityHint,
   planPressure,
   restoreTimer,
-  resumeTimer,
   suggestedCapacity,
   suggestedTasks,
   taskSuggestions,
@@ -82,6 +81,7 @@ import {
   priorityWeight,
   startTimerInState,
   today,
+  toggleTimerInState,
   nowIso,
   type DeletedTaskSnapshot,
   type SplitDraft,
@@ -774,15 +774,7 @@ export function App() {
 
   const toggleTimer = () => {
     const timestamp = nowIso();
-    updateState((value) =>
-      value.activeTimer
-        ? {
-            ...value,
-            activeTimer: value.activeTimer.isRunning ? pauseTimer(value.activeTimer, timestamp) : resumeTimer(value.activeTimer, timestamp),
-            updatedAt: timestamp,
-          }
-        : value,
-    );
+    updateState((value) => toggleTimerInState(value, timestamp));
   };
 
   const resetTimer = () => {

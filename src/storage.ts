@@ -6,6 +6,8 @@ import type {
   BlockProfile,
   DailyPlan,
   DailyReview,
+  ExecutionSignal,
+  ExecutionSignalType,
   Project,
   ProjectMember,
   ProjectMemberRole,
@@ -14,14 +16,18 @@ import type {
   StrictCheckResult,
   StrictModeStatus,
   Task,
+  WorkSession,
+  WorkSessionStatus,
 } from "./types";
 
 const STORAGE_KEY = "timemanage.app_state.v1";
 
-type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks"> & {
+type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
   projects?: Partial<Project>[];
   projectMembers?: Partial<ProjectMember>[];
   tasks?: Partial<Task>[];
+  workSessions?: Partial<WorkSession>[];
+  executionSignals?: Partial<ExecutionSignal>[];
 };
 
 const normalizeProject = (project: Partial<Project>, fallback: Project, index: number): Project => {
@@ -121,6 +127,40 @@ const normalizePlan = (plan: Partial<DailyPlan>): DailyPlan => {
   };
 };
 
+const normalizeWorkSession = (session: Partial<WorkSession>, index: number): WorkSession | undefined => {
+  if (!session.taskId || !session.focusSessionId) return undefined;
+  const timestamp = session.updatedAt ?? session.createdAt ?? session.startedAt ?? new Date().toISOString();
+  const allowedStatuses: WorkSessionStatus[] = ["active", "paused", "ended"];
+  return {
+    id: session.id ?? `work_session_migrated_${index}`,
+    taskId: session.taskId,
+    executorMemberId: session.executorMemberId,
+    focusSessionId: session.focusSessionId,
+    status: session.status && allowedStatuses.includes(session.status) ? session.status : "ended",
+    startedAt: session.startedAt ?? timestamp,
+    pausedAt: session.pausedAt,
+    endedAt: session.endedAt,
+    totalPausedSeconds: session.totalPausedSeconds ?? 0,
+    createdAt: session.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+};
+
+const normalizeExecutionSignal = (signal: Partial<ExecutionSignal>, index: number): ExecutionSignal | undefined => {
+  if (!signal.workSessionId || !signal.taskId) return undefined;
+  const allowedTypes: ExecutionSignalType[] = ["work_started", "work_paused", "work_resumed", "work_ended"];
+  const timestamp = signal.createdAt ?? new Date().toISOString();
+  return {
+    id: signal.id ?? `signal_migrated_${index}`,
+    workSessionId: signal.workSessionId,
+    taskId: signal.taskId,
+    executorMemberId: signal.executorMemberId,
+    type: signal.type && allowedTypes.includes(signal.type) ? signal.type : "work_started",
+    createdAt: timestamp,
+    payload: signal.payload,
+  };
+};
+
 const mergeSettings = (initial: Settings, parsed?: Partial<Settings>): Settings => ({
   ...initial,
   ...parsed,
@@ -148,6 +188,7 @@ const normalizeActiveTimer = (timer?: Partial<ActiveTimer>): ActiveTimer | undef
   return {
     sessionId: timer.sessionId,
     taskId: timer.taskId,
+    workSessionId: timer.workSessionId,
     mode: timer.mode ?? "focus",
     duration,
     remaining: timer.remaining ?? duration,
@@ -186,6 +227,8 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     projectMembers,
     tasks,
     dailyPlans: (parsed.dailyPlans ?? initial.dailyPlans).map(normalizePlan),
+    workSessions: (parsed.workSessions ?? initial.workSessions).map(normalizeWorkSession).filter((session): session is WorkSession => Boolean(session)),
+    executionSignals: (parsed.executionSignals ?? initial.executionSignals).map(normalizeExecutionSignal).filter((signal): signal is ExecutionSignal => Boolean(signal)),
     rewardState: { ...initial.rewardState, ...parsed.rewardState },
     strictViolations: parsed.strictViolations ?? [],
     backupSnapshots: (parsed.backupSnapshots ?? []).map((snapshot) => ({ ...snapshot, payload: snapshot.payload })),

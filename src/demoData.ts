@@ -421,6 +421,8 @@ export const createDemoState = (): AppState => {
     tasks,
     dailyPlans,
     focusSessions,
+    workSessions: [],
+    executionSignals: [],
     interruptions,
     strictViolations,
     rewardState: {

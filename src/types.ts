@@ -14,6 +14,8 @@ export type WhiteNoise = "off" | "rain" | "brown" | "cafe";
 export type SyncIntent = "local" | "self_hosted";
 export type StrictModeIntent = "soft" | "balanced" | "locked";
 export type TimerSettlement = "pending" | "none";
+export type WorkSessionStatus = "active" | "paused" | "ended";
+export type ExecutionSignalType = "work_started" | "work_paused" | "work_resumed" | "work_ended";
 export type InsightKind = "capacity" | "estimate" | "interruption" | "reward" | "commitment" | "strict" | "rhythm";
 export type CoachStepId = "create_task" | "commit_task" | "start_focus" | "review_day";
 export type PlanPressureLevel = "light" | "balanced" | "overloaded";
@@ -148,6 +150,30 @@ export interface FocusSession {
   strictProfileId?: string;
 }
 
+export interface WorkSession {
+  id: string;
+  taskId: string;
+  executorMemberId?: string;
+  focusSessionId: string;
+  status: WorkSessionStatus;
+  startedAt: string;
+  pausedAt?: string;
+  endedAt?: string;
+  totalPausedSeconds: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExecutionSignal {
+  id: string;
+  workSessionId: string;
+  taskId: string;
+  executorMemberId?: string;
+  type: ExecutionSignalType;
+  createdAt: string;
+  payload?: Record<string, unknown>;
+}
+
 export interface Interruption {
   id: string;
   sessionId?: string;
@@ -268,6 +294,7 @@ export interface NotificationSettings {
 export interface ActiveTimer {
   sessionId: string;
   taskId?: string;
+  workSessionId?: string;
   mode: SessionMode;
   duration: number;
   remaining: number;
@@ -482,6 +509,8 @@ export interface AppState {
   tasks: Task[];
   dailyPlans: DailyPlan[];
   focusSessions: FocusSession[];
+  workSessions: WorkSession[];
+  executionSignals: ExecutionSignal[];
   interruptions: Interruption[];
   strictViolations: StrictViolation[];
   blockProfiles: BlockProfile[];

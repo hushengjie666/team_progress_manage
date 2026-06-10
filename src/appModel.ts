@@ -1,6 +1,6 @@
-import { completedFocusSessions, defaultReview, deriveRewardState, suggestedTasks } from "./domain";
+import { completedFocusSessions, defaultReview, deriveRewardState, pauseTimer, resumeTimer, suggestedTasks } from "./domain";
 import { todayKey, uid } from "./seed";
-import type { AppState, DailyPlan, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task } from "./types";
+import type { AppState, DailyPlan, ExecutionSignalType, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, WorkSession } from "./types";
 
 export type Tab = "workspace" | "focus" | "calendar" | "reports" | "settings";
 
@@ -105,12 +105,74 @@ export const modeLabel: Record<SessionMode, string> = {
   long_break: "长休息",
 };
 
-export const endSessionInState = (state: AppState, outcome: SessionOutcome): AppState => {
+const createExecutionSignal = (
+  workSession: WorkSession,
+  type: ExecutionSignalType,
+  timestamp: string,
+  payload?: Record<string, unknown>,
+) => ({
+  id: uid("signal"),
+  workSessionId: workSession.id,
+  taskId: workSession.taskId,
+  executorMemberId: workSession.executorMemberId,
+  type,
+  createdAt: timestamp,
+  payload,
+});
+
+const activeWorkSession = (state: AppState) => {
+  const active = state.activeTimer;
+  if (!active || active.mode !== "focus") return undefined;
+  return state.workSessions.find((session) =>
+    active.workSessionId ? session.id === active.workSessionId : session.focusSessionId === active.sessionId,
+  );
+};
+
+export const toggleTimerInState = (state: AppState, timestamp: string): AppState => {
+  const active = state.activeTimer;
+  if (!active) return state;
+  const timer = active.isRunning ? pauseTimer(active, timestamp) : resumeTimer(active, timestamp);
+  const workSession = activeWorkSession(state);
+  if (!workSession) {
+    return { ...state, activeTimer: timer, updatedAt: timestamp };
+  }
+
+  const nextWorkSession: WorkSession = {
+    ...workSession,
+    status: active.isRunning ? "paused" : "active",
+    pausedAt: active.isRunning ? timestamp : undefined,
+    totalPausedSeconds: timer.totalPausedSeconds,
+    updatedAt: timestamp,
+  };
+  return {
+    ...state,
+    activeTimer: timer,
+    workSessions: state.workSessions.map((session) => (session.id === workSession.id ? nextWorkSession : session)),
+    executionSignals: [
+      createExecutionSignal(nextWorkSession, active.isRunning ? "work_paused" : "work_resumed", timestamp),
+      ...state.executionSignals,
+    ],
+    updatedAt: timestamp,
+  };
+};
+
+export const endSessionInState = (state: AppState, outcome: SessionOutcome, timestamp = nowIso()): AppState => {
   const active = state.activeTimer;
   if (!active) return state;
 
-  const endedAt = nowIso();
+  const endedAt = timestamp;
   const isFocusCompleted = active.mode === "focus" && outcome === "completed";
+  const workSession = activeWorkSession(state);
+  const endedWorkSession: WorkSession | undefined = workSession
+    ? {
+        ...workSession,
+        status: "ended",
+        pausedAt: undefined,
+        endedAt,
+        totalPausedSeconds: active.totalPausedSeconds,
+        updatedAt: endedAt,
+      }
+    : undefined;
   const sessions = state.focusSessions.map((session) =>
     session.id === active.sessionId
       ? {
@@ -145,6 +207,12 @@ export const endSessionInState = (state: AppState, outcome: SessionOutcome): App
     tasks,
     dailyPlans: plans,
     focusSessions: sessions,
+    workSessions: endedWorkSession
+      ? state.workSessions.map((session) => (session.id === endedWorkSession.id ? endedWorkSession : session))
+      : state.workSessions,
+    executionSignals: endedWorkSession
+      ? [createExecutionSignal(endedWorkSession, "work_ended", endedAt, { outcome }), ...state.executionSignals]
+      : state.executionSignals,
     activeTimer: undefined,
     updatedAt: endedAt,
   };
@@ -177,12 +245,32 @@ export const startTimerInState = (
     interruptionCounts: { internal: 0, external: 0 },
     strictProfileId: mode === "focus" ? strictProfileId : undefined,
   };
+  const task = taskId ? state.tasks.find((item) => item.id === taskId) : undefined;
+  const executorMemberId = task?.primaryExecutorMemberId ?? state.currentMemberId;
+  const workSession: WorkSession | undefined = mode === "focus" && taskId
+    ? {
+        id: uid("work_session"),
+        taskId,
+        executorMemberId,
+        focusSessionId: session.id,
+        status: "active",
+        startedAt: timestamp,
+        totalPausedSeconds: 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }
+    : undefined;
   return {
     ...state,
     focusSessions: [session, ...state.focusSessions],
+    workSessions: workSession ? [workSession, ...state.workSessions] : state.workSessions,
+    executionSignals: workSession
+      ? [createExecutionSignal(workSession, "work_started", timestamp, { mode }), ...state.executionSignals]
+      : state.executionSignals,
     activeTimer: {
       sessionId: session.id,
       taskId,
+      workSessionId: workSession?.id,
       mode,
       duration: session.duration,
       remaining: session.duration,

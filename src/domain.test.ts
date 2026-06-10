@@ -17,6 +17,7 @@ import {
   computeStreak,
 } from "./domain";
 import { createInitialState, todayKey } from "./seed";
+import { endSessionInState, startTimerInState, toggleTimerInState } from "./appModel";
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
@@ -64,6 +65,54 @@ describe("timer domain", () => {
     expect(resumed.isRunning).toBe(true);
     expect(resumed.totalPausedSeconds).toBe(120);
     expect(new Date(resumed.plannedEndAt).getTime()).toBe(new Date("2026-05-10T08:27:00Z").getTime());
+  });
+
+  it("records work session execution signals around a focus timer", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-05-10T08:00:00.000Z",
+      undefined,
+      "session_work_test",
+    );
+    expect(started.activeTimer?.workSessionId).toBe(started.workSessions[0].id);
+    expect(started.workSessions[0]).toMatchObject({
+      taskId,
+      executorMemberId: "member_owner",
+      focusSessionId: "session_work_test",
+      status: "active",
+    });
+    expect(started.executionSignals[0]).toMatchObject({
+      workSessionId: started.workSessions[0].id,
+      taskId,
+      executorMemberId: "member_owner",
+      type: "work_started",
+    });
+
+    const paused = toggleTimerInState(started, "2026-05-10T08:05:00.000Z");
+    expect(paused.activeTimer?.isRunning).toBe(false);
+    expect(paused.workSessions[0]).toMatchObject({ status: "paused", pausedAt: "2026-05-10T08:05:00.000Z" });
+
+    const resumed = toggleTimerInState(paused, "2026-05-10T08:07:00.000Z");
+    expect(resumed.activeTimer?.isRunning).toBe(true);
+    expect(resumed.workSessions[0]).toMatchObject({ status: "active", pausedAt: undefined, totalPausedSeconds: 120 });
+
+    const ended = endSessionInState(resumed, "completed", "2026-05-10T08:32:00.000Z");
+    expect(ended.activeTimer).toBeUndefined();
+    expect(ended.workSessions[0]).toMatchObject({
+      status: "ended",
+      endedAt: "2026-05-10T08:32:00.000Z",
+      totalPausedSeconds: 120,
+    });
+    expect(ended.executionSignals.map((signal) => signal.type).slice(0, 4)).toEqual([
+      "work_ended",
+      "work_resumed",
+      "work_paused",
+      "work_started",
+    ]);
   });
 });
 

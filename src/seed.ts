@@ -297,6 +297,8 @@ export const createInitialState = (): AppState => ({
   tasks: sampleTasks,
   dailyPlans: [todayPlan],
   focusSessions: [],
+  workSessions: [],
+  executionSignals: [],
   interruptions: [],
   strictViolations: [],
   blockProfiles: [defaultProfile],
