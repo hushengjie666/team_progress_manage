@@ -1,10 +1,60 @@
 import { createInitialState, defaultNativeCapabilities, defaultTaskTemplates } from "./seed";
 import { isTauri } from "./env";
-import type { ActiveTimer, AppState, BlockProfile, DailyPlan, DailyReview, RepeatRule, Settings, StrictCheckResult, StrictModeStatus, Task } from "./types";
+import type {
+  ActiveTimer,
+  AppState,
+  BlockProfile,
+  DailyPlan,
+  DailyReview,
+  Project,
+  ProjectMember,
+  ProjectMemberRole,
+  RepeatRule,
+  Settings,
+  StrictCheckResult,
+  StrictModeStatus,
+  Task,
+} from "./types";
 
 const STORAGE_KEY = "timemanage.app_state.v1";
 
-const normalizeTask = (task: Partial<Task>, index: number): Task => {
+type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks"> & {
+  projects?: Partial<Project>[];
+  projectMembers?: Partial<ProjectMember>[];
+  tasks?: Partial<Task>[];
+};
+
+const normalizeProject = (project: Partial<Project>, fallback: Project, index: number): Project => {
+  const timestamp = project.updatedAt ?? project.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
+  return {
+    id: project.id ?? (index === 0 ? fallback.id : `project_migrated_${index}`),
+    name: project.name?.trim() || fallback.name,
+    description: project.description ?? "",
+    defaultExpectedStartHours: Math.max(1, project.defaultExpectedStartHours ?? fallback.defaultExpectedStartHours ?? 24),
+    createdAt: project.createdAt ?? timestamp,
+    updatedAt: timestamp,
+    archivedAt: project.archivedAt,
+  };
+};
+
+const normalizeProjectMember = (member: Partial<ProjectMember>, fallback: ProjectMember, projectId: string, index: number): ProjectMember => {
+  const timestamp = member.updatedAt ?? member.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
+  const allowedRoles: ProjectMemberRole[] = ["project_owner", "executor"];
+  const roles = (member.roles ?? fallback.roles ?? ["project_owner", "executor"]).filter((role): role is ProjectMemberRole => allowedRoles.includes(role));
+  return {
+    id: member.id ?? (index === 0 ? fallback.id : `member_migrated_${index}`),
+    projectId: member.projectId ?? projectId,
+    name: member.name?.trim() || fallback.name,
+    email: member.email,
+    roles: roles.length ? roles : ["executor"],
+    createdAt: member.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+};
+
+const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
+
+const normalizeTask = (task: Partial<Task>, index: number, projectId: string): Task => {
   const timestamp = task.updatedAt ?? task.createdAt ?? new Date().toISOString();
   const allowedRepeatRules: RepeatRule[] = ["none", "daily", "weekly", "interval", "weekdays", "monthly", "after_completion"];
   return {
@@ -12,7 +62,14 @@ const normalizeTask = (task: Partial<Task>, index: number): Task => {
     title: task.title ?? "未命名任务",
     notes: task.notes ?? "",
     tags: task.tags ?? [],
+    projectId: task.projectId ?? projectId,
     project: task.project ?? "Inbox",
+    creatorMemberId: task.creatorMemberId,
+    primaryExecutorMemberId: task.primaryExecutorMemberId,
+    collaboratorMemberIds: task.collaboratorMemberIds ?? [],
+    expectedStartAt: task.expectedStartAt,
+    expectedFinishAt: task.expectedFinishAt,
+    progressPercent: clampProgress(task.progressPercent),
     priority: task.priority ?? "medium",
     severity: task.severity ?? "medium",
     estimatePomodoros: task.estimatePomodoros ?? 1,
@@ -105,15 +162,29 @@ const normalizeActiveTimer = (timer?: Partial<ActiveTimer>): ActiveTimer | undef
   };
 };
 
-const mergeStoredState = (payload: string): AppState => {
+export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState => {
   const initial = createInitialState();
-  const parsed = JSON.parse(payload) as Partial<AppState>;
+  const projects = (parsed.projects?.length ? parsed.projects : initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
+  const starterProjectId = projects[0]?.id ?? initial.projects[0].id;
+  const projectMembers = (parsed.projectMembers?.length ? parsed.projectMembers : initial.projectMembers).map((member, index) =>
+    normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index),
+  );
+  const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
+    ? parsed.currentMemberId
+    : projectMembers[0]?.id;
+  const tasks = (parsed.tasks ?? initial.tasks).map((task, index) => {
+    const taskProjectId = task.projectId && projects.some((project) => project.id === task.projectId) ? task.projectId : starterProjectId;
+    return normalizeTask(task, index, taskProjectId);
+  });
   return {
     ...initial,
     ...parsed,
     onboarding: { ...initial.onboarding, ...parsed.onboarding },
     settings: mergeSettings(initial.settings, parsed.settings),
-    tasks: (parsed.tasks ?? initial.tasks).map(normalizeTask),
+    currentMemberId,
+    projects,
+    projectMembers,
+    tasks,
     dailyPlans: (parsed.dailyPlans ?? initial.dailyPlans).map(normalizePlan),
     rewardState: { ...initial.rewardState, ...parsed.rewardState },
     strictViolations: parsed.strictViolations ?? [],
@@ -125,6 +196,8 @@ const mergeStoredState = (payload: string): AppState => {
     sync: { ...initial.sync, ...parsed.sync, tombstones: parsed.sync?.tombstones ?? [], conflicts: parsed.sync?.conflicts ?? [] },
   } as AppState;
 };
+
+const mergeStoredState = (payload: string): AppState => normalizeAppStatePayload(JSON.parse(payload) as Partial<AppState>);
 
 const readBrowserState = (): AppState => {
   const stored = localStorage.getItem(STORAGE_KEY);

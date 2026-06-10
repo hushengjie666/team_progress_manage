@@ -1,4 +1,4 @@
-import type { AppState, BlockProfile, DailyPlan, NativeCapabilityState, Task, TaskTemplate } from "./types";
+import type { AppState, BlockProfile, DailyPlan, NativeCapabilityState, Project, ProjectMember, Task, TaskTemplate } from "./types";
 
 export const todayKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
@@ -18,7 +18,12 @@ const sampleTasks: Task[] = [
     title: "整理时间管理系统 PRD",
     notes: "把方法论、竞品图和旧系统升级点沉淀成可执行范围。",
     tags: ["方法论", "产品"],
+    projectId: "project_starter",
     project: "TimeManage",
+    creatorMemberId: "member_owner",
+    primaryExecutorMemberId: "member_owner",
+    collaboratorMemberIds: [],
+    progressPercent: 0,
     priority: "urgent",
     severity: "high",
     estimatePomodoros: 3,
@@ -51,7 +56,12 @@ const sampleTasks: Task[] = [
     title: "配置分心源屏蔽清单",
     notes: "先覆盖短视频、社交、资讯和容易误点的网站。",
     tags: ["严格模式", "Apple"],
+    projectId: "project_starter",
     project: "自律系统",
+    creatorMemberId: "member_owner",
+    primaryExecutorMemberId: "member_owner",
+    collaboratorMemberIds: [],
+    progressPercent: 0,
     priority: "high",
     severity: "very_high",
     estimatePomodoros: 2,
@@ -71,7 +81,11 @@ const sampleTasks: Task[] = [
     title: "设计番茄报表指标",
     notes: "包含日流量、估算偏差、内外中断、热力图和年度墙。",
     tags: ["报表", "复盘"],
+    projectId: "project_starter",
     project: "TimeManage",
+    creatorMemberId: "member_owner",
+    collaboratorMemberIds: [],
+    progressPercent: 0,
     priority: "medium",
     severity: "medium",
     estimatePomodoros: 5,
@@ -89,7 +103,11 @@ const sampleTasks: Task[] = [
     title: "拆分移动端严格模式实现",
     notes: "超过 7 个番茄的任务需要拆分，避免估算失真。",
     tags: ["iOS", "技术"],
+    projectId: "project_starter",
     project: "原生插件",
+    creatorMemberId: "member_owner",
+    collaboratorMemberIds: [],
+    progressPercent: 0,
     priority: "medium",
     severity: "high",
     estimatePomodoros: 8,
@@ -103,6 +121,24 @@ const sampleTasks: Task[] = [
     updatedAt: now(),
   },
 ];
+
+export const starterProject: Project = {
+  id: "project_starter",
+  name: "TimeManage 团队进度",
+  description: "从个人时间管理迁移而来的团队进度管控起始项目。",
+  defaultExpectedStartHours: 24,
+  createdAt: now(),
+  updatedAt: now(),
+};
+
+export const starterProjectMember: ProjectMember = {
+  id: "member_owner",
+  projectId: starterProject.id,
+  name: "项目负责人",
+  roles: ["project_owner", "executor"],
+  createdAt: now(),
+  updatedAt: now(),
+};
 
 const defaultProfile: BlockProfile = {
   id: "profile_default",
@@ -254,6 +290,9 @@ export const createInitialState = (): AppState => ({
     calendarViewMode: "week",
     commandPaletteHintDismissed: false,
   },
+  currentMemberId: starterProjectMember.id,
+  projects: [starterProject],
+  projectMembers: [starterProjectMember],
   tasks: sampleTasks,
   dailyPlans: [todayPlan],
   focusSessions: [],

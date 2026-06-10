@@ -35,6 +35,7 @@ export type CommandAction =
   | "open_sync_settings"
   | "open_shortcut_help";
 export type NativePlatform = "browser" | "tauri_macos" | "ios";
+export type ProjectMemberRole = "project_owner" | "executor";
 
 export interface Subtask {
   id: string;
@@ -57,7 +58,14 @@ export interface Task {
   title: string;
   notes: string;
   tags: string[];
+  projectId: string;
   project: string;
+  creatorMemberId?: string;
+  primaryExecutorMemberId?: string;
+  collaboratorMemberIds?: string[];
+  expectedStartAt?: string;
+  expectedFinishAt?: string;
+  progressPercent?: number;
   priority: Priority;
   severity: Severity;
   estimatePomodoros: number;
@@ -78,6 +86,26 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  defaultExpectedStartHours: number;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+}
+
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  name: string;
+  email?: string;
+  roles: ProjectMemberRole[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DailyPlan {
@@ -448,6 +476,9 @@ export interface AppState {
   version: number;
   onboarding: Onboarding;
   settings: Settings;
+  currentMemberId?: string;
+  projects: Project[];
+  projectMembers: ProjectMember[];
   tasks: Task[];
   dailyPlans: DailyPlan[];
   focusSessions: FocusSession[];

@@ -556,6 +556,7 @@ export function App() {
   const updateState = (updater: (value: AppState) => AppState) => {
     setState((current) => (current ? ensureTodayPlan(updater(current)) : current));
   };
+  const currentProjectId = state.projects[0]?.id ?? "project_starter";
 
   const addTask = () => {
     const title = draft.title.trim();
@@ -572,7 +573,9 @@ export function App() {
         .split(/[,\s，]+/)
         .map((item) => item.trim())
         .filter(Boolean),
+      projectId: currentProjectId,
       project: draft.project.trim() || "Inbox",
+      creatorMemberId: state.currentMemberId,
       priority: draft.priority,
       severity: draft.severity,
       estimatePomodoros: Math.max(0, Math.round(draft.estimatePomodoros)),
@@ -865,7 +868,9 @@ export function App() {
       title: source.note,
       notes: "由中断收件箱转入活动清单。",
       tags: [source.type === "internal" ? "内部中断" : "外部中断"],
+      projectId: currentProjectId,
       project: "Inbox",
+      creatorMemberId: state.currentMemberId,
       priority: source.type === "external" ? "high" : "medium",
       severity: "medium",
       estimatePomodoros: 1,
@@ -1085,7 +1090,14 @@ export function App() {
       title,
       notes: `由「${task.title}」拆分而来。`,
       tags: task.tags,
+      projectId: task.projectId,
       project: task.project,
+      creatorMemberId: state.currentMemberId ?? task.creatorMemberId,
+      primaryExecutorMemberId: task.primaryExecutorMemberId,
+      collaboratorMemberIds: task.collaboratorMemberIds ?? [],
+      expectedStartAt: task.expectedStartAt,
+      expectedFinishAt: task.expectedFinishAt,
+      progressPercent: 0,
       priority: task.priority,
       severity: task.severity,
       estimatePomodoros: estimatePerTask,
@@ -1499,7 +1511,9 @@ export function App() {
       title: parsed.title,
       notes: "由命令面板自然语言快捷添加。",
       tags: parsed.tags,
+      projectId: currentProjectId,
       project: parsed.project ?? "Inbox",
+      creatorMemberId: state.currentMemberId,
       priority: parsed.priority ?? "medium",
       severity: "medium",
       estimatePomodoros: parsed.estimatePomodoros,

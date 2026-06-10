@@ -19,6 +19,7 @@ import {
 import { createInitialState, todayKey } from "./seed";
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
+import { normalizeAppStatePayload } from "./storage";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -207,6 +208,66 @@ describe("planning and rewards", () => {
 });
 
 describe("data portability and long planning", () => {
+  it("migrates legacy personal task data into a starter project", () => {
+    const legacy = {
+      version: 1,
+      tasks: [
+        {
+          id: "legacy_task",
+          title: "旧任务",
+          notes: "",
+          tags: [],
+          project: "旧项目标签",
+          priority: "medium" as const,
+          severity: "medium" as const,
+          estimatePomodoros: 1,
+          status: "pool" as const,
+          subtasks: [],
+          sortOrder: 10,
+          actualPomodoros: 0,
+          estimateHistory: [],
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+      ],
+    };
+    const migrated = normalizeAppStatePayload(legacy);
+    expect(migrated.projects[0]).toMatchObject({ id: "project_starter" });
+    expect(migrated.projectMembers[0].roles).toEqual(["project_owner", "executor"]);
+    expect(migrated.currentMemberId).toBe(migrated.projectMembers[0].id);
+    expect(migrated.tasks[0]).toMatchObject({
+      id: "legacy_task",
+      project: "旧项目标签",
+      projectId: migrated.projects[0].id,
+      collaboratorMemberIds: [],
+      progressPercent: 0,
+    });
+  });
+
+  it("normalizes imported data into team progress state", () => {
+    const state = createInitialState();
+    const backup = createBackupSnapshot(state, "before_import", "2026-05-10T10:00:00.000Z");
+    const imported = mergeImportedState(
+      state,
+      {
+        version: 1,
+        tasks: [
+          {
+            ...state.tasks[0],
+            id: "imported_legacy_task",
+            projectId: undefined,
+            progressPercent: 150,
+          },
+        ],
+      },
+      backup,
+    );
+    expect(imported.projects.length).toBeGreaterThan(0);
+    expect(imported.tasks[0].projectId).toBe(imported.projects[0].id);
+    expect(imported.tasks[0].progressPercent).toBe(100);
+    expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
+  });
+
   it("summarizes imports, creates backups, and exports CSV", () => {
     const state = createInitialState();
     const summary = summarizeImportPayload(state);

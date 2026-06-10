@@ -1,4 +1,5 @@
 import { uid } from "./seed";
+import { normalizeAppStatePayload } from "./storage";
 import type { AppState, BackupSnapshot, ImportSummary } from "./types";
 
 type ExportableState = Omit<AppState, "backupSnapshots"> & { backupSnapshots?: BackupSnapshot[] };
@@ -78,7 +79,7 @@ export const mergeImportedState = (current: AppState, payload: unknown, backup: 
   if (!summary.valid) throw new Error(summary.message);
   const incoming = payload as Partial<ExportableState>;
   const timestamp = new Date().toISOString();
-  return {
+  const merged = normalizeAppStatePayload({
     ...current,
     ...incoming,
     backupSnapshots: [backup, ...(current.backupSnapshots ?? [])].slice(0, 10),
@@ -91,7 +92,8 @@ export const mergeImportedState = (current: AppState, payload: unknown, backup: 
       tombstones: incoming.sync?.tombstones ?? current.sync.tombstones ?? [],
     },
     updatedAt: timestamp,
-  } as AppState;
+  });
+  return merged;
 };
 
 export const exportTasksCsv = (state: AppState) =>

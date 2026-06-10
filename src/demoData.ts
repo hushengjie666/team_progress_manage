@@ -35,6 +35,7 @@ const makeTask = (patch: Partial<Task> & Pick<Task, "id" | "title" | "project" |
   return {
     notes: "",
     tags: [],
+    projectId: baseProjectId,
     priority: "medium",
     severity: "medium",
     repeatRule: "none",
@@ -47,6 +48,8 @@ const makeTask = (patch: Partial<Task> & Pick<Task, "id" | "title" | "project" |
     ...patch,
   };
 };
+
+const baseProjectId = "project_starter";
 
 export const createDemoState = (): AppState => {
   const base = createInitialState();
