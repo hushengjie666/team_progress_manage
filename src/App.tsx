@@ -34,6 +34,7 @@ import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { updateDesktopTimerPresence } from "./nativeDesktop";
+import { addProjectMemberToState, createProjectInState, updateProjectInState, updateProjectMemberInState } from "./teamProgress";
 import { uid } from "./seed";
 import type {
   AppState,
@@ -46,6 +47,9 @@ import type {
   InterruptionType,
   CommandAction,
   ParsedQuickInput,
+  Project,
+  ProjectMember,
+  ProjectMemberRole,
   ReportFilter,
   SessionMode,
   SessionOutcome,
@@ -962,6 +966,28 @@ export function App() {
     }));
   };
 
+  const createProject = (name: string, description: string) => {
+    const timestamp = nowIso();
+    updateState((value) => createProjectInState(value, name, description, timestamp));
+    setToast("项目已创建");
+  };
+
+  const updateProject = (project: Project) => {
+    const timestamp = nowIso();
+    updateState((value) => updateProjectInState(value, project, timestamp));
+  };
+
+  const addProjectMember = (projectId: string, name: string, email: string, roles: ProjectMemberRole[]) => {
+    const timestamp = nowIso();
+    updateState((value) => addProjectMemberToState(value, projectId, name, email, roles, timestamp));
+    setToast("项目成员已添加");
+  };
+
+  const updateProjectMember = (member: ProjectMember) => {
+    const timestamp = nowIso();
+    updateState((value) => updateProjectMemberInState(value, member, timestamp));
+  };
+
   const updateTask = (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => {
     const timestamp = nowIso();
     updateState((value) => ({
@@ -1756,6 +1782,10 @@ export function App() {
             activeProfile={activeProfile}
             strictStatus={strictStatus}
             updateSettings={updateSettings}
+            createProject={createProject}
+            updateProject={updateProject}
+            addProjectMember={addProjectMember}
+            updateProjectMember={updateProjectMember}
             updateProfile={updateProfile}
             askPermissions={askPermissions}
             askNotificationPermissions={askNotificationPermissions}

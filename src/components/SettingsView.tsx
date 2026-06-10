@@ -1,14 +1,18 @@
 import { AlarmClock, Bell, Cloud, DatabaseBackup, Download, LogIn, RefreshCw, Server, ShieldCheck, ShieldQuestion, Sparkles, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { nowIso } from "../appModel";
 import { deploymentCommands } from "../syncDiagnostics";
-import type { AppState, BlockProfile, ImportSummary, StrictModeStatus, SyncConflict, SyncDiagnosticResult, SyncState } from "../types";
+import type { AppState, BlockProfile, ImportSummary, Project, ProjectMember, ProjectMemberRole, StrictModeStatus, SyncConflict, SyncDiagnosticResult, SyncState } from "../types";
 
 export function SettingsView(props: {
   state: AppState;
   activeProfile?: BlockProfile;
   strictStatus: StrictModeStatus | null;
   updateSettings: <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => void;
+  createProject: (name: string, description: string) => void;
+  updateProject: (project: Project) => void;
+  addProjectMember: (projectId: string, name: string, email: string, roles: ProjectMemberRole[]) => void;
+  updateProjectMember: (member: ProjectMember) => void;
   updateProfile: (profile: BlockProfile) => void;
   askPermissions: () => Promise<void>;
   askNotificationPermissions: () => Promise<void>;
@@ -34,6 +38,10 @@ export function SettingsView(props: {
     activeProfile,
     strictStatus,
     updateSettings,
+    createProject,
+    updateProject,
+    addProjectMember,
+    updateProjectMember,
     updateProfile,
     askNotificationPermissions,
     syncPassword,
@@ -54,6 +62,8 @@ export function SettingsView(props: {
     restartOnboarding,
   } = props;
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [projectDraft, setProjectDraft] = useState({ name: "", description: "" });
+  const [memberDrafts, setMemberDrafts] = useState<Record<string, { name: string; email: string; roles: ProjectMemberRole[] }>>({});
   const commands = deploymentCommands(state.sync.serverUrl);
   const strictPlatform = strictStatus?.platform ?? "browser";
   const supportsSystemChecks = strictPlatform === "tauri_macos" || strictPlatform === "ios";
@@ -69,6 +79,17 @@ export function SettingsView(props: {
         .filter(Boolean),
       updatedAt: nowIso(),
     });
+  };
+
+  const updateDraftRoles = (projectId: string, role: ProjectMemberRole, checked: boolean) => {
+    const draft = memberDrafts[projectId] ?? { name: "", email: "", roles: ["executor"] as ProjectMemberRole[] };
+    const roles = checked ? Array.from(new Set([...draft.roles, role])) : draft.roles.filter((item) => item !== role);
+    setMemberDrafts({ ...memberDrafts, [projectId]: { ...draft, roles } });
+  };
+
+  const updateMemberRole = (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => {
+    const roles = checked ? Array.from(new Set([...member.roles, role])) : member.roles.filter((item) => item !== role);
+    updateProjectMember({ ...member, roles });
   };
 
   return (
@@ -87,6 +108,147 @@ export function SettingsView(props: {
         <button className="secondary-button" onClick={restartOnboarding}>
           重新进行启动问卷
         </button>
+      </section>
+
+      <section className="band settings-panel">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">Team Progress</p>
+            <h2>项目与成员</h2>
+          </div>
+          <Sparkles size={20} />
+        </div>
+        <div className="settings-grid">
+          <label>
+            项目名称
+            <input
+              value={projectDraft.name}
+              onChange={(event) => setProjectDraft({ ...projectDraft, name: event.target.value })}
+              placeholder="例如：客户交付项目"
+            />
+          </label>
+          <label>
+            项目说明
+            <input
+              value={projectDraft.description}
+              onChange={(event) => setProjectDraft({ ...projectDraft, description: event.target.value })}
+              placeholder="这个项目要达成什么"
+            />
+          </label>
+        </div>
+        <button
+          className="primary-button"
+          onClick={() => {
+            createProject(projectDraft.name, projectDraft.description);
+            setProjectDraft({ name: "", description: "" });
+          }}
+        >
+          新建项目
+        </button>
+        <div className="backup-list">
+          {state.projects.map((project) => {
+            const members = state.projectMembers.filter((member) => member.projectId === project.id);
+            const draft = memberDrafts[project.id] ?? { name: "", email: "", roles: ["executor"] as ProjectMemberRole[] };
+            return (
+              <article className="backup-item" key={project.id}>
+                <label>
+                  项目名称
+                  <input
+                    value={project.name}
+                    onChange={(event) => updateProject({ ...project, name: event.target.value })}
+                  />
+                </label>
+                <label>
+                  项目说明
+                  <input
+                    value={project.description}
+                    onChange={(event) => updateProject({ ...project, description: event.target.value })}
+                  />
+                </label>
+                <label>
+                  默认预计开始（小时）
+                  <input
+                    type="number"
+                    min="1"
+                    max="720"
+                    value={project.defaultExpectedStartHours}
+                    onChange={(event) => updateProject({ ...project, defaultExpectedStartHours: Number(event.target.value) })}
+                  />
+                </label>
+                <strong>项目成员</strong>
+                {members.map((member) => (
+                  <div className="sync-table" key={member.id}>
+                    <span>姓名</span>
+                    <input value={member.name} onChange={(event) => updateProjectMember({ ...member, name: event.target.value })} />
+                    <span>邮箱</span>
+                    <input value={member.email ?? ""} onChange={(event) => updateProjectMember({ ...member, email: event.target.value || undefined })} />
+                    <span>项目负责人</span>
+                    <label className="inline-toggle">
+                      <input
+                        type="checkbox"
+                        checked={member.roles.includes("project_owner")}
+                        onChange={(event) => updateMemberRole(member, "project_owner", event.target.checked)}
+                      />
+                      Project Owner
+                    </label>
+                    <span>执行者</span>
+                    <label className="inline-toggle">
+                      <input
+                        type="checkbox"
+                        checked={member.roles.includes("executor")}
+                        onChange={(event) => updateMemberRole(member, "executor", event.target.checked)}
+                      />
+                      Executor
+                    </label>
+                  </div>
+                ))}
+                <div className="settings-grid">
+                  <label>
+                    新成员姓名
+                    <input
+                      value={draft.name}
+                      onChange={(event) => setMemberDrafts({ ...memberDrafts, [project.id]: { ...draft, name: event.target.value } })}
+                    />
+                  </label>
+                  <label>
+                    新成员邮箱
+                    <input
+                      value={draft.email}
+                      onChange={(event) => setMemberDrafts({ ...memberDrafts, [project.id]: { ...draft, email: event.target.value } })}
+                    />
+                  </label>
+                </div>
+                <div className="toggle-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={draft.roles.includes("project_owner")}
+                      onChange={(event) => updateDraftRoles(project.id, "project_owner", event.target.checked)}
+                    />
+                    项目负责人
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={draft.roles.includes("executor")}
+                      onChange={(event) => updateDraftRoles(project.id, "executor", event.target.checked)}
+                    />
+                    执行者
+                  </label>
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      addProjectMember(project.id, draft.name, draft.email, draft.roles);
+                      setMemberDrafts({ ...memberDrafts, [project.id]: { name: "", email: "", roles: ["executor"] } });
+                    }}
+                  >
+                    添加成员
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </section>
 
       <section className="band settings-panel">

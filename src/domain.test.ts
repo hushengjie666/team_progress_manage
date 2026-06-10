@@ -20,6 +20,7 @@ import { createInitialState, todayKey } from "./seed";
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
+import { addProjectMemberToState, createProjectInState, updateProjectMemberInState } from "./teamProgress";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -208,6 +209,53 @@ describe("planning and rewards", () => {
 });
 
 describe("data portability and long planning", () => {
+  it("creates projects with a project owner who can also execute work", () => {
+    const state = createInitialState();
+    const next = createProjectInState(
+      state,
+      "客户交付项目",
+      "跟进客户上线",
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_test`,
+    );
+    expect(next.projects[0]).toMatchObject({
+      id: "project_test",
+      name: "客户交付项目",
+      defaultExpectedStartHours: 24,
+    });
+    expect(next.projectMembers[0]).toMatchObject({
+      id: "member_test",
+      projectId: "project_test",
+      roles: ["project_owner", "executor"],
+    });
+  });
+
+  it("adds and updates project members with project-scoped roles", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const withMember = addProjectMemberToState(
+      state,
+      projectId,
+      "张三",
+      "zhangsan@example.com",
+      ["executor", "project_owner", "executor"],
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_zhangsan`,
+    );
+    expect(withMember.projectMembers[0]).toMatchObject({
+      id: "member_zhangsan",
+      projectId,
+      name: "张三",
+      roles: ["executor", "project_owner"],
+    });
+    const updated = updateProjectMemberInState(
+      withMember,
+      { ...withMember.projectMembers[0], roles: [] },
+      "2026-05-10T11:00:00.000Z",
+    );
+    expect(updated.projectMembers[0].roles).toEqual(["executor"]);
+  });
+
   it("migrates legacy personal task data into a starter project", () => {
     const legacy = {
       version: 1,
