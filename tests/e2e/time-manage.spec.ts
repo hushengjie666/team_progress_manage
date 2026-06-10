@@ -58,6 +58,34 @@ test("starts assigned work from the personal workbench without daily commitment"
 
   await expect(page.getByText("设计番茄报表指标").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "暂停" })).toBeVisible();
+
+  await page.getByLabel("页面导航").getByRole("button", { name: "工作台" }).click();
+  await expect(workbench.getByText("会先结束当前会话，再开始新任务")).toBeVisible();
+  await workbench.locator("article").filter({ hasText: "整理时间管理系统 PRD" }).getByRole("button", { name: "切换任务" }).click();
+  await expect(page.getByText("整理时间管理系统 PRD").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "暂停" })).toBeVisible();
+
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem("timemanage.app_state.v1");
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    return parsed.workSessions?.filter((session: { status: string }) => session.status === "active").length === 1
+      && parsed.executionSignals?.some((signal: { type: string; payload?: { reason?: string } }) =>
+        signal.type === "work_ended" && signal.payload?.reason === "task_switch",
+      );
+  });
+  const workSessionState = await page.evaluate(() => {
+    const raw = localStorage.getItem("timemanage.app_state.v1");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      activeCount: parsed.workSessions.filter((session: { status: string }) => session.status === "active").length,
+      endedBySwitchCount: parsed.executionSignals.filter((signal: { type: string; payload?: { reason?: string } }) =>
+        signal.type === "work_ended" && signal.payload?.reason === "task_switch",
+      ).length,
+    };
+  });
+  expect(workSessionState).toEqual({ activeCount: 1, endedBySwitchCount: 1 });
 });
 
 test("uses usability helpers for advanced task fields, split, delete undo and sync wizard", async ({ page }) => {

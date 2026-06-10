@@ -598,7 +598,7 @@ function PersonalWorkbench(props: {
         <article className="active-work-line">
           <div>
             <strong>{props.activeTask.title}</strong>
-            <span>工作会话已启动，管理者可以看到这项任务正在推进。</span>
+            <span>工作会话已启动。切换到其他任务时，会先结束当前会话，再开始新任务。</span>
           </div>
           <button className="small-button" onClick={() => props.selectTask(props.activeTask!.id)}>
             查看详情
@@ -630,7 +630,7 @@ function PersonalWorkbench(props: {
               </button>
               <button className="small-button" onClick={() => props.beginFocus(task.id)} disabled={task.id === props.activeTask?.id}>
                 <Play size={15} />
-                {task.id === props.activeTask?.id ? "进行中" : "开始工作"}
+                {task.id === props.activeTask?.id ? "进行中" : props.activeTask ? "切换任务" : "开始工作"}
               </button>
             </div>
           </article>

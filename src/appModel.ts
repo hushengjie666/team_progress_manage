@@ -128,6 +128,43 @@ const activeWorkSession = (state: AppState) => {
   );
 };
 
+const activeWorkSessionForExecutor = (state: AppState, executorMemberId?: string) =>
+  state.workSessions.find((session) => session.status === "active" && session.executorMemberId === executorMemberId);
+
+const endWorkSessionForSwitch = (state: AppState, workSession: WorkSession, timestamp: string, nextTaskId: string): AppState => {
+  const active = state.activeTimer?.workSessionId === workSession.id || state.activeTimer?.sessionId === workSession.focusSessionId
+    ? state.activeTimer
+    : undefined;
+
+  const endedWorkSession: WorkSession = {
+    ...workSession,
+    status: "ended",
+    pausedAt: undefined,
+    endedAt: timestamp,
+    totalPausedSeconds: active?.totalPausedSeconds ?? workSession.totalPausedSeconds,
+    updatedAt: timestamp,
+  };
+  return {
+    ...state,
+    focusSessions: state.focusSessions.map((session) =>
+      session.id === workSession.focusSessionId
+        ? {
+            ...session,
+            endedAt: timestamp,
+            outcome: "skipped" as const,
+          }
+        : session,
+    ),
+    workSessions: state.workSessions.map((session) => (session.id === workSession.id ? endedWorkSession : session)),
+    executionSignals: [
+      createExecutionSignal(endedWorkSession, "work_ended", timestamp, { outcome: "skipped", reason: "task_switch", nextTaskId }),
+      ...state.executionSignals,
+    ],
+    activeTimer: active ? undefined : state.activeTimer,
+    updatedAt: timestamp,
+  };
+};
+
 export const toggleTimerInState = (state: AppState, timestamp: string): AppState => {
   const active = state.activeTimer;
   if (!active) return state;
@@ -229,7 +266,7 @@ export const startTimerInState = (
   timestamp: string,
   strictProfileId?: string,
   sessionId = uid("session"),
-) => {
+): AppState => {
   const durationMinutes =
     mode === "focus"
       ? state.settings.focusMinutes
@@ -247,6 +284,21 @@ export const startTimerInState = (
   };
   const task = taskId ? state.tasks.find((item) => item.id === taskId) : undefined;
   const executorMemberId = task?.primaryExecutorMemberId ?? state.currentMemberId;
+  const timerWorkSession = activeWorkSession(state);
+  const currentWorkSession = timerWorkSession?.status === "active" && timerWorkSession.executorMemberId === executorMemberId
+    ? timerWorkSession
+    : activeWorkSessionForExecutor(state, executorMemberId);
+  if (mode === "focus" && taskId && currentWorkSession) {
+    if (currentWorkSession.taskId === taskId) return state;
+    return startTimerInState(
+      endWorkSessionForSwitch(state, currentWorkSession, timestamp, taskId),
+      mode,
+      taskId,
+      timestamp,
+      strictProfileId,
+      sessionId,
+    );
+  }
   const workSession: WorkSession | undefined = mode === "focus" && taskId
     ? {
         id: uid("work_session"),
