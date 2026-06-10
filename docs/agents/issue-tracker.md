@@ -5,7 +5,7 @@ Issues and PRDs for this repo live in GitHub Issues:
 - Repository: `hushengjie666/team_progress_manage`
 - URL: `https://github.com/hushengjie666/team_progress_manage`
 
-Use the `gh` CLI for issue operations. Because this local directory currently has no Git metadata, pass the repository explicitly with `-R hushengjie666/team_progress_manage`.
+Use the `gh` CLI for issue operations. The local `origin` remote points at this repository, so `gh` can infer the repo from the checkout. Passing `-R hushengjie666/team_progress_manage` explicitly is also fine.
 
 ## Conventions
 
