@@ -89,6 +89,22 @@ export function WorkspaceView(props: {
   const suggestions = taskSuggestions(state, todayPlan.date, 5);
   const guideSteps = coachSteps(state, todayPlan.date).filter((step) => !(state.settings.dismissedCoachSteps ?? []).includes(step.id));
   const nextGuideStep = guideSteps.find((step) => !step.completed);
+  const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId) ?? state.projectMembers[0];
+  const assignedTasks = currentMember
+    ? state.tasks
+        .filter((task) => task.primaryExecutorMemberId === currentMember.id)
+        .filter((task) => task.status !== "completed" && task.status !== "archived")
+        .sort((left, right) => {
+          const leftActive = state.activeTimer?.taskId === left.id ? 0 : 1;
+          const rightActive = state.activeTimer?.taskId === right.id ? 0 : 1;
+          if (leftActive !== rightActive) return leftActive - rightActive;
+          return left.sortOrder - right.sortOrder;
+        })
+    : [];
+  const activeAssignedTask = assignedTasks.find((task) => task.id === state.activeTimer?.taskId);
+  const progressUpdateTasks = assignedTasks.filter(
+    (task) => (task.status === "in_progress" || task.actualPomodoros > 0) && (task.progressPercent ?? 0) < 100,
+  );
   const [showAdvancedTask, setShowAdvancedTask] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showGuidance, setShowGuidance] = useState(false);
@@ -139,6 +155,15 @@ export function WorkspaceView(props: {
           {showGuidance ? "收起辅助" : "展开辅助"}
         </button>
       </section>
+
+      <PersonalWorkbench
+        currentMember={currentMember}
+        assignedTasks={assignedTasks}
+        activeTask={activeAssignedTask}
+        progressUpdateTasks={progressUpdateTasks}
+        beginFocus={beginFocus}
+        selectTask={selectTask}
+      />
 
       {showGuidance && <section className="band coach-panel">
         <div className="section-title">
@@ -533,6 +558,85 @@ export function WorkspaceView(props: {
         ))}
       </section>}
     </div>
+  );
+}
+
+function PersonalWorkbench(props: {
+  currentMember?: ProjectMember;
+  assignedTasks: Task[];
+  activeTask?: Task;
+  progressUpdateTasks: Task[];
+  beginFocus: (taskId: string) => void;
+  selectTask: (taskId: string) => void;
+}) {
+  return (
+    <section className="band personal-workbench">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">个人任务台</p>
+          <h2>我的任务</h2>
+        </div>
+        <span className="count-pill">{props.assignedTasks.length}</span>
+      </div>
+
+      <div className="workbench-stats">
+        <div>
+          <span>当前执行者</span>
+          <strong>{props.currentMember?.name ?? "未选择成员"}</strong>
+        </div>
+        <div>
+          <span>正在进行</span>
+          <strong>{props.activeTask?.title ?? "暂无"}</strong>
+        </div>
+        <div>
+          <span>需更新进展</span>
+          <strong>{props.progressUpdateTasks.length}</strong>
+        </div>
+      </div>
+
+      {props.activeTask && (
+        <article className="active-work-line">
+          <div>
+            <strong>{props.activeTask.title}</strong>
+            <span>工作会话已启动，管理者可以看到这项任务正在推进。</span>
+          </div>
+          <button className="small-button" onClick={() => props.selectTask(props.activeTask!.id)}>
+            查看详情
+          </button>
+        </article>
+      )}
+
+      <div className="task-list">
+        {props.assignedTasks.length === 0 && <p className="empty">当前成员还没有被分配任务。</p>}
+        {props.assignedTasks.slice(0, 4).map((task) => (
+          <article className={task.id === props.activeTask?.id ? "task-item active-edge" : "task-item"} key={task.id}>
+            <div>
+              <div className="task-title-row">
+                <strong>{task.title}</strong>
+                <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
+              </div>
+              {task.notes && <p>{task.notes}</p>}
+              <PomodoroProgress actual={task.actualPomodoros} estimate={task.estimatePomodoros} />
+              <div className="task-meta">
+                <span>{task.project}</span>
+                <span>进度 {task.progressPercent ?? 0}%</span>
+                {task.expectedStartAt && <span>预计开始 {new Date(task.expectedStartAt).toLocaleString()}</span>}
+                {task.expectedFinishAt && <span>预计完成 {new Date(task.expectedFinishAt).toLocaleString()}</span>}
+              </div>
+            </div>
+            <div className="task-actions">
+              <button className="icon-button small" title="任务详情" onClick={() => props.selectTask(task.id)}>
+                <PanelRight size={16} />
+              </button>
+              <button className="small-button" onClick={() => props.beginFocus(task.id)} disabled={task.id === props.activeTask?.id}>
+                <Play size={15} />
+                {task.id === props.activeTask?.id ? "进行中" : "开始工作"}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 

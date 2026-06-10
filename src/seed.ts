@@ -84,6 +84,7 @@ const sampleTasks: Task[] = [
     projectId: "project_starter",
     project: "TimeManage",
     creatorMemberId: "member_owner",
+    primaryExecutorMemberId: "member_owner",
     collaboratorMemberIds: [],
     progressPercent: 0,
     priority: "medium",

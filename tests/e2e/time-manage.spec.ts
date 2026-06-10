@@ -42,6 +42,24 @@ test("creates a task, commits it, records interruption and review", async ({ pag
   await expect(page.getByText(/建议明日/)).toBeVisible();
 });
 
+test("starts assigned work from the personal workbench without daily commitment", async ({ page }) => {
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "开始今天" }).click();
+
+  const workbench = page.locator(".personal-workbench");
+  await expect(workbench.getByRole("heading", { name: "我的任务" })).toBeVisible();
+  await expect(workbench.getByText("当前执行者")).toBeVisible();
+
+  const assignedPoolTask = workbench.locator("article").filter({ hasText: "设计番茄报表指标" });
+  await expect(assignedPoolTask).toBeVisible();
+  await assignedPoolTask.getByRole("button", { name: "开始工作" }).click();
+
+  await expect(page.getByText("设计番茄报表指标").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "暂停" })).toBeVisible();
+});
+
 test("uses usability helpers for advanced task fields, split, delete undo and sync wizard", async ({ page }) => {
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();
