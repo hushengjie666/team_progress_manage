@@ -4,6 +4,7 @@ import {
   coachSteps,
   deriveRewardState,
   estimateDeltaLabel,
+  expectedStartForTask,
   focusQuality,
   generateRecurringTask,
   interruptionHotspots,
@@ -12,6 +13,7 @@ import {
   planPressure,
   restoreTimer,
   resumeTimer,
+  stalledTaskRisks,
   suggestedCapacity,
   taskSuggestions,
   computeStreak,
@@ -301,6 +303,105 @@ describe("planning and rewards", () => {
     expect(focusQuality(next, today).score).toBeLessThan(100);
     expect(interruptionHotspots(next)[0]).toMatchObject({ hour: 10, count: 2, internal: 1, external: 1 });
     expect(nextActions(next, today).some((item) => item.id === "clear_inbox")).toBe(true);
+  });
+});
+
+describe("team progress risk detection", () => {
+  it("derives expected start from project default and task override", () => {
+    const state = createInitialState();
+    const task = {
+      ...state.tasks[0],
+      expectedStartAt: undefined,
+      createdAt: "2026-05-10T08:00:00.000Z",
+    };
+    const withProjectRule: AppState = {
+      ...state,
+      projects: state.projects.map((project) => ({ ...project, defaultExpectedStartHours: 4 })),
+      tasks: [task],
+    };
+    expect(expectedStartForTask(withProjectRule, task)).toBe("2026-05-10T12:00:00.000Z");
+
+    const overrideTask = { ...task, expectedStartAt: "2026-05-10T09:30:00.000Z" };
+    expect(expectedStartForTask(withProjectRule, overrideTask)).toBe("2026-05-10T09:30:00.000Z");
+  });
+
+  it("surfaces assigned tasks that have not started after expected start", () => {
+    const state = createInitialState();
+    const task = {
+      ...state.tasks[0],
+      id: "risk_not_started",
+      status: "pool" as const,
+      createdAt: "2026-05-10T08:00:00.000Z",
+      updatedAt: "2026-05-10T08:00:00.000Z",
+      expectedStartAt: undefined,
+    };
+    const next: AppState = {
+      ...state,
+      projects: state.projects.map((project) => ({ ...project, defaultExpectedStartHours: 2 })),
+      tasks: [task],
+      workSessions: [],
+      executionSignals: [],
+    };
+    const risks = stalledTaskRisks(next, new Date("2026-05-10T11:00:00.000Z"));
+    expect(risks).toEqual([
+      expect.objectContaining({
+        taskId: "risk_not_started",
+        kind: "not_started",
+        expectedStartAt: "2026-05-10T10:00:00.000Z",
+      }),
+    ]);
+  });
+
+  it("surfaces in-progress tasks with stale execution signals separately", () => {
+    const state = createInitialState();
+    const task = {
+      ...state.tasks[0],
+      id: "risk_stale_started",
+      status: "in_progress" as const,
+      progressPercent: 40,
+      progressNote: "完成了前置设计，等待联调。",
+      createdAt: "2026-05-10T06:00:00.000Z",
+      updatedAt: "2026-05-10T08:30:00.000Z",
+      expectedStartAt: undefined,
+      expectedFinishAt: "2026-05-12T18:00:00.000Z",
+    };
+    const next: AppState = {
+      ...state,
+      projects: state.projects.map((project) => ({ ...project, defaultExpectedStartHours: 1 })),
+      tasks: [task],
+      workSessions: [
+        {
+          id: "work_stale",
+          taskId: task.id,
+          executorMemberId: "member_owner",
+          focusSessionId: "focus_stale",
+          status: "ended",
+          startedAt: "2026-05-10T08:00:00.000Z",
+          endedAt: "2026-05-10T08:30:00.000Z",
+          totalPausedSeconds: 0,
+          createdAt: "2026-05-10T08:00:00.000Z",
+          updatedAt: "2026-05-10T08:30:00.000Z",
+        },
+      ],
+      executionSignals: [
+        {
+          id: "signal_stale",
+          workSessionId: "work_stale",
+          taskId: task.id,
+          executorMemberId: "member_owner",
+          type: "work_ended",
+          createdAt: "2026-05-10T08:30:00.000Z",
+        },
+      ],
+    };
+    const risks = stalledTaskRisks(next, new Date("2026-05-11T10:00:00.000Z"));
+    expect(risks).toEqual([
+      expect.objectContaining({
+        taskId: "risk_stale_started",
+        kind: "started_stale",
+        latestSignalAt: "2026-05-10T08:30:00.000Z",
+      }),
+    ]);
   });
 });
 

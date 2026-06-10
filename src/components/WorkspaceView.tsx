@@ -1,7 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Activity, AlarmClock, ArrowDown, ArrowUp, Check, ChevronRight, PanelRight, Play, Plus, SlidersHorizontal, Sparkles, Split, Square, Target, Trash2, X } from "lucide-react";
-import { abortedSessionsOnDate, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, taskSuggestions, unresolvedInterruptions } from "../domain";
+import { abortedSessionsOnDate, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, stalledTaskRisks, taskSuggestions, unresolvedInterruptions } from "../domain";
 import { formatDateTimeLocal, labelPriority, nowIso, parseDateTimeLocal, today, type TaskDraft, type TaskFilters, type TaskSort } from "../appModel";
 import { uid } from "../seed";
 import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task } from "../types";
@@ -107,6 +107,7 @@ export function WorkspaceView(props: {
   const progressUpdateTasks = assignedTasks.filter(
     (task) => (task.status === "in_progress" || task.actualPomodoros > 0) && (task.progressPercent ?? 0) < 100,
   );
+  const stalledRisks = stalledTaskRisks(state);
   const [showAdvancedTask, setShowAdvancedTask] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showGuidance, setShowGuidance] = useState(false);
@@ -164,6 +165,12 @@ export function WorkspaceView(props: {
         activeTask={activeAssignedTask}
         progressUpdateTasks={progressUpdateTasks}
         beginFocus={beginFocus}
+        selectTask={selectTask}
+      />
+
+      <StalledRiskPanel
+        risks={stalledRisks}
+        tasks={state.tasks}
         selectTask={selectTask}
       />
 
@@ -561,6 +568,47 @@ export function WorkspaceView(props: {
         ))}
       </section>}
     </div>
+  );
+}
+
+function StalledRiskPanel(props: {
+  risks: ReturnType<typeof stalledTaskRisks>;
+  tasks: Task[];
+  selectTask: (taskId: string) => void;
+}) {
+  const riskLabel = {
+    not_started: "未按预期开始",
+    started_stale: "执行信号停滞",
+    finish_late: "预计完成逾期",
+  };
+  return (
+    <section className="band risk-panel">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">停滞风险</p>
+          <h2>需要管理者关注</h2>
+        </div>
+        <span className="count-pill">{props.risks.length}</span>
+      </div>
+      <div className="insight-list compact">
+        {props.risks.length === 0 && <p className="empty">当前没有超过预计时间或执行信号停滞的任务。</p>}
+        {props.risks.slice(0, 5).map((risk) => {
+          const task = props.tasks.find((item) => item.id === risk.taskId);
+          if (!task) return null;
+          return (
+            <article className="insight-item" key={`${risk.kind}-${risk.taskId}`}>
+              <div>
+                <strong>{task.title}</strong>
+                <span>{riskLabel[risk.kind]} · {risk.detail}</span>
+              </div>
+              <button className="small-button" onClick={() => props.selectTask(task.id)}>
+                查看
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
