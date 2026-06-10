@@ -4,7 +4,7 @@ import { Activity, AlarmClock, ArrowDown, ArrowUp, Check, ChevronRight, PanelRig
 import { abortedSessionsOnDate, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, taskSuggestions, unresolvedInterruptions } from "../domain";
 import { formatDateTimeLocal, labelPriority, nowIso, parseDateTimeLocal, today, type TaskDraft, type TaskFilters, type TaskSort } from "../appModel";
 import { uid } from "../seed";
-import type { AppState, CoachStepId, DailyPlan, Priority, RepeatRule, Severity, Subtask, Task } from "../types";
+import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task } from "../types";
 
 export function WorkspaceView(props: {
   state: AppState;
@@ -25,6 +25,7 @@ export function WorkspaceView(props: {
   deleteTask: (taskId: string) => void;
   selectTask: (taskId: string | null) => void;
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
+  updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
   updatePlanCapacity: (capacity: number) => void;
   acknowledgeOverload: () => void;
@@ -57,6 +58,7 @@ export function WorkspaceView(props: {
     deleteTask,
     selectTask,
     updateTask,
+    updateTaskAssignment,
     moveCommittedTask,
     updatePlanCapacity,
     acknowledgeOverload,
@@ -421,7 +423,10 @@ export function WorkspaceView(props: {
         <div className="task-detail-drawer">
           <TaskDetailPanel
             task={selectedTask}
+            projects={state.projects}
+            projectMembers={state.projectMembers}
             updateTask={updateTask}
+            updateTaskAssignment={updateTaskAssignment}
             close={() => selectTask(null)}
             splitTask={splitTask}
           />
@@ -657,7 +662,10 @@ function PomodoroProgress(props: { actual: number; estimate: number }) {
 
 function TaskDetailPanel(props: {
   task?: Task;
+  projects: AppState["projects"];
+  projectMembers: ProjectMember[];
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
+  updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
   close: () => void;
   splitTask: (taskId: string) => void;
 }) {
@@ -708,6 +716,16 @@ function TaskDetailPanel(props: {
   };
 
   const completedSubtasks = (task.subtasks ?? []).filter((subtask) => subtask.completed).length;
+  const taskProject = props.projects.find((project) => project.id === task.projectId) ?? props.projects[0];
+  const projectMembers = props.projectMembers.filter((member) => member.projectId === taskProject?.id);
+  const executors = projectMembers.filter((member) => member.roles.includes("executor"));
+  const collaboratorIds = task.collaboratorMemberIds ?? [];
+  const toggleCollaborator = (memberId: string, checked: boolean) => {
+    const nextIds = checked
+      ? Array.from(new Set([...collaboratorIds, memberId]))
+      : collaboratorIds.filter((id) => id !== memberId);
+    props.updateTaskAssignment(task.id, { collaboratorMemberIds: nextIds });
+  };
 
   return (
     <section className="band task-detail">
@@ -732,7 +750,20 @@ function TaskDetailPanel(props: {
         </label>
         <label>
           项目
-          <input value={task.project} onChange={(event) => updateTask(task.id, { project: event.target.value || "Inbox" })} />
+          <select
+            value={taskProject?.id ?? ""}
+            onChange={(event) =>
+              props.updateTaskAssignment(task.id, {
+                projectId: event.target.value,
+                primaryExecutorMemberId: "",
+                collaboratorMemberIds: [],
+              })
+            }
+          >
+            {props.projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
         </label>
         <label>
           标签
@@ -746,6 +777,28 @@ function TaskDetailPanel(props: {
                   .filter(Boolean),
               })
             }
+          />
+        </label>
+        <label>
+          主执行人
+          <select
+            value={task.primaryExecutorMemberId ?? ""}
+            onChange={(event) => props.updateTaskAssignment(task.id, { primaryExecutorMemberId: event.target.value })}
+          >
+            <option value="">未分配</option>
+            {executors.map((member) => (
+              <option key={member.id} value={member.id}>{member.name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          进度
+          <input
+            type="number"
+            min="0"
+            max="100"
+            value={task.progressPercent ?? 0}
+            onChange={(event) => updateTask(task.id, { progressPercent: Number(event.target.value) })}
           />
         </label>
         <label>
@@ -802,6 +855,22 @@ function TaskDetailPanel(props: {
           />
         </label>
         <label>
+          预计开始
+          <input
+            type="datetime-local"
+            value={formatDateTimeLocal(task.expectedStartAt)}
+            onChange={(event) => updateTask(task.id, { expectedStartAt: parseDateTimeLocal(event.target.value) })}
+          />
+        </label>
+        <label>
+          预计完成
+          <input
+            type="datetime-local"
+            value={formatDateTimeLocal(task.expectedFinishAt)}
+            onChange={(event) => updateTask(task.id, { expectedFinishAt: parseDateTimeLocal(event.target.value) })}
+          />
+        </label>
+        <label>
           重复
           <select value={task.repeatRule ?? "none"} onChange={(event) => updateTask(task.id, { repeatRule: event.target.value as RepeatRule })}>
             <option value="none">不重复</option>
@@ -824,6 +893,29 @@ function TaskDetailPanel(props: {
             disabled={(task.repeatRule ?? "none") !== "interval" && (task.repeatRule ?? "none") !== "after_completion"}
           />
         </label>
+      </div>
+
+      <div className="subtask-box">
+        <div className="section-title compact-title">
+          <div>
+            <p className="eyebrow">协作成员</p>
+            <h2>协作者</h2>
+          </div>
+        </div>
+        <div className="toggle-row">
+          {projectMembers.map((member) => (
+            <label key={member.id}>
+              <input
+                type="checkbox"
+                checked={collaboratorIds.includes(member.id)}
+                disabled={member.id === task.primaryExecutorMemberId}
+                onChange={(event) => toggleCollaborator(member.id, event.target.checked)}
+              />
+              {member.name}
+            </label>
+          ))}
+          {!projectMembers.length && <p className="empty">这个项目还没有成员。</p>}
+        </div>
       </div>
 
       <div className="detail-summary">

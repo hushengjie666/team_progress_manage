@@ -20,7 +20,7 @@ import { createInitialState, todayKey } from "./seed";
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
-import { addProjectMemberToState, createProjectInState, updateProjectMemberInState } from "./teamProgress";
+import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectMemberInState } from "./teamProgress";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -254,6 +254,61 @@ describe("data portability and long planning", () => {
       "2026-05-10T11:00:00.000Z",
     );
     expect(updated.projectMembers[0].roles).toEqual(["executor"]);
+  });
+
+  it("assigns a task to one primary executor and keeps collaborators separate", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const withMembers = addProjectMemberToState(
+      addProjectMemberToState(
+        state,
+        projectId,
+        "张三",
+        "",
+        ["executor"],
+        "2026-05-10T10:00:00.000Z",
+        (prefix) => `${prefix}_zhangsan`,
+      ),
+      projectId,
+      "李四",
+      "",
+      ["executor"],
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_lisi`,
+    );
+    const assigned = assignTaskInState(withMembers, withMembers.tasks[0].id, {
+      primaryExecutorMemberId: "member_zhangsan",
+      collaboratorMemberIds: ["member_zhangsan", "member_lisi"],
+    }, "2026-05-10T11:00:00.000Z");
+    expect(assigned.tasks[0].primaryExecutorMemberId).toBe("member_zhangsan");
+    expect(assigned.tasks[0].collaboratorMemberIds).toEqual(["member_lisi"]);
+
+    const reassigned = assignTaskInState(assigned, assigned.tasks[0].id, {
+      primaryExecutorMemberId: "member_lisi",
+      collaboratorMemberIds: ["member_zhangsan", "member_lisi"],
+    }, "2026-05-10T12:00:00.000Z");
+    expect(reassigned.tasks[0].primaryExecutorMemberId).toBe("member_lisi");
+    expect(reassigned.tasks[0].collaboratorMemberIds).toEqual(["member_zhangsan"]);
+  });
+
+  it("leaves a task unassigned when the selected member is not an executor", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const withOwnerOnly = addProjectMemberToState(
+      state,
+      projectId,
+      "只负责验收的人",
+      "",
+      ["project_owner"],
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_owner_only`,
+    );
+    const assigned = assignTaskInState(withOwnerOnly, withOwnerOnly.tasks[0].id, {
+      primaryExecutorMemberId: "member_owner_only",
+      collaboratorMemberIds: ["member_owner_only"],
+    });
+    expect(assigned.tasks[0].primaryExecutorMemberId).toBeUndefined();
+    expect(assigned.tasks[0].collaboratorMemberIds).toEqual(["member_owner_only"]);
   });
 
   it("migrates legacy personal task data into a starter project", () => {

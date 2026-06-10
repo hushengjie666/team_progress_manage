@@ -34,7 +34,7 @@ import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { updateDesktopTimerPresence } from "./nativeDesktop";
-import { addProjectMemberToState, createProjectInState, updateProjectInState, updateProjectMemberInState } from "./teamProgress";
+import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectInState, updateProjectMemberInState } from "./teamProgress";
 import { uid } from "./seed";
 import type {
   AppState,
@@ -1001,6 +1001,14 @@ export function App() {
     }));
   };
 
+  const updateTaskAssignment = (
+    taskId: string,
+    assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] },
+  ) => {
+    const timestamp = nowIso();
+    updateState((value) => assignTaskInState(value, taskId, assignment, timestamp));
+  };
+
   const moveCommittedTask = (taskId: string, direction: -1 | 1) => {
     updateState((value) => {
       const plan = getTodayPlan(value);
@@ -1701,6 +1709,7 @@ export function App() {
             deleteTask={deleteTask}
             selectTask={setSelectedTaskId}
             updateTask={updateTask}
+            updateTaskAssignment={updateTaskAssignment}
             moveCommittedTask={moveCommittedTask}
             updatePlanCapacity={updatePlanCapacity}
             acknowledgeOverload={acknowledgeOverload}
