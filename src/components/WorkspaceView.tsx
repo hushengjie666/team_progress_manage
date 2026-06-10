@@ -26,6 +26,7 @@ export function WorkspaceView(props: {
   selectTask: (taskId: string | null) => void;
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
   updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
+  updateTaskProgress: (taskId: string, progressPercent: number, progressNote: string) => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
   updatePlanCapacity: (capacity: number) => void;
   acknowledgeOverload: () => void;
@@ -59,6 +60,7 @@ export function WorkspaceView(props: {
     selectTask,
     updateTask,
     updateTaskAssignment,
+    updateTaskProgress,
     moveCommittedTask,
     updatePlanCapacity,
     acknowledgeOverload,
@@ -452,6 +454,7 @@ export function WorkspaceView(props: {
             projectMembers={state.projectMembers}
             updateTask={updateTask}
             updateTaskAssignment={updateTaskAssignment}
+            updateTaskProgress={updateTaskProgress}
             close={() => selectTask(null)}
             splitTask={splitTask}
           />
@@ -770,6 +773,7 @@ function TaskDetailPanel(props: {
   projectMembers: ProjectMember[];
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
   updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
+  updateTaskProgress: (taskId: string, progressPercent: number, progressNote: string) => void;
   close: () => void;
   splitTask: (taskId: string) => void;
 }) {
@@ -896,13 +900,21 @@ function TaskDetailPanel(props: {
           </select>
         </label>
         <label>
-          进度
+          进度百分比
           <input
             type="number"
             min="0"
             max="100"
             value={task.progressPercent ?? 0}
-            onChange={(event) => updateTask(task.id, { progressPercent: Number(event.target.value) })}
+            onChange={(event) => props.updateTaskProgress(task.id, Number(event.target.value), task.progressNote ?? "")}
+          />
+        </label>
+        <label className="span-2">
+          进展说明
+          <textarea
+            value={task.progressNote ?? ""}
+            onChange={(event) => props.updateTaskProgress(task.id, task.progressPercent ?? 0, event.target.value)}
+            placeholder="说明刚完成了什么、还剩什么，或为什么偏离预期"
           />
         </label>
         <label>

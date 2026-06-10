@@ -6,6 +6,11 @@ type IdFactory = (prefix: string) => string;
 const cleanRoles = (roles: ProjectMemberRole[]): ProjectMemberRole[] =>
   roles.filter((role, index) => roles.indexOf(role) === index);
 
+export const clampProgressPercent = (value?: number) => {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+};
+
 export function createProjectInState(
   state: AppState,
   name: string,
@@ -139,6 +144,29 @@ export function assignTaskInState(
             project: project.name,
             primaryExecutorMemberId,
             collaboratorMemberIds,
+            updatedAt: timestamp,
+          }
+        : task,
+    ),
+    updatedAt: timestamp,
+  };
+}
+
+export function updateTaskProgressInState(
+  state: AppState,
+  taskId: string,
+  progressPercent: number,
+  progressNote: string,
+  timestamp = new Date().toISOString(),
+): AppState {
+  return {
+    ...state,
+    tasks: state.tasks.map((task) =>
+      task.id === taskId
+        ? {
+            ...task,
+            progressPercent: clampProgressPercent(progressPercent),
+            progressNote,
             updatedAt: timestamp,
           }
         : task,

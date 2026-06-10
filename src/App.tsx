@@ -33,7 +33,7 @@ import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { updateDesktopTimerPresence } from "./nativeDesktop";
-import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectInState, updateProjectMemberInState } from "./teamProgress";
+import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectInState, updateProjectMemberInState, updateTaskProgressInState } from "./teamProgress";
 import { uid } from "./seed";
 import type {
   AppState,
@@ -1001,6 +1001,11 @@ export function App() {
     updateState((value) => assignTaskInState(value, taskId, assignment, timestamp));
   };
 
+  const updateTaskProgress = (taskId: string, progressPercent: number, progressNote: string) => {
+    const timestamp = nowIso();
+    updateState((value) => updateTaskProgressInState(value, taskId, progressPercent, progressNote, timestamp));
+  };
+
   const moveCommittedTask = (taskId: string, direction: -1 | 1) => {
     updateState((value) => {
       const plan = getTodayPlan(value);
@@ -1124,6 +1129,7 @@ export function App() {
       expectedStartAt: task.expectedStartAt,
       expectedFinishAt: task.expectedFinishAt,
       progressPercent: 0,
+      progressNote: "",
       priority: task.priority,
       severity: task.severity,
       estimatePomodoros: estimatePerTask,
@@ -1702,6 +1708,7 @@ export function App() {
             selectTask={setSelectedTaskId}
             updateTask={updateTask}
             updateTaskAssignment={updateTaskAssignment}
+            updateTaskProgress={updateTaskProgress}
             moveCommittedTask={moveCommittedTask}
             updatePlanCapacity={updatePlanCapacity}
             acknowledgeOverload={acknowledgeOverload}

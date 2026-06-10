@@ -88,6 +88,32 @@ test("starts assigned work from the personal workbench without daily commitment"
   expect(workSessionState).toEqual({ activeCount: 1, endedBySwitchCount: 1 });
 });
 
+test("persists task progress percent and progress note", async ({ page }) => {
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "开始今天" }).click();
+
+  const workbench = page.locator(".personal-workbench");
+  await workbench.locator("article").filter({ hasText: "设计番茄报表指标" }).getByTitle("任务详情").click();
+  await page.getByRole("spinbutton", { name: "进度百分比" }).fill("45");
+  await page.getByLabel("进展说明").fill("完成指标口径，剩余图表校验。");
+
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem("timemanage.app_state.v1");
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    const task = parsed.tasks.find((item: { title: string }) => item.title === "设计番茄报表指标");
+    return task?.progressPercent === 45 && task?.progressNote === "完成指标口径，剩余图表校验。";
+  });
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
+  await workbench.locator("article").filter({ hasText: "设计番茄报表指标" }).getByTitle("任务详情").click();
+  await expect(page.getByRole("spinbutton", { name: "进度百分比" })).toHaveValue("45");
+  await expect(page.getByLabel("进展说明")).toHaveValue("完成指标口径，剩余图表校验。");
+});
+
 test("uses usability helpers for advanced task fields, split, delete undo and sync wizard", async ({ page }) => {
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();

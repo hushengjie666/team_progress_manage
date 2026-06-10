@@ -90,6 +90,7 @@ export const instantiateTemplate = (template: TaskTemplate, timestamp = new Date
   project: template.project,
   collaboratorMemberIds: [],
   progressPercent: 0,
+  progressNote: "",
   priority: template.priority,
   severity: template.severity,
   estimatePomodoros: template.estimatePomodoros,

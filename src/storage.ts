@@ -76,6 +76,7 @@ const normalizeTask = (task: Partial<Task>, index: number, projectId: string): T
     expectedStartAt: task.expectedStartAt,
     expectedFinishAt: task.expectedFinishAt,
     progressPercent: clampProgress(task.progressPercent),
+    progressNote: task.progressNote ?? "",
     priority: task.priority ?? "medium",
     severity: task.severity ?? "medium",
     estimatePomodoros: task.estimatePomodoros ?? 1,

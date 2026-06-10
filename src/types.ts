@@ -68,6 +68,7 @@ export interface Task {
   expectedStartAt?: string;
   expectedFinishAt?: string;
   progressPercent?: number;
+  progressNote?: string;
   priority: Priority;
   severity: Severity;
   estimatePomodoros: number;

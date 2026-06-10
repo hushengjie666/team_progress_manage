@@ -21,7 +21,7 @@ import { endSessionInState, startTimerInState, toggleTimerInState } from "./appM
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
-import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectMemberInState } from "./teamProgress";
+import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectMemberInState, updateTaskProgressInState } from "./teamProgress";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -407,6 +407,25 @@ describe("data portability and long planning", () => {
     expect(assigned.tasks[0].collaboratorMemberIds).toEqual(["member_owner_only"]);
   });
 
+  it("updates task progress with bounded percent and a manual progress note", () => {
+    const state = createInitialState();
+    const updated = updateTaskProgressInState(
+      state,
+      state.tasks[0].id,
+      140,
+      "完成接口联调，剩余验收清单。",
+      "2026-05-10T11:00:00.000Z",
+    );
+    expect(updated.tasks[0]).toMatchObject({
+      progressPercent: 100,
+      progressNote: "完成接口联调，剩余验收清单。",
+      updatedAt: "2026-05-10T11:00:00.000Z",
+    });
+
+    const reset = updateTaskProgressInState(updated, updated.tasks[0].id, -20, "", "2026-05-10T12:00:00.000Z");
+    expect(reset.tasks[0]).toMatchObject({ progressPercent: 0, progressNote: "" });
+  });
+
   it("migrates legacy personal task data into a starter project", () => {
     const legacy = {
       version: 1,
@@ -440,6 +459,7 @@ describe("data portability and long planning", () => {
       projectId: migrated.projects[0].id,
       collaboratorMemberIds: [],
       progressPercent: 0,
+      progressNote: "",
     });
   });
 
@@ -456,6 +476,7 @@ describe("data portability and long planning", () => {
             id: "imported_legacy_task",
             projectId: undefined,
             progressPercent: 150,
+            progressNote: "导入前已经完成大部分。",
           },
         ],
       },
@@ -464,6 +485,7 @@ describe("data portability and long planning", () => {
     expect(imported.projects.length).toBeGreaterThan(0);
     expect(imported.tasks[0].projectId).toBe(imported.projects[0].id);
     expect(imported.tasks[0].progressPercent).toBe(100);
+    expect(imported.tasks[0].progressNote).toBe("导入前已经完成大部分。");
     expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
   });
 
