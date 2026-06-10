@@ -131,7 +131,7 @@ export function FocusView(props: {
               </div>
               <button className="small-button" onClick={() => props.completeTask(currentTask.id)}>
                 <Check size={15} />
-                标记任务完成
+                提交验收
               </button>
             </>
           ) : (

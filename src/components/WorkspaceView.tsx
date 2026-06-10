@@ -27,6 +27,8 @@ export function WorkspaceView(props: {
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
   updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
   updateTaskProgress: (taskId: string, progressPercent: number, progressNote: string) => void;
+  acceptTask: (taskId: string) => void;
+  returnTaskForReview: (taskId: string, reason: string) => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
   updatePlanCapacity: (capacity: number) => void;
   acknowledgeOverload: () => void;
@@ -61,6 +63,8 @@ export function WorkspaceView(props: {
     updateTask,
     updateTaskAssignment,
     updateTaskProgress,
+    acceptTask,
+    returnTaskForReview,
     moveCommittedTask,
     updatePlanCapacity,
     acknowledgeOverload,
@@ -462,6 +466,8 @@ export function WorkspaceView(props: {
             updateTask={updateTask}
             updateTaskAssignment={updateTaskAssignment}
             updateTaskProgress={updateTaskProgress}
+            acceptTask={acceptTask}
+            returnTaskForReview={returnTaskForReview}
             close={() => selectTask(null)}
             splitTask={splitTask}
           />
@@ -765,8 +771,8 @@ function TaskColumn(props: {
                   <Split size={16} />
                 </button>
               )}
-              {props.onComplete && (
-                <button className="icon-button small" title="完成任务" onClick={() => props.onComplete?.(task.id)}>
+              {props.onComplete && task.status !== "pending_review" && (
+                <button className="icon-button small" title="提交验收" onClick={() => props.onComplete?.(task.id)}>
                   <Check size={16} />
                 </button>
               )}
@@ -822,10 +828,13 @@ function TaskDetailPanel(props: {
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
   updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
   updateTaskProgress: (taskId: string, progressPercent: number, progressNote: string) => void;
+  acceptTask: (taskId: string) => void;
+  returnTaskForReview: (taskId: string, reason: string) => void;
   close: () => void;
   splitTask: (taskId: string) => void;
 }) {
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [returnReason, setReturnReason] = useState("");
   const { task, updateTask } = props;
 
   if (!task) {
@@ -1086,6 +1095,46 @@ function TaskDetailPanel(props: {
         <Metric icon={<Check size={17} />} label="子任务" value={`${completedSubtasks}/${task.subtasks.length}`} />
         <Metric icon={<AlarmClock size={17} />} label="偏差" value={estimateDeltaLabel(task.estimatePomodoros, task.actualPomodoros)} />
       </div>
+
+      {task.reviewReturnReason && task.status !== "pending_review" && (
+        <p className="warning-line compact">最近退回原因：{task.reviewReturnReason}</p>
+      )}
+
+      {task.status === "pending_review" && (
+        <div className="subtask-box">
+          <div className="section-title compact-title">
+            <div>
+              <p className="eyebrow">Task Acceptance</p>
+              <h2>任务验收</h2>
+            </div>
+          </div>
+          <p className="muted">执行者已提交验收。只有验收通过后，这项任务才会进入已完成。</p>
+          <label>
+            退回原因
+            <textarea
+              value={returnReason}
+              onChange={(event) => setReturnReason(event.target.value)}
+              placeholder="说明未通过的原因和需要补齐的结果"
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button" onClick={() => props.acceptTask(task.id)}>
+              <Check size={16} />
+              验收通过
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => {
+                props.returnTaskForReview(task.id, returnReason);
+                setReturnReason("");
+              }}
+              disabled={!returnReason.trim()}
+            >
+              退回任务
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="subtask-box">
         <div className="section-title compact-title">

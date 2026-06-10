@@ -33,7 +33,17 @@ import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { updateDesktopTimerPresence } from "./nativeDesktop";
-import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectInState, updateProjectMemberInState, updateTaskProgressInState } from "./teamProgress";
+import {
+  acceptTaskInState,
+  addProjectMemberToState,
+  assignTaskInState,
+  createProjectInState,
+  returnTaskForReviewInState,
+  submitTaskForReviewInState,
+  updateProjectInState,
+  updateProjectMemberInState,
+  updateTaskProgressInState,
+} from "./teamProgress";
 import { uid } from "./seed";
 import type {
   AppState,
@@ -648,38 +658,19 @@ export function App() {
 
   const completeTask = (taskId: string) => {
     const timestamp = nowIso();
+    updateState((value) => submitTaskForReviewInState(value, taskId, value.currentMemberId, timestamp));
+    setToast("已提交验收，等待项目负责人确认");
+  };
+
+  const acceptTask = (taskId: string) => {
+    const timestamp = nowIso();
     updateState((value) => {
-      const completedTask = value.tasks.find((task) => task.id === taskId);
-      const recurringTask = completedTask ? generateRecurringTask({ ...completedTask, completedAt: timestamp }, timestamp) : null;
+      const acceptedState = acceptTaskInState(value, taskId, value.currentMemberId, timestamp);
+      const acceptedTask = acceptedState.tasks.find((task) => task.id === taskId && task.status === "completed");
+      const recurringTask = acceptedTask ? generateRecurringTask(acceptedTask, timestamp) : null;
       const nextState = {
-        ...value,
-        tasks: [
-          ...value.tasks.map((task) => {
-        if (task.id !== taskId) return task;
-        const actualPomodoros =
-          value.focusSessions.filter((session) => session.taskId === taskId && session.outcome === "completed").length ||
-          task.actualPomodoros ||
-          0;
-        return {
-          ...task,
-          status: "completed" as const,
-          actualPomodoros,
-          completedAt: timestamp,
-          updatedAt: timestamp,
-          estimateHistory: [
-            ...(task.estimateHistory ?? []),
-            {
-              id: uid("estimate"),
-              estimatedPomodoros: task.estimatePomodoros,
-              actualPomodoros,
-              recordedAt: timestamp,
-              source: "completion" as const,
-            },
-          ],
-        };
-          }),
-          ...(recurringTask ? [recurringTask] : []),
-        ],
+        ...acceptedState,
+        tasks: recurringTask ? [...acceptedState.tasks, recurringTask] : acceptedState.tasks,
         updatedAt: timestamp,
       };
       return {
@@ -687,7 +678,13 @@ export function App() {
         rewardState: deriveRewardState(nextState, timestamp),
       };
     });
-    setToast("任务完成，日终回顾时会计入成果");
+    setToast("验收通过，任务已完成");
+  };
+
+  const returnTaskForReview = (taskId: string, reason: string) => {
+    const timestamp = nowIso();
+    updateState((value) => returnTaskForReviewInState(value, taskId, reason, value.currentMemberId, timestamp));
+    setToast("已退回任务并记录原因");
   };
 
   const deleteTask = (taskId: string) => {
@@ -1709,6 +1706,8 @@ export function App() {
             updateTask={updateTask}
             updateTaskAssignment={updateTaskAssignment}
             updateTaskProgress={updateTaskProgress}
+            acceptTask={acceptTask}
+            returnTaskForReview={returnTaskForReview}
             moveCommittedTask={moveCommittedTask}
             updatePlanCapacity={updatePlanCapacity}
             acknowledgeOverload={acknowledgeOverload}

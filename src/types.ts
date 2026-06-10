@@ -1,6 +1,6 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type Severity = "low" | "medium" | "high" | "very_high";
-export type TaskStatus = "pool" | "committed" | "in_progress" | "completed" | "archived";
+export type TaskStatus = "pool" | "committed" | "in_progress" | "pending_review" | "completed" | "archived";
 export type SessionMode = "focus" | "short_break" | "long_break";
 export type SessionOutcome = "completed" | "aborted" | "skipped";
 export type InterruptionType = "internal" | "external";
@@ -88,6 +88,13 @@ export interface Task {
   estimateHistory: EstimateEntry[];
   createdAt: string;
   updatedAt: string;
+  reviewSubmittedAt?: string;
+  reviewSubmittedByMemberId?: string;
+  reviewAcceptedAt?: string;
+  reviewAcceptedByMemberId?: string;
+  reviewReturnedAt?: string;
+  reviewReturnedByMemberId?: string;
+  reviewReturnReason?: string;
   completedAt?: string;
 }
 

@@ -23,7 +23,16 @@ import { endSessionInState, startTimerInState, toggleTimerInState } from "./appM
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
-import { addProjectMemberToState, assignTaskInState, createProjectInState, updateProjectMemberInState, updateTaskProgressInState } from "./teamProgress";
+import {
+  acceptTaskInState,
+  addProjectMemberToState,
+  assignTaskInState,
+  createProjectInState,
+  returnTaskForReviewInState,
+  submitTaskForReviewInState,
+  updateProjectMemberInState,
+  updateTaskProgressInState,
+} from "./teamProgress";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -525,6 +534,57 @@ describe("data portability and long planning", () => {
 
     const reset = updateTaskProgressInState(updated, updated.tasks[0].id, -20, "", "2026-05-10T12:00:00.000Z");
     expect(reset.tasks[0]).toMatchObject({ progressPercent: 0, progressNote: "" });
+  });
+
+  it("submits a task for review before it can be accepted as completed", () => {
+    const state = createInitialState();
+    const submitted = submitTaskForReviewInState(
+      state,
+      state.tasks[0].id,
+      "member_owner",
+      "2026-05-10T10:00:00.000Z",
+    );
+    expect(submitted.tasks[0]).toMatchObject({
+      status: "pending_review",
+      progressPercent: 100,
+      reviewSubmittedAt: "2026-05-10T10:00:00.000Z",
+      reviewSubmittedByMemberId: "member_owner",
+    });
+    expect(submitted.tasks[0].completedAt).toBeUndefined();
+
+    const accepted = acceptTaskInState(
+      submitted,
+      submitted.tasks[0].id,
+      "member_owner",
+      "2026-05-10T11:00:00.000Z",
+    );
+    expect(accepted.tasks[0]).toMatchObject({
+      status: "completed",
+      completedAt: "2026-05-10T11:00:00.000Z",
+      reviewAcceptedAt: "2026-05-10T11:00:00.000Z",
+      reviewAcceptedByMemberId: "member_owner",
+    });
+    expect(accepted.tasks[0].estimateHistory).toHaveLength(1);
+  });
+
+  it("returns a pending review task with a reason", () => {
+    const state = createInitialState();
+    const submitted = submitTaskForReviewInState(state, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
+    const returned = returnTaskForReviewInState(
+      submitted,
+      submitted.tasks[0].id,
+      "验收口径缺少异常场景。",
+      "member_owner",
+      "2026-05-10T11:00:00.000Z",
+    );
+    expect(returned.tasks[0]).toMatchObject({
+      status: "in_progress",
+      progressPercent: 99,
+      reviewReturnedAt: "2026-05-10T11:00:00.000Z",
+      reviewReturnedByMemberId: "member_owner",
+      reviewReturnReason: "验收口径缺少异常场景。",
+    });
+    expect(returned.tasks[0].completedAt).toBeUndefined();
   });
 
   it("migrates legacy personal task data into a starter project", () => {

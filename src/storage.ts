@@ -96,6 +96,13 @@ const normalizeTask = (task: Partial<Task>, index: number, projectId: string): T
     estimateHistory: task.estimateHistory ?? [],
     createdAt: task.createdAt ?? timestamp,
     updatedAt: timestamp,
+    reviewSubmittedAt: task.reviewSubmittedAt,
+    reviewSubmittedByMemberId: task.reviewSubmittedByMemberId,
+    reviewAcceptedAt: task.reviewAcceptedAt,
+    reviewAcceptedByMemberId: task.reviewAcceptedByMemberId,
+    reviewReturnedAt: task.reviewReturnedAt,
+    reviewReturnedByMemberId: task.reviewReturnedByMemberId,
+    reviewReturnReason: task.reviewReturnReason,
     completedAt: task.completedAt,
   };
 };
