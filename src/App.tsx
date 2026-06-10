@@ -2,17 +2,21 @@ import {
   BarChart3,
   CalendarDays,
   Focus,
+  FolderKanban,
+  LayoutDashboard,
   ListChecks,
   Menu,
   Settings,
   ShieldCheck,
   ShieldQuestion,
+  UserCheck,
   TimerReset,
   Search,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateRemaining,
+  buildProgressBoard,
   defaultReview,
   deriveRewardState,
   generateRecurringTask,
@@ -105,6 +109,7 @@ import {
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
+  const [workspaceMode, setWorkspaceMode] = useState<"board" | "workbench">("board");
   const [draft, setDraft] = useState<TaskDraft>(initialDraft);
   const [loaded, setLoaded] = useState(false);
   const [strictStatus, setStrictStatus] = useState<StrictModeStatus | null>(null);
@@ -167,27 +172,29 @@ export function App() {
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
         if (event.key === "1") {
           event.preventDefault();
-          setTab("workspace");
+          setTab("settings");
           return;
         }
         if (event.key === "2") {
           event.preventDefault();
-          setTab("focus");
+          setWorkspaceMode("board");
+          setTab("workspace");
           return;
         }
         if (event.key === "3") {
           event.preventDefault();
-          setTab("calendar");
+          setWorkspaceMode("workbench");
+          setTab("workspace");
           return;
         }
         if (event.key === "4") {
           event.preventDefault();
-          setTab("reports");
+          setTab("calendar");
           return;
         }
         if (event.key === "5") {
           event.preventDefault();
-          setTab("settings");
+          setTab("reports");
           return;
         }
       }
@@ -631,7 +638,7 @@ export function App() {
         updatedAt: nowIso(),
       };
     });
-    setToast("已加入今日承诺");
+    setToast("已加入工作队列");
   };
 
   const removeCommittedTask = (taskId: string) => {
@@ -1558,19 +1565,21 @@ export function App() {
     };
     updateState((value) => ({ ...value, tasks: [task, ...value.tasks], updatedAt: timestamp }));
     setSelectedTaskId(task.id);
+    setWorkspaceMode("workbench");
     setTab("workspace");
     setToast(`已添加：${task.title}`);
   };
 
   const runCommand = (action: CommandAction, parsed?: ParsedQuickInput, taskId?: string) => {
-    if (action === "navigate_workspace") setTab("workspace");
-    if (action === "navigate_focus") setTab("focus");
+    if (action === "navigate_workspace") openBoard();
+    if (action === "navigate_focus") openWorkbench();
     if (action === "navigate_calendar") setTab("calendar");
     if (action === "navigate_reports") setTab("reports");
     if (action === "navigate_settings" || action === "open_sync_settings") setTab("settings");
     if (action === "add_quick_task") addParsedQuickTask(parsed ?? parseQuickInput(""));
     if (action === "open_task" && taskId) {
       setSelectedTaskId(taskId);
+      setWorkspaceMode("workbench");
       setTab("workspace");
     }
     if (action === "start_focus") {
@@ -1592,19 +1601,37 @@ export function App() {
     setState(ensureTodayPlan(createDemoState()));
     setSelectedTaskId("demo_task_today_deep");
     setTaskFilters(initialFilters);
+    setWorkspaceMode("board");
     setTab("workspace");
-    setToast("已加载演示数据，可以从工作台开始体验");
+    setToast("已加载演示数据，可以从进度看板开始体验");
   };
 
   const totalCommittedEstimate = committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0);
   const capacityHint = planCapacityHint(state);
-  const navItems = [
-    { id: "workspace" as const, label: "工作台", icon: <ListChecks size={18} /> },
-    { id: "focus" as const, label: "专注", icon: <Focus size={18} /> },
-    { id: "calendar" as const, label: "日历", icon: <CalendarDays size={18} /> },
-    { id: "reports" as const, label: "报告", icon: <BarChart3 size={18} /> },
-    { id: "settings" as const, label: "设置", icon: <Settings size={18} /> },
+  const primaryProjectId = state.projects[0]?.id ?? "";
+  const sidebarBoard = primaryProjectId ? buildProgressBoard(state, primaryProjectId) : undefined;
+  const sidebarRiskCount = sidebarBoard?.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0) ?? 0;
+  const activeNavKey = tab === "workspace" ? workspaceMode : tab === "settings" ? "projects" : tab;
+  const openProjects = () => setTab("settings");
+  const openBoard = () => {
+    setWorkspaceMode("board");
+    setTab("workspace");
+  };
+  const openWorkbench = () => {
+    setWorkspaceMode("workbench");
+    setTab("workspace");
+  };
+  const primaryNavItems = [
+    { key: "projects", label: "项目", icon: <FolderKanban size={18} />, onClick: openProjects },
+    { key: "board", label: "进度看板", icon: <LayoutDashboard size={18} />, onClick: openBoard },
+    { key: "workbench", label: "我的工作台", icon: <UserCheck size={18} />, onClick: openWorkbench },
   ];
+  const secondaryNavItems = [
+    { key: "focus", label: "计时器", icon: <Focus size={18} />, onClick: () => setTab("focus") },
+    { key: "calendar", label: "排期", icon: <CalendarDays size={18} />, onClick: () => setTab("calendar") },
+    { key: "reports", label: "洞察", icon: <BarChart3 size={18} />, onClick: () => setTab("reports") },
+  ];
+  const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
 
   if (!state.onboarding.completed) {
     return <OnboardingView state={state} completeOnboarding={completeOnboarding} />;
@@ -1618,14 +1645,22 @@ export function App() {
             <TimerReset size={24} />
           </div>
           <div>
-            <strong>TimeManage</strong>
-            <span>自律番茄系统</span>
+            <strong>Team Progress</strong>
+            <span>团队进度管控</span>
           </div>
         </div>
 
         <nav className="nav-list" aria-label="主导航">
-          {navItems.map((item) => (
-            <button className={tab === item.id ? "active" : ""} title={item.label} onClick={() => setTab(item.id)} key={item.id}>
+          <span className="nav-group-label">团队进度</span>
+          {primaryNavItems.map((item) => (
+            <button className={activeNavKey === item.key ? "active" : ""} title={item.label} onClick={item.onClick} key={item.key}>
+              {item.icon}
+              <span>{item.label}</span>
+            </button>
+          ))}
+          <span className="nav-group-label">辅助工具</span>
+          {secondaryNavItems.map((item) => (
+            <button className={activeNavKey === item.key ? "active" : ""} title={item.label} onClick={item.onClick} key={item.key}>
               {item.icon}
               <span>{item.label}</span>
             </button>
@@ -1633,17 +1668,18 @@ export function App() {
         </nav>
 
         <div className="sidebar-status">
-          <span>今日承诺</span>
+          <span>项目进度</span>
           <strong>
-            {todayPlan.completedPomodoros}/{Math.max(todayPlan.capacityPomodoros, totalCommittedEstimate)}
+            {sidebarBoard?.projectProgress ?? 0}%
           </strong>
           <div className="mini-progress">
             <span
               style={{
-                width: `${Math.min(100, (todayPlan.completedPomodoros / Math.max(1, todayPlan.capacityPomodoros)) * 100)}%`,
+                width: `${sidebarBoard?.projectProgress ?? 0}%`,
               }}
             />
           </div>
+          <small>执行中 {sidebarBoard?.activeSessions.length ?? 0} · 风险 {sidebarRiskCount}</small>
         </div>
       </aside>
 
@@ -1656,21 +1692,23 @@ export function App() {
             <div>
               <p className="eyebrow">{today()}</p>
               <h1>
-                {tab === "workspace"
-                  ? "今日工作台"
+                {tab === "settings"
+                  ? "项目与成员"
+                  : tab === "workspace"
+                    ? workspaceMode === "board" ? "项目进度看板" : "我的工作台"
                   : tab === "focus"
-                    ? "沉浸专注"
+                    ? "工作计时器"
                     : tab === "calendar"
-                      ? "长期计划"
+                      ? "排期计划"
                       : tab === "reports"
-                        ? "自律报告"
+                        ? "进度洞察"
                         : "系统设置"}
               </h1>
             </div>
           </div>
           <nav className="topbar-nav" aria-label="页面导航">
-            {navItems.map((item) => (
-              <button className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)} key={item.id}>
+            {topbarNavItems.map((item) => (
+              <button className={activeNavKey === item.key ? "active" : ""} onClick={item.onClick} key={item.key}>
                 {item.icon}
                 <span>{item.label}</span>
               </button>
@@ -1692,6 +1730,7 @@ export function App() {
 
         {tab === "workspace" && (
           <WorkspaceView
+            mode={workspaceMode}
             state={state}
             draft={draft}
             setDraft={setDraft}
@@ -1724,6 +1763,7 @@ export function App() {
               setTab("focus");
               void beginTimer("focus", taskId);
             }}
+            openProjectSettings={openProjects}
             updateReflection={updateReflection}
             updateReview={updateReview}
             completeReview={completeReview}
@@ -1841,7 +1881,7 @@ export function App() {
       <ConfirmDialog
         open={Boolean(pendingDeleteTask)}
         title="删除任务"
-        body={pendingDeleteTask ? `确认删除「${pendingDeleteTask.title}」吗？删除后会从今日承诺和同步队列中移除。` : ""}
+        body={pendingDeleteTask ? `确认删除「${pendingDeleteTask.title}」吗？删除后会从工作队列和同步队列中移除。` : ""}
         confirmLabel="删除"
         danger
         onCancel={() => setPendingDeleteTask(null)}

@@ -33,7 +33,7 @@ export function FocusView(props: {
           <div className="timer-face">
             <p>{active ? modeLabel[active.mode] : "准备开始"}</p>
             <strong>{active ? formatTime(active.remaining) : `${state.settings.focusMinutes}:00`}</strong>
-            <span>{currentTask?.title ?? "从今日承诺中选择一个任务"}</span>
+            <span>{currentTask?.title ?? "从我的工作台选择一个任务"}</span>
             {currentTask && <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} compact />}
           </div>
         </div>
@@ -44,7 +44,7 @@ export function FocusView(props: {
               <p className="eyebrow">Settlement</p>
               <h2>{active.mode === "focus" ? "这个番茄到点了" : "休息到点了"}</h2>
               <p className="muted">
-                {active.mode === "focus" ? "先结算，再决定休息或继续。需要补记中断也可以现在补上。" : "结束休息后，可以回到今日承诺继续推进。"}
+                {active.mode === "focus" ? "先结算，再决定休息或继续。需要补记中断也可以现在补上。" : "结束休息后，可以回到我的工作台继续推进。"}
               </p>
               <div className="button-row">
               <button className="primary-button large" onClick={() => void props.finishTimer("completed")}>
@@ -74,7 +74,7 @@ export function FocusView(props: {
               disabled={!currentTask && committedTasks.length === 0}
             >
               <CirclePlay size={18} />
-              开始番茄
+              开始工作
             </button>
           ) : (
             <>
@@ -106,7 +106,7 @@ export function FocusView(props: {
           {active?.mode === "focus" && active.pendingSettlement !== "pending" && (
             <button onClick={() => void props.finishTimer("completed")}>
               <Check size={16} />
-              完成一个番茄
+              完成一段工作
             </button>
           )}
         </div>
@@ -135,7 +135,7 @@ export function FocusView(props: {
               </button>
             </>
           ) : (
-            <p className="empty">今日承诺为空，先去工作台选择任务。</p>
+            <p className="empty">工作队列为空，先去我的工作台选择任务。</p>
           )}
         </section>
 

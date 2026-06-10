@@ -6,16 +6,27 @@ test.beforeEach(async ({ page }) => {
   await page.reload();
 });
 
-test("completes onboarding and reaches the workspace", async ({ page }) => {
+test("opens around team progress navigation and control room", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "先把分心源摆到桌面上。" })).toBeVisible();
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "开始今天" }).click();
-  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "下一步很明确" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "今日计划助手" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "活动清单", exact: true }).first()).toBeVisible();
+  await expect(page.locator("h1", { hasText: "项目进度看板" })).toBeVisible();
+  await expect(page.getByText("团队进度管控")).toHaveCount(1);
+  await expect(page.getByLabel("主导航").getByRole("button", { name: "项目" })).toBeVisible();
+  await expect(page.getByLabel("主导航").getByRole("button", { name: "进度看板" })).toBeVisible();
+  await expect(page.getByLabel("主导航").getByRole("button", { name: "我的工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "实时掌控项目进度、执行状态和遗漏风险" })).toBeVisible();
+  await expect(page.locator(".progress-board").getByRole("heading", { name: "项目进度看板" })).toBeVisible();
+  await expect(page.locator(".personal-workbench").getByRole("heading", { name: "我的任务" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今日工作台" })).toHaveCount(0);
+  await page.getByLabel("主导航").getByRole("button", { name: "项目" }).click();
+  await expect(page.locator("h1", { hasText: "项目与成员" })).toBeVisible();
+  await expect(page.locator(".settings-panel").first().getByRole("heading", { name: "项目与成员" })).toBeVisible();
+  await page.getByLabel("主导航").getByRole("button", { name: "我的工作台" }).click();
+  await expect(page.getByRole("heading", { name: "我的工作台" })).toBeVisible();
+  await expect(page.locator(".personal-workbench")).toBeVisible();
 });
 
 test("creates a task, commits it, records interruption and review", async ({ page }) => {
@@ -26,15 +37,16 @@ test("creates a task, commits it, records interruption and review", async ({ pag
 
   await page.getByPlaceholder("例如：整理严格模式权限说明").fill("E2E 可靠计时任务");
   await page.getByRole("button", { name: /添加/ }).click();
-  await page.locator("article").filter({ hasText: "E2E 可靠计时任务" }).getByRole("button", { name: "选入今日" }).click();
-  await expect(page.getByRole("heading", { name: "今日承诺", exact: true })).toBeVisible();
+  await page.locator("article").filter({ hasText: "E2E 可靠计时任务" }).getByRole("button", { name: "加入队列" }).click();
+  await expect(page.getByRole("heading", { name: "工作队列", exact: true })).toBeVisible();
 
-  await page.getByRole("button", { name: "专注" }).click();
-  await page.getByRole("button", { name: /开始番茄/ }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "计时器" }).click();
+  await page.getByRole("button", { name: /开始工作/ }).click();
   await page.getByPlaceholder("记录突发念头或外部请求").fill("突然想到要回消息");
   await page.getByRole("button", { name: "内部中断" }).click();
 
-  await page.getByRole("button", { name: "工作台" }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "我的工作台" }).click();
+  await page.getByRole("button", { name: "个人辅助" }).click();
   await page.getByText("突然想到要回消息").waitFor();
   await page.getByRole("button", { name: "转任务" }).first().click();
   await page.getByLabel("今日收获").fill("完成了核心链路测试");
@@ -59,7 +71,7 @@ test("starts assigned work from the personal workbench without daily commitment"
   await expect(page.getByText("设计番茄报表指标").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "暂停" })).toBeVisible();
 
-  await page.getByLabel("页面导航").getByRole("button", { name: "工作台" }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "我的工作台" }).click();
   await expect(workbench.getByText("会先结束当前会话，再开始新任务")).toBeVisible();
   await workbench.locator("article").filter({ hasText: "整理时间管理系统 PRD" }).getByRole("button", { name: "切换任务" }).click();
   await expect(page.getByText("整理时间管理系统 PRD").first()).toBeVisible();
@@ -108,7 +120,7 @@ test("persists task progress percent and progress note", async ({ page }) => {
   });
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
+  await expect(page.locator("h1", { hasText: "项目进度看板" })).toBeVisible();
   await workbench.locator("article").filter({ hasText: "设计番茄报表指标" }).getByTitle("任务详情").click();
   await expect(page.getByRole("spinbutton", { name: "进度百分比" })).toHaveValue("45");
   await expect(page.getByLabel("进展说明")).toHaveValue("完成指标口径，剩余图表校验。");
@@ -203,9 +215,8 @@ test("uses usability helpers for advanced task fields, split, delete undo and sy
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "开始今天" }).click();
 
-  await page.getByRole("button", { name: "更多设置" }).click();
+  await page.getByRole("button", { name: "更多" }).click();
   await page.getByPlaceholder("例如：整理严格模式权限说明").fill("E2E 高级任务");
-  await page.getByLabel("项目").first().fill("E2E 项目");
   await page.getByRole("button", { name: /^添加$/ }).click();
   await expect(page.getByText("E2E 高级任务").first()).toBeVisible();
 
@@ -224,7 +235,7 @@ test("uses usability helpers for advanced task fields, split, delete undo and sy
   await page.getByRole("button", { name: "撤销" }).click();
   await expect(page.getByText("E2E 高级任务").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "项目", exact: true }).click();
   await expect(page.getByRole("heading", { name: "同步配置向导" })).toBeVisible();
   await expect(page.getByRole("button", { name: "检查服务" })).toBeVisible();
   await page.getByRole("button", { name: "展开高级状态" }).click();
@@ -236,7 +247,7 @@ test("shows reports insights", async ({ page }) => {
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "开始今天" }).click();
-  await page.getByRole("button", { name: "报告" }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "洞察" }).click();
   await expect(page.getByRole("heading", { name: "可操作洞察" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "自律激励" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "下一步建议" })).toBeVisible();
@@ -251,11 +262,12 @@ test("uses calendar templates, command palette, report filters and data export",
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "开始今天" }).click();
 
-  await page.getByRole("button", { name: "日历" }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "排期" }).click();
   await expect(page.getByRole("heading", { name: "长期计划日历" })).toBeVisible();
   await page.locator(".template-item").filter({ hasText: "晨间计划" }).getByRole("button", { name: "生成" }).click();
   await expect(page.getByText("晨间计划").first()).toBeVisible();
-  await page.getByRole("button", { name: "日历" }).click();
+  await page.getByTitle("关闭详情").click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "排期" }).click();
   await page.getByLabel("排入这一天").selectOption({ label: "设计番茄报表指标" });
   await page.getByRole("button", { name: "加入计划" }).click();
   await expect(page.getByText("设计番茄报表指标").first()).toBeVisible();
@@ -267,7 +279,10 @@ test("uses calendar templates, command palette, report filters and data export",
   await page.getByRole("button", { name: "保存模板" }).click();
   await expect(page.getByText("E2E 模板").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "工作台", exact: true }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "我的工作台", exact: true }).click();
+  if (await page.getByTitle("关闭详情").count()) {
+    await page.getByTitle("关闭详情").click();
+  }
   await page.getByPlaceholder("例如：整理严格模式权限说明").fill("命令面板定位任务");
   await page.locator(".add-task").getByRole("button", { name: "添加", exact: true }).click();
   await page.keyboard.press("/");
@@ -275,15 +290,16 @@ test("uses calendar templates, command palette, report filters and data export",
   await expect(commandDialog).toBeVisible();
   await commandDialog.getByPlaceholder("搜索命令，或输入：明天10点 写周报 #工作 2p").fill("命令面板定位任务");
   await commandDialog.locator(".command-section .command-item").filter({ hasText: "命令面板定位任务" }).click();
-  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "我的工作台" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "标题" })).toHaveValue("命令面板定位任务");
+  await page.getByTitle("关闭详情").click();
 
-  await page.getByRole("button", { name: "报告" }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "洞察" }).click();
   await expect(page.getByRole("heading", { name: "近 30 天复盘" })).toBeVisible();
   await page.getByLabel("时间范围").selectOption("7d");
   await expect(page.getByRole("heading", { name: "近 7 天复盘" })).toBeVisible();
 
-  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByLabel("页面导航").getByRole("button", { name: "项目", exact: true }).click();
   await expect(page.getByRole("heading", { name: "数据管理" })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出 CSV" }).click();

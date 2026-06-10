@@ -391,7 +391,7 @@ export const planPressure = (state: AppState, plan: DailyPlan): PlanPressure => 
     return {
       level: "overloaded",
       label: "超载",
-      detail: `今日承诺超过容量 ${overBy} 个番茄，建议移出低优先级任务或拆分大任务。`,
+      detail: `工作队列超过容量 ${overBy} 个番茄，建议移出低优先级任务或拆分大任务。`,
       totalEstimate,
       remainingEstimate,
       overBy,
@@ -401,7 +401,7 @@ export const planPressure = (state: AppState, plan: DailyPlan): PlanPressure => 
     return {
       level: "light",
       label: "轻松",
-      detail: "今日承诺低于建议容量，可以保留缓冲，或补入一个小任务。",
+      detail: "工作队列低于建议容量，可以保留缓冲，或补入一个小任务。",
       totalEstimate,
       remainingEstimate,
       overBy,
@@ -410,7 +410,7 @@ export const planPressure = (state: AppState, plan: DailyPlan): PlanPressure => 
   return {
     level: "balanced",
     label: "合适",
-    detail: "今日承诺和容量基本匹配，适合按顺序推进。",
+    detail: "工作队列和容量基本匹配，适合按顺序推进。",
     totalEstimate,
     remainingEstimate,
     overBy,
@@ -434,15 +434,15 @@ export const coachSteps = (state: AppState, date = todayKey()): CoachStep[] => {
     },
     {
       id: "commit_task",
-      title: "把任务选入今日承诺",
-      detail: "不要把任务池当成今日计划，只承诺今天真的要做的事。",
+      title: "把任务加入工作队列",
+      detail: "不要把任务池当成当前执行队列，只放入近期真的要推进的事。",
       completed: hasCommitment,
-      actionLabel: "选入今日",
+      actionLabel: "加入队列",
     },
     {
       id: "start_focus",
       title: "启动第一个番茄",
-      detail: "选择今日承诺中的第一件事，进入单任务专注。",
+      detail: "选择工作队列中的第一件事，进入单任务工作会话。",
       completed: hasFocus,
       actionLabel: "开始番茄",
     },
@@ -520,8 +520,8 @@ export const nextActions = (state: AppState, date = todayKey()): NextAction[] =>
   if (!plan?.committedTaskIds.length) {
     actions.push({
       id: "commit_today",
-      title: "先确定今日承诺",
-      detail: "从活动清单里选 1-3 个最值得做的任务，避免任务池变成压力源。",
+      title: "先确定工作队列",
+      detail: "从任务池里选 1-3 个最值得推进的任务，避免任务池变成压力源。",
       actionLabel: "去工作台",
       target: "workspace",
     });
@@ -682,8 +682,8 @@ export const buildInsights = (state: AppState, date = todayKey()): InsightItem[]
     insights.push({
       id: "commitment",
       kind: "commitment",
-      title: "承诺兑现率",
-      detail: `今日承诺完成度约 ${rate}%。${rate < 60 ? "明天建议少承诺一到两个番茄。" : "节奏稳定，可以维持当前容量。"}`,
+      title: "工作队列完成率",
+      detail: `工作队列完成度约 ${rate}%。${rate < 60 ? "明天建议减少一到两个番茄容量。" : "节奏稳定，可以维持当前容量。"}`,
       severity: rate < 60 ? "warning" : "success",
     });
   }

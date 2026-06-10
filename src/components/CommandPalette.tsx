@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Clock3, Focus, Keyboard, ListChecks, Plus, Search, Settings, X } from "lucide-react";
+import { BarChart3, CalendarDays, Clock3, Focus, FolderKanban, Keyboard, LayoutDashboard, ListChecks, Plus, Search, Settings, UserCheck, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { parseQuickInput } from "../planning";
 import type { CommandAction, ParsedQuickInput, Task } from "../types";
@@ -10,12 +10,12 @@ type CommandItem = {
 };
 
 const baseCommands: CommandItem[] = [
-  { action: "navigate_workspace", label: "打开工作台", hint: "查看今日承诺和任务池" },
-  { action: "navigate_focus", label: "打开专注", hint: "进入计时器和中断记录" },
-  { action: "navigate_calendar", label: "打开日历", hint: "查看长期计划和模板" },
-  { action: "navigate_reports", label: "打开报告", hint: "查看洞察和复盘" },
-  { action: "navigate_settings", label: "打开设置", hint: "同步、通知和严格模式" },
-  { action: "start_focus", label: "开始番茄", hint: "从今日承诺启动下一颗番茄" },
+  { action: "navigate_settings", label: "打开项目", hint: "管理项目、成员和同步设置" },
+  { action: "navigate_workspace", label: "打开进度看板", hint: "查看项目进度、执行中任务和风险" },
+  { action: "navigate_focus", label: "打开我的工作台", hint: "查看分配给我的任务并开始工作" },
+  { action: "navigate_calendar", label: "打开排期", hint: "查看长期计划和模板" },
+  { action: "navigate_reports", label: "打开洞察", hint: "查看项目与执行趋势" },
+  { action: "start_focus", label: "开始工作", hint: "从工作队列启动一段工作会话" },
   { action: "toggle_timer", label: "暂停/继续计时", hint: "控制当前计时器" },
   { action: "record_internal_interruption", label: "记录内部中断", hint: "把突然想做的事先记下来" },
   { action: "record_external_interruption", label: "记录外部中断", hint: "把消息/请求放进中断收件箱" },
@@ -117,12 +117,14 @@ export function CommandPalette(props: {
 }
 
 function CommandIcon({ action }: { action: CommandAction }) {
-  if (action === "navigate_workspace") return <ListChecks size={17} />;
+  if (action === "navigate_workspace") return <LayoutDashboard size={17} />;
   if (action === "open_task") return <ListChecks size={17} />;
-  if (action === "navigate_focus" || action === "start_focus" || action === "toggle_timer") return <Focus size={17} />;
+  if (action === "navigate_focus") return <UserCheck size={17} />;
+  if (action === "start_focus" || action === "toggle_timer") return <Focus size={17} />;
   if (action === "navigate_calendar") return <CalendarDays size={17} />;
   if (action === "navigate_reports") return <BarChart3 size={17} />;
-  if (action === "navigate_settings" || action === "open_sync_settings") return <Settings size={17} />;
+  if (action === "navigate_settings") return <FolderKanban size={17} />;
+  if (action === "open_sync_settings") return <Settings size={17} />;
   if (action === "open_shortcut_help") return <Keyboard size={17} />;
   return <Clock3 size={17} />;
 }

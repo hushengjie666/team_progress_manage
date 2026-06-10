@@ -7,6 +7,7 @@ import { uid } from "../seed";
 import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task } from "../types";
 
 export function WorkspaceView(props: {
+  mode: "board" | "workbench";
   state: AppState;
   draft: TaskDraft;
   setDraft: (draft: TaskDraft) => void;
@@ -36,6 +37,7 @@ export function WorkspaceView(props: {
   dismissCoachStep: (stepId: CoachStepId) => void;
   splitTask: (taskId: string) => void;
   beginFocus: (taskId: string) => void;
+  openProjectSettings: () => void;
   updateReflection: (reflection: string) => void;
   updateReview: (patch: Partial<DailyPlan["review"]>) => void;
   completeReview: () => void;
@@ -123,16 +125,46 @@ export function WorkspaceView(props: {
     ? boardProjectId
     : state.projects[0]?.id ?? "";
   const progressBoard = buildProgressBoard(state, selectedBoardProjectId);
+  const boardRiskCount = progressBoard.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0);
+  const pendingReviewCount = state.tasks.filter((task) => task.status === "pending_review").length;
+  const assignedNotStartedCount = progressBoard.sections.find((section) => section.kind === "assigned_not_started")?.tasks.length ?? 0;
+  const boardPanel = (
+    <ProgressBoardPanel
+      board={progressBoard}
+      projects={state.projects}
+      selectedProjectId={selectedBoardProjectId}
+      setSelectedProjectId={setBoardProjectId}
+      selectTask={selectTask}
+    />
+  );
+  const workbenchPanel = (
+    <PersonalWorkbench
+      currentMember={currentMember}
+      assignedTasks={assignedTasks}
+      activeTask={activeAssignedTask}
+      progressUpdateTasks={progressUpdateTasks}
+      beginFocus={beginFocus}
+      selectTask={selectTask}
+    />
+  );
+  const riskPanel = (
+    <StalledRiskPanel
+      risks={stalledRisks}
+      tasks={state.tasks}
+      selectTask={selectTask}
+    />
+  );
 
   return (
     <div className="content-grid workspace-grid">
       <section className="band hero-workflow workspace-summary">
         <div className="workspace-summary-copy">
-          <p className="eyebrow">Workspace</p>
-          <h2>今日只处理承诺任务</h2>
+          <p className="eyebrow">Team Control Room</p>
+          <h2>实时掌控项目进度、执行状态和遗漏风险</h2>
+          <p>管理者看全局，执行者从自己的任务开始工作；个人番茄只是执行信号的一部分。</p>
           {overload && !todayPlan.overloadAcknowledged && (
             <div className="warning-line">
-              今日计划超出容量 {totalCommittedEstimate - todayPlan.capacityPomodoros} 个番茄。
+              工作队列超出当前容量 {totalCommittedEstimate - todayPlan.capacityPomodoros} 个番茄。
               <button className="link-button" onClick={acknowledgeOverload}>
                 我已确认
               </button>
@@ -140,56 +172,42 @@ export function WorkspaceView(props: {
           )}
         </div>
         <div className="commitment-strip" aria-label="承诺进度">
-          <span>今日完成</span>
-          <strong>{todayPlan.completedPomodoros}</strong>
-          <small>目标 {state.rewardState.dailyGoal}</small>
+          <span>项目</span>
+          <strong>{state.projects.length}</strong>
+          <small>成员 {state.projectMembers.length}</small>
         </div>
         <div className="commitment-strip accent" aria-label="分心成本">
-          <span>今日承诺</span>
-          <strong className={totalCommittedEstimate > todayPlan.capacityPomodoros ? "danger-text" : ""}>{totalCommittedEstimate}</strong>
-          <small>容量 {todayPlan.capacityPomodoros}</small>
+          <span>正在执行</span>
+          <strong>{progressBoard.activeSessions.length}</strong>
+          <small>未开始 {assignedNotStartedCount}</small>
         </div>
-        <label className="commitment-strip capacity-editor" aria-label="今日容量">
-          <span>今日容量</span>
-          <input
-            type="number"
-            min="1"
-            max="16"
-            value={todayPlan.capacityPomodoros}
-            onChange={(event) => updatePlanCapacity(Number(event.target.value))}
-          />
-          <small>
-            建议 {todayPlan.recommendedCapacityPomodoros ?? capacityHint} · 剩余 {remainingEstimate}
-          </small>
-        </label>
+        <div className="commitment-strip" aria-label="风险数量">
+          <span>风险优先项</span>
+          <strong className={boardRiskCount > 0 ? "danger-text" : ""}>{boardRiskCount}</strong>
+          <small>待验收 {pendingReviewCount}</small>
+        </div>
         <button className="secondary-button workspace-more" onClick={() => setShowGuidance((value) => !value)}>
           <Sparkles size={16} />
-          {showGuidance ? "收起辅助" : "展开辅助"}
+          {showGuidance ? "收起个人辅助" : "个人辅助"}
+        </button>
+        <button className="secondary-button workspace-more" onClick={props.openProjectSettings}>
+          管理项目
         </button>
       </section>
 
-      <ProgressBoardPanel
-        board={progressBoard}
-        projects={state.projects}
-        selectedProjectId={selectedBoardProjectId}
-        setSelectedProjectId={setBoardProjectId}
-        selectTask={selectTask}
-      />
-
-      <PersonalWorkbench
-        currentMember={currentMember}
-        assignedTasks={assignedTasks}
-        activeTask={activeAssignedTask}
-        progressUpdateTasks={progressUpdateTasks}
-        beginFocus={beginFocus}
-        selectTask={selectTask}
-      />
-
-      <StalledRiskPanel
-        risks={stalledRisks}
-        tasks={state.tasks}
-        selectTask={selectTask}
-      />
+      {props.mode === "workbench" ? (
+        <>
+          {workbenchPanel}
+          {boardPanel}
+          {riskPanel}
+        </>
+      ) : (
+        <>
+          {boardPanel}
+          {riskPanel}
+          {workbenchPanel}
+        </>
+      )}
 
       {showGuidance && <section className="band coach-panel">
         <div className="section-title">
@@ -221,8 +239,8 @@ export function WorkspaceView(props: {
       {showGuidance && <section className={`band plan-assistant pressure-${pressure.level}`}>
         <div className="section-title">
           <div>
-            <p className="eyebrow">Daily Commitment</p>
-            <h2>今日计划助手</h2>
+            <p className="eyebrow">Personal Planning</p>
+            <h2>个人工作队列助手</h2>
           </div>
           <Target size={20} />
         </div>
@@ -235,7 +253,7 @@ export function WorkspaceView(props: {
             <Sparkles size={16} />
             一键生成今日计划
           </button>
-          <span>已承诺 {pressure.totalEstimate} / 容量 {todayPlan.capacityPomodoros}，剩余 {pressure.remainingEstimate}</span>
+          <span>工作队列 {pressure.totalEstimate} / 容量 {todayPlan.capacityPomodoros}，剩余 {pressure.remainingEstimate}</span>
         </div>
         <div className="suggestion-list">
           {suggestions.slice(0, 3).map((suggestion) => {
@@ -379,7 +397,7 @@ export function WorkspaceView(props: {
           </button>
         </div> : (
           <div className="filter-inline-row">
-            <span>今日承诺 {committedTasks.length} · 活动清单 {poolTasks.length}</span>
+            <span>工作队列 {committedTasks.length} · 任务池 {poolTasks.length}</span>
             <button className="secondary-button" onClick={() => setShowFilters(true)}>
               <SlidersHorizontal size={16} />
               筛选
@@ -443,10 +461,10 @@ export function WorkspaceView(props: {
       </section>
 
       <TaskColumn
-        title="今日承诺"
-        eyebrow="只展示今天选择做的事"
+        title="工作队列"
+        eyebrow="执行者准备开始或继续的任务"
         tasks={committedTasks}
-        empty="从活动清单中选择今日任务。"
+        empty="从任务池中选择要推进的工作。"
         actionLabel="开始"
         actionIcon={<Play size={15} />}
         onAction={beginFocus}
@@ -459,10 +477,10 @@ export function WorkspaceView(props: {
 
       <TaskColumn
         title="活动清单"
-        eyebrow="未承诺任务"
+        eyebrow="尚未进入工作队列"
         tasks={poolTasks}
         empty="任务池空了，可以补充新活动。"
-        actionLabel="选入今日"
+        actionLabel="加入队列"
         actionIcon={<ChevronRight size={15} />}
         onAction={commitTask}
         onDelete={deleteTask}

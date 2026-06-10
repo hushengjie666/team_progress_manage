@@ -97,22 +97,6 @@ export function SettingsView(props: {
       <section className="band settings-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Onboarding</p>
-            <h2>启动问卷</h2>
-          </div>
-          <Sparkles size={20} />
-        </div>
-        <p className="muted">
-          当前目标：每天 {state.onboarding.dailyGoalPomodoros} 个番茄；偏好 {state.onboarding.preferredFocusMinutes} 分钟节奏。
-        </p>
-        <button className="secondary-button" onClick={restartOnboarding}>
-          重新进行启动问卷
-        </button>
-      </section>
-
-      <section className="band settings-panel">
-        <div className="section-title">
-          <div>
             <p className="eyebrow">Team Progress</p>
             <h2>项目与成员</h2>
           </div>
@@ -249,6 +233,22 @@ export function SettingsView(props: {
             );
           })}
         </div>
+      </section>
+
+      <section className="band settings-panel">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">Product Setup</p>
+            <h2>系统配置</h2>
+          </div>
+          <Sparkles size={20} />
+        </div>
+        <p className="muted">
+          当前个人计时节奏：每天 {state.onboarding.dailyGoalPomodoros} 个番茄；偏好 {state.onboarding.preferredFocusMinutes} 分钟。
+        </p>
+        <button className="secondary-button" onClick={restartOnboarding}>
+          重新进行启动问卷
+        </button>
       </section>
 
       <section className="band settings-panel">

@@ -56,7 +56,7 @@ export function SplitTaskDialog(props: {
             <X size={16} />
           </button>
         </div>
-        <p className="muted">每行一个子任务。确认后原任务会归档，新任务会保留项目、标签、优先级和今日承诺位置。</p>
+        <p className="muted">每行一个子任务。确认后原任务会归档，新任务会保留项目、标签、优先级和工作队列位置。</p>
         <textarea
           value={props.draft.text}
           onChange={(event) => props.setDraft({ ...props.draft!, text: event.target.value })}
@@ -80,20 +80,20 @@ export function ShortcutHelpDialog(props: {
 }) {
   if (!props.open) return null;
   const shortcuts = [
-    { keys: "⌘/Ctrl + 1", desc: "聚焦工作台" },
-    { keys: "⌘/Ctrl + 2", desc: "聚焦专注页" },
-    { keys: "⌘/Ctrl + 3", desc: "聚焦日历页" },
-    { keys: "⌘/Ctrl + 4", desc: "聚焦报告页" },
-    { keys: "⌘/Ctrl + 5", desc: "聚焦设置页" },
+    { keys: "⌘/Ctrl + 1", desc: "打开项目与成员" },
+    { keys: "⌘/Ctrl + 2", desc: "打开进度看板" },
+    { keys: "⌘/Ctrl + 3", desc: "打开我的工作台" },
+    { keys: "⌘/Ctrl + 4", desc: "打开排期" },
+    { keys: "⌘/Ctrl + 5", desc: "打开洞察" },
     { keys: "/", desc: "打开命令面板" },
     { keys: "⌘/Ctrl + K", desc: "打开命令面板" },
     { keys: "Esc", desc: "关闭当前弹窗/面板" },
     { keys: "空格", desc: "开始/继续/暂停计时（当前有活动计时）" },
     { keys: "Shift+空格", desc: "确认后重置当前番茄" },
-    { keys: "Enter", desc: "从已选任务开始今日番茄（工作台）" },
-    { keys: "Q", desc: "专注页返回工作台" },
-    { keys: "↑ / ↓", desc: "上下调整今日承诺顺序（工作台）" },
-    { keys: "⌘/Ctrl + Enter", desc: "快速完成今日回顾（工作台）" },
+    { keys: "Enter", desc: "从已选任务开始工作会话（我的工作台）" },
+    { keys: "Q", desc: "计时器返回进度看板" },
+    { keys: "↑ / ↓", desc: "上下调整工作队列顺序（我的工作台）" },
+    { keys: "⌘/Ctrl + Enter", desc: "快速完成个人回顾（我的工作台）" },
     { keys: "I", desc: "记录内部中断（在专注页）" },
     { keys: "O", desc: "记录外部中断（在专注页）" },
   ];

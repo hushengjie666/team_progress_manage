@@ -62,8 +62,8 @@ export function OnboardingView(props: {
             <TimerReset size={24} />
           </div>
           <div>
-            <strong>TimeManage</strong>
-            <span>自律番茄系统</span>
+            <strong>Team Progress</strong>
+            <span>团队进度管控</span>
           </div>
         </div>
         <div className="stepper">
@@ -173,4 +173,3 @@ export function OnboardingView(props: {
     </main>
   );
 }
-
