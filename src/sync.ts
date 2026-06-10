@@ -5,19 +5,27 @@ import type {
   FocusSession,
   Interruption,
   Onboarding,
+  Project,
+  ProjectMember,
   RewardState,
   Settings,
   StrictViolation,
   SyncConflict,
   SyncState,
   Task,
+  WorkSession,
+  ExecutionSignal,
 } from "./types";
 
 type SyncEntity =
   | "settings"
   | "onboarding"
   | "reward_state"
+  | "project"
+  | "project_member"
   | "task"
+  | "work_session"
+  | "execution_signal"
   | "daily_plan"
   | "focus_session"
   | "interruption"
@@ -28,7 +36,11 @@ type SyncPayload =
   | Settings
   | Onboarding
   | RewardState
+  | Project
+  | ProjectMember
   | Task
+  | WorkSession
+  | ExecutionSignal
   | DailyPlan
   | FocusSession
   | Interruption
@@ -77,7 +89,17 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const timestampFor = (entity: SyncEntity, payload: unknown, fallback: string) => {
   if (!isObject(payload)) return fallback;
-  const candidates = ["updatedAt", "endedAt", "startedAt", "createdAt", "completedAt"];
+  const candidates = [
+    "updatedAt",
+    "reviewAcceptedAt",
+    "reviewReturnedAt",
+    "reviewSubmittedAt",
+    "endedAt",
+    "pausedAt",
+    "startedAt",
+    "createdAt",
+    "completedAt",
+  ];
   for (const key of candidates) {
     const value = payload[key];
     if (typeof value === "string" && value) return value;
@@ -163,12 +185,40 @@ export function flattenStateToChanges(state: AppState): SyncChange[] {
       updated_at: state.updatedAt,
       payload: state.rewardState,
     },
+    ...state.projects.map((project) => ({
+      entity: "project" as const,
+      id: project.id,
+      device_id: deviceID,
+      updated_at: project.updatedAt,
+      payload: project,
+    })),
+    ...state.projectMembers.map((member) => ({
+      entity: "project_member" as const,
+      id: member.id,
+      device_id: deviceID,
+      updated_at: member.updatedAt,
+      payload: member,
+    })),
     ...state.tasks.map((task) => ({
       entity: "task" as const,
       id: task.id,
       device_id: deviceID,
       updated_at: task.updatedAt,
       payload: task,
+    })),
+    ...state.workSessions.map((session) => ({
+      entity: "work_session" as const,
+      id: session.id,
+      device_id: deviceID,
+      updated_at: session.updatedAt,
+      payload: session,
+    })),
+    ...state.executionSignals.map((signal) => ({
+      entity: "execution_signal" as const,
+      id: signal.id,
+      device_id: deviceID,
+      updated_at: signal.createdAt,
+      payload: signal,
     })),
     ...state.dailyPlans.map((plan) => ({
       entity: "daily_plan" as const,
@@ -225,7 +275,11 @@ const localPayloadFor = (state: AppState, row: SyncRow): SyncPayload | undefined
   if (row.entity === "settings") return state.settings;
   if (row.entity === "onboarding") return state.onboarding;
   if (row.entity === "reward_state") return state.rewardState;
+  if (row.entity === "project") return state.projects.find((item) => item.id === row.id);
+  if (row.entity === "project_member") return state.projectMembers.find((item) => item.id === row.id);
   if (row.entity === "task") return state.tasks.find((item) => item.id === row.id);
+  if (row.entity === "work_session") return state.workSessions.find((item) => item.id === row.id);
+  if (row.entity === "execution_signal") return state.executionSignals.find((item) => item.id === row.id);
   if (row.entity === "daily_plan") return state.dailyPlans.find((item) => item.id === row.id);
   if (row.entity === "focus_session") return state.focusSessions.find((item) => item.id === row.id);
   if (row.entity === "interruption") return state.interruptions.find((item) => item.id === row.id);
@@ -246,13 +300,20 @@ const conflictFromRow = (state: AppState, row: SyncRow): SyncConflict => {
   };
 };
 
-const upsert = <T extends { id: string }>(items: T[], incoming: T, updatedAt: string, stateUpdatedAt: string) => {
+const upsert = <T extends { id: string }>(entity: SyncEntity, items: T[], incoming: T, updatedAt: string, stateUpdatedAt: string) => {
   const existing = items.find((item) => item.id === incoming.id);
   if (!existing) return [incoming, ...items];
-  return items.map((item) => (item.id === incoming.id && updatedAt >= timestampFor("task", item, stateUpdatedAt) ? incoming : item));
+  return items.map((item) => (item.id === incoming.id && updatedAt >= timestampFor(entity, item, stateUpdatedAt) ? incoming : item));
 };
 
 const removeById = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
+const removeMemberReferences = (tasks: Task[], memberId: string) =>
+  tasks.map((task) => ({
+    ...task,
+    creatorMemberId: task.creatorMemberId === memberId ? undefined : task.creatorMemberId,
+    primaryExecutorMemberId: task.primaryExecutorMemberId === memberId ? undefined : task.primaryExecutorMemberId,
+    collaboratorMemberIds: task.collaboratorMemberIds?.filter((id) => id !== memberId) ?? [],
+  }));
 
 export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevision: number): AppState {
   let next = { ...state };
@@ -262,7 +323,17 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
     if (row.device_id === state.sync.deviceId) continue;
 
     if (row.deleted_at) {
-      if (row.entity === "task") {
+      if (row.entity === "project") {
+        next = { ...next, projects: removeById(next.projects, row.id) };
+      } else if (row.entity === "project_member") {
+        const projectMembers = removeById(next.projectMembers, row.id);
+        next = {
+          ...next,
+          projectMembers,
+          currentMemberId: next.currentMemberId === row.id ? projectMembers[0]?.id : next.currentMemberId,
+          tasks: removeMemberReferences(next.tasks, row.id),
+        };
+      } else if (row.entity === "task") {
         next = {
           ...next,
           tasks: removeById(next.tasks, row.id),
@@ -271,6 +342,10 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
             committedTaskIds: plan.committedTaskIds.filter((taskId) => taskId !== row.id),
           })),
         };
+      } else if (row.entity === "work_session") {
+        next = { ...next, workSessions: removeById(next.workSessions, row.id) };
+      } else if (row.entity === "execution_signal") {
+        next = { ...next, executionSignals: removeById(next.executionSignals, row.id) };
       } else if (row.entity === "daily_plan") {
         next = { ...next, dailyPlans: removeById(next.dailyPlans, row.id) };
       } else if (row.entity === "focus_session") {
@@ -295,39 +370,59 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
       next = { ...next, onboarding: payload as unknown as Onboarding };
     } else if (row.entity === "reward_state" && shouldAcceptRemote(row, next.rewardState, next.updatedAt)) {
       next = { ...next, rewardState: payload as unknown as RewardState };
+    } else if (row.entity === "project") {
+      const incoming = payload as unknown as Project;
+      const existing = next.projects.find((project) => project.id === row.id);
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, projects: upsert(row.entity, next.projects, incoming, row.updated_at, next.updatedAt) };
+    } else if (row.entity === "project_member") {
+      const incoming = payload as unknown as ProjectMember;
+      const existing = next.projectMembers.find((member) => member.id === row.id);
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, projectMembers: upsert(row.entity, next.projectMembers, incoming, row.updated_at, next.updatedAt) };
     } else if (row.entity === "task") {
       const incoming = payload as unknown as Task;
       const existing = next.tasks.find((task) => task.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, tasks: upsert(next.tasks, incoming, row.updated_at, next.updatedAt) };
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, tasks: upsert(row.entity, next.tasks, incoming, row.updated_at, next.updatedAt) };
+    } else if (row.entity === "work_session") {
+      const incoming = payload as unknown as WorkSession;
+      const existing = next.workSessions.find((session) => session.id === row.id);
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
+        next = { ...next, workSessions: upsert(row.entity, next.workSessions, incoming, row.updated_at, next.updatedAt) };
+      }
+    } else if (row.entity === "execution_signal") {
+      const incoming = payload as unknown as ExecutionSignal;
+      const existing = next.executionSignals.find((signal) => signal.id === row.id);
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
+        next = { ...next, executionSignals: upsert(row.entity, next.executionSignals, incoming, row.updated_at, next.updatedAt) };
+      }
     } else if (row.entity === "daily_plan") {
       const incoming = payload as unknown as DailyPlan;
       const existing = next.dailyPlans.find((plan) => plan.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, dailyPlans: upsert(next.dailyPlans, incoming, row.updated_at, next.updatedAt) };
+        next = { ...next, dailyPlans: upsert(row.entity, next.dailyPlans, incoming, row.updated_at, next.updatedAt) };
       }
     } else if (row.entity === "focus_session") {
       const incoming = payload as unknown as FocusSession;
       const existing = next.focusSessions.find((session) => session.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, focusSessions: upsert(next.focusSessions, incoming, row.updated_at, next.updatedAt) };
+        next = { ...next, focusSessions: upsert(row.entity, next.focusSessions, incoming, row.updated_at, next.updatedAt) };
       }
     } else if (row.entity === "interruption") {
       const incoming = payload as unknown as Interruption;
       const existing = next.interruptions.find((interruption) => interruption.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, interruptions: upsert(next.interruptions, incoming, row.updated_at, next.updatedAt) };
+        next = { ...next, interruptions: upsert(row.entity, next.interruptions, incoming, row.updated_at, next.updatedAt) };
       }
     } else if (row.entity === "strict_violation") {
       const incoming = payload as unknown as StrictViolation;
       const existing = next.strictViolations.find((violation) => violation.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, strictViolations: upsert(next.strictViolations, incoming, row.updated_at, next.updatedAt) };
+        next = { ...next, strictViolations: upsert(row.entity, next.strictViolations, incoming, row.updated_at, next.updatedAt) };
       }
     } else if (row.entity === "block_profile") {
       const incoming = payload as unknown as BlockProfile;
       const existing = next.blockProfiles.find((profile) => profile.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, blockProfiles: upsert(next.blockProfiles, incoming, row.updated_at, next.updatedAt) };
+        next = { ...next, blockProfiles: upsert(row.entity, next.blockProfiles, incoming, row.updated_at, next.updatedAt) };
       }
     }
   }

@@ -69,6 +69,8 @@ import type {
   SyncState,
   Task,
   TaskTemplate,
+  WorkSession,
+  ExecutionSignal,
 } from "./types";
 import { OnboardingView } from "./components/OnboardingView";
 import { WorkspaceView } from "./components/WorkspaceView";
@@ -1437,7 +1439,11 @@ export function App() {
       let next = value;
       if (action === "remote" && conflict.remotePayload && typeof conflict.remotePayload === "object") {
         const payload = conflict.remotePayload as Partial<Task> & Record<string, unknown>;
+        if (conflict.entity === "project") next = { ...next, projects: next.projects.map((project) => (project.id === conflict.id ? { ...project, ...payload, id: conflict.id } as Project : project)) };
+        if (conflict.entity === "project_member") next = { ...next, projectMembers: next.projectMembers.map((member) => (member.id === conflict.id ? { ...member, ...payload, id: conflict.id } as ProjectMember : member)) };
         if (conflict.entity === "task") next = { ...next, tasks: next.tasks.map((task) => (task.id === conflict.id ? { ...task, ...payload, id: conflict.id } as Task : task)) };
+        if (conflict.entity === "work_session") next = { ...next, workSessions: next.workSessions.map((session) => (session.id === conflict.id ? { ...session, ...payload, id: conflict.id } as WorkSession : session)) };
+        if (conflict.entity === "execution_signal") next = { ...next, executionSignals: next.executionSignals.map((signal) => (signal.id === conflict.id ? { ...signal, ...payload, id: conflict.id } as ExecutionSignal : signal)) };
         if (conflict.entity === "daily_plan") next = { ...next, dailyPlans: next.dailyPlans.map((plan) => (plan.id === conflict.id ? { ...plan, ...payload, id: conflict.id } as DailyPlan : plan)) };
         if (conflict.entity === "settings") next = { ...next, settings: { ...next.settings, ...payload } as AppState["settings"] };
       }

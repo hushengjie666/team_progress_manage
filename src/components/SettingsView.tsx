@@ -632,8 +632,16 @@ export function SettingsView(props: {
         {state.settings.advancedSyncVisible && (
           <>
             <div className="sync-table">
+              <span>项目</span>
+              <strong>{state.projects.length}</strong>
+              <span>成员</span>
+              <strong>{state.projectMembers.length}</strong>
               <span>任务</span>
               <strong>{state.tasks.length}</strong>
+              <span>工作会话</span>
+              <strong>{state.workSessions.length}</strong>
+              <span>执行信号</span>
+              <strong>{state.executionSignals.length}</strong>
               <span>番茄记录</span>
               <strong>{state.focusSessions.length}</strong>
               <span>中断</span>
