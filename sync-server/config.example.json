@@ -1,0 +1,8 @@
+{
+  "addr": "0.0.0.0:8787",
+  "data_path": "C:\\TimeManage\\sync\\store.json",
+  "username": "demo",
+  "password": "change-me",
+  "secret": "change-me-token-secret"
+}
+

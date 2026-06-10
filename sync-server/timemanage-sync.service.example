@@ -1,0 +1,20 @@
+[Unit]
+Description=TimeManage Sync Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timemanage
+Group=timemanage
+WorkingDirectory=/opt/timemanage-sync
+ExecStart=/opt/timemanage-sync/timemanage-sync serve --config /etc/timemanage-sync/sync.json
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/timemanage-sync
+
+[Install]
+WantedBy=multi-user.target
