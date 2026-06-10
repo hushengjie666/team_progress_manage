@@ -114,6 +114,89 @@ test("persists task progress percent and progress note", async ({ page }) => {
   await expect(page.getByLabel("进展说明")).toHaveValue("完成指标口径，剩余图表校验。");
 });
 
+test("orders the progress board by risk before normal work", async ({ page }) => {
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "下一步" }).click();
+  await page.getByRole("button", { name: "开始今天" }).click();
+
+  await page.waitForFunction(() => {
+    const raw = localStorage.getItem("timemanage.app_state.v1");
+    if (!raw) return false;
+    return JSON.parse(raw).onboarding?.completed === true;
+  });
+  const progressBoardState = await page.evaluate(() => {
+    const raw = localStorage.getItem("timemanage.app_state.v1");
+    if (!raw) return "";
+    const state = JSON.parse(raw);
+    const projectId = state.projects[0].id;
+    const memberId = state.projectMembers[0].id;
+    const now = Date.now();
+    const old = new Date(now - 48 * 60 * 60 * 1000).toISOString();
+    const stale = new Date(now - 30 * 60 * 60 * 1000).toISOString();
+    const recent = new Date(now - 60 * 60 * 1000).toISOString();
+    const nearFinish = new Date(now + 60 * 60 * 1000).toISOString();
+    state.projects = state.projects.map((project: { id: string; defaultExpectedStartHours: number }) =>
+      project.id === projectId ? { ...project, defaultExpectedStartHours: 1 } : project,
+    );
+    const base = state.tasks[0];
+    const task = (id: string, title: string, status: string, patch = {}) => ({
+      ...base,
+      id,
+      title,
+      projectId,
+      project: state.projects[0].name,
+      primaryExecutorMemberId: memberId,
+      status,
+      progressPercent: 20,
+      progressNote: "",
+      createdAt: old,
+      updatedAt: recent,
+      expectedStartAt: undefined,
+      expectedFinishAt: undefined,
+      completedAt: undefined,
+      reviewReturnReason: undefined,
+      ...patch,
+    });
+    state.tasks = [
+      task("e2e_assigned", "E2E 已分配未开始", "pool", { updatedAt: old }),
+      task("e2e_stalled", "E2E 停滞任务", "in_progress", { updatedAt: stale }),
+      task("e2e_blocked", "E2E 阻塞任务", "in_progress", { progressNote: "被外部系统阻塞" }),
+      task("e2e_review", "E2E 待验收任务", "pending_review", { progressPercent: 100, reviewSubmittedAt: recent }),
+      task("e2e_near_finish", "E2E 临近完成任务", "in_progress", { progressPercent: 80, expectedFinishAt: nearFinish }),
+      task("e2e_normal", "E2E 正常工作", "in_progress", { progressPercent: 25 }),
+    ];
+    state.workSessions = [
+      { id: "work_stalled", taskId: "e2e_stalled", executorMemberId: memberId, focusSessionId: "focus_stalled", status: "ended", startedAt: stale, endedAt: stale, totalPausedSeconds: 0, createdAt: stale, updatedAt: stale },
+      { id: "work_blocked", taskId: "e2e_blocked", executorMemberId: memberId, focusSessionId: "focus_blocked", status: "ended", startedAt: recent, endedAt: recent, totalPausedSeconds: 0, createdAt: recent, updatedAt: recent },
+      { id: "work_near", taskId: "e2e_near_finish", executorMemberId: memberId, focusSessionId: "focus_near", status: "ended", startedAt: recent, endedAt: recent, totalPausedSeconds: 0, createdAt: recent, updatedAt: recent },
+      { id: "work_normal", taskId: "e2e_normal", executorMemberId: memberId, focusSessionId: "focus_normal", status: "active", startedAt: recent, totalPausedSeconds: 0, createdAt: recent, updatedAt: recent },
+    ];
+    state.executionSignals = state.workSessions.map((session: { id: string; taskId: string; executorMemberId: string; updatedAt: string }) => ({
+      id: `signal_${session.taskId}`,
+      workSessionId: session.id,
+      taskId: session.taskId,
+      executorMemberId: session.executorMemberId,
+      type: "work_started",
+      createdAt: session.updatedAt,
+    }));
+    return JSON.stringify(state);
+  });
+  await page.addInitScript((payload) => {
+    localStorage.setItem("timemanage.app_state.v1", payload);
+  }, progressBoardState);
+  await page.reload();
+
+  const board = page.locator(".progress-board");
+  await expect(board.getByRole("heading", { name: "项目进度看板" })).toBeVisible();
+  await expect(board.getByText("活跃工作会话")).toBeVisible();
+  await expect(board.getByText("E2E 正常工作").first()).toBeVisible();
+  const sectionTitles = await board.locator(".board-section-heading strong").allTextContents();
+  expect(sectionTitles).toEqual(["已分配未开始", "停滞风险", "阻塞任务", "待验收", "临近预计完成", "正常工作"]);
+  await expect(board.locator(".board-section").filter({ hasText: "已分配未开始" })).toContainText("E2E 已分配未开始");
+  await expect(board.locator(".board-section").filter({ hasText: "正常工作" })).toContainText("E2E 正常工作");
+});
+
 test("uses usability helpers for advanced task fields, split, delete undo and sync wizard", async ({ page }) => {
   await page.getByRole("button", { name: "下一步" }).click();
   await page.getByRole("button", { name: "下一步" }).click();

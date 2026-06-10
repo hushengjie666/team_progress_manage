@@ -1,7 +1,7 @@
 import type React from "react";
 import { useState } from "react";
 import { Activity, AlarmClock, ArrowDown, ArrowUp, Check, ChevronRight, PanelRight, Play, Plus, SlidersHorizontal, Sparkles, Split, Square, Target, Trash2, X } from "lucide-react";
-import { abortedSessionsOnDate, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, stalledTaskRisks, taskSuggestions, unresolvedInterruptions } from "../domain";
+import { abortedSessionsOnDate, buildProgressBoard, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, stalledTaskRisks, taskSuggestions, unresolvedInterruptions } from "../domain";
 import { formatDateTimeLocal, labelPriority, nowIso, parseDateTimeLocal, today, type TaskDraft, type TaskFilters, type TaskSort } from "../appModel";
 import { uid } from "../seed";
 import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task } from "../types";
@@ -115,9 +115,14 @@ export function WorkspaceView(props: {
   const [showAdvancedTask, setShowAdvancedTask] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showGuidance, setShowGuidance] = useState(false);
+  const [boardProjectId, setBoardProjectId] = useState(state.projects[0]?.id ?? "");
   const [showReview, setShowReview] = useState(
     Boolean(todayPlan.reviewedAt || new Date().getHours() >= 18),
   );
+  const selectedBoardProjectId = state.projects.some((project) => project.id === boardProjectId)
+    ? boardProjectId
+    : state.projects[0]?.id ?? "";
+  const progressBoard = buildProgressBoard(state, selectedBoardProjectId);
 
   return (
     <div className="content-grid workspace-grid">
@@ -162,6 +167,14 @@ export function WorkspaceView(props: {
           {showGuidance ? "收起辅助" : "展开辅助"}
         </button>
       </section>
+
+      <ProgressBoardPanel
+        board={progressBoard}
+        projects={state.projects}
+        selectedProjectId={selectedBoardProjectId}
+        setSelectedProjectId={setBoardProjectId}
+        selectTask={selectTask}
+      />
 
       <PersonalWorkbench
         currentMember={currentMember}
@@ -574,6 +587,93 @@ export function WorkspaceView(props: {
         ))}
       </section>}
     </div>
+  );
+}
+
+function formatElapsed(seconds: number) {
+  const safe = Math.max(0, seconds);
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  return hours > 0 ? `${hours}小时${minutes}分` : `${minutes}分`;
+}
+
+function ProgressBoardPanel(props: {
+  board: ReturnType<typeof buildProgressBoard>;
+  projects: AppState["projects"];
+  selectedProjectId: string;
+  setSelectedProjectId: (projectId: string) => void;
+  selectTask: (taskId: string) => void;
+}) {
+  return (
+    <section className="band progress-board">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">Progress Board</p>
+          <h2>项目进度看板</h2>
+        </div>
+        <label className="compact-select">
+          <span className="sr-only">选择项目</span>
+          <select value={props.selectedProjectId} onChange={(event) => props.setSelectedProjectId(event.target.value)}>
+            {props.projects.map((project) => (
+              <option key={project.id} value={project.id}>{project.name}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="board-summary">
+        <div>
+          <span>加权项目进度</span>
+          <strong>{props.board.projectProgress}%</strong>
+        </div>
+        <div>
+          <span>活跃工作会话</span>
+          <strong>{props.board.activeSessions.length}</strong>
+        </div>
+        <div>
+          <span>风险优先项</span>
+          <strong>{props.board.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0)}</strong>
+        </div>
+      </div>
+
+      <div className="active-session-list">
+        {props.board.activeSessions.length === 0 && <p className="empty">当前项目没有正在执行的工作会话。</p>}
+        {props.board.activeSessions.map((session) => (
+          <article className="active-work-line" key={session.workSessionId}>
+            <div>
+              <strong>{session.taskTitle}</strong>
+              <span>
+                {session.executorName ?? "未指定执行者"} · 开始 {new Date(session.startedAt).toLocaleTimeString()} · 已进行 {formatElapsed(session.elapsedSeconds)}
+              </span>
+            </div>
+            <button className="small-button" onClick={() => props.selectTask(session.taskId)}>查看</button>
+          </article>
+        ))}
+      </div>
+
+      <div className="board-section-list">
+        {props.board.sections.map((section) => (
+          <div className={`board-section board-section-${section.kind}`} key={section.kind}>
+            <div className="board-section-heading">
+              <strong>{section.title}</strong>
+              <span>{section.tasks.length}</span>
+            </div>
+            {section.tasks.length === 0 && <p className="empty">暂无任务。</p>}
+            {section.tasks.map((task) => (
+              <article className="board-task" key={`${section.kind}-${task.taskId}`}>
+                <div>
+                  <strong>{task.title}</strong>
+                  <span>{task.executorName ?? "未分配执行者"} · 进度 {task.progressPercent}%</span>
+                  <p>{task.detail}</p>
+                  {task.progressNote && <p>进展说明：{task.progressNote}</p>}
+                </div>
+                <button className="small-button" onClick={() => props.selectTask(task.taskId)}>查看</button>
+              </article>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
