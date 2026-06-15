@@ -31,7 +31,7 @@ import {
 } from "./domain";
 import { playTimerSound, requestTimerNotifications, sendTimerNotification, startWhiteNoise } from "./notifications";
 import { checkStrictModeViolation, loadState, requestStrictPermissions, saveState, startStrictMode, stopStrictMode } from "./storage";
-import { loginToSyncServer, syncAppState } from "./sync";
+import { bootstrapWorkspace, createTeamMemberAccount, getAuthStatus, loginToSyncServer, loginToWorkspace, syncAppState, updateTeamMemberAccount } from "./sync";
 import { buildCsvBundle, createBackupSnapshot, exportStateJson, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
@@ -39,18 +39,22 @@ import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { updateDesktopTimerPresence } from "./nativeDesktop";
 import {
   acceptTaskInState,
-  addProjectMemberToState,
+  bindTeamMemberToProjectInState,
+  createTeamMemberInState,
   assignTaskInState,
   createProjectInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectInState,
   updateProjectMemberInState,
+  updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
+import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
 import { uid } from "./seed";
 import type {
   AppState,
+  AuthState,
   BlockProfile,
   CoachStepId,
   DailyPlan,
@@ -73,17 +77,19 @@ import type {
   SyncState,
   Task,
   TaskTemplate,
+  TeamMember,
   WorkSession,
   ExecutionSignal,
 } from "./types";
-import { OnboardingView } from "./components/OnboardingView";
 import { WorkspaceView } from "./components/WorkspaceView";
+import { ProjectDetailView, type ProjectDetailTab } from "./components/ProjectDetailView";
 import { FocusView, MiniTimer } from "./components/FocusView";
 import { ConfirmDialog, ShortcutHelpDialog, SplitTaskDialog } from "./components/Dialogs";
 import { ReportsView } from "./components/ReportsView";
 import { SettingsView } from "./components/SettingsView";
 import { CalendarView } from "./components/CalendarView";
 import { CommandPalette } from "./components/CommandPalette";
+import { AuthGate } from "./components/AuthGate";
 import {
   emptyTaskDefaults,
   endSessionInState,
@@ -110,6 +116,8 @@ export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
   const [workspaceMode, setWorkspaceMode] = useState<"board" | "workbench">("board");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectDetailTab, setProjectDetailTab] = useState<ProjectDetailTab>("overview");
   const [draft, setDraft] = useState<TaskDraft>(initialDraft);
   const [loaded, setLoaded] = useState(false);
   const [strictStatus, setStrictStatus] = useState<StrictModeStatus | null>(null);
@@ -127,6 +135,7 @@ export function App() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<"members" | "projects" | "timer" | "focus" | "sync" | "data" | "system">("members");
   const stateRef = useRef<AppState | null>(null);
   const pendingImportPayloadRef = useRef<unknown>(null);
   const syncInFlightRef = useRef(false);
@@ -136,6 +145,84 @@ export function App() {
   const undoTimerRef = useRef<number | null>(null);
   const tabRef = useRef<Tab>("workspace");
   const selectedTaskIdRef = useRef<string | null>(null);
+
+  const bindAccountToMembers = (value: AppState, auth: AuthState): AppState => {
+    const account = auth.account;
+    if (!account) return value;
+    const timestamp = nowIso();
+    const existingTeamMember =
+      value.teamMembers.find((member) => member.accountId === account.id) ??
+      value.teamMembers.find((member) => !member.accountId && member.email?.toLowerCase() === account.email.toLowerCase());
+    const teamMember: TeamMember = existingTeamMember
+      ? {
+          ...existingTeamMember,
+          accountId: account.id,
+          name: existingTeamMember.name || account.name,
+          email: existingTeamMember.email ?? account.email,
+          status: existingTeamMember.status ?? "active",
+          updatedAt: timestamp,
+        }
+      : {
+          id: uid("team_member"),
+          accountId: account.id,
+          name: account.name,
+          email: account.email,
+          status: "active",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+    const teamMembers = existingTeamMember
+      ? value.teamMembers.map((member) => (member.id === existingTeamMember.id ? teamMember : member))
+      : [teamMember, ...value.teamMembers];
+    const hasAccountOwnerForProject = (projectId: string) =>
+      value.projectMembers.some((member) => member.projectId === projectId && member.accountId === account.id && member.roles.includes("project_owner"));
+    const projectMembers = value.projectMembers.map((member) =>
+      member.accountId === account.id ||
+      (!member.accountId && member.roles.includes("project_owner") && !hasAccountOwnerForProject(member.projectId) && (!member.email || member.email === account.email))
+        ? {
+            ...member,
+            teamMemberId: teamMember.id,
+            accountId: account.id,
+            name: member.name || account.name,
+            email: member.email ?? account.email,
+            status: member.status ?? "active",
+            updatedAt: timestamp,
+          }
+        : { ...member, status: member.status ?? "active" },
+    );
+    const currentMember =
+      projectMembers.find((member) => member.id === value.currentMemberId && member.accountId === account.id) ??
+      projectMembers.find((member) => member.accountId === account.id) ??
+      projectMembers[0];
+    return {
+      ...value,
+      auth,
+      teamMembers,
+      currentMemberId: currentMember?.id,
+      projectMembers,
+      sync: {
+        ...value.sync,
+        enabled: true,
+        token: auth.token,
+        username: account.email,
+        message: auth.message,
+        status: "idle",
+      },
+      updatedAt: timestamp,
+    };
+  };
+
+  const setAuthPatch = (patch: Partial<AuthState>) => {
+    setState((current) =>
+      current
+        ? {
+            ...current,
+            auth: { ...current.auth, ...patch },
+            updatedAt: nowIso(),
+          }
+        : current,
+    );
+  };
 
   useEffect(() => {
     stateRef.current = state;
@@ -172,6 +259,7 @@ export function App() {
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
         if (event.key === "1") {
           event.preventDefault();
+          setSettingsSection("projects");
           setTab("settings");
           return;
         }
@@ -286,7 +374,7 @@ export function App() {
 
   useEffect(() => {
     loadState()
-      .then((value) => {
+      .then(async (value) => {
         const params = new URLSearchParams(window.location.search);
         const shouldLoadDemo = params.get("demo") === "1" || sessionStorage.getItem("timemanage.load_demo") === "1";
         if (params.get("demo") === "1") sessionStorage.setItem("timemanage.load_demo", "1");
@@ -297,7 +385,32 @@ export function App() {
           setLoaded(true);
           return;
         }
-        setState(ensureTodayPlan({ ...value, activeTimer: restoreTimer(value.activeTimer) }));
+        let next = ensureTodayPlan({ ...value, activeTimer: restoreTimer(value.activeTimer) });
+        try {
+          const status = await getAuthStatus(next.sync.serverUrl);
+          next = {
+            ...next,
+            auth: {
+              ...next.auth,
+              status: next.auth.token ? "authenticated" : "signed_out",
+              bootstrapped: status.bootstrapped,
+              message: status.bootstrapped ? "请登录团队工作区" : "当前服务还没有团队，请先初始化",
+            },
+          };
+        } catch (error) {
+          next = {
+            ...next,
+            auth: {
+              ...next.auth,
+              status: "error",
+              message: error instanceof Error ? `认证服务不可用：${error.message}` : "认证服务不可用",
+            },
+          };
+        }
+        if (next.auth.account && next.auth.token) {
+          next = bindAccountToMembers(next, { ...next.auth, status: "authenticated" });
+        }
+        setState(next);
         setLoaded(true);
       })
       .catch(() => {
@@ -615,6 +728,12 @@ export function App() {
     updateState((value) => ({ ...value, tasks: [task, ...value.tasks], updatedAt: timestamp }));
     setDraft(initialDraft);
     setToast(task.estimatePomodoros > 7 ? "已添加，但建议拆分这个大任务" : "任务已进入活动清单");
+  };
+
+  const createProjectTask = (projectId: string, input: ProjectTaskInput) => {
+    const timestamp = nowIso();
+    updateState((value) => createProjectTaskInState(value, projectId, input, timestamp));
+    setToast("项目任务已创建");
   };
 
   const commitTask = (taskId: string) => {
@@ -966,7 +1085,13 @@ export function App() {
 
   const createProject = (name: string, description: string) => {
     const timestamp = nowIso();
-    updateState((value) => createProjectInState(value, name, description, timestamp));
+    updateState((value) =>
+      createProjectInState(value, name, description, timestamp, uid, {
+        accountId: value.auth.account?.id,
+        name: value.auth.account?.name,
+        email: value.auth.account?.email,
+      }),
+    );
     setToast("项目已创建");
   };
 
@@ -975,15 +1100,73 @@ export function App() {
     updateState((value) => updateProjectInState(value, project, timestamp));
   };
 
-  const addProjectMember = (projectId: string, name: string, email: string, roles: ProjectMemberRole[]) => {
+  const createTeamMember = (name: string, email: string, password = "demo") => {
     const timestamp = nowIso();
-    updateState((value) => addProjectMemberToState(value, projectId, name, email, roles, timestamp));
-    setToast("项目成员已添加");
+    const token = state.auth.token ?? state.sync.token;
+    if (token && email.trim()) {
+      void createTeamMemberAccount(state.sync, token, { name, email, password })
+        .then((member) => {
+          updateState((value) => ({
+            ...value,
+            teamMembers: value.teamMembers.some((item) => item.id === member.id)
+              ? value.teamMembers.map((item) => (item.id === member.id ? member : item))
+              : [member, ...value.teamMembers],
+            updatedAt: nowIso(),
+          }));
+          setToast("成员账号已创建，可在项目中绑定");
+        })
+        .catch((error) => {
+          const message = error instanceof Error ? error.message : "成员账号创建失败";
+          setToast(message);
+        });
+      return;
+    }
+    updateState((value) => createTeamMemberInState(value, name, email, timestamp));
+    setToast("已创建本地成员，可在项目中绑定");
+  };
+
+  const updateTeamMember = (member: TeamMember) => {
+    const timestamp = nowIso();
+    updateState((value) => updateTeamMemberInState(value, member, timestamp));
+  };
+
+  const bindTeamMemberToProject = (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => {
+    const timestamp = nowIso();
+    updateState((value) => bindTeamMemberToProjectInState(value, projectId, teamMemberId, roles, timestamp));
+    setToast("项目成员绑定已更新");
   };
 
   const updateProjectMember = (member: ProjectMember) => {
     const timestamp = nowIso();
     updateState((value) => updateProjectMemberInState(value, member, timestamp));
+  };
+
+  const updateTeamMemberPassword = (member: TeamMember, password: string) => {
+    const token = state.auth.token ?? state.sync.token;
+    if (!token) {
+      setToast("请先登录团队服务后再修改成员密码");
+      return;
+    }
+    if (!member.accountId) {
+      setToast("该成员还没有绑定账号，无法修改密码");
+      return;
+    }
+    if (!password.trim()) {
+      setToast("请输入新密码");
+      return;
+    }
+    void updateTeamMemberAccount(state.sync, token, member.id, { password })
+      .then((updatedMember) => {
+        updateState((value) => ({
+          ...value,
+          teamMembers: value.teamMembers.map((item) => (item.id === updatedMember.id ? updatedMember : item)),
+          updatedAt: nowIso(),
+        }));
+        setToast("成员密码已更新");
+      })
+      .catch((error) => {
+        setToast(error instanceof Error ? error.message : "成员密码更新失败");
+      });
   };
 
   const updateTask = (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => {
@@ -1207,6 +1390,81 @@ export function App() {
     }));
   };
 
+  const checkAuthStatus = async () => {
+    setAuthPatch({ status: "checking", message: "正在检查团队服务" });
+    const source = stateRef.current;
+    if (!source) return;
+    try {
+      const status = await getAuthStatus(source.sync.serverUrl);
+      setAuthPatch({
+        status: source.auth.token ? "authenticated" : "signed_out",
+        bootstrapped: status.bootstrapped,
+        message: status.bootstrapped ? "请登录团队工作区" : "当前服务还没有团队，请先初始化",
+      });
+    } catch (error) {
+      setAuthPatch({
+        status: "error",
+        message: error instanceof Error ? `认证服务不可用：${error.message}` : "认证服务不可用",
+      });
+    }
+  };
+
+  const applySession = (session: { token: string; expiresAt: string; account: AuthState["account"]; workspace: AuthState["workspace"] }, message: string) => {
+    updateState((value) =>
+      bindAccountToMembers(value, {
+        status: "authenticated",
+        token: session.token,
+        expiresAt: session.expiresAt,
+        account: session.account,
+        workspace: session.workspace,
+        bootstrapped: true,
+        message,
+      }),
+    );
+  };
+
+  const handleWorkspaceBootstrap = async (payload: { workspaceName: string; name: string; email: string; password: string }) => {
+    setAuthPatch({ status: "checking", message: "正在初始化团队" });
+    try {
+      const source = stateRef.current ?? state;
+      if (!source) throw new Error("本地状态尚未加载");
+      const session = await bootstrapWorkspace(source.sync, payload);
+      const message = `已初始化 ${session.workspace.name}`;
+      const nextState = bindAccountToMembers(source, {
+        status: "authenticated",
+        token: session.token,
+        expiresAt: session.expiresAt,
+        account: session.account,
+        workspace: session.workspace,
+        bootstrapped: true,
+        message,
+      });
+      setState(ensureTodayPlan(nextState));
+      setToast(message);
+      window.setTimeout(() => void runSync(true), 100);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "初始化失败";
+      setAuthPatch({ status: "error", message });
+      setToast(message);
+    }
+  };
+
+  const handleWorkspaceLogin = async (email: string, password: string) => {
+    setAuthPatch({ status: "checking", message: "正在登录团队工作区" });
+    try {
+      const source = stateRef.current ?? state;
+      if (!source) throw new Error("本地状态尚未加载");
+      const session = await loginToWorkspace(source.sync, email, password);
+      applySession(session, `已登录 ${session.workspace.name}`);
+      setToast("团队工作区已登录");
+      window.setTimeout(() => void runSync(true), 100);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "登录失败";
+      setAuthPatch({ status: "error", message });
+      setToast(message);
+    }
+  };
+
   const setSyncStatus = (patch: Partial<SyncState>) => {
     updateState((current) => ({
       ...current,
@@ -1275,74 +1533,6 @@ export function App() {
 
   const handleSyncNow = async () => {
     await runSync(true);
-  };
-
-  const completeOnboarding = (payload: {
-    distractionSources: string[];
-    desiredHabit: string;
-    currentDailyWasteMinutes: number;
-    dailyGoalPomodoros: number;
-    preferredFocusMinutes: number;
-    strictModeIntent: AppState["onboarding"]["strictModeIntent"];
-    syncIntent: AppState["onboarding"]["syncIntent"];
-    blockedApps: string[];
-    blockedWebsites: string[];
-  }) => {
-    const timestamp = nowIso();
-    updateState((value) => {
-      const activeProfileId = value.settings.activeBlockProfileId ?? value.blockProfiles[0]?.id ?? "profile_default";
-      const existingProfile = value.blockProfiles.find((profile) => profile.id === activeProfileId) ?? value.blockProfiles[0];
-      const profile = {
-        ...(existingProfile ?? {
-          id: activeProfileId,
-          name: "深度专注",
-          schedule: "专注番茄期间",
-          platformPermissionState: "unknown" as const,
-          createdAt: timestamp,
-        }),
-        apps: payload.blockedApps,
-        websites: payload.blockedWebsites,
-        strictness: payload.strictModeIntent,
-        updatedAt: timestamp,
-      };
-      return {
-        ...value,
-        onboarding: {
-          completed: true,
-          distractionSources: payload.distractionSources,
-          desiredHabit: payload.desiredHabit,
-          currentDailyWasteMinutes: payload.currentDailyWasteMinutes,
-          dailyGoalPomodoros: payload.dailyGoalPomodoros,
-          preferredFocusMinutes: payload.preferredFocusMinutes,
-          strictModeIntent: payload.strictModeIntent,
-          syncIntent: payload.syncIntent,
-        },
-        settings: {
-          ...value.settings,
-          focusMinutes: payload.preferredFocusMinutes,
-          strictModeEnabled: payload.strictModeIntent !== "soft",
-          activeBlockProfileId: profile.id,
-        },
-        rewardState: {
-          ...value.rewardState,
-          dailyGoal: payload.dailyGoalPomodoros,
-          badges: Array.from(new Set([...value.rewardState.badges, "完成启动问卷"])),
-        },
-        blockProfiles: value.blockProfiles.some((item) => item.id === profile.id)
-          ? value.blockProfiles.map((item) => (item.id === profile.id ? profile : item))
-          : [profile, ...value.blockProfiles],
-        updatedAt: timestamp,
-      };
-    });
-    setToast("启动问卷已完成，今天从可兑现的承诺开始");
-  };
-
-  const restartOnboarding = () => {
-    updateState((value) => ({
-      ...value,
-      onboarding: { ...value.onboarding, completed: false },
-      updatedAt: nowIso(),
-    }));
   };
 
   const downloadText = (filename: string, text: string, mime = "text/plain;charset=utf-8") => {
@@ -1447,6 +1637,7 @@ export function App() {
       if (action === "remote" && conflict.remotePayload && typeof conflict.remotePayload === "object") {
         const payload = conflict.remotePayload as Partial<Task> & Record<string, unknown>;
         if (conflict.entity === "project") next = { ...next, projects: next.projects.map((project) => (project.id === conflict.id ? { ...project, ...payload, id: conflict.id } as Project : project)) };
+        if (conflict.entity === "team_member") next = { ...next, teamMembers: next.teamMembers.map((member) => (member.id === conflict.id ? { ...member, ...payload, id: conflict.id } as TeamMember : member)) };
         if (conflict.entity === "project_member") next = { ...next, projectMembers: next.projectMembers.map((member) => (member.id === conflict.id ? { ...member, ...payload, id: conflict.id } as ProjectMember : member)) };
         if (conflict.entity === "task") next = { ...next, tasks: next.tasks.map((task) => (task.id === conflict.id ? { ...task, ...payload, id: conflict.id } as Task : task)) };
         if (conflict.entity === "work_session") next = { ...next, workSessions: next.workSessions.map((session) => (session.id === conflict.id ? { ...session, ...payload, id: conflict.id } as WorkSession : session)) };
@@ -1575,7 +1766,14 @@ export function App() {
     if (action === "navigate_focus") openWorkbench();
     if (action === "navigate_calendar") setTab("calendar");
     if (action === "navigate_reports") setTab("reports");
-    if (action === "navigate_settings" || action === "open_sync_settings") setTab("settings");
+    if (action === "navigate_settings") {
+      setSettingsSection("projects");
+      setTab("settings");
+    }
+    if (action === "open_sync_settings") {
+      setSettingsSection("sync");
+      setTab("settings");
+    }
     if (action === "add_quick_task") addParsedQuickTask(parsed ?? parseQuickInput(""));
     if (action === "open_task" && taskId) {
       setSelectedTaskId(taskId);
@@ -1603,16 +1801,29 @@ export function App() {
     setTaskFilters(initialFilters);
     setWorkspaceMode("board");
     setTab("workspace");
-    setToast("已加载演示数据，可以从进度看板开始体验");
+    setToast("已加载演示数据，可以从项目总览开始体验");
   };
 
   const totalCommittedEstimate = committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0);
   const capacityHint = planCapacityHint(state);
   const primaryProjectId = state.projects[0]?.id ?? "";
+  const activeProjectId = selectedProjectId && state.projects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : primaryProjectId;
+  const activeProject = state.projects.find((project) => project.id === activeProjectId);
   const sidebarBoard = primaryProjectId ? buildProgressBoard(state, primaryProjectId) : undefined;
   const sidebarRiskCount = sidebarBoard?.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0) ?? 0;
-  const activeNavKey = tab === "workspace" ? workspaceMode : tab === "settings" ? "projects" : tab;
-  const openProjects = () => setTab("settings");
+  const activeNavKey = tab === "workspace" ? workspaceMode : tab === "project" ? "board" : tab === "settings" ? "admin" : tab;
+  const openAdmin = (section: typeof settingsSection = "members") => {
+    setSettingsSection(section);
+    setTab("settings");
+  };
+  const openProjectDetail = (projectId: string, detailTab: ProjectDetailTab = "overview") => {
+    setSelectedProjectId(projectId);
+    setProjectDetailTab(detailTab);
+    setSelectedTaskId(null);
+    setTab("project");
+  };
   const openBoard = () => {
     setWorkspaceMode("board");
     setTab("workspace");
@@ -1622,19 +1833,49 @@ export function App() {
     setTab("workspace");
   };
   const primaryNavItems = [
-    { key: "projects", label: "项目", icon: <FolderKanban size={18} />, onClick: openProjects },
-    { key: "board", label: "进度看板", icon: <LayoutDashboard size={18} />, onClick: openBoard },
-    { key: "workbench", label: "我的工作台", icon: <UserCheck size={18} />, onClick: openWorkbench },
+    { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard },
+    { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench },
+    { key: "admin", label: "管理中心", icon: <FolderKanban size={18} />, onClick: () => openAdmin("members") },
   ];
   const secondaryNavItems = [
-    { key: "focus", label: "计时器", icon: <Focus size={18} />, onClick: () => setTab("focus") },
-    { key: "calendar", label: "排期", icon: <CalendarDays size={18} />, onClick: () => setTab("calendar") },
-    { key: "reports", label: "洞察", icon: <BarChart3 size={18} />, onClick: () => setTab("reports") },
+    { key: "focus", label: "开始工作", icon: <Focus size={18} />, onClick: () => setTab("focus") },
+    { key: "calendar", label: "排期日历", icon: <CalendarDays size={18} />, onClick: () => setTab("calendar") },
+    { key: "reports", label: "复盘洞察", icon: <BarChart3 size={18} />, onClick: () => setTab("reports") },
   ];
   const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
 
-  if (!state.onboarding.completed) {
-    return <OnboardingView state={state} completeOnboarding={completeOnboarding} />;
+  const logout = () => {
+    updateState((value) => ({
+      ...value,
+      auth: {
+        status: "signed_out",
+        bootstrapped: true,
+        message: "已退出登录",
+      },
+      sync: {
+        ...value.sync,
+        token: undefined,
+        enabled: false,
+        message: "已退出团队工作区",
+      },
+      updatedAt: nowIso(),
+    }));
+    setToast("已退出登录");
+  };
+
+  if (state.auth.status !== "authenticated" || !state.auth.token) {
+    return (
+      <AuthGate
+        status={state.auth.status}
+        bootstrapped={state.auth.bootstrapped}
+        serverUrl={state.sync.serverUrl}
+        message={state.auth.message}
+        updateServerUrl={(serverUrl) => updateSyncSetting("serverUrl", serverUrl)}
+        checkStatus={checkAuthStatus}
+        bootstrap={handleWorkspaceBootstrap}
+        login={handleWorkspaceLogin}
+      />
+    );
   }
 
   return (
@@ -1693,15 +1934,17 @@ export function App() {
               <p className="eyebrow">{today()}</p>
               <h1>
                 {tab === "settings"
-                  ? "项目与成员"
+                  ? "管理中心"
+                  : tab === "project"
+                    ? activeProject?.name ?? "项目工作区"
                   : tab === "workspace"
-                    ? workspaceMode === "board" ? "项目进度看板" : "我的工作台"
+                    ? workspaceMode === "board" ? "项目总览" : "我的任务"
                   : tab === "focus"
-                    ? "工作计时器"
+                    ? "开始工作"
                     : tab === "calendar"
-                      ? "排期计划"
+                      ? "排期日历"
                       : tab === "reports"
-                        ? "进度洞察"
+                        ? "复盘洞察"
                         : "系统设置"}
               </h1>
             </div>
@@ -1718,6 +1961,9 @@ export function App() {
             <span className="toast">{toast}</span>
             <button className="secondary-button" onClick={loadDemoData}>
               演示数据
+            </button>
+            <button className="secondary-button" onClick={logout}>
+              账号：{state.auth.account?.name ?? "退出"}
             </button>
             <button className="icon-button" title="命令面板" onClick={() => setCommandPaletteOpen(true)}>
               <Search size={18} />
@@ -1763,12 +2009,43 @@ export function App() {
               setTab("focus");
               void beginTimer("focus", taskId);
             }}
-            openProjectSettings={openProjects}
+            openProjectSettings={() => openAdmin("projects")}
+            openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
             updateReflection={updateReflection}
             updateReview={updateReview}
             completeReview={completeReview}
             resolveInterruption={resolveInterruption}
             convertInterruptionToTask={convertInterruptionToTask}
+          />
+        )}
+
+        {tab === "project" && activeProjectId && (
+          <ProjectDetailView
+            state={state}
+            projectId={activeProjectId}
+            activeTab={projectDetailTab}
+            setActiveTab={setProjectDetailTab}
+            selectedTask={selectedTask}
+            selectTask={setSelectedTaskId}
+            createProjectTask={createProjectTask}
+            updateProject={updateProject}
+            updateTask={updateTask}
+            updateTaskAssignment={updateTaskAssignment}
+            updateTaskProgress={updateTaskProgress}
+            acceptTask={acceptTask}
+            returnTaskForReview={returnTaskForReview}
+            splitTask={splitTask}
+            beginFocus={(taskId) => {
+              setTab("focus");
+              void beginTimer("focus", taskId);
+            }}
+            backToBoard={() => {
+              setWorkspaceMode("board");
+              setTab("workspace");
+            }}
+            backToAdmin={() => openAdmin("projects")}
+            openProjectSettings={() => openAdmin("projects")}
+            openMemberSettings={() => openAdmin("members")}
           />
         )}
 
@@ -1832,13 +2109,19 @@ export function App() {
         {tab === "settings" && (
           <SettingsView
             state={state}
+            activeSection={settingsSection}
+            setActiveSection={setSettingsSection}
             activeProfile={activeProfile}
             strictStatus={strictStatus}
             updateSettings={updateSettings}
             createProject={createProject}
             updateProject={updateProject}
-            addProjectMember={addProjectMember}
+            createTeamMember={createTeamMember}
+            updateTeamMember={updateTeamMember}
+            updateTeamMemberPassword={updateTeamMemberPassword}
+            bindTeamMemberToProject={bindTeamMemberToProject}
             updateProjectMember={updateProjectMember}
+            openProjectDetail={(projectId) => openProjectDetail(projectId, "settings")}
             updateProfile={updateProfile}
             askPermissions={askPermissions}
             askNotificationPermissions={askNotificationPermissions}
@@ -1857,7 +2140,6 @@ export function App() {
             confirmImport={confirmImport}
             restoreBackup={restoreBackup}
             resolveSyncConflict={resolveSyncConflict}
-            restartOnboarding={restartOnboarding}
           />
         )}
       </section>

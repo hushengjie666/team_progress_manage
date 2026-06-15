@@ -18,6 +18,7 @@ const teamState = (): AppState => {
   const member: ProjectMember = {
     id: "member_sync",
     projectId: project.id,
+    accountId: "account_sync",
     name: "执行者",
     email: "executor@example.com",
     roles: ["project_owner", "executor"],
@@ -134,6 +135,38 @@ describe("team progress sync", () => {
     expect(merged.workSessions.find((session) => session.id === "work_session_sync")).toMatchObject({ taskId: "task_sync" });
     expect(merged.executionSignals.find((signal) => signal.id === "signal_sync")).toMatchObject({ workSessionId: "work_session_sync" });
     expect(merged.sync.lastPulledRevision).toBe(6);
+  });
+
+  it("keeps a locally completed onboarding from being reverted by remote setup state", () => {
+    const base = teamState();
+    const local = {
+      ...base,
+      onboarding: {
+        ...base.onboarding,
+        completed: true,
+      },
+      updatedAt: iso("2026-06-10T10:00:00Z"),
+    };
+    const remoteOnboarding = {
+      ...local.onboarding,
+      completed: false,
+    };
+
+    const merged = mergeRowsIntoState(
+      local,
+      [
+        row({
+          entity: "onboarding",
+          id: "default",
+          updated_at: iso("2026-06-10T10:05:00Z"),
+          payload: remoteOnboarding,
+          revision: 12,
+        }),
+      ],
+      12,
+    );
+
+    expect(merged.onboarding.completed).toBe(true);
   });
 
   it("applies tombstones for team progress entities", () => {

@@ -23,17 +23,13 @@ export function OnboardingView(props: {
   const [waste, setWaste] = useState(state.onboarding.currentDailyWasteMinutes);
   const [dailyGoal, setDailyGoal] = useState(state.onboarding.dailyGoalPomodoros);
   const [focusMinutes, setFocusMinutes] = useState(state.onboarding.preferredFocusMinutes);
-  const [strictIntent, setStrictIntent] = useState<AppState["onboarding"]["strictModeIntent"]>(state.onboarding.strictModeIntent);
-  const [syncIntent, setSyncIntent] = useState<AppState["onboarding"]["syncIntent"]>(state.onboarding.syncIntent);
   const activeProfile = state.blockProfiles.find((profile) => profile.id === state.settings.activeBlockProfileId) ?? state.blockProfiles[0];
-  const [apps, setApps] = useState(activeProfile?.apps.join("\n") ?? "");
-  const [websites, setWebsites] = useState(activeProfile?.websites.join("\n") ?? "");
   const sourceList = sources
     .split(/[,\n，]+/)
     .map((item) => item.trim())
     .filter(Boolean);
   const wasteDays = Math.round((waste * 365) / 60 / 24);
-  const steps = ["分心来源", "浪费反思", "目标节奏", "严格与同步"];
+  const steps = ["分心来源", "浪费反思", "目标节奏"];
 
   const finish = () =>
     completeOnboarding({
@@ -42,16 +38,10 @@ export function OnboardingView(props: {
       currentDailyWasteMinutes: waste,
       dailyGoalPomodoros: dailyGoal,
       preferredFocusMinutes: focusMinutes,
-      strictModeIntent: strictIntent,
-      syncIntent,
-      blockedApps: apps
-        .split(/[,\n，]+/)
-        .map((item) => item.trim())
-        .filter(Boolean),
-      blockedWebsites: websites
-        .split(/[,\n，]+/)
-        .map((item) => item.trim())
-        .filter(Boolean),
+      strictModeIntent: state.onboarding.strictModeIntent,
+      syncIntent: state.onboarding.syncIntent,
+      blockedApps: activeProfile?.apps ?? [],
+      blockedWebsites: activeProfile?.websites ?? [],
     });
 
   return (
@@ -63,8 +53,18 @@ export function OnboardingView(props: {
           </div>
           <div>
             <strong>Team Progress</strong>
-            <span>团队进度管控</span>
+            <span>团队进度管控 · 个人偏好可稍后调整</span>
           </div>
+        </div>
+        <div className="onboarding-intro">
+          <div>
+            <p className="eyebrow">首次使用</p>
+            <h1>先进入团队系统，个人节奏可以慢慢调。</h1>
+            <p className="muted">下面只是个人节奏偏好，不影响项目、成员和任务管理。</p>
+          </div>
+          <button className="secondary-button" onClick={finish}>
+            使用默认配置进入系统
+          </button>
         </div>
         <div className="stepper">
           {steps.map((label, index) => (
@@ -123,38 +123,6 @@ export function OnboardingView(props: {
           </div>
         )}
 
-        {step === 3 && (
-          <div className="onboarding-card">
-            <p className="eyebrow">Strict Mode</p>
-            <h1>给分心设置一点摩擦。</h1>
-            <div className="settings-grid">
-              <label>
-                严格模式强度
-                <select value={strictIntent} onChange={(event) => setStrictIntent(event.target.value as AppState["onboarding"]["strictModeIntent"])}>
-                  <option value="soft">软记录</option>
-                  <option value="balanced">违规暂停</option>
-                  <option value="locked">连续违规作废</option>
-                </select>
-              </label>
-              <label>
-                同步偏好
-                <select value={syncIntent} onChange={(event) => setSyncIntent(event.target.value as AppState["onboarding"]["syncIntent"])}>
-                  <option value="local">先本地使用</option>
-                  <option value="self_hosted">连接自建同步服务</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              屏蔽 App
-              <textarea value={apps} onChange={(event) => setApps(event.target.value)} />
-            </label>
-            <label>
-              屏蔽网站
-              <textarea value={websites} onChange={(event) => setWebsites(event.target.value)} />
-            </label>
-          </div>
-        )}
-
         <div className="onboarding-actions">
           <button className="secondary-button" disabled={step === 0} onClick={() => setStep((value) => Math.max(0, value - 1))}>
             上一步
@@ -165,7 +133,7 @@ export function OnboardingView(props: {
             </button>
           ) : (
             <button className="primary-button" onClick={finish}>
-              开始今天
+              保存偏好并进入系统
             </button>
           )}
         </div>

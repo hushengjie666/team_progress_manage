@@ -10,16 +10,16 @@ type CommandItem = {
 };
 
 const baseCommands: CommandItem[] = [
-  { action: "navigate_settings", label: "打开项目", hint: "管理项目、成员和同步设置" },
-  { action: "navigate_workspace", label: "打开进度看板", hint: "查看项目进度、执行中任务和风险" },
-  { action: "navigate_focus", label: "打开我的工作台", hint: "查看分配给我的任务并开始工作" },
+  { action: "navigate_settings", label: "打开管理中心", hint: "管理项目成员、计时偏好、备份和系统能力" },
+  { action: "navigate_workspace", label: "打开项目总览", hint: "查看项目进度、执行中任务和风险" },
+  { action: "navigate_focus", label: "打开我的任务", hint: "查看分配给我的任务并开始工作" },
   { action: "navigate_calendar", label: "打开排期", hint: "查看长期计划和模板" },
   { action: "navigate_reports", label: "打开洞察", hint: "查看项目与执行趋势" },
   { action: "start_focus", label: "开始工作", hint: "从工作队列启动一段工作会话" },
   { action: "toggle_timer", label: "暂停/继续计时", hint: "控制当前计时器" },
   { action: "record_internal_interruption", label: "记录内部中断", hint: "把突然想做的事先记下来" },
   { action: "record_external_interruption", label: "记录外部中断", hint: "把消息/请求放进中断收件箱" },
-  { action: "open_sync_settings", label: "同步设置", hint: "检查服务器、登录和立即同步" },
+  { action: "open_sync_settings", label: "打开团队同步", hint: "检查服务器、登录、诊断和立即同步" },
   { action: "open_shortcut_help", label: "快捷键说明", hint: "查看高频场景下的键盘命令" },
 ];
 

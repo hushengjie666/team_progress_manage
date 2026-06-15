@@ -16,14 +16,16 @@ import type {
   StrictCheckResult,
   StrictModeStatus,
   Task,
+  TeamMember,
   WorkSession,
   WorkSessionStatus,
 } from "./types";
 
 const STORAGE_KEY = "timemanage.app_state.v1";
 
-type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
+type NormalizableAppState = Omit<Partial<AppState>, "projects" | "teamMembers" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
   projects?: Partial<Project>[];
+  teamMembers?: Partial<TeamMember>[];
   projectMembers?: Partial<ProjectMember>[];
   tasks?: Partial<Task>[];
   workSessions?: Partial<WorkSession>[];
@@ -43,6 +45,26 @@ const normalizeProject = (project: Partial<Project>, fallback: Project, index: n
   };
 };
 
+const normalizeTeamMember = (member: Partial<TeamMember>, fallback: TeamMember, index: number): TeamMember => {
+  const timestamp = member.updatedAt ?? member.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
+  return {
+    id: member.id ?? (index === 0 ? fallback.id : `team_member_migrated_${index}`),
+    accountId: member.accountId ?? (index === 0 ? fallback.accountId : undefined),
+    name: member.name?.trim() || fallback.name,
+    email: member.email,
+    status: member.status ?? "active",
+    createdAt: member.createdAt ?? timestamp,
+    updatedAt: timestamp,
+  };
+};
+
+const memberIdentityKey = (member: Pick<ProjectMember, "teamMemberId" | "accountId" | "email" | "id">) => {
+  if (member.teamMemberId) return member.teamMemberId;
+  if (member.accountId) return `team_member_${member.accountId}`;
+  if (member.email) return `team_member_email_${member.email.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
+  return `team_member_${member.id}`;
+};
+
 const normalizeProjectMember = (member: Partial<ProjectMember>, fallback: ProjectMember, projectId: string, index: number): ProjectMember => {
   const timestamp = member.updatedAt ?? member.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
   const allowedRoles: ProjectMemberRole[] = ["project_owner", "executor"];
@@ -50,12 +72,56 @@ const normalizeProjectMember = (member: Partial<ProjectMember>, fallback: Projec
   return {
     id: member.id ?? (index === 0 ? fallback.id : `member_migrated_${index}`),
     projectId: member.projectId ?? projectId,
+    teamMemberId: member.teamMemberId,
+    accountId: member.accountId ?? (index === 0 ? fallback.accountId : undefined),
     name: member.name?.trim() || fallback.name,
     email: member.email,
     roles: roles.length ? roles : ["executor"],
+    status: member.status ?? "active",
     createdAt: member.createdAt ?? timestamp,
     updatedAt: timestamp,
   };
+};
+
+const migrateTeamMembers = (projectMembers: ProjectMember[], parsedTeamMembers: Partial<TeamMember>[] | undefined, fallback: TeamMember) => {
+  const teamMembers = parsedTeamMembers?.length ? parsedTeamMembers.map((member, index) => normalizeTeamMember(member, fallback, index)) : [];
+  const byId = new Map(teamMembers.map((member) => [member.id, member]));
+  for (const projectMember of projectMembers) {
+    const id = memberIdentityKey(projectMember);
+    if (!byId.has(id)) {
+      byId.set(id, {
+        id,
+        accountId: projectMember.accountId,
+        name: projectMember.name,
+        email: projectMember.email,
+        status: projectMember.status ?? "active",
+        createdAt: projectMember.createdAt,
+        updatedAt: projectMember.updatedAt,
+      });
+    }
+  }
+  return Array.from(byId.values());
+};
+
+const attachTeamMembersToProjectMembers = (projectMembers: ProjectMember[], teamMembers: TeamMember[]) => {
+  const byId = new Map(teamMembers.map((member) => [member.id, member]));
+  const byAccount = new Map(teamMembers.filter((member) => member.accountId).map((member) => [member.accountId, member]));
+  const byEmail = new Map(teamMembers.filter((member) => member.email).map((member) => [member.email?.toLowerCase(), member]));
+  return projectMembers.map((projectMember) => {
+    const teamMember =
+      (projectMember.teamMemberId ? byId.get(projectMember.teamMemberId) : undefined) ??
+      (projectMember.accountId ? byAccount.get(projectMember.accountId) : undefined) ??
+      (projectMember.email ? byEmail.get(projectMember.email.toLowerCase()) : undefined) ??
+      byId.get(memberIdentityKey(projectMember));
+    return {
+      ...projectMember,
+      teamMemberId: teamMember?.id ?? projectMember.teamMemberId,
+      accountId: teamMember?.accountId ?? projectMember.accountId,
+      name: teamMember?.name ?? projectMember.name,
+      email: teamMember?.email ?? projectMember.email,
+      status: projectMember.status ?? teamMember?.status ?? "active",
+    };
+  });
 };
 
 const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
@@ -215,9 +281,11 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
   const initial = createInitialState();
   const projects = (parsed.projects?.length ? parsed.projects : initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
   const starterProjectId = projects[0]?.id ?? initial.projects[0].id;
-  const projectMembers = (parsed.projectMembers?.length ? parsed.projectMembers : initial.projectMembers).map((member, index) =>
+  const rawProjectMembers = (parsed.projectMembers?.length ? parsed.projectMembers : initial.projectMembers).map((member, index) =>
     normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index),
   );
+  const teamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
+  const projectMembers = attachTeamMembersToProjectMembers(rawProjectMembers, teamMembers);
   const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
     ? parsed.currentMemberId
     : projectMembers[0]?.id;
@@ -228,10 +296,12 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
   return {
     ...initial,
     ...parsed,
-    onboarding: { ...initial.onboarding, ...parsed.onboarding },
+    onboarding: { ...initial.onboarding, ...parsed.onboarding, completed: true },
     settings: mergeSettings(initial.settings, parsed.settings),
+    auth: { ...initial.auth, ...parsed.auth },
     currentMemberId,
     projects,
+    teamMembers,
     projectMembers,
     tasks,
     dailyPlans: (parsed.dailyPlans ?? initial.dailyPlans).map(normalizePlan),

@@ -38,6 +38,7 @@ export type CommandAction =
   | "open_shortcut_help";
 export type NativePlatform = "browser" | "tauri_macos" | "ios";
 export type ProjectMemberRole = "project_owner" | "executor";
+export type AuthStatus = "checking" | "signed_out" | "authenticated" | "error";
 
 export interface Subtask {
   id: string;
@@ -108,12 +109,42 @@ export interface Project {
   archivedAt?: string;
 }
 
+export interface TeamMember {
+  id: string;
+  accountId?: string;
+  name: string;
+  email?: string;
+  status?: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ProjectMember {
   id: string;
   projectId: string;
+  teamMemberId?: string;
+  accountId?: string;
   name: string;
   email?: string;
   roles: ProjectMemberRole[];
+  status?: "active" | "disabled";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Account {
+  id: string;
+  workspaceId: string;
+  name: string;
+  email: string;
+  disabledAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -507,12 +538,24 @@ export interface SyncState {
   conflicts: SyncConflict[];
 }
 
+export interface AuthState {
+  status: AuthStatus;
+  token?: string;
+  expiresAt?: string;
+  account?: Account;
+  workspace?: Workspace;
+  bootstrapped?: boolean;
+  message: string;
+}
+
 export interface AppState {
   version: number;
   onboarding: Onboarding;
   settings: Settings;
+  auth: AuthState;
   currentMemberId?: string;
   projects: Project[];
+  teamMembers: TeamMember[];
   projectMembers: ProjectMember[];
   tasks: Task[];
   dailyPlans: DailyPlan[];

@@ -2,7 +2,7 @@ import { completedFocusSessions, defaultReview, deriveRewardState, pauseTimer, r
 import { todayKey, uid } from "./seed";
 import type { AppState, DailyPlan, ExecutionSignalType, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, WorkSession } from "./types";
 
-export type Tab = "workspace" | "focus" | "calendar" | "reports" | "settings";
+export type Tab = "workspace" | "project" | "focus" | "calendar" | "reports" | "settings";
 
 export type TaskDraft = {
   title: string;

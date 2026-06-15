@@ -38,6 +38,7 @@ export function WorkspaceView(props: {
   splitTask: (taskId: string) => void;
   beginFocus: (taskId: string) => void;
   openProjectSettings: () => void;
+  openProjectDetail: (projectId: string) => void;
   updateReflection: (reflection: string) => void;
   updateReview: (patch: Partial<DailyPlan["review"]>) => void;
   completeReview: () => void;
@@ -135,6 +136,7 @@ export function WorkspaceView(props: {
       selectedProjectId={selectedBoardProjectId}
       setSelectedProjectId={setBoardProjectId}
       selectTask={selectTask}
+      openProjectDetail={props.openProjectDetail}
     />
   );
   const workbenchPanel = (
@@ -159,9 +161,13 @@ export function WorkspaceView(props: {
     <div className="content-grid workspace-grid">
       <section className="band hero-workflow workspace-summary">
         <div className="workspace-summary-copy">
-          <p className="eyebrow">Team Control Room</p>
-          <h2>实时掌控项目进度、执行状态和遗漏风险</h2>
-          <p>管理者看全局，执行者从自己的任务开始工作；个人番茄只是执行信号的一部分。</p>
+          <p className="eyebrow">{props.mode === "board" ? "项目总览" : "我的任务"}</p>
+          <h2>{props.mode === "board" ? "先看全局，再处理风险" : "只看分配给我的工作"}</h2>
+          <p>
+            {props.mode === "board"
+              ? "这里汇总项目进度、正在执行、已分配但未开始和停滞风险。"
+              : "这里按当前登录成员过滤任务，开始工作会创建可信的实时工作会话。"}
+          </p>
           {overload && !todayPlan.overloadAcknowledged && (
             <div className="warning-line">
               工作队列超出当前容量 {totalCommittedEstimate - todayPlan.capacityPomodoros} 个番茄。
@@ -186,29 +192,30 @@ export function WorkspaceView(props: {
           <strong className={boardRiskCount > 0 ? "danger-text" : ""}>{boardRiskCount}</strong>
           <small>待验收 {pendingReviewCount}</small>
         </div>
-        <button className="secondary-button workspace-more" onClick={() => setShowGuidance((value) => !value)}>
-          <Sparkles size={16} />
-          {showGuidance ? "收起个人辅助" : "个人辅助"}
-        </button>
+        {props.mode === "workbench" && (
+          <button className="secondary-button workspace-more" onClick={() => setShowGuidance((value) => !value)}>
+            <Sparkles size={16} />
+            {showGuidance ? "收起辅助面板" : "展开辅助面板"}
+          </button>
+        )}
         <button className="secondary-button workspace-more" onClick={props.openProjectSettings}>
-          管理项目
+          管理项目成员
         </button>
       </section>
 
       {props.mode === "workbench" ? (
         <>
           {workbenchPanel}
-          {boardPanel}
-          {riskPanel}
         </>
       ) : (
         <>
           {boardPanel}
           {riskPanel}
-          {workbenchPanel}
         </>
       )}
 
+      {props.mode === "workbench" && (
+        <>
       {showGuidance && <section className="band coach-panel">
         <div className="section-title">
           <div>
@@ -462,7 +469,7 @@ export function WorkspaceView(props: {
 
       <TaskColumn
         title="工作队列"
-        eyebrow="执行者准备开始或继续的任务"
+        eyebrow="今日准备执行"
         tasks={committedTasks}
         empty="从任务池中选择要推进的工作。"
         actionLabel="开始"
@@ -477,7 +484,7 @@ export function WorkspaceView(props: {
 
       <TaskColumn
         title="活动清单"
-        eyebrow="尚未进入工作队列"
+        eyebrow="待安排任务池"
         tasks={poolTasks}
         empty="任务池空了，可以补充新活动。"
         actionLabel="加入队列"
@@ -487,6 +494,8 @@ export function WorkspaceView(props: {
         onSelect={selectTask}
         onSplit={splitTask}
       />
+        </>
+      )}
 
       {selectedTask && (
         <div className="task-detail-drawer">
@@ -505,105 +514,109 @@ export function WorkspaceView(props: {
         </div>
       )}
 
-      {!showReview && (
-        <section className="band review-nudge">
-          <div>
-            <p className="eyebrow">Daily Review</p>
-            <h2>日终回顾已收起</h2>
-          </div>
-          <button className="secondary-button" onClick={() => setShowReview(true)}>
-            现在打开
-          </button>
-        </section>
-      )}
+      {props.mode === "workbench" && (
+        <>
+          {!showReview && (
+            <section className="band review-nudge">
+              <div>
+                <p className="eyebrow">日终回顾</p>
+                <h2>日终回顾已收起</h2>
+              </div>
+              <button className="secondary-button" onClick={() => setShowReview(true)}>
+                现在打开
+              </button>
+            </section>
+          )}
 
-      {showReview && <section className="band review-panel">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Daily Review</p>
-            <h2>日终回顾</h2>
-          </div>
-          <Check size={20} />
-        </div>
-        <div className="review-stats">
-          <Metric icon={<Target size={17} />} label="承诺兑现" value={`${completionRate}%`} />
-          <Metric icon={<Square size={17} />} label="作废番茄" value={`${abortedToday}`} />
-          <Metric icon={<Activity size={17} />} label="今日中断" value={`${interruptionsToday.length}`} />
-        </div>
-        <div className="review-grid">
-          <label>
-            状态
-            <select value={todayPlan.review.mood} onChange={(event) => updateReview({ mood: event.target.value as DailyPlan["review"]["mood"] })}>
-              <option value="low">低能量</option>
-              <option value="normal">稳定</option>
-              <option value="good">不错</option>
-              <option value="great">高光</option>
-            </select>
-          </label>
-          <label>
-            今日收获
-            <textarea value={todayPlan.review.wins} onChange={(event) => updateReview({ wins: event.target.value })} />
-          </label>
-          <label>
-            阻碍
-            <textarea value={todayPlan.review.blockers} onChange={(event) => updateReview({ blockers: event.target.value })} />
-          </label>
-          <label>
-            中断模式
-            <textarea value={todayPlan.review.interruptionPattern} onChange={(event) => updateReview({ interruptionPattern: event.target.value })} />
-          </label>
-          <label>
-            明日注意事项
-            <textarea value={todayPlan.review.tomorrowFocus} onChange={(event) => updateReview({ tomorrowFocus: event.target.value })} />
-          </label>
-        </div>
-        {lowEstimateTasks.length > 0 && (
-          <div className="insight-list compact">
-            {lowEstimateTasks.map(({ task, actual }) => (
-              <article className="insight-item" key={task.id}>
-                <strong>{task.title}</strong>
-                <span>低估 {actual - task.estimatePomodoros} 个番茄，明天优先拆小。</span>
+          {showReview && <section className="band review-panel">
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">日终回顾</p>
+                <h2>日终回顾</h2>
+              </div>
+              <Check size={20} />
+            </div>
+            <div className="review-stats">
+              <Metric icon={<Target size={17} />} label="承诺兑现" value={`${completionRate}%`} />
+              <Metric icon={<Square size={17} />} label="作废番茄" value={`${abortedToday}`} />
+              <Metric icon={<Activity size={17} />} label="今日中断" value={`${interruptionsToday.length}`} />
+            </div>
+            <div className="review-grid">
+              <label>
+                状态
+                <select value={todayPlan.review.mood} onChange={(event) => updateReview({ mood: event.target.value as DailyPlan["review"]["mood"] })}>
+                  <option value="low">低能量</option>
+                  <option value="normal">稳定</option>
+                  <option value="good">不错</option>
+                  <option value="great">高光</option>
+                </select>
+              </label>
+              <label>
+                今日收获
+                <textarea value={todayPlan.review.wins} onChange={(event) => updateReview({ wins: event.target.value })} />
+              </label>
+              <label>
+                阻碍
+                <textarea value={todayPlan.review.blockers} onChange={(event) => updateReview({ blockers: event.target.value })} />
+              </label>
+              <label>
+                中断模式
+                <textarea value={todayPlan.review.interruptionPattern} onChange={(event) => updateReview({ interruptionPattern: event.target.value })} />
+              </label>
+              <label>
+                明日注意事项
+                <textarea value={todayPlan.review.tomorrowFocus} onChange={(event) => updateReview({ tomorrowFocus: event.target.value })} />
+              </label>
+            </div>
+            {lowEstimateTasks.length > 0 && (
+              <div className="insight-list compact">
+                {lowEstimateTasks.map(({ task, actual }) => (
+                  <article className="insight-item" key={task.id}>
+                    <strong>{task.title}</strong>
+                    <span>低估 {actual - task.estimatePomodoros} 个番茄，明天优先拆小。</span>
+                  </article>
+                ))}
+              </div>
+            )}
+            <div className="button-row">
+              <button className="primary-button" onClick={completeReview}>
+                <Check size={16} />
+                完成回顾并生成明日建议
+              </button>
+              <button className="secondary-button" onClick={() => updateReflection(todayPlan.review.wins)}>
+                同步到旧总结
+              </button>
+            </div>
+            <p className="muted">
+              {todayPlan.reviewedAt
+                ? `已于 ${new Date(todayPlan.reviewedAt).toLocaleTimeString()} 完成回顾，建议明日 ${todayPlan.suggestedCapacityPomodoros ?? capacityHint} 个番茄。`
+                : "完成回顾后会更新连续天数、徽章和明日容量建议。"}
+            </p>
+          </section>}
+
+          {showGuidance && inbox.length > 0 && <section className="band inbox-panel">
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">Inbox</p>
+                <h2>中断收件箱</h2>
+              </div>
+              <Activity size={20} />
+            </div>
+            {inbox.map((item) => (
+              <article className="inbox-item" key={item.id}>
+                <div>
+                  <strong>{item.note}</strong>
+                  <span>{item.type === "internal" ? "内部中断" : "外部中断"} · {new Date(item.createdAt).toLocaleTimeString()}</span>
+                </div>
+                <div className="button-row">
+                  <button className="small-button" onClick={() => convertInterruptionToTask(item.id)}>转任务</button>
+                  <button className="small-button" onClick={() => resolveInterruption(item.id)}>已处理</button>
+                </div>
               </article>
             ))}
-          </div>
-        )}
-        <div className="button-row">
-          <button className="primary-button" onClick={completeReview}>
-            <Check size={16} />
-            完成回顾并生成明日建议
-          </button>
-          <button className="secondary-button" onClick={() => updateReflection(todayPlan.review.wins)}>
-            同步到旧总结
-          </button>
-        </div>
-        <p className="muted">
-          {todayPlan.reviewedAt
-            ? `已于 ${new Date(todayPlan.reviewedAt).toLocaleTimeString()} 完成回顾，建议明日 ${todayPlan.suggestedCapacityPomodoros ?? capacityHint} 个番茄。`
-            : "完成回顾后会更新连续天数、徽章和明日容量建议。"}
-        </p>
-      </section>}
-
-      {showGuidance && inbox.length > 0 && <section className="band inbox-panel">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Inbox</p>
-            <h2>中断收件箱</h2>
-          </div>
-          <Activity size={20} />
-        </div>
-        {inbox.map((item) => (
-          <article className="inbox-item" key={item.id}>
-            <div>
-              <strong>{item.note}</strong>
-              <span>{item.type === "internal" ? "内部中断" : "外部中断"} · {new Date(item.createdAt).toLocaleTimeString()}</span>
-            </div>
-            <div className="button-row">
-              <button className="small-button" onClick={() => convertInterruptionToTask(item.id)}>转任务</button>
-              <button className="small-button" onClick={() => resolveInterruption(item.id)}>已处理</button>
-            </div>
-          </article>
-        ))}
-      </section>}
+          </section>}
+        </>
+      )}
     </div>
   );
 }
@@ -621,12 +634,13 @@ function ProgressBoardPanel(props: {
   selectedProjectId: string;
   setSelectedProjectId: (projectId: string) => void;
   selectTask: (taskId: string) => void;
+  openProjectDetail?: (projectId: string) => void;
 }) {
   return (
     <section className="band progress-board">
       <div className="section-title">
         <div>
-          <p className="eyebrow">Progress Board</p>
+          <p className="eyebrow">项目实时状态</p>
           <h2>项目进度看板</h2>
         </div>
         <label className="compact-select">
@@ -637,6 +651,11 @@ function ProgressBoardPanel(props: {
             ))}
           </select>
         </label>
+        {props.openProjectDetail && (
+          <button className="secondary-button" onClick={() => props.openProjectDetail?.(props.selectedProjectId)}>
+            进入项目
+          </button>
+        )}
       </div>
 
       <div className="board-summary">
@@ -791,6 +810,7 @@ function PersonalWorkbench(props: {
                 <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
               </div>
               {task.notes && <p>{task.notes}</p>}
+              <TaskProgressBar percent={task.progressPercent ?? 0} />
               <PomodoroProgress actual={task.actualPomodoros} estimate={task.estimatePomodoros} />
               <div className="task-meta">
                 <span>{task.project}</span>
@@ -849,6 +869,7 @@ function TaskColumn(props: {
                 <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
               </div>
               {task.notes && <p>{task.notes}</p>}
+              <TaskProgressBar percent={task.progressPercent ?? 0} />
               <PomodoroProgress actual={task.actualPomodoros} estimate={task.estimatePomodoros} />
               <div className="task-meta">
                 <span>{task.project}</span>
@@ -912,6 +933,16 @@ function TaskColumn(props: {
   );
 }
 
+function TaskProgressBar({ percent }: { percent: number }) {
+  const safe = Math.max(0, Math.min(100, Math.round(percent)));
+  return (
+    <div className="task-progress-bar" aria-label={`任务进度 ${safe}%`}>
+      <span style={{ width: `${safe}%` }} />
+      <strong>{safe}%</strong>
+    </div>
+  );
+}
+
 function PomodoroProgress(props: { actual: number; estimate: number }) {
   const estimate = Math.max(0, Math.round(props.estimate));
   const actual = Math.max(0, Math.round(props.actual));
@@ -939,7 +970,7 @@ function PomodoroProgress(props: { actual: number; estimate: number }) {
   );
 }
 
-function TaskDetailPanel(props: {
+export function TaskDetailPanel(props: {
   task?: Task;
   projects: AppState["projects"];
   projectMembers: ProjectMember[];
@@ -950,10 +981,15 @@ function TaskDetailPanel(props: {
   returnTaskForReview: (taskId: string, reason: string) => void;
   close: () => void;
   splitTask: (taskId: string) => void;
+  canEdit?: boolean;
+  canReview?: boolean;
+  lockProject?: boolean;
 }) {
   const [subtaskTitle, setSubtaskTitle] = useState("");
   const [returnReason, setReturnReason] = useState("");
   const { task, updateTask } = props;
+  const canEdit = props.canEdit ?? true;
+  const canReview = props.canReview ?? true;
 
   if (!task) {
     return (
@@ -1022,168 +1058,207 @@ function TaskDetailPanel(props: {
         </button>
       </div>
 
-      <div className="detail-grid">
-        <label className="span-2">
-          标题
-          <input value={task.title} onChange={(event) => updateTask(task.id, { title: event.target.value })} />
-        </label>
-        <label className="span-2">
-          备注
-          <textarea value={task.notes} onChange={(event) => updateTask(task.id, { notes: event.target.value })} />
-        </label>
-        <label>
-          项目
-          <select
-            value={taskProject?.id ?? ""}
-            onChange={(event) =>
-              props.updateTaskAssignment(task.id, {
-                projectId: event.target.value,
-                primaryExecutorMemberId: "",
-                collaboratorMemberIds: [],
-              })
-            }
-          >
-            {props.projects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          标签
-          <input
-            value={task.tags.join(", ")}
-            onChange={(event) =>
-              updateTask(task.id, {
-                tags: event.target.value
-                  .split(/[,\s，]+/)
-                  .map((item) => item.trim())
-                  .filter(Boolean),
-              })
-            }
-          />
-        </label>
-        <label>
-          主执行人
-          <select
-            value={task.primaryExecutorMemberId ?? ""}
-            onChange={(event) => props.updateTaskAssignment(task.id, { primaryExecutorMemberId: event.target.value })}
-          >
-            <option value="">未分配</option>
-            {executors.map((member) => (
-              <option key={member.id} value={member.id}>{member.name}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          进度百分比
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={task.progressPercent ?? 0}
-            onChange={(event) => props.updateTaskProgress(task.id, Number(event.target.value), task.progressNote ?? "")}
-          />
-        </label>
-        <label className="span-2">
-          进展说明
-          <textarea
-            value={task.progressNote ?? ""}
-            onChange={(event) => props.updateTaskProgress(task.id, task.progressPercent ?? 0, event.target.value)}
-            placeholder="说明刚完成了什么、还剩什么，或为什么偏离预期"
-          />
-        </label>
-        <label>
-          优先级
-          <select value={task.priority} onChange={(event) => updateTask(task.id, { priority: event.target.value as Priority })}>
-            <option value="urgent">紧急</option>
-            <option value="high">高</option>
-            <option value="medium">中</option>
-            <option value="low">低</option>
-          </select>
-        </label>
-        <label>
-          严重度
-          <select value={task.severity} onChange={(event) => updateTask(task.id, { severity: event.target.value as Severity })}>
-            <option value="very_high">非常高</option>
-            <option value="high">高</option>
-            <option value="medium">中</option>
-            <option value="low">低</option>
-          </select>
-        </label>
-        <label>
-          估算番茄
-          <input
-            type="number"
-            min="0"
-            max="30"
-            value={task.estimatePomodoros}
-            onChange={(event) => updateTask(task.id, { estimatePomodoros: Number(event.target.value) })}
-          />
-        </label>
-        <label>
-          实际番茄
-          <input
-            type="number"
-            min="0"
-            value={task.actualPomodoros}
-            onChange={(event) => updateTask(task.id, { actualPomodoros: Number(event.target.value) })}
-          />
-        </label>
-        <label>
-          到期日
-          <input
-            type="datetime-local"
-            value={formatDateTimeLocal(task.dueAt)}
-            onChange={(event) => updateTask(task.id, { dueAt: parseDateTimeLocal(event.target.value) })}
-          />
-        </label>
-        <label>
-          提醒
-          <input
-            type="datetime-local"
-            value={formatDateTimeLocal(task.reminderAt)}
-            onChange={(event) => updateTask(task.id, { reminderAt: parseDateTimeLocal(event.target.value) })}
-          />
-        </label>
-        <label>
-          预计开始
-          <input
-            type="datetime-local"
-            value={formatDateTimeLocal(task.expectedStartAt)}
-            onChange={(event) => updateTask(task.id, { expectedStartAt: parseDateTimeLocal(event.target.value) })}
-          />
-        </label>
-        <label>
-          预计完成
-          <input
-            type="datetime-local"
-            value={formatDateTimeLocal(task.expectedFinishAt)}
-            onChange={(event) => updateTask(task.id, { expectedFinishAt: parseDateTimeLocal(event.target.value) })}
-          />
-        </label>
-        <label>
-          重复
-          <select value={task.repeatRule ?? "none"} onChange={(event) => updateTask(task.id, { repeatRule: event.target.value as RepeatRule })}>
-            <option value="none">不重复</option>
-            <option value="daily">每天</option>
-            <option value="weekly">每周</option>
-            <option value="weekdays">工作日</option>
-            <option value="monthly">每月</option>
-            <option value="interval">间隔天数</option>
-            <option value="after_completion">完成后间隔</option>
-          </select>
-        </label>
-        <label>
-          间隔天
-          <input
-            type="number"
-            min="1"
-            max="60"
-            value={task.repeatIntervalDays ?? 1}
-            onChange={(event) => updateTask(task.id, { repeatIntervalDays: Number(event.target.value) })}
-            disabled={(task.repeatRule ?? "none") !== "interval" && (task.repeatRule ?? "none") !== "after_completion"}
-          />
-        </label>
+      <div className="detail-section">
+        <div className="detail-section-heading">
+          <strong>基本信息</strong>
+          <span>任务是什么、属于哪个项目、优先级如何。</span>
+        </div>
+        <div className="detail-grid">
+          <label className="span-2">
+            标题
+            <input value={task.title} disabled={!canEdit} onChange={(event) => updateTask(task.id, { title: event.target.value })} />
+          </label>
+          <label>
+            项目
+            {props.lockProject ? (
+              <input value={taskProject?.name ?? "未命名项目"} disabled />
+            ) : (
+              <select
+                value={taskProject?.id ?? ""}
+                disabled={!canEdit}
+                onChange={(event) =>
+                  props.updateTaskAssignment(task.id, {
+                    projectId: event.target.value,
+                    primaryExecutorMemberId: "",
+                    collaboratorMemberIds: [],
+                  })
+                }
+              >
+                {props.projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            )}
+          </label>
+          <label>
+            标签
+            <input
+              value={task.tags.join(", ")}
+              disabled={!canEdit}
+              onChange={(event) =>
+                updateTask(task.id, {
+                  tags: event.target.value
+                    .split(/[,\s，]+/)
+                    .map((item) => item.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          </label>
+          <label>
+            优先级
+            <select value={task.priority} disabled={!canEdit} onChange={(event) => updateTask(task.id, { priority: event.target.value as Priority })}>
+              <option value="urgent">紧急</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label>
+            严重度
+            <select value={task.severity} disabled={!canEdit} onChange={(event) => updateTask(task.id, { severity: event.target.value as Severity })}>
+              <option value="very_high">非常高</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label className="span-2">
+            备注
+            <textarea value={task.notes} disabled={!canEdit} onChange={(event) => updateTask(task.id, { notes: event.target.value })} />
+          </label>
+        </div>
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-heading">
+          <strong>执行与进展</strong>
+          <span>谁负责、做了多少、现在卡在哪里。</span>
+        </div>
+        <div className="detail-grid">
+          <label>
+            主执行人
+            <select
+              value={task.primaryExecutorMemberId ?? ""}
+              disabled={!canEdit}
+              onChange={(event) => props.updateTaskAssignment(task.id, { primaryExecutorMemberId: event.target.value })}
+            >
+              <option value="">未分配</option>
+              {executors.map((member) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            进度百分比
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={task.progressPercent ?? 0}
+              disabled={!canEdit}
+              onChange={(event) => props.updateTaskProgress(task.id, Number(event.target.value), task.progressNote ?? "")}
+            />
+          </label>
+          <label>
+            估算番茄
+            <input
+              type="number"
+              min="0"
+              max="30"
+              value={task.estimatePomodoros}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { estimatePomodoros: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            实际番茄
+            <input
+              type="number"
+              min="0"
+              value={task.actualPomodoros}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { actualPomodoros: Number(event.target.value) })}
+            />
+          </label>
+          <label className="span-2">
+            进展说明
+            <textarea
+              value={task.progressNote ?? ""}
+              disabled={!canEdit}
+              onChange={(event) => props.updateTaskProgress(task.id, task.progressPercent ?? 0, event.target.value)}
+              placeholder="说明刚完成了什么、还剩什么，或为什么偏离预期"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="detail-section">
+        <div className="detail-section-heading">
+          <strong>排期与重复</strong>
+          <span>期望什么时候开始、什么时候交付。</span>
+        </div>
+        <div className="detail-grid">
+          <label>
+            预计开始
+            <input
+              type="datetime-local"
+              value={formatDateTimeLocal(task.expectedStartAt)}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { expectedStartAt: parseDateTimeLocal(event.target.value) })}
+            />
+          </label>
+          <label>
+            预计完成
+            <input
+              type="datetime-local"
+              value={formatDateTimeLocal(task.expectedFinishAt)}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { expectedFinishAt: parseDateTimeLocal(event.target.value) })}
+            />
+          </label>
+          <label>
+            到期日
+            <input
+              type="datetime-local"
+              value={formatDateTimeLocal(task.dueAt)}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { dueAt: parseDateTimeLocal(event.target.value) })}
+            />
+          </label>
+          <label>
+            提醒
+            <input
+              type="datetime-local"
+              value={formatDateTimeLocal(task.reminderAt)}
+              disabled={!canEdit}
+              onChange={(event) => updateTask(task.id, { reminderAt: parseDateTimeLocal(event.target.value) })}
+            />
+          </label>
+          <label>
+            重复
+            <select value={task.repeatRule ?? "none"} disabled={!canEdit} onChange={(event) => updateTask(task.id, { repeatRule: event.target.value as RepeatRule })}>
+              <option value="none">不重复</option>
+              <option value="daily">每天</option>
+              <option value="weekly">每周</option>
+              <option value="weekdays">工作日</option>
+              <option value="monthly">每月</option>
+              <option value="interval">间隔天数</option>
+              <option value="after_completion">完成后间隔</option>
+            </select>
+          </label>
+          <label>
+            间隔天
+            <input
+              type="number"
+              min="1"
+              max="60"
+              value={task.repeatIntervalDays ?? 1}
+              onChange={(event) => updateTask(task.id, { repeatIntervalDays: Number(event.target.value) })}
+              disabled={!canEdit || ((task.repeatRule ?? "none") !== "interval" && (task.repeatRule ?? "none") !== "after_completion")}
+            />
+          </label>
+        </div>
       </div>
 
       <div className="subtask-box">
@@ -1199,7 +1274,7 @@ function TaskDetailPanel(props: {
               <input
                 type="checkbox"
                 checked={collaboratorIds.includes(member.id)}
-                disabled={member.id === task.primaryExecutorMemberId}
+                disabled={!canEdit || member.id === task.primaryExecutorMemberId}
                 onChange={(event) => toggleCollaborator(member.id, event.target.checked)}
               />
               {member.name}
@@ -1218,11 +1293,11 @@ function TaskDetailPanel(props: {
         <p className="warning-line compact">最近退回原因：{task.reviewReturnReason}</p>
       )}
 
-      {task.status === "pending_review" && (
+      {task.status === "pending_review" && canReview && (
         <div className="subtask-box">
           <div className="section-title compact-title">
             <div>
-              <p className="eyebrow">Task Acceptance</p>
+              <p className="eyebrow">任务验收</p>
               <h2>任务验收</h2>
             </div>
           </div>
@@ -1231,12 +1306,13 @@ function TaskDetailPanel(props: {
             退回原因
             <textarea
               value={returnReason}
+              disabled={!canReview}
               onChange={(event) => setReturnReason(event.target.value)}
               placeholder="说明未通过的原因和需要补齐的结果"
             />
           </label>
           <div className="button-row">
-            <button className="primary-button" onClick={() => props.acceptTask(task.id)}>
+            <button className="primary-button" disabled={!canReview} onClick={() => props.acceptTask(task.id)}>
               <Check size={16} />
               验收通过
             </button>
@@ -1246,7 +1322,7 @@ function TaskDetailPanel(props: {
                 props.returnTaskForReview(task.id, returnReason);
                 setReturnReason("");
               }}
-              disabled={!returnReason.trim()}
+              disabled={!canReview || !returnReason.trim()}
             >
               退回任务
             </button>
@@ -1257,20 +1333,21 @@ function TaskDetailPanel(props: {
       <div className="subtask-box">
         <div className="section-title compact-title">
           <div>
-            <p className="eyebrow">Subtasks</p>
+            <p className="eyebrow">子任务</p>
             <h2>子任务</h2>
           </div>
         </div>
         <div className="subtask-add">
           <input
             value={subtaskTitle}
+            disabled={!canEdit}
             onChange={(event) => setSubtaskTitle(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") addSubtask();
             }}
             placeholder="添加子任务"
           />
-          <button className="secondary-button" onClick={addSubtask}>
+          <button className="secondary-button" disabled={!canEdit} onClick={addSubtask}>
             <Plus size={16} />
             添加
           </button>
@@ -1281,6 +1358,7 @@ function TaskDetailPanel(props: {
               <input
                 type="checkbox"
                 checked={subtask.completed}
+                disabled={!canEdit}
                 onChange={(event) => updateSubtask(subtask.id, { completed: event.target.checked })}
               />
               <span className={subtask.completed ? "done" : ""}>{subtask.title}</span>
@@ -1288,6 +1366,7 @@ function TaskDetailPanel(props: {
                 type="button"
                 className="icon-button small"
                 title="删除子任务"
+                disabled={!canEdit}
                 onClick={() =>
                   updateTask(task.id, (current) => ({
                     ...current,
@@ -1303,7 +1382,7 @@ function TaskDetailPanel(props: {
       </div>
 
       {task.estimatePomodoros > 7 && (
-        <button className="primary-button" onClick={() => props.splitTask(task.id)}>
+        <button className="primary-button" disabled={!canEdit} onClick={() => props.splitTask(task.id)}>
           <Split size={16} />
           拆分大任务
         </button>

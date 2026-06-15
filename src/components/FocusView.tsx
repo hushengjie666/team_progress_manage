@@ -33,7 +33,7 @@ export function FocusView(props: {
           <div className="timer-face">
             <p>{active ? modeLabel[active.mode] : "准备开始"}</p>
             <strong>{active ? formatTime(active.remaining) : `${state.settings.focusMinutes}:00`}</strong>
-            <span>{currentTask?.title ?? "从我的工作台选择一个任务"}</span>
+            <span>{currentTask?.title ?? "从我的任务选择一个任务"}</span>
             {currentTask && <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} compact />}
           </div>
         </div>
@@ -41,10 +41,10 @@ export function FocusView(props: {
         <div className="timer-controls">
           {active?.pendingSettlement === "pending" ? (
             <div className="settlement-panel">
-              <p className="eyebrow">Settlement</p>
+              <p className="eyebrow">结算当前计时</p>
               <h2>{active.mode === "focus" ? "这个番茄到点了" : "休息到点了"}</h2>
               <p className="muted">
-                {active.mode === "focus" ? "先结算，再决定休息或继续。需要补记中断也可以现在补上。" : "结束休息后，可以回到我的工作台继续推进。"}
+                {active.mode === "focus" ? "先结算，再决定休息或继续。需要补记中断也可以现在补上。" : "结束休息后，可以回到我的任务继续推进。"}
               </p>
               <div className="button-row">
               <button className="primary-button large" onClick={() => void props.finishTimer("completed")}>
@@ -116,7 +116,7 @@ export function FocusView(props: {
         <section className="band now-task">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Now List</p>
+              <p className="eyebrow">当前工作</p>
               <h2>当下清单</h2>
             </div>
             <Target size={20} />
@@ -135,14 +135,14 @@ export function FocusView(props: {
               </button>
             </>
           ) : (
-            <p className="empty">工作队列为空，先去我的工作台选择任务。</p>
+            <p className="empty">工作队列为空，先去我的任务选择任务。</p>
           )}
         </section>
 
         <section className="band strict-card">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Strict Mode</p>
+              <p className="eyebrow">防分心</p>
               <h2>软严格模式</h2>
             </div>
             <BellOff size={20} />
@@ -168,7 +168,7 @@ export function FocusView(props: {
         <section className="band interruption-box">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Interruption</p>
+              <p className="eyebrow">中断记录</p>
               <h2>中断记录</h2>
             </div>
             <Activity size={20} />

@@ -1,5 +1,6 @@
 import type {
   AppState,
+  Account,
   BlockProfile,
   DailyPlan,
   FocusSession,
@@ -13,6 +14,8 @@ import type {
   SyncConflict,
   SyncState,
   Task,
+  TeamMember,
+  Workspace,
   WorkSession,
   ExecutionSignal,
 } from "./types";
@@ -21,6 +24,7 @@ type SyncEntity =
   | "settings"
   | "onboarding"
   | "reward_state"
+  | "team_member"
   | "project"
   | "project_member"
   | "task"
@@ -36,6 +40,7 @@ type SyncPayload =
   | Settings
   | Onboarding
   | RewardState
+  | TeamMember
   | Project
   | ProjectMember
   | Task
@@ -65,6 +70,57 @@ interface LoginResponse {
   token: string;
   user_id: string;
   expires_at: string;
+  account: ServerAccount;
+  workspace: ServerWorkspace;
+}
+
+interface ServerAccount {
+  id: string;
+  workspace_id: string;
+  name: string;
+  email: string;
+  disabled_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ServerWorkspace {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthStatusResponse {
+  bootstrapped: boolean;
+  workspace_id?: string;
+  workspace_name?: string;
+}
+
+export interface AuthSession {
+  token: string;
+  expiresAt: string;
+  account: Account;
+  workspace: Workspace;
+}
+
+export interface BootstrapPayload {
+  workspaceName: string;
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface MemberAccountPayload {
+  projectId?: string;
+  name: string;
+  email: string;
+  password: string;
+  roles: ProjectMember["roles"];
+}
+
+interface MemberResponse {
+  member: SyncRow;
 }
 
 interface PushResponse {
@@ -117,6 +173,12 @@ const shouldAcceptRemote = (remote: SyncRow, local?: SyncPayload, stateUpdatedAt
   return remote.updated_at >= localTimestampFor(remote.entity, local, stateUpdatedAt);
 };
 
+const shouldAcceptRemoteOnboarding = (remote: SyncRow, local: Onboarding, stateUpdatedAt: string) => {
+  const remotePayload = remote.payload;
+  if (local.completed && isObject(remotePayload) && remotePayload.completed === false) return false;
+  return shouldAcceptRemote(remote, local, stateUpdatedAt);
+};
+
 const withStatus = (sync: SyncState, patch: Partial<SyncState>): SyncState => ({
   ...sync,
   ...patch,
@@ -142,23 +204,152 @@ const readResponse = async <T>(response: Response): Promise<T> => {
   throw new Error(message);
 };
 
-export async function loginToSyncServer(sync: SyncState, password: string): Promise<SyncState> {
-  const response = await fetch(apiUrl(sync.serverUrl, "/auth/login"), {
+const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
+  try {
+    const response = await fetch(input, init);
+    return readResponse<T>(response);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("无法连接团队服务，请检查服务地址是否正确，并确认同步服务已启动");
+    }
+    throw error;
+  }
+};
+
+const mapAccount = (account: ServerAccount): Account => ({
+  id: account.id,
+  workspaceId: account.workspace_id,
+  name: account.name,
+  email: account.email,
+  disabledAt: account.disabled_at || undefined,
+  createdAt: account.created_at,
+  updatedAt: account.updated_at,
+});
+
+const mapWorkspace = (workspace: ServerWorkspace): Workspace => ({
+  id: workspace.id,
+  name: workspace.name,
+  createdAt: workspace.created_at,
+  updatedAt: workspace.updated_at,
+});
+
+const sessionFromLogin = (payload: LoginResponse): AuthSession => ({
+  token: payload.token,
+  expiresAt: payload.expires_at,
+  account: mapAccount(payload.account),
+  workspace: mapWorkspace(payload.workspace),
+});
+
+export async function getAuthStatus(serverUrl: string): Promise<AuthStatusResponse> {
+  return requestJson<AuthStatusResponse>(apiUrl(serverUrl, "/auth/status"));
+}
+
+export async function bootstrapWorkspace(sync: SyncState, payload: BootstrapPayload): Promise<AuthSession> {
+  const payloadResponse = await requestJson<LoginResponse>(apiUrl(sync.serverUrl, "/auth/bootstrap"), {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({
-      username: sync.username.trim(),
+      workspace_name: payload.workspaceName,
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      device_id: sync.deviceId,
+    }),
+  });
+  return sessionFromLogin(payloadResponse);
+}
+
+export async function loginToWorkspace(sync: SyncState, email: string, password: string): Promise<AuthSession> {
+  const payload = await requestJson<LoginResponse>(apiUrl(sync.serverUrl, "/auth/login"), {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      email: email.trim(),
       password,
       device_id: sync.deviceId,
     }),
   });
-  const payload = await readResponse<LoginResponse>(response);
+  return sessionFromLogin(payload);
+}
+
+export async function loginToSyncServer(sync: SyncState, password: string): Promise<SyncState> {
+  const payload = await loginToWorkspace(sync, sync.username, password);
   return withStatus(sync, {
     enabled: true,
+    username: payload.account.email,
     token: payload.token,
     status: "idle",
-    message: `已登录同步服务，有效期至 ${new Date(payload.expires_at).toLocaleString()}`,
+    message: `已登录团队工作区，有效期至 ${new Date(payload.expiresAt).toLocaleString()}`,
   });
+}
+
+export async function createMemberAccount(sync: SyncState, token: string, payload: MemberAccountPayload): Promise<ProjectMember> {
+  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, "/members"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      project_id: payload.projectId,
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      roles: payload.roles,
+    }),
+  });
+  return result.member.payload as ProjectMember;
+}
+
+export async function createTeamMemberAccount(
+  sync: SyncState,
+  token: string,
+  payload: Omit<MemberAccountPayload, "projectId" | "roles">,
+): Promise<TeamMember> {
+  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, "/members"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+    }),
+  });
+  return result.member.payload as TeamMember;
+}
+
+export async function updateMemberAccount(
+  sync: SyncState,
+  token: string,
+  memberId: string,
+  payload: Partial<Omit<MemberAccountPayload, "projectId">>,
+): Promise<ProjectMember> {
+  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, `/members/${encodeURIComponent(memberId)}`), {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      roles: payload.roles,
+    }),
+  });
+  return result.member.payload as ProjectMember;
+}
+
+export async function updateTeamMemberAccount(
+  sync: SyncState,
+  token: string,
+  memberId: string,
+  payload: Partial<Omit<MemberAccountPayload, "projectId" | "roles">>,
+): Promise<TeamMember> {
+  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, `/members/${encodeURIComponent(memberId)}`), {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+    }),
+  });
+  return result.member.payload as TeamMember;
 }
 
 export function flattenStateToChanges(state: AppState): SyncChange[] {
@@ -191,6 +382,13 @@ export function flattenStateToChanges(state: AppState): SyncChange[] {
       device_id: deviceID,
       updated_at: project.updatedAt,
       payload: project,
+    })),
+    ...state.teamMembers.map((member) => ({
+      entity: "team_member" as const,
+      id: member.id,
+      device_id: deviceID,
+      updated_at: member.updatedAt,
+      payload: member,
     })),
     ...state.projectMembers.map((member) => ({
       entity: "project_member" as const,
@@ -325,6 +523,8 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
     if (row.deleted_at) {
       if (row.entity === "project") {
         next = { ...next, projects: removeById(next.projects, row.id) };
+      } else if (row.entity === "team_member") {
+        next = { ...next, teamMembers: removeById(next.teamMembers, row.id) };
       } else if (row.entity === "project_member") {
         const projectMembers = removeById(next.projectMembers, row.id);
         next = {
@@ -366,7 +566,7 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
 
     if (row.entity === "settings" && shouldAcceptRemote(row, next.settings, next.updatedAt)) {
       next = { ...next, settings: payload as unknown as Settings };
-    } else if (row.entity === "onboarding" && shouldAcceptRemote(row, next.onboarding, next.updatedAt)) {
+    } else if (row.entity === "onboarding" && shouldAcceptRemoteOnboarding(row, next.onboarding, next.updatedAt)) {
       next = { ...next, onboarding: payload as unknown as Onboarding };
     } else if (row.entity === "reward_state" && shouldAcceptRemote(row, next.rewardState, next.updatedAt)) {
       next = { ...next, rewardState: payload as unknown as RewardState };
@@ -374,6 +574,20 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
       const incoming = payload as unknown as Project;
       const existing = next.projects.find((project) => project.id === row.id);
       if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, projects: upsert(row.entity, next.projects, incoming, row.updated_at, next.updatedAt) };
+    } else if (row.entity === "team_member") {
+      const incoming = payload as unknown as TeamMember;
+      const existing = next.teamMembers.find((member) => member.id === row.id);
+      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
+        next = {
+          ...next,
+          teamMembers: upsert(row.entity, next.teamMembers, incoming, row.updated_at, next.updatedAt),
+          projectMembers: next.projectMembers.map((member) =>
+            member.teamMemberId === incoming.id
+              ? { ...member, accountId: incoming.accountId ?? member.accountId, name: incoming.name, email: incoming.email, status: incoming.status ?? member.status }
+              : member,
+          ),
+        };
+      }
     } else if (row.entity === "project_member") {
       const incoming = payload as unknown as ProjectMember;
       const existing = next.projectMembers.find((member) => member.id === row.id);
@@ -440,12 +654,13 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
 }
 
 export async function syncAppState(state: AppState): Promise<AppState> {
-  if (!state.sync.token) throw new Error("请先登录同步服务");
+  const token = state.auth.token ?? state.sync.token;
+  if (!token) throw new Error("请先登录团队工作区");
   const syncStartedAt = nowIso();
   const changes = flattenStateToChanges(state);
   const pushResponse = await fetch(apiUrl(state.sync.serverUrl, "/sync/push"), {
     method: "POST",
-    headers: authHeaders(state.sync.token),
+    headers: authHeaders(token),
     body: JSON.stringify({
       device_id: state.sync.deviceId,
       changes,
@@ -454,7 +669,7 @@ export async function syncAppState(state: AppState): Promise<AppState> {
   const pushed = await readResponse<PushResponse>(pushResponse);
 
   const pullResponse = await fetch(apiUrl(state.sync.serverUrl, `/sync/pull?since=${state.sync.lastPulledRevision}`), {
-    headers: authHeaders(state.sync.token),
+    headers: authHeaders(token),
   });
   const pulled = await readResponse<PullResponse>(pullResponse);
   const merged = mergeRowsIntoState(state, pulled.changes, pulled.current_revision);

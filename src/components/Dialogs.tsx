@@ -80,9 +80,9 @@ export function ShortcutHelpDialog(props: {
 }) {
   if (!props.open) return null;
   const shortcuts = [
-    { keys: "⌘/Ctrl + 1", desc: "打开项目与成员" },
-    { keys: "⌘/Ctrl + 2", desc: "打开进度看板" },
-    { keys: "⌘/Ctrl + 3", desc: "打开我的工作台" },
+    { keys: "⌘/Ctrl + 1", desc: "打开管理中心" },
+    { keys: "⌘/Ctrl + 2", desc: "打开项目总览" },
+    { keys: "⌘/Ctrl + 3", desc: "打开我的任务" },
     { keys: "⌘/Ctrl + 4", desc: "打开排期" },
     { keys: "⌘/Ctrl + 5", desc: "打开洞察" },
     { keys: "/", desc: "打开命令面板" },
@@ -90,10 +90,10 @@ export function ShortcutHelpDialog(props: {
     { keys: "Esc", desc: "关闭当前弹窗/面板" },
     { keys: "空格", desc: "开始/继续/暂停计时（当前有活动计时）" },
     { keys: "Shift+空格", desc: "确认后重置当前番茄" },
-    { keys: "Enter", desc: "从已选任务开始工作会话（我的工作台）" },
-    { keys: "Q", desc: "计时器返回进度看板" },
-    { keys: "↑ / ↓", desc: "上下调整工作队列顺序（我的工作台）" },
-    { keys: "⌘/Ctrl + Enter", desc: "快速完成个人回顾（我的工作台）" },
+    { keys: "Enter", desc: "从已选任务开始工作会话（我的任务）" },
+    { keys: "Q", desc: "计时器返回项目总览" },
+    { keys: "↑ / ↓", desc: "上下调整工作队列顺序（我的任务）" },
+    { keys: "⌘/Ctrl + Enter", desc: "快速完成个人回顾（我的任务）" },
     { keys: "I", desc: "记录内部中断（在专注页）" },
     { keys: "O", desc: "记录外部中断（在专注页）" },
   ];

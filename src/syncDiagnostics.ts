@@ -1,4 +1,4 @@
-import { flattenStateToChanges, loginToSyncServer, syncAppState } from "./sync";
+import { flattenStateToChanges, loginToWorkspace, syncAppState } from "./sync";
 import type { AppState, SyncDiagnosticResult, SyncDiagnosticStep } from "./types";
 
 const apiUrl = (serverUrl: string, path: string) => `${serverUrl.replace(/\/+$/, "")}${path}`;
@@ -48,18 +48,30 @@ export async function runSyncDiagnostics(state: AppState, password?: string): Pr
 
   if (password && state.sync.username) {
     try {
-      const loginResult = await timed(() => loginToSyncServer(workingState.sync, password));
-      workingState = { ...workingState, sync: loginResult.result };
+      const loginResult = await timed(() => loginToWorkspace(workingState.sync, workingState.sync.username, password));
+      workingState = {
+        ...workingState,
+        auth: {
+          status: "authenticated",
+          token: loginResult.result.token,
+          expiresAt: loginResult.result.expiresAt,
+          account: loginResult.result.account,
+          workspace: loginResult.result.workspace,
+          bootstrapped: true,
+          message: "诊断登录成功",
+        },
+        sync: { ...workingState.sync, enabled: true, token: loginResult.result.token, username: loginResult.result.account.email },
+      };
       steps.push({ id: "login", label: "登录", ok: true, latencyMs: loginResult.latencyMs, detail: "账号可登录，Token 已刷新。" });
     } catch (error) {
       lastError = error instanceof Error ? error.message : "登录失败";
       steps.push({ id: "login", label: "登录", ok: false, detail: lastError });
     }
   } else {
-    steps.push({ id: "login", label: "登录", ok: Boolean(state.sync.token), detail: state.sync.token ? "已有 Token。" : "未提供密码，跳过登录。" });
+    steps.push({ id: "login", label: "登录", ok: Boolean(state.auth.token ?? state.sync.token), detail: state.auth.token || state.sync.token ? "已有 Token。" : "未提供密码，跳过登录。" });
   }
 
-  if (workingState.sync.token) {
+  if (workingState.auth.token ?? workingState.sync.token) {
     try {
       const changes = flattenStateToChanges(workingState).length;
       const syncResult = await timed(() => syncAppState(workingState));

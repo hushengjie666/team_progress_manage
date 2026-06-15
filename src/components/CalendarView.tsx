@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ClipboardList, Clock3, Plus, RotateCcw, Sparkles } from "lucide-react";
+import { CalendarDays, Check, ClipboardList, Clock3, Plus, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { calendarSummaries } from "../planning";
 import { todayKey, uid } from "../seed";
@@ -63,8 +63,9 @@ export function CalendarView(props: {
     <div className="calendar-layout">
       <section className="band calendar-toolbar">
         <div>
-          <p className="eyebrow">Long Plan</p>
+          <p className="eyebrow">排期日历</p>
           <h2>长期计划日历</h2>
+          <p className="muted compact-copy">选择日期后查看当天计划、番茄记录、提醒和回顾。</p>
         </div>
         <div className="segmented">
           <button className={mode === "week" ? "active" : ""} onClick={() => setMode("week")}>周</button>
@@ -103,7 +104,7 @@ export function CalendarView(props: {
         <section className="band day-detail">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Day Detail</p>
+              <p className="eyebrow">当日明细</p>
               <h2>{selected?.date ?? todayKey()} 详情</h2>
             </div>
             <CalendarDays size={20} />
@@ -118,8 +119,8 @@ export function CalendarView(props: {
           <div className="day-review-summary">
             <div className="section-title">
               <div>
-                <p className="eyebrow">Review Snapshot</p>
-                <h3>日终回顾</h3>
+                <p className="eyebrow">回顾快照</p>
+                <h3>当天复盘</h3>
               </div>
               <CalendarDays size={20} />
             </div>
@@ -154,7 +155,7 @@ export function CalendarView(props: {
           <div className="timeline-section">
             <div className="section-title">
               <div>
-                <p className="eyebrow">Focus Timeline</p>
+                <p className="eyebrow">执行时间线</p>
                 <h3>日内番茄与中断</h3>
               </div>
               <Clock3 size={20} />
@@ -231,8 +232,8 @@ export function CalendarView(props: {
         <section className="band template-panel">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Templates</p>
-              <h2>任务模板</h2>
+              <p className="eyebrow">任务模板</p>
+              <h2>可复用任务模板</h2>
             </div>
             <ClipboardList size={20} />
           </div>
@@ -282,26 +283,6 @@ export function CalendarView(props: {
           </div>
         </section>
       </div>
-
-      <section className="band native-roadmap">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Apple Cross Device</p>
-            <h2>跨端能力状态</h2>
-          </div>
-          <Sparkles size={20} />
-        </div>
-        <div className="capability-grid">
-          {state.nativeCapabilities.map((capability) => (
-            <article className="capability-item" key={capability.platform}>
-              <strong>{capability.label}</strong>
-              <span>{capability.available ? "当前可用/可验收" : "适配层已保留"}</span>
-              <p>{capability.fallback}</p>
-              <small>{capability.capabilities.join(" · ")}</small>
-            </article>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

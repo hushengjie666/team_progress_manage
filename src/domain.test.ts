@@ -34,6 +34,7 @@ import {
   updateProjectMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
+import { createProjectTaskInState, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
 import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -512,6 +513,120 @@ describe("progress board", () => {
 });
 
 describe("data portability and long planning", () => {
+  it("returns only one project's tasks and includes archived tasks by default", () => {
+    const state = createInitialState();
+    const firstProjectId = state.projects[0].id;
+    const withSecondProject = createProjectInState(
+      state,
+      "第二项目",
+      "",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_second`,
+    );
+    const withFirstTask = createProjectTaskInState(
+      withSecondProject,
+      firstProjectId,
+      { title: "当前项目归档任务" },
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_first`,
+    );
+    const withArchivedFirstTask = {
+      ...withFirstTask,
+      tasks: withFirstTask.tasks.map((task) =>
+        task.id === "task_first" ? { ...task, status: "archived" as const } : task,
+      ),
+    };
+    const withOtherTask = createProjectTaskInState(
+      withArchivedFirstTask,
+      "project_second",
+      { title: "其他项目任务" },
+      "2026-05-10T11:00:00.000Z",
+      (prefix) => `${prefix}_other`,
+    );
+
+    const tasks = projectTasksForProject(withOtherTask, firstProjectId);
+
+    expect(tasks.every((task) => task.projectId === firstProjectId)).toBe(true);
+    expect(tasks.some((task) => task.title === "当前项目归档任务" && task.status === "archived")).toBe(true);
+    expect(tasks.some((task) => task.title === "其他项目任务")).toBe(false);
+  });
+
+  it("creates project detail tasks in the current project", () => {
+    const state = createInitialState();
+    const project = state.projects[0];
+    const next = createProjectTaskInState(
+      state,
+      project.id,
+      { title: "项目详情页新任务", estimatePomodoros: 3 },
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_detail`,
+    );
+
+    expect(next.tasks[0]).toMatchObject({
+      id: "task_detail",
+      title: "项目详情页新任务",
+      projectId: project.id,
+      project: project.name,
+      estimatePomodoros: 3,
+      status: "pool",
+    });
+  });
+
+  it("separates project owner review permissions from member edit permissions", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const ownerAccess = projectAccessForCurrentMember(state, projectId);
+    const withMember = addProjectMemberToState(
+      state,
+      projectId,
+      "普通成员",
+      "member@example.com",
+      ["executor"],
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_member`,
+    );
+    const memberAccess = projectAccessForCurrentMember({ ...withMember, currentMemberId: "member_member" }, projectId);
+    const nonMemberAccess = projectAccessForCurrentMember({ ...withMember, currentMemberId: "missing_member" }, projectId);
+    const withSecondProject = createProjectInState(
+      state,
+      "同账号项目",
+      "",
+      "2026-05-10T11:00:00.000Z",
+      (prefix) => `${prefix}_account`,
+    );
+    const accountScopedState: AppState = {
+      ...withSecondProject,
+      auth: {
+        ...withSecondProject.auth,
+        account: {
+          id: "account_owner",
+          workspaceId: "workspace_test",
+          name: "负责人",
+          email: "owner@example.com",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+      },
+      projectMembers: withSecondProject.projectMembers.map((member) =>
+        member.projectId === "project_account" ? { ...member, accountId: "account_owner" } : member,
+      ),
+    };
+    const accountAccess = projectAccessForCurrentMember(accountScopedState, "project_account");
+    const emailScopedState: AppState = {
+      ...accountScopedState,
+      projectMembers: accountScopedState.projectMembers.map((member) =>
+        member.projectId === "project_account" ? { ...member, accountId: undefined, teamMemberId: undefined, email: "owner@example.com" } : member,
+      ),
+    };
+    const emailAccess = projectAccessForCurrentMember(emailScopedState, "project_account");
+
+    expect(ownerAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
+    expect(memberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: false });
+    expect(nonMemberAccess).toMatchObject({ canView: false, canEditTasks: false, canReviewTasks: false });
+    expect(accountAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
+    expect(emailAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
+  });
+
   it("creates projects with a project owner who can also execute work", () => {
     const state = createInitialState();
     const next = createProjectInState(

@@ -111,8 +111,9 @@ export function ReportsView({
       <section className="band report-filter-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Review Filter</p>
+            <p className="eyebrow">复盘筛选</p>
             <h2>{summary.rangeLabel}复盘</h2>
+            <p className="muted compact-copy">先选范围，再看兑现率、估算偏差、中断和下一步建议。</p>
           </div>
           <SlidersHorizontal size={20} />
         </div>
@@ -170,7 +171,7 @@ export function ReportsView({
       <section className="band reward-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Reward Loop</p>
+            <p className="eyebrow">激励反馈</p>
             <h2>自律激励</h2>
           </div>
           <Trophy size={20} />
@@ -193,7 +194,7 @@ export function ReportsView({
       <section className="band next-action-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Next Actions</p>
+            <p className="eyebrow">下一步</p>
             <h2>下一步建议</h2>
           </div>
           <Sparkles size={20} />
@@ -217,8 +218,8 @@ export function ReportsView({
       <section className="band insight-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Actionable Insights</p>
-            <h2>可操作洞察</h2>
+            <p className="eyebrow">可操作洞察</p>
+            <h2>优先处理的问题</h2>
           </div>
           <Sparkles size={20} />
         </div>
@@ -249,8 +250,9 @@ export function ReportsView({
       <section className="band trend-panel" id="focus-trend">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Focus Trend</p>
+            <p className="eyebrow">专注趋势</p>
             <h2>近 14 天专注趋势</h2>
+            <p className="muted compact-copy">柱子越高，表示当天完成的番茄越多。</p>
           </div>
           <BarChart3 size={20} />
         </div>
@@ -267,8 +269,9 @@ export function ReportsView({
       <section className="band heatmap-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Annual Wall</p>
+            <p className="eyebrow">年度热力</p>
             <h2>番茄热力图</h2>
+            <p className="muted compact-copy">颜色越深，表示当天专注记录越密集。</p>
           </div>
           <CalendarDays size={20} />
         </div>
@@ -282,8 +285,9 @@ export function ReportsView({
       <section className="band estimate-panel" id="estimate-feedback">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Estimate Feedback</p>
+            <p className="eyebrow">估算反馈</p>
             <h2>估算反馈</h2>
+            <p className="muted compact-copy">高于基线代表低估，低于基线代表高估。</p>
           </div>
           <AlarmClock size={20} />
         </div>
@@ -314,8 +318,9 @@ export function ReportsView({
       <section className="band hotspot-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Interruption Hotspots</p>
+            <p className="eyebrow">中断分析</p>
             <h2>中断高发时段</h2>
+            <p className="muted compact-copy">优先处理次数最高的时段和来源。</p>
           </div>
           <Activity size={20} />
         </div>
@@ -336,7 +341,7 @@ export function ReportsView({
       <section className="band distribution-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Distribution</p>
+            <p className="eyebrow">分布分析</p>
             <h2>项目与标签分布</h2>
           </div>
           <SlidersHorizontal size={20} />
@@ -360,7 +365,7 @@ export function ReportsView({
       <section className="band timeline-panel" id="focus-timeline">
         <div className="section-title">
           <div>
-            <p className="eyebrow">Timeline</p>
+            <p className="eyebrow">执行记录</p>
             <h2>专注时间线</h2>
           </div>
           <Clock3 size={20} />

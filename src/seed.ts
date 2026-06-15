@@ -1,4 +1,4 @@
-import type { AppState, BlockProfile, DailyPlan, NativeCapabilityState, Project, ProjectMember, Task, TaskTemplate } from "./types";
+import type { AppState, BlockProfile, DailyPlan, NativeCapabilityState, Project, ProjectMember, Task, TaskTemplate, TeamMember } from "./types";
 
 export const todayKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
@@ -139,8 +139,22 @@ export const starterProject: Project = {
 export const starterProjectMember: ProjectMember = {
   id: "member_owner",
   projectId: starterProject.id,
+  teamMemberId: "team_member_owner",
+  accountId: "account_owner",
   name: "项目负责人",
+  email: "owner@example.com",
   roles: ["project_owner", "executor"],
+  status: "active",
+  createdAt: now(),
+  updatedAt: now(),
+};
+
+export const starterTeamMember: TeamMember = {
+  id: "team_member_owner",
+  accountId: "account_owner",
+  name: "项目负责人",
+  email: "owner@example.com",
+  status: "active",
   createdAt: now(),
   updatedAt: now(),
 };
@@ -258,7 +272,7 @@ export const defaultNativeCapabilities: NativeCapabilityState[] = [
 export const createInitialState = (): AppState => ({
   version: 1,
   onboarding: {
-    completed: false,
+    completed: true,
     distractionSources: ["短视频", "社交消息", "资讯流"],
     desiredHabit: "每天完成 8 个高质量番茄",
     currentDailyWasteMinutes: 120,
@@ -295,8 +309,14 @@ export const createInitialState = (): AppState => ({
     calendarViewMode: "week",
     commandPaletteHintDismissed: false,
   },
+  auth: {
+    status: "signed_out",
+    bootstrapped: undefined,
+    message: "请登录团队工作区",
+  },
   currentMemberId: starterProjectMember.id,
   projects: [starterProject],
+  teamMembers: [starterTeamMember],
   projectMembers: [starterProjectMember],
   tasks: sampleTasks,
   dailyPlans: [todayPlan],
