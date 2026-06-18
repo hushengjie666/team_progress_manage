@@ -1,24 +1,31 @@
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Activity, AlarmClock, ArrowDown, ArrowUp, Check, ChevronRight, PanelRight, Play, Plus, SlidersHorizontal, Sparkles, Split, Square, Target, Trash2, X } from "lucide-react";
-import { abortedSessionsOnDate, buildProgressBoard, coachSteps, dailyCompletionRate, estimateDeltaLabel, interruptionsOnDate, planPressure, sessionsForTask, stalledTaskRisks, taskSuggestions, unresolvedInterruptions } from "../domain";
-import { formatDateTimeLocal, labelPriority, nowIso, parseDateTimeLocal, today, type TaskDraft, type TaskFilters, type TaskSort } from "../appModel";
+import { coachSteps, estimateDeltaLabel, planPressure, taskSuggestions, unresolvedInterruptions } from "../domain";
+import { formatDateTimeLocal, labelPriority, labelTaskStage, nowIso, parseDateTimeLocal, taskStageOptions, today, type TaskDraft, type TaskFilters, type TaskSort } from "../appModel";
+import {
+  buildMyProjectTaskCards,
+  buildProjectOverviewCards,
+  taskAssignedToMemberIdentity,
+  projectMemberIdentityIds,
+  type MyProjectTaskCard,
+  type ProjectOverviewCard,
+} from "../projectOverview";
 import { uid } from "../seed";
-import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task } from "../types";
+import type { AppState, CoachStepId, DailyPlan, Priority, ProjectMember, RepeatRule, Severity, Subtask, Task, TaskStage, TaskStatus } from "../types";
 
 export function WorkspaceView(props: {
   mode: "board" | "workbench";
   state: AppState;
   draft: TaskDraft;
   setDraft: (draft: TaskDraft) => void;
-  addTask: () => void;
+  addTask: (projectId?: string) => void;
   poolTasks: Task[];
   committedTasks: Task[];
   todayPlan: DailyPlan;
   selectedTask?: Task;
   taskFilters: TaskFilters;
   setTaskFilters: (filters: TaskFilters) => void;
-  capacityHint: number;
   totalCommittedEstimate: number;
   commitTask: (taskId: string) => void;
   removeCommittedTask: (taskId: string) => void;
@@ -39,24 +46,17 @@ export function WorkspaceView(props: {
   beginFocus: (taskId: string) => void;
   openProjectSettings: () => void;
   openProjectDetail: (projectId: string) => void;
-  updateReflection: (reflection: string) => void;
-  updateReview: (patch: Partial<DailyPlan["review"]>) => void;
-  completeReview: () => void;
   resolveInterruption: (interruptionId: string) => void;
   convertInterruptionToTask: (interruptionId: string) => void;
 }) {
   const {
     state,
-    draft,
-    setDraft,
-    addTask,
     poolTasks,
     committedTasks,
     todayPlan,
     selectedTask,
     taskFilters,
     setTaskFilters,
-    capacityHint,
     totalCommittedEstimate,
     commitTask,
     removeCommittedTask,
@@ -75,9 +75,6 @@ export function WorkspaceView(props: {
     dismissCoachStep,
     splitTask,
     beginFocus,
-    updateReflection,
-    updateReview,
-    completeReview,
     resolveInterruption,
     convertInterruptionToTask,
   } = props;
@@ -86,136 +83,91 @@ export function WorkspaceView(props: {
   const overload = totalCommittedEstimate > todayPlan.capacityPomodoros;
   const projects = Array.from(new Set(state.tasks.map((task) => task.project))).sort();
   const tags = Array.from(new Set(state.tasks.flatMap((task) => task.tags))).sort();
-  const completionRate = dailyCompletionRate(state, todayPlan);
-  const abortedToday = abortedSessionsOnDate(state, today()).length;
-  const interruptionsToday = interruptionsOnDate(state, today());
   const inbox = unresolvedInterruptions(state).slice(0, 6);
-  const lowEstimateTasks = state.tasks
-    .map((task) => ({ task, actual: sessionsForTask(state, task.id).length || task.actualPomodoros }))
-    .filter(({ task, actual }) => actual - task.estimatePomodoros >= 2)
-    .slice(0, 3);
   const pressure = planPressure(state, todayPlan);
   const suggestions = taskSuggestions(state, todayPlan.date, 5);
   const guideSteps = coachSteps(state, todayPlan.date).filter((step) => !(state.settings.dismissedCoachSteps ?? []).includes(step.id));
   const nextGuideStep = guideSteps.find((step) => !step.completed);
   const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId) ?? state.projectMembers[0];
-  const assignedTasks = currentMember
-    ? state.tasks
-        .filter((task) => task.primaryExecutorMemberId === currentMember.id)
-        .filter((task) => task.status !== "completed" && task.status !== "archived")
-        .sort((left, right) => {
-          const leftActive = state.activeTimer?.taskId === left.id ? 0 : 1;
-          const rightActive = state.activeTimer?.taskId === right.id ? 0 : 1;
-          if (leftActive !== rightActive) return leftActive - rightActive;
-          return left.sortOrder - right.sortOrder;
-        })
-    : [];
-  const activeAssignedTask = assignedTasks.find((task) => task.id === state.activeTimer?.taskId);
-  const progressUpdateTasks = assignedTasks.filter(
-    (task) => (task.status === "in_progress" || task.actualPomodoros > 0) && (task.progressPercent ?? 0) < 100,
+  const myProjectTaskCards = buildMyProjectTaskCards(state, currentMember);
+  const availableWorkbenchProjectIds = myProjectTaskCards.map((card) => card.projectId);
+  const [selectedWorkbenchProjectIds, setSelectedWorkbenchProjectIds] = useState<string[]>([]);
+  const effectiveWorkbenchProjectIds = selectedWorkbenchProjectIds.length > 0
+    ? selectedWorkbenchProjectIds
+    : availableWorkbenchProjectIds;
+  const selectedProjectIdSet = new Set(effectiveWorkbenchProjectIds);
+  const memberIdentityIds = projectMemberIdentityIds(state, currentMember);
+  const committedWorkbenchTasks = committedTasks.filter(
+    (task) =>
+      selectedProjectIdSet.has(task.projectId) &&
+      task.status !== "completed" &&
+      task.status !== "split" &&
+      task.status !== "archived" &&
+      taskAssignedToMemberIdentity(task, memberIdentityIds),
   );
-  const stalledRisks = stalledTaskRisks(state);
-  const [showAdvancedTask, setShowAdvancedTask] = useState(false);
+  const poolWorkbenchTasks = poolTasks.filter(
+    (task) =>
+      selectedProjectIdSet.has(task.projectId) &&
+      task.status !== "completed" &&
+      task.status !== "split" &&
+      task.status !== "archived" &&
+      taskAssignedToMemberIdentity(task, memberIdentityIds),
+  );
+  const projectOverviewCards = buildProjectOverviewCards(state);
   const [showFilters, setShowFilters] = useState(false);
   const [showGuidance, setShowGuidance] = useState(false);
-  const [boardProjectId, setBoardProjectId] = useState(state.projects[0]?.id ?? "");
-  const [showReview, setShowReview] = useState(
-    Boolean(todayPlan.reviewedAt || new Date().getHours() >= 18),
-  );
-  const selectedBoardProjectId = state.projects.some((project) => project.id === boardProjectId)
-    ? boardProjectId
-    : state.projects[0]?.id ?? "";
-  const progressBoard = buildProgressBoard(state, selectedBoardProjectId);
-  const boardRiskCount = progressBoard.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0);
-  const pendingReviewCount = state.tasks.filter((task) => task.status === "pending_review").length;
-  const assignedNotStartedCount = progressBoard.sections.find((section) => section.kind === "assigned_not_started")?.tasks.length ?? 0;
-  const boardPanel = (
-    <ProgressBoardPanel
-      board={progressBoard}
-      projects={state.projects}
-      selectedProjectId={selectedBoardProjectId}
-      setSelectedProjectId={setBoardProjectId}
-      selectTask={selectTask}
-      openProjectDetail={props.openProjectDetail}
-    />
-  );
+  useEffect(() => {
+    setSelectedWorkbenchProjectIds([]);
+  }, [currentMember?.id]);
+  useEffect(() => {
+    setSelectedWorkbenchProjectIds((current) => {
+      const available = new Set(availableWorkbenchProjectIds);
+      const next = current.filter((projectId) => available.has(projectId));
+      return next.length === current.length ? current : next;
+    });
+  }, [availableWorkbenchProjectIds.join("|")]);
+  const toggleWorkbenchProject = (projectId: string) => {
+    setSelectedWorkbenchProjectIds((current) => {
+      return current.includes(projectId)
+        ? current.filter((item) => item !== projectId)
+        : [...current, projectId];
+    });
+  };
   const workbenchPanel = (
-    <PersonalWorkbench
-      currentMember={currentMember}
-      assignedTasks={assignedTasks}
-      activeTask={activeAssignedTask}
-      progressUpdateTasks={progressUpdateTasks}
-      beginFocus={beginFocus}
-      selectTask={selectTask}
+    <MyProjectTaskFilterPanel
+      cards={myProjectTaskCards}
+      selectedProjectIds={selectedWorkbenchProjectIds}
+      toggleProject={toggleWorkbenchProject}
     />
   );
-  const riskPanel = (
-    <StalledRiskPanel
-      risks={stalledRisks}
-      tasks={state.tasks}
-      selectTask={selectTask}
-    />
-  );
+
+  if (props.mode === "board") {
+    return (
+      <div className="content-grid workspace-grid project-overview-grid">
+        <ProjectOverviewCardsPanel
+          cards={projectOverviewCards}
+          openProjectDetail={props.openProjectDetail}
+          openProjectSettings={props.openProjectSettings}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="content-grid workspace-grid">
-      <section className="band hero-workflow workspace-summary">
-        <div className="workspace-summary-copy">
-          <p className="eyebrow">{props.mode === "board" ? "项目总览" : "我的任务"}</p>
-          <h2>{props.mode === "board" ? "先看全局，再处理风险" : "只看分配给我的工作"}</h2>
-          <p>
-            {props.mode === "board"
-              ? "这里汇总项目进度、正在执行、已分配但未开始和停滞风险。"
-              : "这里按当前登录成员过滤任务，开始工作会创建可信的实时工作会话。"}
-          </p>
-          {overload && !todayPlan.overloadAcknowledged && (
-            <div className="warning-line">
-              工作队列超出当前容量 {totalCommittedEstimate - todayPlan.capacityPomodoros} 个番茄。
-              <button className="link-button" onClick={acknowledgeOverload}>
-                我已确认
-              </button>
-            </div>
-          )}
-        </div>
-        <div className="commitment-strip" aria-label="承诺进度">
-          <span>项目</span>
-          <strong>{state.projects.length}</strong>
-          <small>成员 {state.projectMembers.length}</small>
-        </div>
-        <div className="commitment-strip accent" aria-label="分心成本">
-          <span>正在执行</span>
-          <strong>{progressBoard.activeSessions.length}</strong>
-          <small>未开始 {assignedNotStartedCount}</small>
-        </div>
-        <div className="commitment-strip" aria-label="风险数量">
-          <span>风险优先项</span>
-          <strong className={boardRiskCount > 0 ? "danger-text" : ""}>{boardRiskCount}</strong>
-          <small>待验收 {pendingReviewCount}</small>
-        </div>
-        {props.mode === "workbench" && (
-          <button className="secondary-button workspace-more" onClick={() => setShowGuidance((value) => !value)}>
-            <Sparkles size={16} />
-            {showGuidance ? "收起辅助面板" : "展开辅助面板"}
-          </button>
-        )}
-        <button className="secondary-button workspace-more" onClick={props.openProjectSettings}>
-          管理项目成员
-        </button>
-      </section>
-
-      {props.mode === "workbench" ? (
-        <>
-          {workbenchPanel}
-        </>
-      ) : (
-        <>
-          {boardPanel}
-          {riskPanel}
-        </>
-      )}
+      {workbenchPanel}
 
       {props.mode === "workbench" && (
         <>
+      {overload && !todayPlan.overloadAcknowledged && (
+        <section className="band warning-line">
+          工作队列超出当前容量 {totalCommittedEstimate - todayPlan.capacityPomodoros} 个番茄。
+          <button className="link-button" onClick={acknowledgeOverload}>
+            我已确认
+          </button>
+        </section>
+      )}
+
       {showGuidance && <section className="band coach-panel">
         <div className="section-title">
           <div>
@@ -288,111 +240,6 @@ export function WorkspaceView(props: {
         </div>
       </section>}
 
-      <section className="band add-task compact-add-task">
-        <div className="compact-add-title">
-          <Plus size={17} />
-          <strong>快速添加</strong>
-        </div>
-
-        <div className="task-form compact-task-form">
-          <label className="quick-title">
-            <span className="sr-only">任务名称</span>
-            <input
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-              placeholder="例如：整理严格模式权限说明"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") addTask();
-              }}
-            />
-          </label>
-          <label className="quick-estimate">
-            <span className="sr-only">估算番茄</span>
-            <input
-              type="number"
-              min="0"
-              max="12"
-              value={draft.estimatePomodoros}
-              onChange={(event) => setDraft({ ...draft, estimatePomodoros: Number(event.target.value) })}
-            />
-          </label>
-        </div>
-        <button className="primary-button" onClick={addTask}>
-          <Plus size={16} />
-          添加
-        </button>
-        <button className="secondary-button compact-toggle" onClick={() => setShowAdvancedTask((value) => !value)}>
-          <SlidersHorizontal size={16} />
-          {showAdvancedTask ? "收起" : "更多"}
-        </button>
-        {showAdvancedTask && (
-          <div className="task-form advanced-task-form">
-          <label>
-            项目
-            <input value={draft.project} onChange={(event) => setDraft({ ...draft, project: event.target.value })} />
-          </label>
-          <label>
-            标签
-            <input value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} />
-          </label>
-          <label>
-            优先级
-            <select value={draft.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as Priority })}>
-              <option value="low">低</option>
-              <option value="medium">中</option>
-              <option value="high">高</option>
-              <option value="urgent">紧急</option>
-            </select>
-          </label>
-          <label>
-            严重度
-            <select value={draft.severity} onChange={(event) => setDraft({ ...draft, severity: event.target.value as Severity })}>
-              <option value="low">低</option>
-              <option value="medium">中</option>
-              <option value="high">高</option>
-              <option value="very_high">非常高</option>
-            </select>
-          </label>
-          <label>
-            到期日
-            <input type="datetime-local" value={draft.dueAt} onChange={(event) => setDraft({ ...draft, dueAt: event.target.value })} />
-          </label>
-          <label>
-            提醒
-            <input type="datetime-local" value={draft.reminderAt} onChange={(event) => setDraft({ ...draft, reminderAt: event.target.value })} />
-          </label>
-          <label>
-            重复
-            <select value={draft.repeatRule} onChange={(event) => setDraft({ ...draft, repeatRule: event.target.value as RepeatRule })}>
-              <option value="none">不重复</option>
-              <option value="daily">每天</option>
-              <option value="weekly">每周</option>
-              <option value="weekdays">工作日</option>
-              <option value="monthly">每月</option>
-              <option value="interval">间隔天数</option>
-              <option value="after_completion">完成后间隔</option>
-            </select>
-          </label>
-          <label>
-            间隔天
-            <input
-              type="number"
-              min="1"
-              max="60"
-              value={draft.repeatIntervalDays}
-              disabled={draft.repeatRule !== "interval" && draft.repeatRule !== "after_completion"}
-              onChange={(event) => setDraft({ ...draft, repeatIntervalDays: Number(event.target.value) })}
-            />
-          </label>
-          <label className="span-2">
-            备注
-            <textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
-          </label>
-        </div>
-        )}
-        {draft.estimatePomodoros > 7 && <p className="warning">超过 7 个番茄的活动建议拆分，避免计划阶段失真。</p>}
-      </section>
-
       <section className={showFilters ? "band filter-panel" : "filter-panel filter-inline"}>
         {showFilters ? <div className="section-title">
           <div>
@@ -404,7 +251,7 @@ export function WorkspaceView(props: {
           </button>
         </div> : (
           <div className="filter-inline-row">
-            <span>工作队列 {committedTasks.length} · 任务池 {poolTasks.length}</span>
+            <span>工作队列 {committedWorkbenchTasks.length} · 任务池 {poolWorkbenchTasks.length}</span>
             <button className="secondary-button" onClick={() => setShowFilters(true)}>
               <SlidersHorizontal size={16} />
               筛选
@@ -468,10 +315,24 @@ export function WorkspaceView(props: {
       </section>
 
       <TaskColumn
+        title="活动清单"
+        eyebrow="待安排任务池"
+        tasks={poolWorkbenchTasks}
+        empty={selectedWorkbenchProjectIds.length > 0 ? "所选项目里暂无待安排任务。" : "暂无待安排任务。"}
+        actionLabel="加入队列"
+        actionIcon={<ChevronRight size={15} />}
+        onAction={commitTask}
+        onDelete={deleteTask}
+        onSelect={selectTask}
+        onSplit={splitTask}
+        activeTaskId={state.activeTimer?.taskId}
+      />
+
+      <TaskColumn
         title="工作队列"
         eyebrow="今日准备执行"
-        tasks={committedTasks}
-        empty="从任务池中选择要推进的工作。"
+        tasks={committedWorkbenchTasks}
+        empty={selectedWorkbenchProjectIds.length > 0 ? "所选项目里暂无今日准备执行的任务。" : "暂无今日准备执行的任务。"}
         actionLabel="开始"
         actionIcon={<Play size={15} />}
         onAction={beginFocus}
@@ -480,120 +341,26 @@ export function WorkspaceView(props: {
         onSelect={selectTask}
         onSplit={splitTask}
         onMove={moveCommittedTask}
-      />
-
-      <TaskColumn
-        title="活动清单"
-        eyebrow="待安排任务池"
-        tasks={poolTasks}
-        empty="任务池空了，可以补充新活动。"
-        actionLabel="加入队列"
-        actionIcon={<ChevronRight size={15} />}
-        onAction={commitTask}
-        onDelete={deleteTask}
-        onSelect={selectTask}
-        onSplit={splitTask}
+        activeTaskId={state.activeTimer?.taskId}
       />
         </>
       )}
 
-      {selectedTask && (
-        <div className="task-detail-drawer">
-          <TaskDetailPanel
-            task={selectedTask}
-            projects={state.projects}
-            projectMembers={state.projectMembers}
-            updateTask={updateTask}
-            updateTaskAssignment={updateTaskAssignment}
-            updateTaskProgress={updateTaskProgress}
-            acceptTask={acceptTask}
-            returnTaskForReview={returnTaskForReview}
-            close={() => selectTask(null)}
-            splitTask={splitTask}
-          />
-        </div>
-      )}
+      <TaskDetailModal
+        task={selectedTask}
+        projects={state.projects}
+        projectMembers={state.projectMembers}
+        updateTask={updateTask}
+        updateTaskAssignment={updateTaskAssignment}
+        updateTaskProgress={updateTaskProgress}
+        acceptTask={acceptTask}
+        returnTaskForReview={returnTaskForReview}
+        close={() => selectTask(null)}
+        splitTask={splitTask}
+      />
 
       {props.mode === "workbench" && (
         <>
-          {!showReview && (
-            <section className="band review-nudge">
-              <div>
-                <p className="eyebrow">日终回顾</p>
-                <h2>日终回顾已收起</h2>
-              </div>
-              <button className="secondary-button" onClick={() => setShowReview(true)}>
-                现在打开
-              </button>
-            </section>
-          )}
-
-          {showReview && <section className="band review-panel">
-            <div className="section-title">
-              <div>
-                <p className="eyebrow">日终回顾</p>
-                <h2>日终回顾</h2>
-              </div>
-              <Check size={20} />
-            </div>
-            <div className="review-stats">
-              <Metric icon={<Target size={17} />} label="承诺兑现" value={`${completionRate}%`} />
-              <Metric icon={<Square size={17} />} label="作废番茄" value={`${abortedToday}`} />
-              <Metric icon={<Activity size={17} />} label="今日中断" value={`${interruptionsToday.length}`} />
-            </div>
-            <div className="review-grid">
-              <label>
-                状态
-                <select value={todayPlan.review.mood} onChange={(event) => updateReview({ mood: event.target.value as DailyPlan["review"]["mood"] })}>
-                  <option value="low">低能量</option>
-                  <option value="normal">稳定</option>
-                  <option value="good">不错</option>
-                  <option value="great">高光</option>
-                </select>
-              </label>
-              <label>
-                今日收获
-                <textarea value={todayPlan.review.wins} onChange={(event) => updateReview({ wins: event.target.value })} />
-              </label>
-              <label>
-                阻碍
-                <textarea value={todayPlan.review.blockers} onChange={(event) => updateReview({ blockers: event.target.value })} />
-              </label>
-              <label>
-                中断模式
-                <textarea value={todayPlan.review.interruptionPattern} onChange={(event) => updateReview({ interruptionPattern: event.target.value })} />
-              </label>
-              <label>
-                明日注意事项
-                <textarea value={todayPlan.review.tomorrowFocus} onChange={(event) => updateReview({ tomorrowFocus: event.target.value })} />
-              </label>
-            </div>
-            {lowEstimateTasks.length > 0 && (
-              <div className="insight-list compact">
-                {lowEstimateTasks.map(({ task, actual }) => (
-                  <article className="insight-item" key={task.id}>
-                    <strong>{task.title}</strong>
-                    <span>低估 {actual - task.estimatePomodoros} 个番茄，明天优先拆小。</span>
-                  </article>
-                ))}
-              </div>
-            )}
-            <div className="button-row">
-              <button className="primary-button" onClick={completeReview}>
-                <Check size={16} />
-                完成回顾并生成明日建议
-              </button>
-              <button className="secondary-button" onClick={() => updateReflection(todayPlan.review.wins)}>
-                同步到旧总结
-              </button>
-            </div>
-            <p className="muted">
-              {todayPlan.reviewedAt
-                ? `已于 ${new Date(todayPlan.reviewedAt).toLocaleTimeString()} 完成回顾，建议明日 ${todayPlan.suggestedCapacityPomodoros ?? capacityHint} 个番茄。`
-                : "完成回顾后会更新连续天数、徽章和明日容量建议。"}
-            </p>
-          </section>}
-
           {showGuidance && inbox.length > 0 && <section className="band inbox-panel">
             <div className="section-title">
               <div>
@@ -621,215 +388,165 @@ export function WorkspaceView(props: {
   );
 }
 
-function formatElapsed(seconds: number) {
-  const safe = Math.max(0, seconds);
-  const hours = Math.floor(safe / 3600);
-  const minutes = Math.floor((safe % 3600) / 60);
-  return hours > 0 ? `${hours}小时${minutes}分` : `${minutes}分`;
-}
+const projectStatusLabels: Record<TaskStatus, string> = {
+  pool: "任务池",
+  committed: "已安排",
+  in_progress: "进行中",
+  pending_review: "待验收",
+  completed: "已完成",
+  split: "已拆分",
+  archived: "已归档",
+};
 
-function ProgressBoardPanel(props: {
-  board: ReturnType<typeof buildProgressBoard>;
-  projects: AppState["projects"];
-  selectedProjectId: string;
-  setSelectedProjectId: (projectId: string) => void;
-  selectTask: (taskId: string) => void;
-  openProjectDetail?: (projectId: string) => void;
+const projectStatusOrder: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
+
+function ProjectOverviewCardsPanel(props: {
+  cards: ProjectOverviewCard[];
+  openProjectDetail: (projectId: string) => void;
+  openProjectSettings: () => void;
 }) {
   return (
-    <section className="band progress-board">
-      <div className="section-title">
-        <div>
-          <p className="eyebrow">项目实时状态</p>
-          <h2>项目进度看板</h2>
+    <section className="project-card-board" aria-label="项目卡片总览">
+      {props.cards.length === 0 && (
+        <div className="band project-overview-empty">
+          <p className="eyebrow">项目总览</p>
+          <h2>还没有项目</h2>
+          <p className="muted">先到管理中心创建项目，再回到这里查看项目运营卡片。</p>
+          <button className="primary-button" onClick={props.openProjectSettings}>创建项目</button>
         </div>
-        <label className="compact-select">
-          <span className="sr-only">选择项目</span>
-          <select value={props.selectedProjectId} onChange={(event) => props.setSelectedProjectId(event.target.value)}>
-            {props.projects.map((project) => (
-              <option key={project.id} value={project.id}>{project.name}</option>
-            ))}
-          </select>
-        </label>
-        {props.openProjectDetail && (
-          <button className="secondary-button" onClick={() => props.openProjectDetail?.(props.selectedProjectId)}>
-            进入项目
-          </button>
-        )}
-      </div>
-
-      <div className="board-summary">
-        <div>
-          <span>加权项目进度</span>
-          <strong>{props.board.projectProgress}%</strong>
-        </div>
-        <div>
-          <span>活跃工作会话</span>
-          <strong>{props.board.activeSessions.length}</strong>
-        </div>
-        <div>
-          <span>风险优先项</span>
-          <strong>{props.board.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0)}</strong>
-        </div>
-      </div>
-
-      <div className="active-session-list">
-        {props.board.activeSessions.length === 0 && <p className="empty">当前项目没有正在执行的工作会话。</p>}
-        {props.board.activeSessions.map((session) => (
-          <article className="active-work-line" key={session.workSessionId}>
-            <div>
-              <strong>{session.taskTitle}</strong>
-              <span>
-                {session.executorName ?? "未指定执行者"} · 开始 {new Date(session.startedAt).toLocaleTimeString()} · 已进行 {formatElapsed(session.elapsedSeconds)}
-              </span>
-            </div>
-            <button className="small-button" onClick={() => props.selectTask(session.taskId)}>查看</button>
-          </article>
-        ))}
-      </div>
-
-      <div className="board-section-list">
-        {props.board.sections.map((section) => (
-          <div className={`board-section board-section-${section.kind}`} key={section.kind}>
-            <div className="board-section-heading">
-              <strong>{section.title}</strong>
-              <span>{section.tasks.length}</span>
-            </div>
-            {section.tasks.length === 0 && <p className="empty">暂无任务。</p>}
-            {section.tasks.map((task) => (
-              <article className="board-task" key={`${section.kind}-${task.taskId}`}>
-                <div>
-                  <strong>{task.title}</strong>
-                  <span>{task.executorName ?? "未分配执行者"} · 进度 {task.progressPercent}%</span>
-                  <p>{task.detail}</p>
-                  {task.progressNote && <p>进展说明：{task.progressNote}</p>}
-                </div>
-                <button className="small-button" onClick={() => props.selectTask(task.taskId)}>查看</button>
-              </article>
-            ))}
-          </div>
-        ))}
-      </div>
+      )}
+      {props.cards.map((card) => (
+        <ProjectOverviewCardItem
+          card={card}
+          key={card.projectId}
+          openProjectDetail={props.openProjectDetail}
+          openProjectSettings={props.openProjectSettings}
+        />
+      ))}
     </section>
   );
 }
 
-function StalledRiskPanel(props: {
-  risks: ReturnType<typeof stalledTaskRisks>;
-  tasks: Task[];
-  selectTask: (taskId: string) => void;
+function ProjectOverviewCardItem(props: {
+  card: ProjectOverviewCard;
+  openProjectDetail: (projectId: string) => void;
+  openProjectSettings: () => void;
 }) {
-  const riskLabel = {
-    not_started: "未按预期开始",
-    started_stale: "执行信号停滞",
-    finish_late: "预计完成逾期",
-  };
+  const { card } = props;
+  const hasRisk = card.riskCount > 0;
+  const hasPendingReview = card.pendingReviewCount > 0;
+  const activeStatuses = projectStatusOrder.filter((status) => card.statusCounts[status] > 0);
+
   return (
-    <section className="band risk-panel">
-      <div className="section-title">
+    <article className={hasRisk || hasPendingReview ? "project-overview-card attention" : "project-overview-card"}>
+      <div className="project-overview-card-header">
         <div>
-          <p className="eyebrow">停滞风险</p>
-          <h2>需要管理者关注</h2>
+          <h2>{card.name}</h2>
+          <p>{card.description || "这个项目还没有说明。"}</p>
         </div>
-        <span className="count-pill">{props.risks.length}</span>
+        <div className="project-overview-progress-inline" aria-label={`项目进度 ${card.progressPercent}%`}>
+          <strong>{card.progressPercent}%</strong>
+          <span>进度</span>
+        </div>
       </div>
-      <div className="insight-list compact">
-        {props.risks.length === 0 && <p className="empty">当前没有超过预计时间或执行信号停滞的任务。</p>}
-        {props.risks.slice(0, 5).map((risk) => {
-          const task = props.tasks.find((item) => item.id === risk.taskId);
-          if (!task) return null;
+
+      <div className="project-overview-meter">
+        <span style={{ width: `${Math.max(0, Math.min(100, card.progressPercent))}%` }} />
+      </div>
+
+      <div className="project-overview-metrics">
+        <div>
+          <span>任务</span>
+          <strong>{card.taskCount}</strong>
+        </div>
+        <div>
+          <span>成员</span>
+          <strong>{card.memberCount}</strong>
+        </div>
+        <div className={card.riskCount > 0 ? "metric-danger metric-strong" : ""}>
+          <span>风险</span>
+          <strong>{card.riskCount}</strong>
+        </div>
+        <div className={card.pendingReviewCount > 0 ? "metric-warning metric-strong" : ""}>
+          <span>待验收</span>
+          <strong>{card.pendingReviewCount}</strong>
+        </div>
+      </div>
+
+      <div className="project-status-strip">
+        {(activeStatuses.length > 0 ? activeStatuses : ["pool" as TaskStatus]).map((status) => (
+          <div className={`project-status-pill status-${status}`} key={status}>
+            <span>{projectStatusLabels[status]}</span>
+            <strong>{card.statusCounts[status]}</strong>
+          </div>
+        ))}
+      </div>
+
+      <div className="project-overview-signal">
+        <span className={card.assignedNotStartedCount > 0 ? "signal-warning" : ""}>
+          未开始 {card.assignedNotStartedCount}
+        </span>
+        <span className={card.activeSessionCount > 0 ? "signal-live" : ""}>
+          工作会话 {card.activeSessionCount}
+        </span>
+      </div>
+
+      <div className="project-overview-actions">
+        <button className="primary-button" onClick={() => props.openProjectDetail(card.projectId)}>
+          进入项目
+          <ChevronRight size={16} />
+        </button>
+        <button className="secondary-button" onClick={props.openProjectSettings}>管理成员</button>
+      </div>
+    </article>
+  );
+}
+
+function MyProjectTaskFilterPanel(props: {
+  cards: MyProjectTaskCard[];
+  selectedProjectIds: string[];
+  toggleProject: (projectId: string) => void;
+}) {
+  const selectedSet = new Set(props.selectedProjectIds);
+  const hasActiveFilter = props.selectedProjectIds.length > 0;
+
+  return (
+    <section className="band personal-workbench my-project-task-panel">
+      <div className="my-project-card-grid">
+        {props.cards.length === 0 && <p className="empty">当前成员还没有绑定项目。</p>}
+        {props.cards.map((card) => {
+          const selected = selectedSet.has(card.projectId);
+          const selectionLabel = selected ? "筛选中" : hasActiveFilter ? "未筛选" : "默认全部";
           return (
-            <article className="insight-item" key={`${risk.kind}-${risk.taskId}`}>
-              <div>
-                <strong>{task.title}</strong>
-                <span>{riskLabel[risk.kind]} · {risk.detail}</span>
+            <button
+              className={selected ? "my-project-task-card selected" : "my-project-task-card"}
+              key={card.projectId}
+              onClick={() => props.toggleProject(card.projectId)}
+              type="button"
+              aria-pressed={selected}
+            >
+              <div className="my-project-card-main">
+                <div>
+                  <p className="eyebrow">{selectionLabel}</p>
+                  <h2>{card.name}</h2>
+                </div>
+                <div className="my-project-progress" aria-label={`项目进度 ${card.progressPercent}%`}>
+                  <strong>{card.progressPercent}%</strong>
+                </div>
               </div>
-              <button className="small-button" onClick={() => props.selectTask(task.id)}>
-                查看
-              </button>
-            </article>
+              <div className="my-project-mini-meter">
+                <span style={{ width: `${Math.max(0, Math.min(100, card.progressPercent))}%` }} />
+              </div>
+              <div className="my-project-mini-metrics">
+                <span>任务 {card.myTaskCount}</span>
+                <span>进行中 {card.inProgressCount}</span>
+                <span>待验收 {card.pendingReviewCount}</span>
+                <span>池 {card.poolCount}</span>
+                <span>安排 {card.committedCount}</span>
+              </div>
+            </button>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-function PersonalWorkbench(props: {
-  currentMember?: ProjectMember;
-  assignedTasks: Task[];
-  activeTask?: Task;
-  progressUpdateTasks: Task[];
-  beginFocus: (taskId: string) => void;
-  selectTask: (taskId: string) => void;
-}) {
-  return (
-    <section className="band personal-workbench">
-      <div className="section-title">
-        <div>
-          <p className="eyebrow">个人任务台</p>
-          <h2>我的任务</h2>
-        </div>
-        <span className="count-pill">{props.assignedTasks.length}</span>
-      </div>
-
-      <div className="workbench-stats">
-        <div>
-          <span>当前执行者</span>
-          <strong>{props.currentMember?.name ?? "未选择成员"}</strong>
-        </div>
-        <div>
-          <span>正在进行</span>
-          <strong>{props.activeTask?.title ?? "暂无"}</strong>
-        </div>
-        <div>
-          <span>需更新进展</span>
-          <strong>{props.progressUpdateTasks.length}</strong>
-        </div>
-      </div>
-
-      {props.activeTask && (
-        <article className="active-work-line">
-          <div>
-            <strong>{props.activeTask.title}</strong>
-            <span>工作会话已启动。切换到其他任务时，会先结束当前会话，再开始新任务。</span>
-          </div>
-          <button className="small-button" onClick={() => props.selectTask(props.activeTask!.id)}>
-            查看详情
-          </button>
-        </article>
-      )}
-
-      <div className="task-list">
-        {props.assignedTasks.length === 0 && <p className="empty">当前成员还没有被分配任务。</p>}
-        {props.assignedTasks.slice(0, 4).map((task) => (
-          <article className={task.id === props.activeTask?.id ? "task-item active-edge" : "task-item"} key={task.id}>
-            <div>
-              <div className="task-title-row">
-                <strong>{task.title}</strong>
-                <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
-              </div>
-              {task.notes && <p>{task.notes}</p>}
-              <TaskProgressBar percent={task.progressPercent ?? 0} />
-              <PomodoroProgress actual={task.actualPomodoros} estimate={task.estimatePomodoros} />
-              <div className="task-meta">
-                <span>{task.project}</span>
-                <span>进度 {task.progressPercent ?? 0}%</span>
-                {task.expectedStartAt && <span>预计开始 {new Date(task.expectedStartAt).toLocaleString()}</span>}
-                {task.expectedFinishAt && <span>预计完成 {new Date(task.expectedFinishAt).toLocaleString()}</span>}
-              </div>
-            </div>
-            <div className="task-actions">
-              <button className="icon-button small" title="任务详情" onClick={() => props.selectTask(task.id)}>
-                <PanelRight size={16} />
-              </button>
-              <button className="small-button" onClick={() => props.beginFocus(task.id)} disabled={task.id === props.activeTask?.id}>
-                <Play size={15} />
-                {task.id === props.activeTask?.id ? "进行中" : props.activeTask ? "切换任务" : "开始工作"}
-              </button>
-            </div>
-          </article>
-        ))}
       </div>
     </section>
   );
@@ -849,6 +566,7 @@ function TaskColumn(props: {
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
   onMove?: (taskId: string, direction: -1 | 1) => void;
+  activeTaskId?: string;
 }) {
   return (
     <section className="band task-column">
@@ -861,18 +579,30 @@ function TaskColumn(props: {
       </div>
       <div className="task-list">
         {props.tasks.length === 0 && <p className="empty">{props.empty}</p>}
-        {props.tasks.map((task) => (
-          <article className={task.estimatePomodoros > 7 ? "task-item warning-edge" : "task-item"} key={task.id}>
+        {props.tasks.map((task) => {
+          const isActiveTask = props.activeTaskId === task.id;
+          const canSubmitReview = task.status === "committed" || task.status === "in_progress";
+          return (
+          <article
+            className={[
+              "task-item",
+              task.estimatePomodoros > 7 ? "warning-edge" : "",
+              isActiveTask ? "active-edge running-task" : "",
+            ].filter(Boolean).join(" ")}
+            key={task.id}
+          >
             <div>
               <div className="task-title-row">
                 <strong>{task.title}</strong>
                 <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
+                {isActiveTask && <span className="running-pill"><Activity size={13} />正在执行</span>}
               </div>
               {task.notes && <p>{task.notes}</p>}
               <TaskProgressBar percent={task.progressPercent ?? 0} />
               <PomodoroProgress actual={task.actualPomodoros} estimate={task.estimatePomodoros} />
               <div className="task-meta">
                 <span>{task.project}</span>
+                <span>{labelTaskStage[task.stage]}</span>
                 {task.dueAt && <span>到期 {new Date(task.dueAt).toLocaleDateString()}</span>}
                 {task.severity === "very_high" && <span>高严重度</span>}
               </div>
@@ -901,16 +631,34 @@ function TaskColumn(props: {
                   <PanelRight size={16} />
                 </button>
               )}
-              <button className="small-button" onClick={() => props.onAction(task.id)}>
-                {props.actionIcon}
-                {props.actionLabel}
-              </button>
-              {props.onSplit && task.estimatePomodoros > 7 && (
+              {task.status === "split" ? (
+                <span className="status-pill">已拆分</span>
+              ) : task.status === "pending_review" ? (
+                <span className="status-pill">
+                  <Check size={15} />
+                  待验收
+                </span>
+              ) : task.status === "completed" ? (
+                <span className="status-pill">已完成</span>
+              ) : task.status === "archived" ? (
+                <span className="status-pill">已归档</span>
+              ) : isActiveTask ? (
+                <span className="small-button active-action" aria-label="当前正在执行的任务">
+                  <Activity size={15} />
+                  执行中
+                </span>
+              ) : (
+                <button className="small-button" onClick={() => props.onAction(task.id)}>
+                  {props.actionIcon}
+                  {props.actionLabel}
+                </button>
+              )}
+              {props.onSplit && task.status !== "completed" && task.status !== "split" && task.status !== "archived" && (
                 <button className="icon-button small" title="拆分任务" onClick={() => props.onSplit?.(task.id)}>
                   <Split size={16} />
                 </button>
               )}
-              {props.onComplete && task.status !== "pending_review" && (
+              {props.onComplete && canSubmitReview && (
                 <button className="icon-button small" title="提交验收" onClick={() => props.onComplete?.(task.id)}>
                   <Check size={16} />
                 </button>
@@ -927,7 +675,8 @@ function TaskColumn(props: {
               )}
             </div>
           </article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -966,6 +715,33 @@ function PomodoroProgress(props: { actual: number; estimate: number }) {
         {overflow > 0 && <span className="pomodoro-overflow">+{overflow}</span>}
       </div>
       <span>番茄</span>
+    </div>
+  );
+}
+
+export function TaskDetailModal(props: React.ComponentProps<typeof TaskDetailPanel>) {
+  useEffect(() => {
+    if (!props.task) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") props.close();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [props]);
+
+  if (!props.task) return null;
+
+  return (
+    <div
+      className="modal-backdrop task-detail-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) props.close();
+      }}
+    >
+      <section className="modal-panel task-detail-modal" role="dialog" aria-modal="true" aria-label={`任务详情：${props.task.title}`}>
+        <TaskDetailPanel {...props} />
+      </section>
     </div>
   );
 }
@@ -1112,6 +888,14 @@ export function TaskDetailPanel(props: {
               <option value="high">高</option>
               <option value="medium">中</option>
               <option value="low">低</option>
+            </select>
+          </label>
+          <label>
+            阶段
+            <select value={task.stage} disabled={!canEdit} onChange={(event) => updateTask(task.id, { stage: event.target.value as TaskStage })}>
+              {taskStageOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </label>
           <label>
@@ -1381,10 +1165,10 @@ export function TaskDetailPanel(props: {
         </div>
       </div>
 
-      {task.estimatePomodoros > 7 && (
+      {task.status !== "completed" && task.status !== "split" && task.status !== "archived" && (
         <button className="primary-button" disabled={!canEdit} onClick={() => props.splitTask(task.id)}>
           <Split size={16} />
-          拆分大任务
+          {task.estimatePomodoros > 7 ? "拆分大任务" : "拆分任务"}
         </button>
       )}
     </section>

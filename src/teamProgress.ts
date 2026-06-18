@@ -132,6 +132,45 @@ export function updateTeamMemberInState(state: AppState, teamMember: TeamMember,
   };
 }
 
+export function deleteTeamMemberInState(state: AppState, teamMemberId: string, timestamp = new Date().toISOString()): AppState {
+  const deletedProjectMembers = state.projectMembers.filter((member) => member.teamMemberId === teamMemberId);
+  const deletedProjectMemberIds = new Set(deletedProjectMembers.map((member) => member.id));
+  const projectMembers = state.projectMembers.filter((member) => !deletedProjectMemberIds.has(member.id));
+  return {
+    ...state,
+    teamMembers: state.teamMembers.filter((member) => member.id !== teamMemberId),
+    projectMembers,
+    currentMemberId: state.currentMemberId && deletedProjectMemberIds.has(state.currentMemberId) ? projectMembers[0]?.id : state.currentMemberId,
+    tasks: state.tasks.map((task) => ({
+      ...task,
+      creatorMemberId: task.creatorMemberId && deletedProjectMemberIds.has(task.creatorMemberId) ? undefined : task.creatorMemberId,
+      primaryExecutorMemberId: task.primaryExecutorMemberId && deletedProjectMemberIds.has(task.primaryExecutorMemberId)
+        ? undefined
+        : task.primaryExecutorMemberId,
+      collaboratorMemberIds: task.collaboratorMemberIds?.filter((id) => !deletedProjectMemberIds.has(id)) ?? [],
+      updatedAt:
+        (task.creatorMemberId && deletedProjectMemberIds.has(task.creatorMemberId)) ||
+        (task.primaryExecutorMemberId && deletedProjectMemberIds.has(task.primaryExecutorMemberId)) ||
+        task.collaboratorMemberIds?.some((id) => deletedProjectMemberIds.has(id))
+          ? timestamp
+          : task.updatedAt,
+    })),
+    sync: {
+      ...state.sync,
+      tombstones: [
+        ...(state.sync.tombstones ?? []).filter(
+          (item) =>
+            !(item.entity === "team_member" && item.id === teamMemberId) &&
+            !(item.entity === "project_member" && deletedProjectMemberIds.has(item.id)),
+        ),
+        { entity: "team_member", id: teamMemberId, deletedAt: timestamp },
+        ...deletedProjectMembers.map((member) => ({ entity: "project_member" as const, id: member.id, deletedAt: timestamp })),
+      ],
+    },
+    updatedAt: timestamp,
+  };
+}
+
 export function updateProjectInState(state: AppState, project: Project, timestamp = new Date().toISOString()): AppState {
   return {
     ...state,
@@ -304,10 +343,11 @@ export function submitTaskForReviewInState(
   submitterMemberId: string | undefined,
   timestamp = new Date().toISOString(),
 ): AppState {
+  const canSubmitForReview = (task: Task) => task.status === "committed" || task.status === "in_progress";
   return {
     ...state,
     tasks: state.tasks.map((task) =>
-      task.id === taskId
+      task.id === taskId && canSubmitForReview(task)
         ? {
             ...task,
             status: "pending_review" as const,

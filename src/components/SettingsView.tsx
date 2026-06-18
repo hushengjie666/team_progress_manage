@@ -1,8 +1,8 @@
-import { AlarmClock, Bell, Cloud, DatabaseBackup, Download, LogIn, RefreshCw, Server, ShieldCheck, ShieldQuestion, Sparkles, Upload } from "lucide-react";
-import { useRef, useState } from "react";
+import { AlarmClock, Bell, Cloud, DatabaseBackup, Download, LogIn, RefreshCw, Server, ShieldCheck, ShieldQuestion, Sparkles, Trash2, Upload } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { nowIso } from "../appModel";
 import { deploymentCommands } from "../syncDiagnostics";
-import type { AppState, BlockProfile, ImportSummary, Project, ProjectMember, ProjectMemberRole, StrictModeStatus, SyncConflict, SyncDiagnosticResult, SyncState, TeamMember } from "../types";
+import type { AppState, BlockProfile, ImportSummary, Project, ProjectMember, StrictModeStatus, SyncConflict, SyncDiagnosticResult, SyncState, TeamMember } from "../types";
 
 export type SettingsSection = "members" | "projects" | "timer" | "focus" | "sync" | "data" | "system";
 
@@ -18,9 +18,8 @@ export function SettingsView(props: {
   createTeamMember: (name: string, email: string, password?: string) => void;
   updateTeamMember: (member: TeamMember) => void;
   updateTeamMemberPassword: (member: TeamMember, password: string) => void;
-  bindTeamMemberToProject: (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => void;
-  updateProjectMember: (member: ProjectMember) => void;
-  openProjectDetail: (projectId: string) => void;
+  deleteTeamMember: (teamMemberId: string) => void;
+  openProjectDetail: (projectId: string, tab?: "overview" | "tasks" | "members" | "settings") => void;
   updateProfile: (profile: BlockProfile) => void;
   askPermissions: () => Promise<void>;
   askNotificationPermissions: () => Promise<void>;
@@ -52,8 +51,7 @@ export function SettingsView(props: {
     createTeamMember,
     updateTeamMember,
     updateTeamMemberPassword,
-    bindTeamMemberToProject,
-    updateProjectMember,
+    deleteTeamMember,
     openProjectDetail,
     updateProfile,
     askNotificationPermissions,
@@ -104,26 +102,18 @@ export function SettingsView(props: {
     });
   };
 
-  const updateMemberRole = (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => {
-    const roles = checked ? Array.from(new Set([...member.roles, role])) : member.roles.filter((item) => item !== role);
-    updateProjectMember({ ...member, roles });
-  };
-
-  const accountId = state.auth.account?.id;
-  const canManageWorkspaceProjects = state.projectMembers.some(
-    (member) =>
-      member.roles.includes("project_owner") &&
-      (member.accountId === accountId || member.id === state.currentMemberId),
+  const canManageWorkspaceProjects = true;
+  const canManageProject = (_projectId: string) => true;
+  const normalizedMemberDraftEmail = memberDraft.email.trim().toLowerCase();
+  const memberDraftEmailExists = Boolean(
+    normalizedMemberDraftEmail &&
+      state.teamMembers.some(
+        (member) => member.status !== "disabled" && member.email?.trim().toLowerCase() === normalizedMemberDraftEmail,
+      ),
   );
-  const canManageProject = (projectId: string) =>
-    canManageWorkspaceProjects ||
-    state.projectMembers.some(
-      (member) =>
-        member.projectId === projectId &&
-        member.roles.includes("project_owner") &&
-        (member.accountId === accountId || member.id === state.currentMemberId),
-    );
-  const activeTeamMembers = state.teamMembers.filter((member) => member.status !== "disabled");
+  const memberDraftValidationMessage = memberDraftEmailExists
+    ? "该登录邮箱或手机号已存在于成员库，请直接编辑现有成员或绑定到项目。"
+    : "";
 
   return (
     <div className="settings-layout">
@@ -175,7 +165,7 @@ export function SettingsView(props: {
               />
             </label>
             <label>
-              成员邮箱
+              登录邮箱或手机号
               <input
                 value={memberDraft.email}
                 disabled={!canManageWorkspaceProjects}
@@ -201,10 +191,14 @@ export function SettingsView(props: {
           <div className="button-row">
             <button
               className="primary-button"
-              disabled={!canManageWorkspaceProjects}
+              disabled={!canManageWorkspaceProjects || memberDraftEmailExists}
               onClick={() => {
                 if (!memberDraft.name.trim() || !memberDraft.email.trim() || !memberDraft.password.trim()) {
-                  setMemberDraftWarning("请先填写成员姓名、邮箱和初始密码。");
+                  setMemberDraftWarning("请先填写成员姓名、登录邮箱或手机号和初始密码。");
+                  return;
+                }
+                if (memberDraftValidationMessage) {
+                  setMemberDraftWarning(memberDraftValidationMessage);
                   return;
                 }
                 createTeamMember(memberDraft.name, memberDraft.email, memberDraft.password);
@@ -215,18 +209,21 @@ export function SettingsView(props: {
               创建成员账号
             </button>
           </div>
-          {!canManageWorkspaceProjects && <p className="muted">只有项目负责人可以创建和维护团队成员。</p>}
-          {memberDraftWarning && <p className="warning-line compact">{memberDraftWarning}</p>}
+          {(memberDraftWarning || memberDraftValidationMessage) && (
+            <p className="warning-line compact">{memberDraftWarning || memberDraftValidationMessage}</p>
+          )}
         </section>
         <div className="member-directory">
           {state.teamMembers.map((member) => (
             <TeamMemberCard
               key={member.id}
               member={member}
+              teamMembers={state.teamMembers}
               projectCount={state.projectMembers.filter((binding) => binding.teamMemberId === member.id && binding.status !== "disabled").length}
               canManage={canManageWorkspaceProjects}
               passwordDraft={memberPasswordDrafts[member.id] ?? ""}
               updateMember={updateTeamMember}
+              deleteMember={() => deleteTeamMember(member.id)}
               updatePasswordDraft={(password) => setMemberPasswordDrafts({ ...memberPasswordDrafts, [member.id]: password })}
               updatePassword={(password) => {
                 updateTeamMemberPassword(member, password);
@@ -334,22 +331,17 @@ export function SettingsView(props: {
                         <strong>{members.length}</strong>
                       </div>
                     </div>
-                    <span className="project-card-note">成员绑定在下方统一维护</span>
-                    <button className="secondary-button" onClick={() => openProjectDetail(project.id)}>
-                      打开项目
-                    </button>
-                    {!canManage && <p className="muted">只有项目负责人可以修改项目资料和成员。</p>}
+                    <span className="project-card-note">成员绑定已迁移到项目内部的成员页。</span>
+                    <div className="button-row">
+                      <button className="secondary-button" onClick={() => openProjectDetail(project.id, "settings")}>
+                        打开项目
+                      </button>
+                      <button className="primary-button" onClick={() => openProjectDetail(project.id, "members")}>
+                        管理成员
+                      </button>
+                    </div>
                   </div>
                 </article>
-                <ProjectBindingPanel
-                  project={project}
-                  teamMembers={activeTeamMembers}
-                  projectMembers={state.projectMembers}
-                  canManage={canManage}
-                  bindTeamMemberToProject={bindTeamMemberToProject}
-                  updateMemberRole={updateMemberRole}
-                  updateProjectMember={updateProjectMember}
-                />
               </div>
             );
           })}
@@ -798,6 +790,24 @@ export function SettingsView(props: {
               <strong>{state.interruptions.length}</strong>
               <span>远端版本</span>
               <strong>{state.sync.lastPulledRevision}</strong>
+              <span>SSE 状态</span>
+              <strong>
+                {state.sync.sseStatus === "open"
+                  ? "已连接"
+                  : state.sync.sseStatus === "connecting"
+                    ? "连接中"
+                    : state.sync.sseStatus === "error"
+                      ? "异常"
+                      : "未连接"}
+              </strong>
+              <span>收到版本</span>
+              <strong>{state.sync.lastReceivedRevision ?? 0}</strong>
+              <span>待补推</span>
+              <strong>{state.sync.pendingLocalSync ? "是" : "否"}</strong>
+              <span>待补拉</span>
+              <strong>{state.sync.pendingRemoteRevision ?? "无"}</strong>
+              <span>触发原因</span>
+              <strong>{state.sync.lastSyncReason ?? "无"}</strong>
               <span>冲突</span>
               <strong>{state.sync.conflictCount}</strong>
               <span>上次同步</span>
@@ -862,37 +872,82 @@ export function SettingsView(props: {
 
 function TeamMemberCard({
   member,
+  teamMembers,
   projectCount,
   canManage,
   updateMember,
+  deleteMember,
   passwordDraft,
   updatePasswordDraft,
   updatePassword,
 }: {
   member: TeamMember;
+  teamMembers: TeamMember[];
   projectCount: number;
   canManage: boolean;
   updateMember: (member: TeamMember) => void;
+  deleteMember: () => void;
   passwordDraft: string;
   updatePasswordDraft: (password: string) => void;
   updatePassword: (password: string) => void;
 }) {
+  const [draft, setDraft] = useState({ name: member.name, email: member.email ?? "" });
+  const normalizedEmail = draft.email.trim().toLowerCase();
+  const nameValue = draft.name.trim();
+  const originalEmail = member.email ?? "";
+  const hasChanges = draft.name !== member.name || draft.email !== originalEmail;
+  const emailRequired = true;
+  const emailMissing = emailRequired && !normalizedEmail;
+  const emailDuplicate = Boolean(normalizedEmail) && teamMembers.some(
+    (item) => item.id !== member.id && item.status !== "disabled" && item.email?.trim().toLowerCase() === normalizedEmail,
+  );
+  const validationMessage = !nameValue
+    ? "请输入成员姓名"
+    : emailMissing
+      ? "已绑定账号的成员必须保留登录邮箱或手机号"
+      : emailDuplicate
+        ? "该登录邮箱或手机号已存在于成员库"
+        : "";
+  const canSave = canManage && hasChanges && !validationMessage;
+
+  useEffect(() => {
+    setDraft({ name: member.name, email: member.email ?? "" });
+  }, [member.id, member.name, member.email]);
+
   return (
     <article className="member-card team-member-card" key={member.id}>
-      <div className="member-card-main">
-        <label>
-          姓名
-          <input value={member.name} disabled={!canManage} onChange={(event) => updateMember({ ...member, name: event.target.value })} />
-        </label>
-        <label>
-          邮箱
-          <input value={member.email ?? ""} disabled={!canManage} onChange={(event) => updateMember({ ...member, email: event.target.value || undefined })} />
-        </label>
+      <div className="member-profile-editor">
+        <div className="member-card-main">
+          <label>
+            姓名
+            <input value={draft.name} disabled={!canManage} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+          </label>
+          <label>
+            登录邮箱或手机号
+            <input value={draft.email} disabled={!canManage} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
+          </label>
+        </div>
+        {validationMessage && hasChanges && <p className="member-validation">{validationMessage}</p>}
       </div>
       <div className="member-role-row">
         <span className="status-pill">{member.status === "disabled" ? "已停用" : "启用中"}</span>
         <span className="status-pill">{projectCount} 个项目</span>
         <span className="status-pill">{member.accountId ? "已绑定账号" : "本地成员"}</span>
+        <button
+          className="secondary-button"
+          disabled={!canSave}
+          onClick={() => updateMember({ ...member, name: nameValue, email: normalizedEmail || undefined })}
+        >
+          保存资料
+        </button>
+        {hasChanges && (
+          <button className="small-button" disabled={!canManage} onClick={() => setDraft({ name: member.name, email: member.email ?? "" })}>
+            重置
+          </button>
+        )}
+        <button className="icon-button small danger" disabled={!canManage} title="删除成员" onClick={deleteMember}>
+          <Trash2 size={15} />
+        </button>
       </div>
       <div className="member-password-row">
         <label>
@@ -910,78 +965,6 @@ function TeamMemberCard({
         </button>
       </div>
     </article>
-  );
-}
-
-function ProjectBindingPanel({
-  project,
-  teamMembers,
-  projectMembers,
-  canManage,
-  bindTeamMemberToProject,
-  updateMemberRole,
-  updateProjectMember,
-}: {
-  project: Project;
-  teamMembers: TeamMember[];
-  projectMembers: ProjectMember[];
-  canManage: boolean;
-  bindTeamMemberToProject: (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => void;
-  updateMemberRole: (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => void;
-  updateProjectMember: (member: ProjectMember) => void;
-}) {
-  const bindings = projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
-  const bindingFor = (teamMemberId: string) => bindings.find((member) => member.teamMemberId === teamMemberId);
-
-  return (
-    <section className="project-binding-panel">
-      <div className="member-section-title">
-        <strong>项目成员绑定</strong>
-        <span>从成员库选择成员，再设置项目内角色。</span>
-      </div>
-      <div className="project-binding-list">
-        {teamMembers.map((teamMember) => {
-          const binding = bindingFor(teamMember.id);
-          const isBound = Boolean(binding);
-          return (
-            <article className={isBound ? "project-binding-row bound" : "project-binding-row"} key={teamMember.id}>
-              <div>
-                <strong>{teamMember.name}</strong>
-                <span>{teamMember.email ?? "未填写邮箱"}</span>
-              </div>
-              <label className="inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={binding?.roles.includes("project_owner") ?? false}
-                  disabled={!canManage || !binding}
-                  onChange={(event) => binding && updateMemberRole(binding, "project_owner", event.target.checked)}
-                />
-                项目负责人
-              </label>
-              <label className="inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={binding?.roles.includes("executor") ?? false}
-                  disabled={!canManage || !binding}
-                  onChange={(event) => binding && updateMemberRole(binding, "executor", event.target.checked)}
-                />
-                执行者
-              </label>
-              {isBound ? (
-                <button className="secondary-button" disabled={!canManage} onClick={() => binding && updateProjectMember({ ...binding, status: "disabled" })}>
-                  解除绑定
-                </button>
-              ) : (
-                <button className="primary-button" disabled={!canManage} onClick={() => bindTeamMemberToProject(project.id, teamMember.id, ["executor"])}>
-                  绑定到项目
-                </button>
-              )}
-            </article>
-          );
-        })}
-        {!teamMembers.length && <p className="empty">成员库为空，请先到“成员管理”创建成员。</p>}
-      </div>
-    </section>
   );
 }
 

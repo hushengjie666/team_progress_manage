@@ -1,6 +1,7 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type Severity = "low" | "medium" | "high" | "very_high";
-export type TaskStatus = "pool" | "committed" | "in_progress" | "pending_review" | "completed" | "archived";
+export type TaskStage = "sales" | "requirements" | "design" | "development" | "testing" | "deployment" | "acceptance";
+export type TaskStatus = "pool" | "committed" | "in_progress" | "pending_review" | "completed" | "split" | "archived";
 export type SessionMode = "focus" | "short_break" | "long_break";
 export type SessionOutcome = "completed" | "aborted" | "skipped";
 export type InterruptionType = "internal" | "external";
@@ -26,6 +27,7 @@ export type CommandAction =
   | "navigate_workspace"
   | "navigate_focus"
   | "navigate_calendar"
+  | "navigate_daily"
   | "navigate_reports"
   | "navigate_settings"
   | "add_quick_task"
@@ -72,6 +74,7 @@ export interface Task {
   progressNote?: string;
   priority: Priority;
   severity: Severity;
+  stage: TaskStage;
   estimatePomodoros: number;
   status: TaskStatus;
   dueAt?: string;
@@ -456,6 +459,7 @@ export interface TaskTemplate {
   tags: string[];
   priority: Priority;
   severity: Severity;
+  stage?: TaskStage;
   estimatePomodoros: number;
   subtasks: string[];
   repeatRule?: RepeatRule;
@@ -536,6 +540,11 @@ export interface SyncState {
   conflictCount: number;
   tombstones: SyncTombstone[];
   conflicts: SyncConflict[];
+  sseStatus?: "idle" | "connecting" | "open" | "error";
+  lastReceivedRevision?: number;
+  pendingLocalSync?: boolean;
+  pendingRemoteRevision?: number;
+  lastSyncReason?: string;
 }
 
 export interface AuthState {

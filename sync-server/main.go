@@ -156,6 +156,13 @@ type pullResponse struct {
 	CurrentRevision int64     `json:"current_revision"`
 }
 
+type syncEvent struct {
+	WorkspaceID     string `json:"workspace_id"`
+	CurrentRevision int64  `json:"current_revision"`
+	DeviceID        string `json:"device_id,omitempty"`
+	Time            string `json:"time"`
+}
+
 type tokenClaims struct {
 	UserID      string `json:"user_id,omitempty"`
 	AccountID   string `json:"account_id"`
@@ -169,9 +176,11 @@ type authContext struct {
 }
 
 type app struct {
-	mu    sync.Mutex
-	cfg   config
-	store store
+	mu              sync.Mutex
+	eventsMu        sync.Mutex
+	cfg             config
+	store           store
+	syncSubscribers map[string]map[chan syncEvent]struct{}
 }
 
 func main() {
@@ -215,7 +224,7 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	if err != nil {
 		return fmt.Errorf("load store: %w", err)
 	}
-	api := &app{cfg: cfg, store: s}
+	api := newApp(cfg, s)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", api.handleHealth)
 	mux.HandleFunc("/auth/status", api.handleAuthStatus)
@@ -228,6 +237,7 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	mux.HandleFunc("/sync/status", api.withAuth(api.handleStatus))
 	mux.HandleFunc("/sync/pull", api.withAuth(api.handlePull))
 	mux.HandleFunc("/sync/push", api.withAuth(api.handlePush))
+	mux.HandleFunc("/sync/events", api.handleEvents)
 
 	log.Printf("TimeManage sync server listening on http://%s", cfg.addr)
 	log.Printf("Data file: %s", cfg.dataPath)
@@ -242,6 +252,10 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 		return err
 	}
 	return nil
+}
+
+func newApp(cfg config, s store) *app {
+	return &app{cfg: cfg, store: s, syncSubscribers: map[string]map[chan syncEvent]struct{}{}}
 }
 
 func defaultConfig() config {
@@ -696,6 +710,110 @@ func (a *app) handlePull(w http.ResponseWriter, r *http.Request, auth authContex
 	})
 }
 
+func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	auth, err := a.verifyEventRequest(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming is not supported")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	deviceID := strings.TrimSpace(r.URL.Query().Get("device_id"))
+	events, unsubscribe := a.subscribeWorkspace(auth.WorkspaceID)
+	defer unsubscribe()
+
+	a.mu.Lock()
+	currentRevision := a.store.NextRevision - 1
+	a.mu.Unlock()
+	writeSSE(w, "hello", syncEvent{
+		WorkspaceID:     auth.WorkspaceID,
+		CurrentRevision: currentRevision,
+		DeviceID:        deviceID,
+		Time:            time.Now().UTC().Format(time.RFC3339),
+	})
+	flusher.Flush()
+
+	keepAlive := time.NewTicker(25 * time.Second)
+	defer keepAlive.Stop()
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case event := <-events:
+			writeSSE(w, "revision", event)
+			flusher.Flush()
+		case <-keepAlive.C:
+			_, _ = w.Write([]byte(": keepalive\n\n"))
+			flusher.Flush()
+		}
+	}
+}
+
+func writeSSE(w http.ResponseWriter, eventName string, payload syncEvent) {
+	bytes, err := json.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "event: %s\n", eventName)
+	_, _ = fmt.Fprintf(w, "data: %s\n\n", bytes)
+}
+
+func (a *app) subscribeWorkspace(workspaceID string) (<-chan syncEvent, func()) {
+	ch := make(chan syncEvent, 16)
+	a.eventsMu.Lock()
+	if a.syncSubscribers == nil {
+		a.syncSubscribers = map[string]map[chan syncEvent]struct{}{}
+	}
+	if a.syncSubscribers[workspaceID] == nil {
+		a.syncSubscribers[workspaceID] = map[chan syncEvent]struct{}{}
+	}
+	a.syncSubscribers[workspaceID][ch] = struct{}{}
+	a.eventsMu.Unlock()
+
+	unsubscribe := func() {
+		a.eventsMu.Lock()
+		defer a.eventsMu.Unlock()
+		delete(a.syncSubscribers[workspaceID], ch)
+		if len(a.syncSubscribers[workspaceID]) == 0 {
+			delete(a.syncSubscribers, workspaceID)
+		}
+		close(ch)
+	}
+	return ch, unsubscribe
+}
+
+func (a *app) notifyWorkspaceChanged(workspaceID string, revision int64, deviceID string) {
+	if workspaceID == "" || revision <= 0 {
+		return
+	}
+	event := syncEvent{
+		WorkspaceID:     workspaceID,
+		CurrentRevision: revision,
+		DeviceID:        deviceID,
+		Time:            time.Now().UTC().Format(time.RFC3339),
+	}
+	a.eventsMu.Lock()
+	defer a.eventsMu.Unlock()
+	for ch := range a.syncSubscribers[workspaceID] {
+		select {
+		case ch <- event:
+		default:
+		}
+	}
+}
+
 func (a *app) handlePush(w http.ResponseWriter, r *http.Request, auth authContext) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -722,6 +840,7 @@ func (a *app) handlePush(w http.ResponseWriter, r *http.Request, auth authContex
 	workspace := a.workspaceLocked(auth.WorkspaceID)
 	accepted := make([]syncRow, 0, len(req.Changes))
 	conflicts := make([]syncRow, 0)
+	changedRows := 0
 
 	for _, change := range req.Changes {
 		change.UserID = auth.AccountID
@@ -766,15 +885,17 @@ func (a *app) handlePush(w http.ResponseWriter, r *http.Request, auth authContex
 		a.store.NextRevision++
 		workspace.Rows[rowKey] = change
 		accepted = append(accepted, change)
+		changedRows++
 	}
 	workspace.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	a.store.Workspaces[auth.WorkspaceID] = workspace
 
-	if len(accepted) > 0 {
+	if changedRows > 0 {
 		if err := a.saveLocked(); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
+		a.notifyWorkspaceChanged(auth.WorkspaceID, a.store.NextRevision-1, req.DeviceID)
 	}
 
 	writeJSON(w, http.StatusOK, pushResponse{
@@ -815,6 +936,10 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 	account, found := a.accountByEmailLocked(email)
 	if found && account.WorkspaceID != auth.WorkspaceID {
 		writeError(w, http.StatusConflict, "email belongs to another workspace")
+		return
+	}
+	if found && projectID == "" {
+		writeError(w, http.StatusConflict, "email already exists")
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -871,6 +996,7 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
+		a.notifyWorkspaceChanged(auth.WorkspaceID, a.store.NextRevision-1, "server")
 		writeJSON(w, http.StatusOK, memberResponse{Account: account, Member: row})
 		return
 	}
@@ -905,16 +1031,16 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 		return
 	}
 	memberPayload := map[string]any{
-		"id":        memberID,
-		"projectId": projectID,
+		"id":           memberID,
+		"projectId":    projectID,
 		"teamMemberId": teamMemberID,
-		"accountId": account.ID,
-		"name":      fallback(strings.TrimSpace(req.Name), account.Name),
-		"email":     account.Email,
-		"roles":     normalizeRoles(req.Roles),
-		"status":    fallback(strings.TrimSpace(req.Status), "active"),
-		"createdAt": now,
-		"updatedAt": now,
+		"accountId":    account.ID,
+		"name":         fallback(strings.TrimSpace(req.Name), account.Name),
+		"email":        account.Email,
+		"roles":        normalizeRoles(req.Roles),
+		"status":       fallback(strings.TrimSpace(req.Status), "active"),
+		"createdAt":    now,
+		"updatedAt":    now,
 	}
 	payload, _ := json.Marshal(memberPayload)
 	row := syncRow{
@@ -937,6 +1063,7 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
+	a.notifyWorkspaceChanged(auth.WorkspaceID, a.store.NextRevision-1, "server")
 	writeJSON(w, http.StatusOK, memberResponse{Account: account, Member: row})
 }
 
@@ -962,6 +1089,38 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 	existing, found := workspace.Rows[key("project_member", memberID)]
 	if !found {
 		existing, found = workspace.Rows[key("team_member", memberID)]
+	}
+	if !found && strings.HasPrefix(memberID, "team_member_") {
+		accountID := strings.TrimPrefix(memberID, "team_member_")
+		account, ok := a.store.Accounts[accountID]
+		if ok && account.WorkspaceID == auth.WorkspaceID {
+			timestamp := time.Now().UTC().Format(time.RFC3339)
+			status := "active"
+			if account.DisabledAt != "" {
+				status = "disabled"
+			}
+			payload, _ := json.Marshal(map[string]any{
+				"id":        memberID,
+				"accountId": account.ID,
+				"name":      account.Name,
+				"email":     account.Email,
+				"status":    status,
+				"createdAt": fallback(account.CreatedAt, timestamp),
+				"updatedAt": fallback(account.UpdatedAt, timestamp),
+			})
+			existing = syncRow{
+				UserID:      auth.AccountID,
+				AccountID:   auth.AccountID,
+				WorkspaceID: auth.WorkspaceID,
+				Entity:      "team_member",
+				ID:          memberID,
+				DeviceID:    "server",
+				UpdatedAt:   timestamp,
+				Version:     1,
+				Payload:     payload,
+			}
+			found = true
+		}
 	}
 	if !found {
 		writeError(w, http.StatusNotFound, "member not found")
@@ -1008,14 +1167,36 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 	}
 	if strings.TrimSpace(req.Password) != "" {
 		accountID, _ := payload["accountId"].(string)
+		email, _ := payload["email"].(string)
+		if accountID == "" && existing.Entity == "team_member" {
+			accountID = newID("account")
+			payload["accountId"] = accountID
+		}
 		if accountID == "" {
 			writeError(w, http.StatusBadRequest, "member account is required to update password")
 			return
 		}
 		account, ok := a.store.Accounts[accountID]
 		if !ok || account.WorkspaceID != auth.WorkspaceID {
-			writeError(w, http.StatusNotFound, "member account not found")
-			return
+			if existing.Entity != "team_member" || normalizeEmail(email) == "" {
+				writeError(w, http.StatusNotFound, "member account not found")
+				return
+			}
+			for _, item := range a.store.Accounts {
+				if item.ID != accountID && item.WorkspaceID == auth.WorkspaceID && normalizeEmail(item.Email) == normalizeEmail(email) {
+					writeError(w, http.StatusConflict, "email belongs to another account")
+					return
+				}
+			}
+			name, _ := payload["name"].(string)
+			account = accountRecord{
+				ID:          accountID,
+				WorkspaceID: auth.WorkspaceID,
+				Name:        fallback(strings.TrimSpace(name), normalizeEmail(email)),
+				Email:       normalizeEmail(email),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			}
 		}
 		hash, err := hashPassword(req.Password)
 		if err != nil {
@@ -1065,6 +1246,7 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
+	a.notifyWorkspaceChanged(auth.WorkspaceID, a.store.NextRevision-1, "server")
 	writeJSON(w, http.StatusOK, memberResponse{Member: existing})
 }
 
@@ -1083,6 +1265,18 @@ func (a *app) verifyRequest(r *http.Request) (authContext, error) {
 	header := r.Header.Get("Authorization")
 	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
 	if token == "" || token == header {
+		return authContext{}, errors.New("missing bearer token")
+	}
+	return a.verifyToken(token)
+}
+
+func (a *app) verifyEventRequest(r *http.Request) (authContext, error) {
+	header := r.Header.Get("Authorization")
+	token := strings.TrimSpace(strings.TrimPrefix(header, "Bearer "))
+	if token == "" || token == header {
+		token = strings.TrimSpace(r.URL.Query().Get("token"))
+	}
+	if token == "" {
 		return authContext{}, errors.New("missing bearer token")
 	}
 	return a.verifyToken(token)

@@ -16,6 +16,8 @@ import type {
   StrictCheckResult,
   StrictModeStatus,
   Task,
+  TaskStage,
+  TaskStatus,
   TeamMember,
   WorkSession,
   WorkSessionStatus,
@@ -103,6 +105,60 @@ const migrateTeamMembers = (projectMembers: ProjectMember[], parsedTeamMembers: 
   return Array.from(byId.values());
 };
 
+const teamMemberIdentityKey = (member: Pick<TeamMember, "accountId" | "email" | "id">) => {
+  if (member.email) return `login:${member.email.trim().toLowerCase()}`;
+  if (member.accountId) return `account:${member.accountId}`;
+  return `id:${member.id}`;
+};
+
+const dedupeTeamMembers = (teamMembers: TeamMember[], projectMembers: ProjectMember[], preferredAccountId?: string) => {
+  const projectCountByTeamMemberId = new Map<string, number>();
+  projectMembers.forEach((member) => {
+    if (!member.teamMemberId || member.status === "disabled") return;
+    projectCountByTeamMemberId.set(member.teamMemberId, (projectCountByTeamMemberId.get(member.teamMemberId) ?? 0) + 1);
+  });
+  const byKey = new Map<string, TeamMember>();
+  const aliasById = new Map<string, string>();
+
+  const pickWinner = (left: TeamMember, right: TeamMember) => {
+    if (preferredAccountId) {
+      if (left.accountId === preferredAccountId && right.accountId !== preferredAccountId) return left;
+      if (right.accountId === preferredAccountId && left.accountId !== preferredAccountId) return right;
+    }
+    const leftCount = projectCountByTeamMemberId.get(left.id) ?? 0;
+    const rightCount = projectCountByTeamMemberId.get(right.id) ?? 0;
+    if (leftCount !== rightCount) return leftCount > rightCount ? left : right;
+    return left.updatedAt >= right.updatedAt ? left : right;
+  };
+
+  teamMembers.forEach((member) => {
+    const key = teamMemberIdentityKey(member);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, member);
+      return;
+    }
+    const winner = pickWinner(existing, member);
+    const loser = winner.id === existing.id ? member : existing;
+    byKey.set(key, {
+      ...winner,
+      accountId: winner.accountId ?? loser.accountId,
+      name: winner.name || loser.name,
+      email: winner.email ?? loser.email,
+      status: winner.status === "active" || loser.status === "active" ? "active" : winner.status,
+    });
+    aliasById.set(loser.id, winner.id);
+  });
+
+  const dedupedMembers = Array.from(byKey.values());
+  const dedupedProjectMembers = projectMembers.map((member) => ({
+    ...member,
+    teamMemberId: member.teamMemberId ? aliasById.get(member.teamMemberId) ?? member.teamMemberId : member.teamMemberId,
+  }));
+
+  return { teamMembers: dedupedMembers, projectMembers: dedupedProjectMembers };
+};
+
 const attachTeamMembersToProjectMembers = (projectMembers: ProjectMember[], teamMembers: TeamMember[]) => {
   const byId = new Map(teamMembers.map((member) => [member.id, member]));
   const byAccount = new Map(teamMembers.filter((member) => member.accountId).map((member) => [member.accountId, member]));
@@ -113,18 +169,25 @@ const attachTeamMembersToProjectMembers = (projectMembers: ProjectMember[], team
       (projectMember.accountId ? byAccount.get(projectMember.accountId) : undefined) ??
       (projectMember.email ? byEmail.get(projectMember.email.toLowerCase()) : undefined) ??
       byId.get(memberIdentityKey(projectMember));
+    const accountChanged = Boolean(projectMember.accountId && teamMember?.accountId && projectMember.accountId !== teamMember.accountId);
+    const roles = accountChanged
+      ? projectMember.roles.filter((role) => role !== "project_owner")
+      : projectMember.roles;
     return {
       ...projectMember,
       teamMemberId: teamMember?.id ?? projectMember.teamMemberId,
       accountId: teamMember?.accountId ?? projectMember.accountId,
       name: teamMember?.name ?? projectMember.name,
       email: teamMember?.email ?? projectMember.email,
+      roles: roles.length ? roles : ["executor"],
       status: projectMember.status ?? teamMember?.status ?? "active",
     };
   });
 };
 
 const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
+const allowedTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
+const allowedTaskStages: TaskStage[] = ["sales", "requirements", "design", "development", "testing", "deployment", "acceptance"];
 
 const normalizeTask = (task: Partial<Task>, index: number, projectId: string): Task => {
   const timestamp = task.updatedAt ?? task.createdAt ?? new Date().toISOString();
@@ -145,8 +208,9 @@ const normalizeTask = (task: Partial<Task>, index: number, projectId: string): T
     progressNote: task.progressNote ?? "",
     priority: task.priority ?? "medium",
     severity: task.severity ?? "medium",
+    stage: task.stage && allowedTaskStages.includes(task.stage) ? task.stage : "requirements",
     estimatePomodoros: task.estimatePomodoros ?? 1,
-    status: task.status ?? "pool",
+    status: task.status && allowedTaskStatuses.includes(task.status) ? task.status : "pool",
     dueAt: task.dueAt,
     reminderAt: task.reminderAt,
     repeatRule: task.repeatRule && allowedRepeatRules.includes(task.repeatRule) ? task.repeatRule : "none",
@@ -172,6 +236,18 @@ const normalizeTask = (task: Partial<Task>, index: number, projectId: string): T
     completedAt: task.completedAt,
   };
 };
+
+const restoreSplitParentTasks = (tasks: Task[]) =>
+  tasks.map((task) => {
+    if (task.status !== "archived") return task;
+    const hasSplitChildren = tasks.some(
+      (candidate) =>
+        candidate.id !== task.id &&
+        candidate.projectId === task.projectId &&
+        candidate.notes.includes(`由「${task.title}」拆分而来。`),
+    );
+    return hasSplitChildren ? { ...task, status: "split" as const } : task;
+  });
 
 const normalizeReview = (review?: Partial<DailyReview>): DailyReview => ({
   mood: review?.mood ?? "normal",
@@ -284,15 +360,17 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
   const rawProjectMembers = (parsed.projectMembers?.length ? parsed.projectMembers : initial.projectMembers).map((member, index) =>
     normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index),
   );
-  const teamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
-  const projectMembers = attachTeamMembersToProjectMembers(rawProjectMembers, teamMembers);
+  const migratedTeamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
+  const deduped = dedupeTeamMembers(migratedTeamMembers, rawProjectMembers, parsed.auth?.account?.id);
+  const teamMembers = deduped.teamMembers;
+  const projectMembers = attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers);
   const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
     ? parsed.currentMemberId
     : projectMembers[0]?.id;
-  const tasks = (parsed.tasks ?? initial.tasks).map((task, index) => {
+  const tasks = restoreSplitParentTasks((parsed.tasks ?? initial.tasks).map((task, index) => {
     const taskProjectId = task.projectId && projects.some((project) => project.id === task.projectId) ? task.projectId : starterProjectId;
     return normalizeTask(task, index, taskProjectId);
-  });
+  }));
   return {
     ...initial,
     ...parsed,

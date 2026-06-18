@@ -1,15 +1,12 @@
-import { Activity, BellOff, Check, CirclePause, CirclePlay, Leaf, Pause, Play, RotateCcw, Square, Target } from "lucide-react";
+import { Check, CirclePause, CirclePlay, Leaf, ListChecks, Pause, Play, RotateCcw, Square, Target } from "lucide-react";
 import { completedFocusSessions } from "../domain";
 import { formatTime, modeLabel } from "../appModel";
-import type { AppState, BlockProfile, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../types";
+import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../types";
 
 export function FocusView(props: {
   state: AppState;
   currentTask?: Task;
   committedTasks: Task[];
-  activeProfile?: BlockProfile;
-  quickNote: string;
-  setQuickNote: (value: string) => void;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   toggleTimer: () => void;
   resetTimer: () => void;
@@ -17,14 +14,25 @@ export function FocusView(props: {
   addInterruption: (type: InterruptionType, action?: InterruptionAction) => void;
   completeTask: (taskId: string) => void;
 }) {
-  const { state, currentTask, committedTasks, activeProfile, quickNote, setQuickNote } = props;
+  const { state, currentTask, committedTasks } = props;
   const active = state.activeTimer;
   const progress = active ? 100 - (active.remaining / active.duration) * 100 : 0;
   const upcomingBreakMode =
     completedFocusSessions(state).length > 0 && completedFocusSessions(state).length % state.settings.longBreakEvery === 0
       ? "long_break"
       : "short_break";
-  const sessionViolations = state.strictViolations.filter((item) => item.sessionId === active?.sessionId).slice(0, 3);
+  const activeTaskId = active?.taskId;
+  const todayWorkTasks = [
+    ...(currentTask && !committedTasks.some((task) => task.id === currentTask.id) ? [currentTask] : []),
+    ...committedTasks,
+  ]
+    .filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived")
+    .sort((left, right) => {
+      const leftActive = left.id === activeTaskId ? 0 : 1;
+      const rightActive = right.id === activeTaskId ? 0 : 1;
+      if (leftActive !== rightActive) return leftActive - rightActive;
+      return left.sortOrder - right.sortOrder;
+    });
 
   return (
     <div className="focus-layout">
@@ -139,52 +147,35 @@ export function FocusView(props: {
           )}
         </section>
 
-        <section className="band strict-card">
+        <section className="band focus-todo-panel">
           <div className="section-title">
             <div>
-              <p className="eyebrow">防分心</p>
-              <h2>软严格模式</h2>
+              <p className="eyebrow">今日工作</p>
+              <h2>待办清单</h2>
             </div>
-            <BellOff size={20} />
+            <ListChecks size={20} />
           </div>
-          <p>{activeProfile?.name ?? "未配置屏蔽方案"}</p>
-          <div className="chip-row compact">
-            {activeProfile?.apps.slice(0, 4).map((app) => (
-              <span className="chip filled" key={app}>
-                {app}
-              </span>
-            ))}
-          </div>
-          <p className="muted">
-            浏览器预览只做软记录；Tauri macOS 会检测前台 App/URL，并按强度记录、暂停或作废。
-          </p>
-          {sessionViolations.map((violation) => (
-            <p className="warning-line compact" key={violation.id}>
-              {violation.action === "aborted" ? "已作废" : violation.action === "paused" ? "已暂停" : "已记录"}：{violation.matchedValue}
-            </p>
-          ))}
-        </section>
-
-        <section className="band interruption-box">
-          <div className="section-title">
-            <div>
-              <p className="eyebrow">中断记录</p>
-              <h2>中断记录</h2>
-            </div>
-            <Activity size={20} />
-          </div>
-          <input
-            value={quickNote}
-            onChange={(event) => setQuickNote(event.target.value)}
-            placeholder="记录突发念头或外部请求"
-          />
-          <div className="button-row">
-            <button className="secondary-button" onClick={() => props.addInterruption("internal", "defer")}>
-              内部中断
-            </button>
-            <button className="secondary-button" onClick={() => props.addInterruption("external", "inbox")}>
-              外部中断
-            </button>
+          <div className="focus-todo-list">
+            {todayWorkTasks.length === 0 && <p className="empty">今日工作队列为空，先去我的任务选择要推进的任务。</p>}
+            {todayWorkTasks.map((task) => {
+              const isActive = task.id === activeTaskId;
+              return (
+                <article className={isActive ? "focus-todo-item active" : "focus-todo-item"} key={task.id}>
+                  <div>
+                    <strong>{task.title}</strong>
+                    <span>{task.project} · {task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
+                  </div>
+                  {isActive ? (
+                    <span className="running-pill">执行中</span>
+                  ) : (
+                    <button className="small-button" onClick={() => void props.beginTimer("focus", task.id)}>
+                      <Play size={14} />
+                      开始
+                    </button>
+                  )}
+                </article>
+              );
+            })}
           </div>
         </section>
       </aside>

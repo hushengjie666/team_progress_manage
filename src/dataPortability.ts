@@ -98,7 +98,7 @@ export const mergeImportedState = (current: AppState, payload: unknown, backup: 
 
 export const exportTasksCsv = (state: AppState) =>
   toCsv(
-    ["id", "title", "project", "tags", "priority", "severity", "estimatePomodoros", "actualPomodoros", "progressPercent", "progressNote", "status", "dueAt", "repeatRule", "updatedAt"],
+    ["id", "title", "project", "tags", "priority", "severity", "stage", "estimatePomodoros", "actualPomodoros", "progressPercent", "progressNote", "status", "dueAt", "repeatRule", "updatedAt"],
     state.tasks.map((task) => [
       task.id,
       task.title,
@@ -106,6 +106,7 @@ export const exportTasksCsv = (state: AppState) =>
       task.tags.join("|"),
       task.priority,
       task.severity,
+      task.stage,
       task.estimatePomodoros,
       task.actualPomodoros,
       task.progressPercent ?? 0,

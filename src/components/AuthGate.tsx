@@ -18,6 +18,10 @@ export function AuthGate(props: {
   const [password, setPassword] = useState("demo");
   const busy = props.status === "checking";
   const needsBootstrap = props.bootstrapped === false;
+  const submitAuth = () =>
+    needsBootstrap
+      ? props.bootstrap({ workspaceName, name, email, password })
+      : props.login(email, password);
 
   return (
     <main className="auth-shell">
@@ -29,47 +33,49 @@ export function AuthGate(props: {
         <h1>{needsBootstrap ? "初始化团队工作区" : "登录团队工作区"}</h1>
         <p className="muted">{props.message}</p>
 
-        <label>
-          服务地址
-          <div className="auth-inline">
-            <input value={props.serverUrl} onChange={(event) => props.updateServerUrl(event.target.value)} />
-            <button className="icon-button" title="检查服务" disabled={busy} onClick={() => void props.checkStatus()}>
-              <Server size={18} />
-            </button>
-          </div>
-        </label>
-
-        {needsBootstrap && (
-          <label>
-            团队名称
-            <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
-          </label>
-        )}
-
-        <label>
-          姓名
-          <input value={name} onChange={(event) => setName(event.target.value)} disabled={!needsBootstrap} />
-        </label>
-        <label>
-          邮箱
-          <input value={email} onChange={(event) => setEmail(event.target.value)} />
-        </label>
-        <label>
-          密码
-          <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
-        </label>
-
-        <button
-          className="primary-button large"
-          disabled={busy}
-          onClick={() =>
-            needsBootstrap
-              ? void props.bootstrap({ workspaceName, name, email, password })
-              : void props.login(email, password)
-          }
+        <form
+          className="auth-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!busy) void submitAuth();
+          }}
         >
-          {needsBootstrap ? "创建团队并登录" : "登录"}
-        </button>
+          <label>
+            服务地址
+            <div className="auth-inline">
+              <input value={props.serverUrl} onChange={(event) => props.updateServerUrl(event.target.value)} />
+              <button type="button" className="icon-button" title="检查服务" disabled={busy} onClick={() => void props.checkStatus()}>
+                <Server size={18} />
+              </button>
+            </div>
+          </label>
+
+          {needsBootstrap && (
+            <label>
+              团队名称
+              <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
+            </label>
+          )}
+
+          {needsBootstrap && (
+            <label>
+              姓名
+              <input value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+          )}
+          <label>
+            {needsBootstrap ? "负责人登录邮箱或手机号" : "登录邮箱或手机号"}
+            <input value={email} onChange={(event) => setEmail(event.target.value)} />
+          </label>
+          <label>
+            密码
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </label>
+
+          <button type="submit" className="primary-button large" disabled={busy}>
+            {needsBootstrap ? "创建团队并登录" : "登录"}
+          </button>
+        </form>
       </section>
     </main>
   );

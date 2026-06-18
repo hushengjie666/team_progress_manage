@@ -40,6 +40,7 @@ const makeTask = (patch: Partial<Task> & Pick<Task, "id" | "title" | "project" |
     progressNote: "",
     priority: "medium",
     severity: "medium",
+    stage: "requirements",
     repeatRule: "none",
     subtasks: [],
     sortOrder: 100,

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { flattenStateToChanges, mergeRowsIntoState, syncAppState, type SyncRow } from "./sync";
+import { flattenStateToChanges, mergeRowsIntoState, mergeSyncedStateIntoLatest, syncableStateFingerprint, syncAppState, type SyncRow } from "./sync";
 import type { AppState, ExecutionSignal, Project, ProjectMember, Task, WorkSession } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -109,6 +109,40 @@ describe("team progress sync", () => {
     expect(byKey.get("execution_signal:signal_sync")?.payload).toMatchObject({ type: "work_started", payload: { mode: "focus" } });
   });
 
+  it("keeps the sync fingerprint stable for sync-only timestamps", () => {
+    const state = teamState();
+    const changedStatus = {
+      ...state,
+      updatedAt: iso("2026-05-10T16:35:00Z"),
+      sync: {
+        ...state.sync,
+        status: "syncing" as const,
+        message: "正在同步",
+        lastSyncedAt: iso("2026-05-10T16:35:00Z"),
+      },
+    };
+
+    expect(syncableStateFingerprint(changedStatus)).toBe(syncableStateFingerprint(state));
+  });
+
+  it("changes the sync fingerprint when syncable task payload changes", () => {
+    const state = teamState();
+    const changedTask = {
+      ...state,
+      tasks: state.tasks.map((task) =>
+        task.id === "task_sync"
+          ? {
+              ...task,
+              progressPercent: 90,
+              updatedAt: iso("2026-05-10T16:40:00Z"),
+            }
+          : task,
+      ),
+    };
+
+    expect(syncableStateFingerprint(changedTask)).not.toBe(syncableStateFingerprint(state));
+  });
+
   it("pulls and merges project, member, assignment, work session, progress and acceptance state", () => {
     const local = createInitialState();
     const remote = teamState();
@@ -135,6 +169,206 @@ describe("team progress sync", () => {
     expect(merged.workSessions.find((session) => session.id === "work_session_sync")).toMatchObject({ taskId: "task_sync" });
     expect(merged.executionSignals.find((signal) => signal.id === "signal_sync")).toMatchObject({ workSessionId: "work_session_sync" });
     expect(merged.sync.lastPulledRevision).toBe(6);
+  });
+
+  it("merges pulled daily plan rows even when the device id matches local state", () => {
+    const local = teamState();
+    const localPlan = {
+      ...local.dailyPlans[0],
+      id: "plan_2026-06-18",
+      date: "2026-06-18",
+      committedTaskIds: ["task_local_today"],
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const remotePlan = {
+      ...localPlan,
+      committedTaskIds: ["task_local_today", "task_remote_today"],
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+
+    const merged = mergeRowsIntoState(
+      { ...local, dailyPlans: [localPlan], sync: { ...local.sync, deviceId: "device_shared" } },
+      [
+        row({
+          entity: "daily_plan",
+          id: remotePlan.id,
+          device_id: "device_shared",
+          updated_at: remotePlan.updatedAt,
+          payload: remotePlan,
+          revision: 30,
+        }),
+      ],
+      30,
+    );
+
+    expect(merged.dailyPlans[0].committedTaskIds).toEqual(["task_local_today", "task_remote_today"]);
+    expect(merged.sync.lastPulledRevision).toBe(30);
+  });
+
+  it("applies newer daily plan removals from remote sync", () => {
+    const local = teamState();
+    const localPlan = {
+      ...local.dailyPlans[0],
+      id: "plan_2026-06-18",
+      date: "2026-06-18",
+      committedTaskIds: ["task_keep_today", "task_removed_today"],
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const remotePlan = {
+      ...localPlan,
+      committedTaskIds: ["task_keep_today"],
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+
+    const merged = mergeRowsIntoState(
+      { ...local, dailyPlans: [localPlan] },
+      [
+        row({
+          entity: "daily_plan",
+          id: remotePlan.id,
+          updated_at: remotePlan.updatedAt,
+          payload: remotePlan,
+          revision: 31,
+        }),
+      ],
+      31,
+    );
+
+    expect(merged.dailyPlans[0].committedTaskIds).toEqual(["task_keep_today"]);
+  });
+
+  it("removes today queue tasks through the full pull sync flow", async () => {
+    const local = teamState();
+    const localPlan = {
+      ...local.dailyPlans[0],
+      id: "plan_2026-06-18",
+      date: "2026-06-18",
+      committedTaskIds: ["task_keep_today", "task_removed_today"],
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const remotePlan = {
+      ...localPlan,
+      committedTaskIds: ["task_keep_today"],
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          accepted: [],
+          conflicts: [],
+          current_revision: 30,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          changes: [
+            row({
+              entity: "daily_plan",
+              id: remotePlan.id,
+              updated_at: remotePlan.updatedAt,
+              payload: remotePlan,
+              revision: 31,
+            }),
+          ],
+          current_revision: 31,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const synced = await syncAppState({ ...local, dailyPlans: [localPlan], sync: { ...local.sync, lastPulledRevision: 30 } });
+
+    expect(synced.dailyPlans[0].committedTaskIds).toEqual(["task_keep_today"]);
+    expect(synced.sync.lastPulledRevision).toBe(31);
+  });
+
+  it("keeps local changes made while a sync request is in flight", () => {
+    const source = teamState();
+    const synced = {
+      ...source,
+      sync: {
+        ...source.sync,
+        status: "synced" as const,
+        lastPulledRevision: 42,
+        lastSyncedAt: iso("2026-06-18T09:30:00Z"),
+      },
+      tasks: source.tasks.map((task) =>
+        task.id === "task_sync"
+          ? {
+              ...task,
+              title: "远端同步结果",
+              updatedAt: iso("2026-06-18T09:30:00Z"),
+            }
+          : task,
+      ),
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+    const latest = {
+      ...source,
+      tasks: source.tasks.map((task) =>
+        task.id === "task_sync"
+          ? {
+              ...task,
+              title: "同步期间本地修改",
+              updatedAt: iso("2026-06-18T09:31:00Z"),
+            }
+          : task,
+      ),
+      updatedAt: iso("2026-06-18T09:31:00Z"),
+    };
+
+    const merged = mergeSyncedStateIntoLatest(latest, source, synced);
+
+    expect(merged.tasks[0].title).toBe("同步期间本地修改");
+    expect(merged.sync.lastPulledRevision).toBe(42);
+  });
+
+  it("does not resurrect remote-deleted rows when latest local state is unchanged", () => {
+    const source = teamState();
+    const synced = {
+      ...source,
+      tasks: [],
+      sync: {
+        ...source.sync,
+        status: "synced" as const,
+        lastPulledRevision: 43,
+      },
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+
+    const merged = mergeSyncedStateIntoLatest(source, source, synced);
+
+    expect(merged.tasks).toHaveLength(0);
+    expect(merged.sync.lastPulledRevision).toBe(43);
+  });
+
+  it("keeps local deletions made while a sync request is in flight", () => {
+    const source = teamState();
+    const synced = {
+      ...source,
+      sync: {
+        ...source.sync,
+        status: "synced" as const,
+        lastPulledRevision: 44,
+      },
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+    const latest = {
+      ...source,
+      tasks: [],
+      sync: {
+        ...source.sync,
+        tombstones: [{ entity: "task" as const, id: "task_sync", deletedAt: iso("2026-06-18T09:31:00Z") }],
+      },
+      updatedAt: iso("2026-06-18T09:31:00Z"),
+    };
+
+    const merged = mergeSyncedStateIntoLatest(latest, source, synced);
+
+    expect(merged.tasks).toHaveLength(0);
+    expect(merged.sync.tombstones).toEqual([{ entity: "task", id: "task_sync", deletedAt: iso("2026-06-18T09:31:00Z") }]);
+    expect(merged.sync.lastPulledRevision).toBe(44);
   });
 
   it("keeps a locally completed onboarding from being reverted by remote setup state", () => {

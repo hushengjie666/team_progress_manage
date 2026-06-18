@@ -134,6 +134,13 @@ interface PullResponse {
   current_revision: number;
 }
 
+export interface SyncRevisionEvent {
+  workspace_id: string;
+  current_revision: number;
+  device_id?: string;
+  time: string;
+}
+
 const singletonEntities: SyncEntity[] = ["settings", "onboarding", "reward_state"];
 
 const apiUrl = (serverUrl: string, path: string) => `${serverUrl.replace(/\/+$/, "")}${path}`;
@@ -190,6 +197,15 @@ const authHeaders = (token?: string) => ({
   "Content-Type": "application/json",
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
+
+export function createSyncEventSource(sync: SyncState, token?: string): EventSource | undefined {
+  const authToken = token ?? sync.token;
+  if (!authToken || typeof EventSource === "undefined") return undefined;
+  const url = new URL(apiUrl(sync.serverUrl, "/sync/events"));
+  url.searchParams.set("token", authToken);
+  url.searchParams.set("device_id", sync.deviceId);
+  return new EventSource(url.toString());
+}
 
 const readResponse = async <T>(response: Response): Promise<T> => {
   if (response.ok) return response.json() as Promise<T>;
@@ -469,6 +485,18 @@ export function flattenStateToChanges(state: AppState): SyncChange[] {
   return changes;
 }
 
+export function syncableStateFingerprint(state: AppState): string {
+  return JSON.stringify(
+    flattenStateToChanges(state).map((change) => ({
+      entity: change.entity,
+      id: change.id,
+      updatedAt: singletonEntities.includes(change.entity) ? undefined : change.updated_at,
+      deletedAt: change.deleted_at,
+      payload: change.payload,
+    })),
+  );
+}
+
 const localPayloadFor = (state: AppState, row: SyncRow): SyncPayload | undefined => {
   if (row.entity === "settings") return state.settings;
   if (row.entity === "onboarding") return state.onboarding;
@@ -504,6 +532,89 @@ const upsert = <T extends { id: string }>(entity: SyncEntity, items: T[], incomi
   return items.map((item) => (item.id === incoming.id && updatedAt >= timestampFor(entity, item, stateUpdatedAt) ? incoming : item));
 };
 
+const hasLocalChangeAfterSyncStarted = (entity: SyncEntity, source: SyncPayload | undefined, latest: SyncPayload, sourceStateUpdatedAt: string) => {
+  if (!source) return true;
+  return localTimestampFor(entity, latest, sourceStateUpdatedAt) > localTimestampFor(entity, source, sourceStateUpdatedAt);
+};
+
+const mergeEntityListIntoLatest = <T extends { id: string }>(
+  entity: SyncEntity,
+  latestItems: T[],
+  sourceItems: T[],
+  syncedItems: T[],
+  sourceStateUpdatedAt: string,
+) => {
+  const latestById = new Map(latestItems.map((item) => [item.id, item]));
+  const sourceById = new Map(sourceItems.map((item) => [item.id, item]));
+  const syncedById = new Map(syncedItems.map((item) => [item.id, item]));
+  const merged: T[] = [];
+  const seen = new Set<string>();
+
+  for (const item of syncedItems) {
+    const latest = latestById.get(item.id);
+    const source = sourceById.get(item.id);
+    seen.add(item.id);
+    if (!latest && source) continue;
+    if (latest && hasLocalChangeAfterSyncStarted(entity, source as unknown as SyncPayload | undefined, latest as unknown as SyncPayload, sourceStateUpdatedAt)) {
+      merged.push(latest);
+    } else {
+      merged.push(item);
+    }
+  }
+
+  for (const latest of latestItems) {
+    if (seen.has(latest.id)) continue;
+    const source = sourceById.get(latest.id);
+    if (hasLocalChangeAfterSyncStarted(entity, source as unknown as SyncPayload | undefined, latest as unknown as SyncPayload, sourceStateUpdatedAt)) {
+      merged.push(latest);
+    }
+  }
+
+  return merged;
+};
+
+export function mergeSyncedStateIntoLatest(latest: AppState, source: AppState, synced: AppState): AppState {
+  const latestHasLocalSingletonChanges = latest.updatedAt > source.updatedAt;
+  const syncedTombstoneKeys = new Set((synced.sync.tombstones ?? []).map((item) => `${item.entity}:${item.id}`));
+  const localTombstones = (latest.sync.tombstones ?? []).filter((item) => !syncedTombstoneKeys.has(`${item.entity}:${item.id}`));
+  return {
+    ...synced,
+    auth: latest.auth,
+    activeTimer: latest.activeTimer,
+    nativeCapabilities: latest.nativeCapabilities,
+    settings: latestHasLocalSingletonChanges ? latest.settings : synced.settings,
+    onboarding: latestHasLocalSingletonChanges ? latest.onboarding : synced.onboarding,
+    rewardState: latestHasLocalSingletonChanges ? latest.rewardState : synced.rewardState,
+    projects: mergeEntityListIntoLatest("project", latest.projects, source.projects, synced.projects, source.updatedAt),
+    teamMembers: mergeEntityListIntoLatest("team_member", latest.teamMembers, source.teamMembers, synced.teamMembers, source.updatedAt),
+    projectMembers: mergeEntityListIntoLatest("project_member", latest.projectMembers, source.projectMembers, synced.projectMembers, source.updatedAt),
+    tasks: mergeEntityListIntoLatest("task", latest.tasks, source.tasks, synced.tasks, source.updatedAt),
+    workSessions: mergeEntityListIntoLatest("work_session", latest.workSessions, source.workSessions, synced.workSessions, source.updatedAt),
+    executionSignals: mergeEntityListIntoLatest("execution_signal", latest.executionSignals, source.executionSignals, synced.executionSignals, source.updatedAt),
+    dailyPlans: mergeEntityListIntoLatest("daily_plan", latest.dailyPlans, source.dailyPlans, synced.dailyPlans, source.updatedAt),
+    focusSessions: mergeEntityListIntoLatest("focus_session", latest.focusSessions, source.focusSessions, synced.focusSessions, source.updatedAt),
+    interruptions: mergeEntityListIntoLatest("interruption", latest.interruptions, source.interruptions, synced.interruptions, source.updatedAt),
+    strictViolations: mergeEntityListIntoLatest("strict_violation", latest.strictViolations, source.strictViolations, synced.strictViolations, source.updatedAt),
+    blockProfiles: mergeEntityListIntoLatest("block_profile", latest.blockProfiles, source.blockProfiles, synced.blockProfiles, source.updatedAt),
+    sync: {
+      ...synced.sync,
+      tombstones: [...(synced.sync.tombstones ?? []), ...localTombstones],
+    },
+    updatedAt: latest.updatedAt > source.updatedAt ? latest.updatedAt : synced.updatedAt,
+  };
+}
+
+const mergeDailyPlan = (local: DailyPlan, remote: DailyPlan, remoteUpdatedAt: string, stateUpdatedAt: string): DailyPlan => {
+  const localUpdatedAt = timestampFor("daily_plan", local, stateUpdatedAt);
+  const remoteWins = remoteUpdatedAt >= localUpdatedAt;
+  if (!remoteWins) return local;
+  return {
+    ...local,
+    ...remote,
+    committedTaskIds: remote.committedTaskIds ?? [],
+  };
+};
+
 const removeById = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
 const removeMemberReferences = (tasks: Task[], memberId: string) =>
   tasks.map((task) => ({
@@ -518,8 +629,6 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
   let tombstones = [...(state.sync.tombstones ?? [])];
 
   for (const row of rows) {
-    if (row.device_id === state.sync.deviceId) continue;
-
     if (row.deleted_at) {
       if (row.entity === "project") {
         next = { ...next, projects: removeById(next.projects, row.id) };
@@ -611,8 +720,13 @@ export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevi
     } else if (row.entity === "daily_plan") {
       const incoming = payload as unknown as DailyPlan;
       const existing = next.dailyPlans.find((plan) => plan.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, dailyPlans: upsert(row.entity, next.dailyPlans, incoming, row.updated_at, next.updatedAt) };
+      if (existing) {
+        next = {
+          ...next,
+          dailyPlans: next.dailyPlans.map((plan) => (plan.id === row.id ? mergeDailyPlan(plan, incoming, row.updated_at, next.updatedAt) : plan)),
+        };
+      } else if (shouldAcceptRemote(row, existing, next.updatedAt)) {
+        next = { ...next, dailyPlans: [incoming, ...next.dailyPlans] };
       }
     } else if (row.entity === "focus_session") {
       const incoming = payload as unknown as FocusSession;

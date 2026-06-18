@@ -2,8 +2,8 @@ import { CalendarDays, Check, ClipboardList, Clock3, Plus, RotateCcw } from "luc
 import { useMemo, useState } from "react";
 import { calendarSummaries } from "../planning";
 import { todayKey, uid } from "../seed";
-import { modeLabel } from "../appModel";
-import type { AppState, CalendarViewMode, DailyReview, Priority, Severity, TaskTemplate } from "../types";
+import { modeLabel, taskStageOptions } from "../appModel";
+import type { AppState, CalendarViewMode, DailyReview, Priority, Severity, TaskStage, TaskTemplate } from "../types";
 
 const startOfWeek = (date: Date) => {
   const copy = new Date(date);
@@ -37,7 +37,7 @@ export function CalendarView(props: {
   const selectedTasks = selected?.committedTaskIds.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean) ?? [];
   const overdueTasks = selected?.overdueTaskIds.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean) ?? [];
   const reminderTasks = selected?.reminderTaskIds.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean) ?? [];
-  const schedulableTasks = state.tasks.filter((task) => task.status !== "completed" && task.status !== "archived" && !selected?.committedTaskIds.includes(task.id));
+  const schedulableTasks = state.tasks.filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived" && !selected?.committedTaskIds.includes(task.id));
   const selectedDateKey = selected?.date ?? todayKey();
   const selectedSessions = useMemo(
     () => state.focusSessions.filter((item) => item.startedAt.slice(0, 10) === selectedDateKey),
@@ -249,6 +249,7 @@ export function CalendarView(props: {
                 tags: [],
                 priority: "medium",
                 severity: "medium",
+                stage: "requirements",
                 estimatePomodoros: 1,
                 subtasks: [],
               })
@@ -338,6 +339,14 @@ function TemplateEditor(props: {
           <option value="medium">中</option>
           <option value="high">高</option>
           <option value="very_high">非常高</option>
+        </select>
+      </label>
+      <label>
+        阶段
+        <select value={template.stage ?? "requirements"} onChange={(event) => update({ stage: event.target.value as TaskStage })}>
+          {taskStageOptions.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
         </select>
       </label>
       <label className="span-2">

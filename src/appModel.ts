@@ -1,8 +1,8 @@
 import { completedFocusSessions, defaultReview, deriveRewardState, pauseTimer, resumeTimer, suggestedTasks } from "./domain";
 import { todayKey, uid } from "./seed";
-import type { AppState, DailyPlan, ExecutionSignalType, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, WorkSession } from "./types";
+import type { AppState, DailyPlan, ExecutionSignalType, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, TaskStage, WorkSession } from "./types";
 
-export type Tab = "workspace" | "project" | "focus" | "calendar" | "reports" | "settings";
+export type Tab = "workspace" | "project" | "focus" | "calendar" | "daily" | "reports" | "settings";
 
 export type TaskDraft = {
   title: string;
@@ -11,6 +11,7 @@ export type TaskDraft = {
   estimatePomodoros: number;
   priority: Priority;
   severity: Severity;
+  stage: TaskStage;
   notes: string;
   dueAt: string;
   reminderAt: string;
@@ -35,6 +36,7 @@ export const initialDraft: TaskDraft = {
   estimatePomodoros: 2,
   priority: "medium",
   severity: "medium",
+  stage: "requirements",
   notes: "",
   dueAt: "",
   reminderAt: "",
@@ -56,6 +58,16 @@ export type SplitDraft = {
 export const nowIso = () => new Date().toISOString();
 export const today = () => todayKey();
 export const priorityWeight: Record<Priority, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
+export const taskStageOptions: { value: TaskStage; label: string }[] = [
+  { value: "sales", label: "销售" },
+  { value: "requirements", label: "需求" },
+  { value: "design", label: "设计" },
+  { value: "development", label: "开发" },
+  { value: "testing", label: "测试" },
+  { value: "deployment", label: "部署" },
+  { value: "acceptance", label: "验收" },
+];
+export const labelTaskStage: Record<TaskStage, string> = Object.fromEntries(taskStageOptions.map((option) => [option.value, option.label])) as Record<TaskStage, string>;
 export const initialFilters: TaskFilters = { query: "", project: "all", tag: "all", priority: "all", sort: "manual" };
 
 export const emptyTaskDefaults = (timestamp: string, sortOrder: number) => ({

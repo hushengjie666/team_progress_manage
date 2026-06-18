@@ -201,7 +201,7 @@ export const stalledTaskRisks = (state: AppState, now = new Date()): StalledTask
   const nowTime = now.getTime();
   const staleAfterMs = 24 * 3_600_000;
   return state.tasks
-    .filter((task) => task.primaryExecutorMemberId && task.status !== "completed" && task.status !== "archived")
+    .filter((task) => task.primaryExecutorMemberId && task.status !== "completed" && task.status !== "split" && task.status !== "archived")
     .flatMap((task): StalledTaskRisk[] => {
       const expectedStartAt = expectedStartForTask(state, task);
       const expectedFinishAt = task.expectedFinishAt;
@@ -280,8 +280,8 @@ const hasAnyWorkSession = (sessions: WorkSession[], task: Task) =>
 
 export const buildProgressBoard = (state: AppState, projectId: string, now = new Date()): ProgressBoard => {
   const project = state.projects.find((item) => item.id === projectId) ?? state.projects[0];
-  const tasks = state.tasks.filter((task) => task.projectId === project?.id && task.status !== "archived");
-  const progressTasks = tasks.filter((task) => task.status !== "archived");
+  const tasks = state.tasks.filter((task) => task.projectId === project?.id && task.status !== "archived" && task.status !== "split");
+  const progressTasks = tasks.filter((task) => task.status !== "archived" && task.status !== "split");
   const totalWeight = progressTasks.reduce((sum, task) => sum + Math.max(1, task.estimatePomodoros || 1), 0);
   const weightedProgress = totalWeight
     ? Math.round(progressTasks.reduce((sum, task) => sum + (task.progressPercent ?? (task.status === "completed" ? 100 : 0)) * Math.max(1, task.estimatePomodoros || 1), 0) / totalWeight)
@@ -419,7 +419,7 @@ export const planPressure = (state: AppState, plan: DailyPlan): PlanPressure => 
 
 export const coachSteps = (state: AppState, date = todayKey()): CoachStep[] => {
   const plan = planForDate(state, date);
-  const activeTasks = state.tasks.filter((task) => task.status !== "archived" && task.status !== "completed");
+  const activeTasks = state.tasks.filter((task) => task.status !== "archived" && task.status !== "split" && task.status !== "completed");
   const hasTask = activeTasks.length > 0;
   const hasCommitment = Boolean(plan?.committedTaskIds.length);
   const hasFocus = state.focusSessions.some((session) => session.mode === "focus") || state.activeTimer?.mode === "focus";

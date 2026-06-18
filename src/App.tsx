@@ -5,7 +5,6 @@ import {
   FolderKanban,
   LayoutDashboard,
   ListChecks,
-  Menu,
   Settings,
   ShieldCheck,
   ShieldQuestion,
@@ -31,7 +30,19 @@ import {
 } from "./domain";
 import { playTimerSound, requestTimerNotifications, sendTimerNotification, startWhiteNoise } from "./notifications";
 import { checkStrictModeViolation, loadState, requestStrictPermissions, saveState, startStrictMode, stopStrictMode } from "./storage";
-import { bootstrapWorkspace, createTeamMemberAccount, getAuthStatus, loginToSyncServer, loginToWorkspace, syncAppState, updateTeamMemberAccount } from "./sync";
+import {
+  bootstrapWorkspace,
+  createSyncEventSource,
+  createTeamMemberAccount,
+  getAuthStatus,
+  loginToSyncServer,
+  loginToWorkspace,
+  mergeSyncedStateIntoLatest,
+  type SyncRevisionEvent,
+  syncableStateFingerprint,
+  syncAppState,
+  updateTeamMemberAccount,
+} from "./sync";
 import { buildCsvBundle, createBackupSnapshot, exportStateJson, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { createDemoState } from "./demoData";
 import { instantiateTemplate, parseQuickInput } from "./planning";
@@ -41,6 +52,7 @@ import {
   acceptTaskInState,
   bindTeamMemberToProjectInState,
   createTeamMemberInState,
+  deleteTeamMemberInState,
   assignTaskInState,
   createProjectInState,
   returnTaskForReviewInState,
@@ -90,6 +102,8 @@ import { SettingsView } from "./components/SettingsView";
 import { CalendarView } from "./components/CalendarView";
 import { CommandPalette } from "./components/CommandPalette";
 import { AuthGate } from "./components/AuthGate";
+import { DailyReviewView } from "./components/DailyReviewView";
+import { AppTopbar } from "./components/AppTopbar";
 import {
   emptyTaskDefaults,
   endSessionInState,
@@ -112,6 +126,14 @@ import {
   type TaskFilters,
 } from "./appModel";
 
+function shouldShowStrictStatusToast(status: StrictModeStatus) {
+  return status.platform !== "browser" || !status.message.includes("浏览器预览已进入软严格模式");
+}
+
+const LOCAL_SYNC_DEBOUNCE_MS = 800;
+const REMOTE_SYNC_DEBOUNCE_MS = 250;
+const REMOTE_SYNC_BUSY_RETRY_MS = 1000;
+
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
@@ -122,6 +144,7 @@ export function App() {
   const [loaded, setLoaded] = useState(false);
   const [strictStatus, setStrictStatus] = useState<StrictModeStatus | null>(null);
   const [toast, setToast] = useState("本地优先模式已就绪");
+  const [toastVisible, setToastVisible] = useState(true);
   const [quickNote, setQuickNote] = useState("");
   const [syncPassword, setSyncPassword] = useState("demo");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -134,11 +157,16 @@ export function App() {
   const [syncDiagnostic, setSyncDiagnostic] = useState<SyncDiagnosticResult | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [settingsSection, setSettingsSection] = useState<"members" | "projects" | "timer" | "focus" | "sync" | "data" | "system">("members");
   const stateRef = useRef<AppState | null>(null);
   const pendingImportPayloadRef = useRef<unknown>(null);
   const syncInFlightRef = useRef(false);
+  const syncDebounceRef = useRef<number | null>(null);
+  const syncFingerprintRef = useRef<string | null>(null);
+  const remoteSyncDebounceRef = useRef<number | null>(null);
+  const remoteSyncTargetRevisionRef = useRef(0);
+  const pendingLocalSyncRef = useRef(false);
+  const lastSyncReasonRef = useRef("manual");
   const strictStartingRef = useRef<Set<string>>(new Set());
   const reminderSentRef = useRef<Set<string>>(new Set());
   const stopNoiseRef = useRef<(() => void) | null>(null);
@@ -228,6 +256,79 @@ export function App() {
     stateRef.current = state;
   }, [state]);
 
+  const requestSync = (reason: string, options: { delayMs?: number; showToast?: boolean; targetRevision?: number } = {}) => {
+    const current = stateRef.current;
+    const token = current?.auth.token ?? current?.sync.token;
+    if (!current?.sync.enabled || !token || !current.sync.autoSync) return;
+    lastSyncReasonRef.current = reason;
+    if (options.targetRevision !== undefined) {
+      remoteSyncTargetRevisionRef.current = Math.max(remoteSyncTargetRevisionRef.current, options.targetRevision);
+    }
+    if (reason === "local-change" && syncInFlightRef.current) {
+      pendingLocalSyncRef.current = true;
+      setState((value) =>
+        value
+          ? {
+              ...value,
+              sync: {
+                ...value.sync,
+                pendingLocalSync: true,
+                pendingRemoteRevision: remoteSyncTargetRevisionRef.current || value.sync.pendingRemoteRevision,
+                lastSyncReason: reason,
+              },
+            }
+          : value,
+      );
+      return;
+    }
+    if (syncInFlightRef.current) {
+      setState((value) =>
+        value
+          ? {
+              ...value,
+              sync: {
+                ...value.sync,
+                pendingLocalSync: pendingLocalSyncRef.current,
+                pendingRemoteRevision: remoteSyncTargetRevisionRef.current || value.sync.pendingRemoteRevision,
+                lastSyncReason: reason,
+              },
+            }
+          : value,
+      );
+      return;
+    }
+    if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
+    if (current.sync.status === "authenticating") return;
+    if (syncDebounceRef.current !== null) window.clearTimeout(syncDebounceRef.current);
+    syncDebounceRef.current = window.setTimeout(() => {
+      syncDebounceRef.current = null;
+      void runSync(options.showToast ?? false);
+    }, options.delayMs ?? LOCAL_SYNC_DEBOUNCE_MS);
+    setState((value) =>
+      value
+        ? {
+            ...value,
+            sync: {
+              ...value.sync,
+              pendingLocalSync: pendingLocalSyncRef.current,
+              pendingRemoteRevision: remoteSyncTargetRevisionRef.current || value.sync.pendingRemoteRevision,
+              lastSyncReason: reason,
+            },
+          }
+        : value,
+    );
+  };
+
+  useEffect(() => {
+    if (!toast) {
+      setToastVisible(false);
+      return;
+    }
+    setToastVisible(true);
+    const timer = window.setTimeout(() => setToastVisible(false), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   useEffect(
     () => () => {
       if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
@@ -282,6 +383,11 @@ export function App() {
         }
         if (event.key === "5") {
           event.preventDefault();
+          setTab("daily");
+          return;
+        }
+        if (event.key === "6") {
+          event.preventDefault();
           setTab("reports");
           return;
         }
@@ -299,7 +405,7 @@ export function App() {
       if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
         event.preventDefault();
         const plan = current ? getTodayPlan(current) : null;
-        if (current && plan && !plan.reviewedAt && currentTab === "workspace") {
+        if (current && plan && !plan.reviewedAt && currentTab === "daily") {
           completeReview();
         }
         return;
@@ -497,17 +603,111 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!state?.sync.enabled || !state.sync.token || !state.sync.autoSync) return;
+    const token = state?.auth.token ?? state?.sync.token;
+    if (!state?.sync.enabled || !token || !state.sync.autoSync) return;
     const intervalMs = Math.max(30, state.sync.intervalSeconds) * 1000;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
-      if (!current?.sync.enabled || !current.sync.token || !current.sync.autoSync) return;
+      const currentToken = current?.auth.token ?? current?.sync.token;
+      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
       if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
       if (current.sync.status === "syncing" || current.sync.status === "authenticating") return;
-      void runSync(false);
+      requestSync("interval", { delayMs: 0 });
     }, intervalMs);
     return () => window.clearInterval(handle);
-  }, [state?.sync.enabled, state?.sync.token, state?.sync.autoSync, state?.sync.intervalSeconds]);
+  }, [state?.sync.enabled, state?.auth.token, state?.sync.token, state?.sync.autoSync, state?.sync.intervalSeconds]);
+
+  const eventSourceToken = state?.auth.token ?? state?.sync.token;
+  useEffect(() => {
+    if (!state?.sync.enabled || !state.sync.autoSync || !eventSourceToken) return;
+    const eventSource = createSyncEventSource(state.sync, eventSourceToken);
+    if (!eventSource) return;
+
+    const handleSyncEvent = (event: MessageEvent<string>) => {
+      let payload: SyncRevisionEvent;
+      try {
+        payload = JSON.parse(event.data) as SyncRevisionEvent;
+      } catch {
+        return;
+      }
+      const current = stateRef.current;
+      const currentToken = current?.auth.token ?? current?.sync.token;
+      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
+      if (payload.current_revision <= current.sync.lastPulledRevision) return;
+      if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
+      if (current.sync.status === "authenticating") return;
+      setState((value) =>
+        value
+          ? {
+              ...value,
+              sync: {
+                ...value.sync,
+                sseStatus: "open",
+                lastReceivedRevision: Math.max(value.sync.lastReceivedRevision ?? 0, payload.current_revision),
+                pendingRemoteRevision: Math.max(value.sync.pendingRemoteRevision ?? 0, payload.current_revision),
+              },
+            }
+          : value,
+      );
+      requestSync(event.type === "hello" ? "sse-hello" : "sse-revision", {
+        targetRevision: payload.current_revision,
+        delayMs: syncInFlightRef.current || current.sync.status === "syncing" ? REMOTE_SYNC_BUSY_RETRY_MS : REMOTE_SYNC_DEBOUNCE_MS,
+      });
+    };
+
+    setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "connecting" } } : value));
+    eventSource.addEventListener("hello", handleSyncEvent);
+    eventSource.addEventListener("revision", handleSyncEvent);
+    eventSource.addEventListener("open", () => {
+      setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "open" } } : value));
+    });
+    eventSource.addEventListener("error", () => {
+      setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "error" } } : value));
+    });
+    return () => {
+      eventSource.removeEventListener("hello", handleSyncEvent);
+      eventSource.removeEventListener("revision", handleSyncEvent);
+      eventSource.close();
+      if (remoteSyncDebounceRef.current !== null) {
+        window.clearTimeout(remoteSyncDebounceRef.current);
+        remoteSyncDebounceRef.current = null;
+      }
+      remoteSyncTargetRevisionRef.current = 0;
+    };
+  }, [state?.sync.enabled, state?.sync.autoSync, state?.sync.serverUrl, state?.sync.deviceId, eventSourceToken]);
+
+  useEffect(() => {
+    if (!state) return;
+
+    const fingerprint = syncableStateFingerprint(state);
+    if (syncFingerprintRef.current === null) {
+      syncFingerprintRef.current = fingerprint;
+      return;
+    }
+    if (syncFingerprintRef.current === fingerprint) return;
+    syncFingerprintRef.current = fingerprint;
+
+    const token = state.auth.token ?? state.sync.token;
+    if (!state.sync.enabled || !token || !state.sync.autoSync) return;
+    if (state.sync.nextRetryAt && Date.now() < new Date(state.sync.nextRetryAt).getTime()) return;
+    if (state.sync.status === "authenticating") return;
+
+    requestSync("local-change", { delayMs: LOCAL_SYNC_DEBOUNCE_MS });
+  }, [state]);
+
+  useEffect(() => {
+    return () => {
+      if (syncDebounceRef.current !== null) {
+        window.clearTimeout(syncDebounceRef.current);
+        syncDebounceRef.current = null;
+      }
+      if (remoteSyncDebounceRef.current !== null) {
+        window.clearTimeout(remoteSyncDebounceRef.current);
+        remoteSyncDebounceRef.current = null;
+      }
+      remoteSyncTargetRevisionRef.current = 0;
+    };
+  }, []);
 
   useEffect(() => {
     stopNoiseRef.current?.();
@@ -572,7 +772,7 @@ export function App() {
     void startStrictMode(profile)
       .then((status) => {
         setStrictStatus(status);
-        setToast(status.message);
+        if (shouldShowStrictStatusToast(status)) setToast(status.message);
         updateState((value) =>
           value.activeTimer?.sessionId === active.sessionId
             ? { ...value, activeTimer: { ...value.activeTimer, strictStarted: status.active } }
@@ -637,7 +837,7 @@ export function App() {
     if (!state || !todayPlan) return [];
     return todayPlan.committedTaskIds
       .map((id) => state.tasks.find((task) => task.id === id))
-      .filter((task): task is Task => Boolean(task));
+      .filter((task): task is Task => task !== undefined && task.status !== "split" && task.status !== "archived");
   }, [state, todayPlan]);
 
   const poolTasks = useMemo(() => {
@@ -652,6 +852,7 @@ export function App() {
         task.tags.some((tag) => tag.toLowerCase().includes(query));
       return (
         task.status !== "completed" &&
+        task.status !== "split" &&
         task.status !== "archived" &&
         !todayPlan.committedTaskIds.includes(task.id) &&
         matchesQuery &&
@@ -669,8 +870,8 @@ export function App() {
   }, [state, todayPlan, taskFilters]);
 
   const currentTask = useMemo(() => {
-    if (!state?.activeTimer?.taskId) return committedTasks.find((task) => task.status !== "completed");
-    return state.tasks.find((task) => task.id === state.activeTimer?.taskId);
+    if (!state?.activeTimer?.taskId) return committedTasks.find((task) => task.status !== "completed" && task.status !== "split");
+    return state.tasks.find((task) => task.id === state.activeTimer?.taskId && task.status !== "split");
   }, [state, committedTasks]);
 
   const selectedTask = useMemo(() => {
@@ -694,13 +895,17 @@ export function App() {
   };
   const currentProjectId = state.projects[0]?.id ?? "project_starter";
 
-  const addTask = () => {
+  const addTask = (projectId?: string) => {
     const title = draft.title.trim();
     if (!title) {
       setToast("先写一个任务名称");
       return;
     }
     const timestamp = nowIso();
+    const targetProject = projectId
+      ? state.projects.find((project) => project.id === projectId) ?? state.projects[0]
+      : state.projects[0];
+    const taskProjectId = targetProject?.id ?? currentProjectId;
     const task: Task = {
       id: uid("task"),
       title,
@@ -709,11 +914,12 @@ export function App() {
         .split(/[,\s，]+/)
         .map((item) => item.trim())
         .filter(Boolean),
-      projectId: currentProjectId,
-      project: draft.project.trim() || "Inbox",
+      projectId: taskProjectId,
+      project: projectId ? (targetProject?.name ?? draft.project.trim()) || "Inbox" : draft.project.trim() || "Inbox",
       creatorMemberId: state.currentMemberId,
       priority: draft.priority,
       severity: draft.severity,
+      stage: draft.stage,
       estimatePomodoros: Math.max(0, Math.round(draft.estimatePomodoros)),
       status: "pool",
       ...emptyTaskDefaults(timestamp, Date.now()),
@@ -785,6 +991,24 @@ export function App() {
   };
 
   const completeTask = (taskId: string) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    if (task.status === "pending_review") {
+      setToast("该任务已提交验收，等待项目负责人确认");
+      return;
+    }
+    if (task.status === "completed") {
+      setToast("任务已完成，无需重复提交");
+      return;
+    }
+    if (task.status === "pool") {
+      setToast("请先加入工作队列或开始执行后再提交验收");
+      return;
+    }
+    if (task.status === "split" || task.status === "archived") {
+      setToast("当前状态不能提交验收");
+      return;
+    }
     const timestamp = nowIso();
     updateState((value) => submitTaskForReviewInState(value, taskId, value.currentMemberId, timestamp));
     setToast("已提交验收，等待项目负责人确认");
@@ -885,7 +1109,7 @@ export function App() {
       strictStartingRef.current.add(sessionId);
       const status = await startStrictMode(activeProfile);
       setStrictStatus(status);
-      setToast(status.message);
+      if (shouldShowStrictStatusToast(status)) setToast(status.message);
       updateState((value) =>
         value.activeTimer?.sessionId === sessionId
           ? { ...value, activeTimer: { ...value.activeTimer, strictStarted: status.active } }
@@ -994,6 +1218,7 @@ export function App() {
       creatorMemberId: state.currentMemberId,
       priority: source.type === "external" ? "high" : "medium",
       severity: "medium",
+      stage: "requirements",
       estimatePomodoros: 1,
       status: "pool",
       ...emptyTaskDefaults(timestamp, Date.now()),
@@ -1102,9 +1327,18 @@ export function App() {
 
   const createTeamMember = (name: string, email: string, password = "demo") => {
     const timestamp = nowIso();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setToast("请输入登录邮箱或手机号");
+      return;
+    }
+    if (state.teamMembers.some((member) => member.status !== "disabled" && member.email?.trim().toLowerCase() === normalizedEmail)) {
+      setToast("该登录邮箱或手机号已存在于成员库，请勿重复创建");
+      return;
+    }
     const token = state.auth.token ?? state.sync.token;
-    if (token && email.trim()) {
-      void createTeamMemberAccount(state.sync, token, { name, email, password })
+    if (token) {
+      void createTeamMemberAccount(state.sync, token, { name, email: normalizedEmail, password })
         .then((member) => {
           updateState((value) => ({
             ...value,
@@ -1121,13 +1355,74 @@ export function App() {
         });
       return;
     }
-    updateState((value) => createTeamMemberInState(value, name, email, timestamp));
+    updateState((value) => createTeamMemberInState(value, name, normalizedEmail, timestamp));
     setToast("已创建本地成员，可在项目中绑定");
   };
 
   const updateTeamMember = (member: TeamMember) => {
     const timestamp = nowIso();
-    updateState((value) => updateTeamMemberInState(value, member, timestamp));
+    const normalizedEmail = member.email?.trim().toLowerCase() ?? "";
+    const normalizedName = member.name.trim();
+    if (!normalizedName) {
+      setToast("请输入成员姓名");
+      return;
+    }
+    if (!normalizedEmail) {
+      setToast("请输入登录邮箱或手机号");
+      return;
+    }
+    if (state.teamMembers.some((item) => item.id !== member.id && item.status !== "disabled" && item.email?.trim().toLowerCase() === normalizedEmail)) {
+      setToast("该登录邮箱或手机号已存在于成员库，请勿重复使用");
+      return;
+    }
+    const nextMember = { ...member, name: normalizedName, email: normalizedEmail };
+    const token = state.auth.token ?? state.sync.token;
+    if (token && member.accountId) {
+      void updateTeamMemberAccount(state.sync, token, member.id, { name: normalizedName, email: normalizedEmail })
+        .then((updatedMember) => {
+          updateState((value) => updateTeamMemberInState(value, updatedMember, nowIso()));
+          setToast("成员资料已保存");
+        })
+        .catch((error) => {
+          setToast(error instanceof Error ? error.message : "成员资料保存失败");
+        });
+      return;
+    }
+    updateState((value) => updateTeamMemberInState(value, nextMember, timestamp));
+    setToast("成员资料已保存");
+  };
+
+  const deleteTeamMember = (teamMemberId: string) => {
+    const member = state.teamMembers.find((item) => item.id === teamMemberId);
+    if (!member) return;
+    if (member.accountId && member.accountId === state.auth.account?.id) {
+      setToast("不能删除当前登录账号");
+      return;
+    }
+    const activeBindings = state.projectMembers.filter((binding) => binding.teamMemberId === teamMemberId && binding.status !== "disabled");
+    const blocks = activeBindings.filter((binding) => {
+      if (!binding.roles.includes("project_owner")) return false;
+      return !state.projectMembers.some(
+        (other) =>
+          other.id !== binding.id &&
+          other.projectId === binding.projectId &&
+          other.status !== "disabled" &&
+          other.roles.includes("project_owner"),
+      );
+    });
+    if (blocks.length > 0) {
+      const projectNames = blocks
+        .map((binding) => state.projects.find((project) => project.id === binding.projectId)?.name)
+        .filter(Boolean)
+        .join("、");
+      setToast(`不能删除项目唯一负责人：${projectNames}`);
+      return;
+    }
+    const confirmed = window.confirm(`确定删除成员「${member.name}」吗？将解除该成员的项目绑定，并清理任务分配。`);
+    if (!confirmed) return;
+    const timestamp = nowIso();
+    updateState((value) => deleteTeamMemberInState(value, teamMemberId, timestamp));
+    setToast("成员已删除");
   };
 
   const bindTeamMemberToProject = (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => {
@@ -1321,6 +1616,7 @@ export function App() {
       progressNote: "",
       priority: task.priority,
       severity: task.severity,
+      stage: task.stage,
       estimatePomodoros: estimatePerTask,
       status: task.status === "committed" || todayPlan.committedTaskIds.includes(task.id) ? "committed" : "pool",
       ...emptyTaskDefaults(timestamp, task.sortOrder + index + 1),
@@ -1340,7 +1636,17 @@ export function App() {
             status: task.status === "committed" || currentPlan.committedTaskIds.includes(task.id) ? ("committed" as const) : item.status,
           })),
           ...value.tasks.map((item) =>
-            item.id === task.id ? { ...item, status: "archived" as const, updatedAt: timestamp } : item,
+            item.id === task.id
+              ? {
+                  ...item,
+                  status: "split" as const,
+                  notes: [
+                    item.notes,
+                    `已拆分为：${titles.join("、")}。`,
+                  ].filter(Boolean).join("\n"),
+                  updatedAt: timestamp,
+                }
+              : item,
           ),
         ],
         dailyPlans: value.dailyPlans.map((plan) => ({
@@ -1351,7 +1657,7 @@ export function App() {
         updatedAt: timestamp,
       };
     });
-    setSelectedTaskId(newTasks[0]?.id ?? null);
+    setSelectedTaskId(task.id);
     setPendingSplit(null);
     setToast(`已拆分为 ${newTasks.length} 个子任务`);
   };
@@ -1509,10 +1815,35 @@ export function App() {
     const source = stateRef.current;
     if (!source || syncInFlightRef.current) return;
     syncInFlightRef.current = true;
-    setSyncStatus({ status: "syncing", message: "正在推送与拉取变更" });
+    pendingLocalSyncRef.current = false;
+    const sourceRemoteTargetRevision = remoteSyncTargetRevisionRef.current;
+    setSyncStatus({
+      status: "syncing",
+      message: "正在推送与拉取变更",
+      pendingLocalSync: false,
+      pendingRemoteRevision: sourceRemoteTargetRevision || undefined,
+      lastSyncReason: lastSyncReasonRef.current,
+    });
     try {
       const nextState = await syncAppState({ ...source, sync: { ...source.sync, status: "syncing" } });
-      setState(ensureTodayPlan(nextState));
+      const completedRevision = nextState.sync.lastPulledRevision;
+      if (remoteSyncTargetRevisionRef.current <= completedRevision) {
+        remoteSyncTargetRevisionRef.current = 0;
+      }
+      setState((current) => {
+        const latest = current ?? source;
+        const merged = latest === source ? nextState : mergeSyncedStateIntoLatest(latest, source, nextState);
+        return ensureTodayPlan({
+          ...merged,
+          sync: {
+            ...merged.sync,
+            pendingLocalSync: pendingLocalSyncRef.current,
+            pendingRemoteRevision: remoteSyncTargetRevisionRef.current || undefined,
+            lastReceivedRevision: Math.max(merged.sync.lastReceivedRevision ?? 0, source.sync.lastReceivedRevision ?? 0),
+            lastSyncReason: lastSyncReasonRef.current,
+          },
+        });
+      });
       if (showToast) setToast(nextState.sync.message);
     } catch (error) {
       const message = error instanceof Error ? error.message : "同步失败";
@@ -1528,6 +1859,11 @@ export function App() {
       if (showToast) setToast(message);
     } finally {
       syncInFlightRef.current = false;
+      const current = stateRef.current;
+      const hasPendingRemote = current ? remoteSyncTargetRevisionRef.current > current.sync.lastPulledRevision : remoteSyncTargetRevisionRef.current > 0;
+      if (pendingLocalSyncRef.current || hasPendingRemote) {
+        requestSync(pendingLocalSyncRef.current ? "pending-local" : "pending-remote", { delayMs: 0 });
+      }
     }
   };
 
@@ -1679,6 +2015,7 @@ export function App() {
       name: template.name.trim() || "未命名模板",
       project: template.project.trim() || "Inbox",
       tags: template.tags.map((tag) => tag.trim()).filter(Boolean),
+      stage: template.stage ?? "requirements",
       estimatePomodoros: Math.max(1, Math.round(template.estimatePomodoros)),
       subtasks: template.subtasks.map((item) => item.trim()).filter(Boolean),
     };
@@ -1749,6 +2086,7 @@ export function App() {
       creatorMemberId: state.currentMemberId,
       priority: parsed.priority ?? "medium",
       severity: "medium",
+      stage: "requirements",
       estimatePomodoros: parsed.estimatePomodoros,
       status: "pool",
       ...emptyTaskDefaults(timestamp, Date.now()),
@@ -1765,6 +2103,7 @@ export function App() {
     if (action === "navigate_workspace") openBoard();
     if (action === "navigate_focus") openWorkbench();
     if (action === "navigate_calendar") setTab("calendar");
+    if (action === "navigate_daily") setTab("daily");
     if (action === "navigate_reports") setTab("reports");
     if (action === "navigate_settings") {
       setSettingsSection("projects");
@@ -1810,9 +2149,6 @@ export function App() {
   const activeProjectId = selectedProjectId && state.projects.some((project) => project.id === selectedProjectId)
     ? selectedProjectId
     : primaryProjectId;
-  const activeProject = state.projects.find((project) => project.id === activeProjectId);
-  const sidebarBoard = primaryProjectId ? buildProgressBoard(state, primaryProjectId) : undefined;
-  const sidebarRiskCount = sidebarBoard?.sections.filter((section) => section.kind !== "normal").reduce((sum, section) => sum + section.tasks.length, 0) ?? 0;
   const activeNavKey = tab === "workspace" ? workspaceMode : tab === "project" ? "board" : tab === "settings" ? "admin" : tab;
   const openAdmin = (section: typeof settingsSection = "members") => {
     setSettingsSection(section);
@@ -1832,6 +2168,9 @@ export function App() {
     setWorkspaceMode("workbench");
     setTab("workspace");
   };
+  const openDailyReview = () => {
+    setTab("daily");
+  };
   const primaryNavItems = [
     { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard },
     { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench },
@@ -1840,6 +2179,7 @@ export function App() {
   const secondaryNavItems = [
     { key: "focus", label: "开始工作", icon: <Focus size={18} />, onClick: () => setTab("focus") },
     { key: "calendar", label: "排期日历", icon: <CalendarDays size={18} />, onClick: () => setTab("calendar") },
+    { key: "daily", label: "每日总结", icon: <ListChecks size={18} />, onClick: openDailyReview },
     { key: "reports", label: "复盘洞察", icon: <BarChart3 size={18} />, onClick: () => setTab("reports") },
   ];
   const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
@@ -1879,100 +2219,33 @@ export function App() {
   }
 
   return (
-    <main className={sidebarExpanded ? "app-shell sidebar-open" : "app-shell sidebar-collapsed"}>
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">
-            <TimerReset size={24} />
-          </div>
-          <div>
-            <strong>Team Progress</strong>
-            <span>团队进度管控</span>
-          </div>
-        </div>
-
-        <nav className="nav-list" aria-label="主导航">
-          <span className="nav-group-label">团队进度</span>
-          {primaryNavItems.map((item) => (
-            <button className={activeNavKey === item.key ? "active" : ""} title={item.label} onClick={item.onClick} key={item.key}>
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-          <span className="nav-group-label">辅助工具</span>
-          {secondaryNavItems.map((item) => (
-            <button className={activeNavKey === item.key ? "active" : ""} title={item.label} onClick={item.onClick} key={item.key}>
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="sidebar-status">
-          <span>项目进度</span>
-          <strong>
-            {sidebarBoard?.projectProgress ?? 0}%
-          </strong>
-          <div className="mini-progress">
-            <span
-              style={{
-                width: `${sidebarBoard?.projectProgress ?? 0}%`,
-              }}
-            />
-          </div>
-          <small>执行中 {sidebarBoard?.activeSessions.length ?? 0} · 风险 {sidebarRiskCount}</small>
-        </div>
-      </aside>
-
+    <main className="app-shell">
       <section className="main-panel">
-        <header className="topbar">
-          <div className="topbar-heading">
-            <button className="icon-button" title={sidebarExpanded ? "收起侧栏" : "展开侧栏"} onClick={() => setSidebarExpanded((value) => !value)}>
-              <Menu size={18} />
-            </button>
-            <div>
-              <p className="eyebrow">{today()}</p>
-              <h1>
-                {tab === "settings"
-                  ? "管理中心"
-                  : tab === "project"
-                    ? activeProject?.name ?? "项目工作区"
-                  : tab === "workspace"
-                    ? workspaceMode === "board" ? "项目总览" : "我的任务"
-                  : tab === "focus"
-                    ? "开始工作"
-                    : tab === "calendar"
-                      ? "排期日历"
-                      : tab === "reports"
-                        ? "复盘洞察"
-                        : "系统设置"}
-              </h1>
-            </div>
-          </div>
-          <nav className="topbar-nav" aria-label="页面导航">
-            {topbarNavItems.map((item) => (
-              <button className={activeNavKey === item.key ? "active" : ""} onClick={item.onClick} key={item.key}>
-                {item.icon}
-                <span>{item.label}</span>
+        <AppTopbar
+          navItems={topbarNavItems}
+          activeNavKey={activeNavKey}
+          actions={(
+            <>
+              <button className="secondary-button" onClick={loadDemoData}>
+                演示数据
               </button>
-            ))}
-          </nav>
-          <div className="topbar-actions">
-            <span className="toast">{toast}</span>
-            <button className="secondary-button" onClick={loadDemoData}>
-              演示数据
-            </button>
-            <button className="secondary-button" onClick={logout}>
-              账号：{state.auth.account?.name ?? "退出"}
-            </button>
-            <button className="icon-button" title="命令面板" onClick={() => setCommandPaletteOpen(true)}>
-              <Search size={18} />
-            </button>
-            <button className="icon-button" title="严格模式权限" onClick={askPermissions}>
-              {strictStatus?.permission_state === "granted" ? <ShieldCheck size={18} /> : <ShieldQuestion size={18} />}
-            </button>
+              <button className="secondary-button" onClick={logout}>
+                账号：{state.auth.account?.name ?? "退出"}
+              </button>
+              <button className="icon-button" title="命令面板" onClick={() => setCommandPaletteOpen(true)}>
+                <Search size={18} />
+              </button>
+              <button className="icon-button" title="严格模式权限" onClick={askPermissions}>
+                {strictStatus?.permission_state === "granted" ? <ShieldCheck size={18} /> : <ShieldQuestion size={18} />}
+              </button>
+            </>
+          )}
+        />
+        {toast && toastVisible && (
+          <div className="global-toast" role="status" aria-live="polite">
+            {toast}
           </div>
-        </header>
+        )}
 
         {tab === "workspace" && (
           <WorkspaceView
@@ -1987,7 +2260,6 @@ export function App() {
             selectedTask={selectedTask}
             taskFilters={taskFilters}
             setTaskFilters={setTaskFilters}
-            capacityHint={capacityHint}
             totalCommittedEstimate={totalCommittedEstimate}
             commitTask={commitTask}
             removeCommittedTask={removeCommittedTask}
@@ -2011,9 +2283,6 @@ export function App() {
             }}
             openProjectSettings={() => openAdmin("projects")}
             openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
-            updateReflection={updateReflection}
-            updateReview={updateReview}
-            completeReview={completeReview}
             resolveInterruption={resolveInterruption}
             convertInterruptionToTask={convertInterruptionToTask}
           />
@@ -2039,12 +2308,13 @@ export function App() {
               setTab("focus");
               void beginTimer("focus", taskId);
             }}
+            bindTeamMemberToProject={bindTeamMemberToProject}
+            updateProjectMember={updateProjectMember}
             backToBoard={() => {
               setWorkspaceMode("board");
               setTab("workspace");
             }}
             backToAdmin={() => openAdmin("projects")}
-            openProjectSettings={() => openAdmin("projects")}
             openMemberSettings={() => openAdmin("members")}
           />
         )}
@@ -2054,9 +2324,6 @@ export function App() {
             state={state}
             currentTask={currentTask}
             committedTasks={committedTasks}
-            activeProfile={activeProfile}
-            quickNote={quickNote}
-            setQuickNote={setQuickNote}
             beginTimer={beginTimer}
             toggleTimer={toggleTimer}
             resetTimer={resetTimer}
@@ -2079,6 +2346,17 @@ export function App() {
               setSelectedTaskId(taskId);
               setTab("workspace");
             }}
+          />
+        )}
+
+        {tab === "daily" && (
+          <DailyReviewView
+            state={state}
+            todayPlan={todayPlan}
+            capacityHint={capacityHint}
+            updateReflection={updateReflection}
+            updateReview={updateReview}
+            completeReview={completeReview}
           />
         )}
 
@@ -2119,9 +2397,8 @@ export function App() {
             createTeamMember={createTeamMember}
             updateTeamMember={updateTeamMember}
             updateTeamMemberPassword={updateTeamMemberPassword}
-            bindTeamMemberToProject={bindTeamMemberToProject}
-            updateProjectMember={updateProjectMember}
-            openProjectDetail={(projectId) => openProjectDetail(projectId, "settings")}
+            deleteTeamMember={deleteTeamMember}
+            openProjectDetail={openProjectDetail}
             updateProfile={updateProfile}
             askPermissions={askPermissions}
             askNotificationPermissions={askNotificationPermissions}

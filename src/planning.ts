@@ -71,7 +71,7 @@ export const calendarSummaries = (state: AppState, startDate: string, days: numb
       interruptionCount: interruptionsOnDate(state, key).length,
       abortedPomodoros: abortedSessionsOnDate(state, key).length,
       overdueTaskIds: state.tasks
-        .filter((task) => task.status !== "completed" && task.status !== "archived" && task.dueAt && task.dueAt <= dueCutoff && task.dueAt.slice(0, 10) <= key)
+        .filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived" && task.dueAt && task.dueAt <= dueCutoff && task.dueAt.slice(0, 10) <= key)
         .map((task) => task.id),
       reminderTaskIds: state.tasks.filter((task) => task.reminderAt?.slice(0, 10) === key).map((task) => task.id),
       reviewed: Boolean(plan?.reviewedAt),
@@ -93,6 +93,7 @@ export const instantiateTemplate = (template: TaskTemplate, timestamp = new Date
   progressNote: "",
   priority: template.priority,
   severity: template.severity,
+  stage: template.stage ?? "requirements",
   estimatePomodoros: template.estimatePomodoros,
   status: "pool",
   repeatRule: template.repeatRule ?? "none",

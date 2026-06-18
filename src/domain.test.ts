@@ -24,18 +24,27 @@ import { endSessionInState, startTimerInState, toggleTimerInState } from "./appM
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
+import { mergeRowsIntoState, type SyncRow } from "./sync";
 import {
   acceptTaskInState,
   addProjectMemberToState,
   assignTaskInState,
   createProjectInState,
+  deleteTeamMemberInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectMemberInState,
+  updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
-import { createProjectTaskInState, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
-import type { ActiveTimer, AppState, FocusSession, TaskTemplate } from "./types";
+import { buildProjectOverviewTaskBoard, createProjectTaskInState, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
+import {
+  buildMyProjectTaskCards,
+  buildProjectOverviewCards,
+  filterMyTasksByProjectSelection,
+  quickAddProjectIdForSelection,
+} from "./projectOverview";
+import type { ActiveTimer, AppState, FocusSession, ProjectMember, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
@@ -510,9 +519,268 @@ describe("progress board", () => {
       "normal_work",
     ]);
   });
+
+  it("builds project overview cards with project-scoped counts and archived tasks", () => {
+    const state = createInitialState();
+    const firstProjectId = state.projects[0].id;
+    const withSecondProject = createProjectInState(
+      state,
+      "第二项目",
+      "用于验证卡片隔离",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_second_card`,
+    );
+    const next: AppState = {
+      ...withSecondProject,
+      tasks: [
+        { ...state.tasks[0], id: "card_first_archived", projectId: firstProjectId, status: "archived" },
+        { ...state.tasks[1], id: "card_first_review", projectId: firstProjectId, status: "pending_review", progressPercent: 100 },
+        { ...state.tasks[2], id: "card_second_progress", projectId: "project_second_card", status: "in_progress", progressPercent: 40 },
+      ],
+      projectMembers: [
+        ...withSecondProject.projectMembers,
+        {
+          id: "member_disabled_card",
+          projectId: firstProjectId,
+          name: "停用成员",
+          roles: ["executor"],
+          status: "disabled",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      ],
+    };
+
+    const cards = buildProjectOverviewCards(next);
+    const first = cards.find((card) => card.projectId === firstProjectId);
+    const second = cards.find((card) => card.projectId === "project_second_card");
+
+    expect(first).toMatchObject({
+      taskCount: 2,
+      memberCount: 1,
+      pendingReviewCount: 1,
+      statusCounts: expect.objectContaining({ archived: 1, pending_review: 1 }),
+    });
+    expect(second).toMatchObject({
+      taskCount: 1,
+      inProgressCount: 1,
+      statusCounts: expect.objectContaining({ in_progress: 1, archived: 0 }),
+    });
+  });
+
+  it("builds the project detail overview board from pooled work and member today work groups", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const owner = state.projectMembers.find((member) => member.id === "member_owner");
+    const reviewer = {
+      ...owner!,
+      id: "member_reviewer_overview",
+      name: "协作者",
+      roles: owner!.roles,
+    };
+    const baseTask = state.tasks[0];
+    const tasks = [
+      { ...baseTask, id: "overview_pool", projectId, status: "pool" as const, sortOrder: 1 },
+      { ...baseTask, id: "overview_committed", projectId, status: "committed" as const, sortOrder: 2 },
+      { ...baseTask, id: "overview_active", projectId, status: "in_progress" as const, primaryExecutorMemberId: owner?.id, sortOrder: 3 },
+      { ...baseTask, id: "overview_other_running", projectId, status: "in_progress" as const, primaryExecutorMemberId: reviewer.id, sortOrder: 4 },
+      { ...baseTask, id: "overview_unassigned", projectId, status: "in_progress" as const, primaryExecutorMemberId: undefined, sortOrder: 5 },
+      { ...baseTask, id: "overview_review", projectId, status: "pending_review" as const, sortOrder: 6 },
+      { ...baseTask, id: "overview_split", projectId, status: "split" as const, sortOrder: 7 },
+      { ...baseTask, id: "overview_archived", projectId, status: "archived" as const, sortOrder: 8 },
+    ];
+
+    const idleMember: ProjectMember = {
+      ...reviewer,
+      id: "member_idle",
+      name: "空闲成员",
+      roles: ["executor"],
+    };
+    const board = buildProjectOverviewTaskBoard(
+      tasks,
+      [owner!, reviewer, idleMember],
+      "overview_active",
+      ["overview_active", "overview_committed", "overview_other_running", "overview_unassigned"],
+    );
+
+    expect(board.poolTasks.map((task) => task.id)).toEqual(["overview_pool", "overview_committed"]);
+    expect(board.pendingReviewTasks.map((task) => task.id)).toEqual(["overview_review"]);
+    expect(board.inProgressTasks.map((task) => task.id)).toEqual(["overview_active", "overview_other_running", "overview_unassigned"]);
+    expect(board.todayWorkGroups.map((group) => ({
+      memberName: group.memberName,
+      taskIds: group.tasks.map((task) => task.id),
+      hasActiveTask: group.hasActiveTask,
+    }))).toEqual([
+      { memberName: "项目负责人", taskIds: ["overview_active", "overview_committed"], hasActiveTask: true },
+      { memberName: "协作者", taskIds: ["overview_other_running"], hasActiveTask: false },
+      { memberName: "未分配", taskIds: ["overview_unassigned"], hasActiveTask: false },
+      { memberName: "空闲成员", taskIds: [], hasActiveTask: false },
+    ]);
+  });
+
+  it("keeps project overview today work empty when no daily plan tasks are provided", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const owner = state.projectMembers.find((member) => member.id === "member_owner")!;
+    const baseTask = state.tasks[0];
+    const tasks = [
+      { ...baseTask, id: "not_today_committed", projectId, status: "committed" as const, primaryExecutorMemberId: owner.id, sortOrder: 1 },
+      { ...baseTask, id: "not_today_running", projectId, status: "in_progress" as const, primaryExecutorMemberId: owner.id, sortOrder: 2 },
+    ];
+
+    const board = buildProjectOverviewTaskBoard(tasks, [owner], "not_today_running", []);
+
+    expect(board.poolTasks.map((task) => task.id)).toEqual(["not_today_committed"]);
+    expect(board.inProgressTasks.map((task) => task.id)).toEqual(["not_today_running"]);
+    expect(board.todayWorkGroups).toEqual([
+      {
+        memberId: owner.id,
+        memberName: owner.name,
+        tasks: [],
+        hasActiveTask: false,
+      },
+    ]);
+  });
+
+  it("builds my project task cards from active participations only", () => {
+    const state = createInitialState();
+    const firstProjectId = state.projects[0].id;
+    const withSecondProject = createProjectInState(
+      state,
+      "第二项目",
+      "同一账号参与的另一个项目",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_my_card`,
+      { accountId: "account_owner", name: "项目负责人", email: "owner@example.com" },
+    );
+    const secondMember = withSecondProject.projectMembers.find((member) => member.projectId === "project_my_card");
+    const currentMember = withSecondProject.projectMembers.find((member) => member.id === "member_owner");
+    const next: AppState = {
+      ...withSecondProject,
+      currentMemberId: "member_owner",
+      tasks: [
+        { ...state.tasks[0], id: "my_first_committed", projectId: firstProjectId, status: "committed", primaryExecutorMemberId: "member_owner" },
+        { ...state.tasks[1], id: "my_first_done", projectId: firstProjectId, status: "completed", primaryExecutorMemberId: "member_owner" },
+        { ...state.tasks[2], id: "my_second_progress", projectId: "project_my_card", project: "第二项目", status: "in_progress", primaryExecutorMemberId: secondMember?.id },
+        { ...state.tasks[3], id: "other_second_pool", projectId: "project_my_card", project: "第二项目", status: "pool", primaryExecutorMemberId: "member_other" },
+      ],
+      projectMembers: [
+        ...withSecondProject.projectMembers,
+        {
+          id: "member_disabled_participation",
+          projectId: "project_disabled",
+          teamMemberId: "team_member_owner",
+          accountId: "account_owner",
+          name: "停用成员",
+          roles: ["executor"],
+          status: "disabled",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      ],
+    };
+
+    const cards = buildMyProjectTaskCards(next, currentMember);
+
+    expect(cards.map((card) => card.projectId).sort()).toEqual([firstProjectId, "project_my_card"].sort());
+    expect(cards.find((card) => card.projectId === firstProjectId)).toMatchObject({
+      myTaskCount: 1,
+      committedCount: 1,
+    });
+    expect(cards.find((card) => card.projectId === "project_my_card")).toMatchObject({
+      myTaskCount: 1,
+      inProgressCount: 1,
+    });
+    expect(cards.some((card) => card.projectId === "project_disabled")).toBe(false);
+  });
+
+  it("filters my tasks by selected projects and derives single quick-add project", () => {
+    const state = createInitialState();
+    const firstProjectId = state.projects[0].id;
+    const withSecondProject = createProjectInState(
+      state,
+      "第二项目",
+      "用于验证项目多选过滤",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_filter_card`,
+      { accountId: "account_owner", name: "项目负责人", email: "owner@example.com" },
+    );
+    const secondMember = withSecondProject.projectMembers.find((member) => member.projectId === "project_filter_card");
+    const currentMember = withSecondProject.projectMembers.find((member) => member.id === "member_owner");
+    const next: AppState = {
+      ...withSecondProject,
+      currentMemberId: "member_owner",
+      tasks: [
+        { ...state.tasks[0], id: "selected_first", projectId: firstProjectId, status: "committed", primaryExecutorMemberId: "member_owner" },
+        { ...state.tasks[1], id: "selected_second", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: secondMember?.id },
+        { ...state.tasks[1], id: "selected_split_parent", projectId: "project_filter_card", project: "第二项目", status: "split", primaryExecutorMemberId: secondMember?.id },
+        { ...state.tasks[2], id: "selected_archived", projectId: "project_filter_card", project: "第二项目", status: "archived", primaryExecutorMemberId: secondMember?.id },
+        { ...state.tasks[3], id: "selected_other_member", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: "member_other" },
+      ],
+    };
+
+    expect(filterMyTasksByProjectSelection(next, currentMember, [firstProjectId]).map((task) => task.id)).toEqual(["selected_first"]);
+    expect(filterMyTasksByProjectSelection(next, currentMember, ["project_filter_card"]).map((task) => task.id)).toEqual(["selected_second"]);
+    expect(filterMyTasksByProjectSelection(next, currentMember, []).map((task) => task.id)).toEqual(["selected_first", "selected_second"]);
+    expect(quickAddProjectIdForSelection([firstProjectId])).toBe(firstProjectId);
+    expect(quickAddProjectIdForSelection([firstProjectId, "project_filter_card"])).toBeUndefined();
+  });
+
+  it("keeps split parent tasks out of execution lists while preserving project traceability", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId);
+    const next: AppState = {
+      ...state,
+      tasks: [
+        { ...state.tasks[0], id: "split_parent", projectId, status: "split", primaryExecutorMemberId: currentMember?.id },
+        { ...state.tasks[1], id: "split_child", projectId, status: "pool", primaryExecutorMemberId: currentMember?.id },
+      ],
+    };
+
+    expect(filterMyTasksByProjectSelection(next, currentMember, []).map((task) => task.id)).toEqual(["split_child"]);
+    expect(buildProjectOverviewCards(next)[0].statusCounts.split).toBe(1);
+    expect(buildProgressBoard(next, projectId).sections.flatMap((section) => section.tasks).some((task) => task.taskId === "split_parent")).toBe(false);
+    expect(filterProjectTasks(next.tasks, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    }).map((task) => task.id)).toEqual(["split_child"]);
+    expect(filterProjectTasks(next.tasks, {
+      query: "",
+      status: "split",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    }).map((task) => task.id)).toEqual(["split_parent"]);
+  });
 });
 
 describe("data portability and long planning", () => {
+  it("restores archived split parents as visible split tasks during normalization", () => {
+    const state = createInitialState();
+    const parent = {
+      ...state.tasks[0],
+      id: "legacy_split_parent",
+      title: "旧拆分主任务",
+      status: "archived" as const,
+      projectId: state.projects[0].id,
+    };
+    const child = {
+      ...state.tasks[1],
+      id: "legacy_split_child",
+      title: "旧拆分主任务 1",
+      notes: "由「旧拆分主任务」拆分而来。",
+      projectId: state.projects[0].id,
+    };
+
+    const normalized = normalizeAppStatePayload({ ...state, tasks: [parent, child] });
+
+    expect(normalized.tasks.find((task) => task.id === "legacy_split_parent")?.status).toBe("split");
+  });
+
   it("returns only one project's tasks and includes archived tasks by default", () => {
     const state = createInitialState();
     const firstProjectId = state.projects[0].id;
@@ -572,7 +840,75 @@ describe("data portability and long planning", () => {
     });
   });
 
-  it("separates project owner review permissions from member edit permissions", () => {
+  it("converts project detail estimate hours to pomodoros when creating tasks", () => {
+    const baseState = createInitialState();
+    const state = { ...baseState, settings: { ...baseState.settings, focusMinutes: 25 } };
+    const project = state.projects[0];
+    const next = createProjectTaskInState(
+      state,
+      project.id,
+      { title: "小时估算任务", estimateHours: 1 },
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_hours`,
+    );
+
+    expect(next.tasks[0]).toMatchObject({
+      id: "task_hours",
+      title: "小时估算任务",
+      estimatePomodoros: 3,
+    });
+  });
+
+  it("creates project detail tasks with full planning and collaboration fields", () => {
+    const state = createInitialState();
+    const project = state.projects[0];
+    const next = createProjectTaskInState(
+      state,
+      project.id,
+      {
+        title: "完整字段任务",
+        notes: "补充说明",
+        tags: ["需求", "前端"],
+        priority: "high",
+        severity: "very_high",
+        stage: "development",
+        estimatePomodoros: 5,
+        primaryExecutorMemberId: "member_owner",
+        collaboratorMemberIds: ["member_executor", "member_owner"],
+        expectedStartAt: "2026-05-10T10:00:00.000Z",
+        expectedFinishAt: "2026-05-11T10:00:00.000Z",
+        dueAt: "2026-05-12T10:00:00.000Z",
+        reminderAt: "2026-05-12T09:00:00.000Z",
+        repeatRule: "interval",
+        repeatIntervalDays: 3,
+        subtasks: ["拆第一步", "拆第二步"],
+      },
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_full`,
+    );
+
+    expect(next.tasks[0]).toMatchObject({
+      id: "task_full",
+      title: "完整字段任务",
+      notes: "补充说明",
+      tags: ["需求", "前端"],
+      priority: "high",
+      severity: "very_high",
+      stage: "development",
+      estimatePomodoros: 5,
+      primaryExecutorMemberId: "member_owner",
+      collaboratorMemberIds: ["member_executor"],
+      expectedStartAt: "2026-05-10T10:00:00.000Z",
+      expectedFinishAt: "2026-05-11T10:00:00.000Z",
+      dueAt: "2026-05-12T10:00:00.000Z",
+      reminderAt: "2026-05-12T09:00:00.000Z",
+      repeatRule: "interval",
+      repeatIntervalDays: 3,
+    });
+    expect(next.tasks[0].subtasks.map((subtask) => subtask.title)).toEqual(["拆第一步", "拆第二步"]);
+  });
+
+  it("allows every account to view and manage project workspaces", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
     const ownerAccess = projectAccessForCurrentMember(state, projectId);
@@ -621,8 +957,8 @@ describe("data portability and long planning", () => {
     const emailAccess = projectAccessForCurrentMember(emailScopedState, "project_account");
 
     expect(ownerAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
-    expect(memberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: false });
-    expect(nonMemberAccess).toMatchObject({ canView: false, canEditTasks: false, canReviewTasks: false });
+    expect(memberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
+    expect(nonMemberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
     expect(accountAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
     expect(emailAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
   });
@@ -672,6 +1008,52 @@ describe("data portability and long planning", () => {
       "2026-05-10T11:00:00.000Z",
     );
     expect(updated.projectMembers[0].roles).toEqual(["executor"]);
+  });
+
+  it("updates team member profile data across project bindings", () => {
+    const state = createInitialState();
+    const teamMember = state.teamMembers[0];
+    const updated = updateTeamMemberInState(
+      state,
+      { ...teamMember, name: "负责人 A", email: "owner-a@example.com" },
+      "2026-05-10T11:00:00.000Z",
+    );
+
+    expect(updated.teamMembers.find((member) => member.id === teamMember.id)).toMatchObject({
+      name: "负责人 A",
+      email: "owner-a@example.com",
+      updatedAt: "2026-05-10T11:00:00.000Z",
+    });
+    expect(updated.projectMembers.filter((member) => member.teamMemberId === teamMember.id)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "负责人 A",
+          email: "owner-a@example.com",
+          updatedAt: "2026-05-10T11:00:00.000Z",
+        }),
+      ]),
+    );
+    expect(updated.updatedAt).toBe("2026-05-10T11:00:00.000Z");
+  });
+
+  it("deletes a team member and clears project task assignments", () => {
+    const state = createInitialState();
+    const deleted = deleteTeamMemberInState(state, "team_member_owner", "2026-05-10T11:00:00.000Z");
+
+    expect(deleted.teamMembers.some((member) => member.id === "team_member_owner")).toBe(false);
+    expect(deleted.projectMembers.some((member) => member.teamMemberId === "team_member_owner")).toBe(false);
+    expect(deleted.tasks[0]).toMatchObject({
+      creatorMemberId: undefined,
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      updatedAt: "2026-05-10T11:00:00.000Z",
+    });
+    expect(deleted.sync.tombstones).toEqual(
+      expect.arrayContaining([
+        { entity: "team_member", id: "team_member_owner", deletedAt: "2026-05-10T11:00:00.000Z" },
+        { entity: "project_member", id: "member_owner", deletedAt: "2026-05-10T11:00:00.000Z" },
+      ]),
+    );
   });
 
   it("assigns a task to one primary executor and keeps collaborators separate", () => {
@@ -750,8 +1132,9 @@ describe("data portability and long planning", () => {
 
   it("submits a task for review before it can be accepted as completed", () => {
     const state = createInitialState();
+    const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
     const submitted = submitTaskForReviewInState(
-      state,
+      inProgressState,
       state.tasks[0].id,
       "member_owner",
       "2026-05-10T10:00:00.000Z",
@@ -779,9 +1162,45 @@ describe("data portability and long planning", () => {
     expect(accepted.tasks[0].estimateHistory).toHaveLength(1);
   });
 
+  it("does not resubmit tasks already waiting for review", () => {
+    const state = createInitialState();
+    const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
+    const submitted = submitTaskForReviewInState(
+      inProgressState,
+      state.tasks[0].id,
+      "member_owner",
+      "2026-05-10T10:00:00.000Z",
+    );
+    const resubmitted = submitTaskForReviewInState(
+      submitted,
+      state.tasks[0].id,
+      "member_other",
+      "2026-05-10T11:00:00.000Z",
+    );
+
+    expect(resubmitted.tasks[0]).toMatchObject({
+      status: "pending_review",
+      reviewSubmittedAt: "2026-05-10T10:00:00.000Z",
+      reviewSubmittedByMemberId: "member_owner",
+      updatedAt: "2026-05-10T10:00:00.000Z",
+    });
+  });
+
+  it("only submits committed or in-progress tasks for review", () => {
+    const state = createInitialState();
+    const poolState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "pool" as const } : task) };
+    const poolAttempt = submitTaskForReviewInState(poolState, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
+    const committedState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "committed" as const } : task) };
+    const committedAttempt = submitTaskForReviewInState(committedState, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
+
+    expect(poolAttempt.tasks[0].status).toBe("pool");
+    expect(committedAttempt.tasks[0].status).toBe("pending_review");
+  });
+
   it("returns a pending review task with a reason", () => {
     const state = createInitialState();
-    const submitted = submitTaskForReviewInState(state, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
+    const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
+    const submitted = submitTaskForReviewInState(inProgressState, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
     const returned = returnTaskForReviewInState(
       submitted,
       submitted.tasks[0].id,
@@ -862,6 +1281,91 @@ describe("data portability and long planning", () => {
     expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
   });
 
+  it("deduplicates team members by login identity during normalization", () => {
+    const state = createInitialState();
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      teamMembers: [
+        { ...state.teamMembers[0], id: "team_member_bound", email: "owner@example.com", updatedAt: "2026-05-10T10:00:00.000Z" },
+        { ...state.teamMembers[0], id: "team_member_duplicate", email: "owner@example.com", updatedAt: "2026-05-10T11:00:00.000Z" },
+      ],
+      projectMembers: state.projectMembers.map((member) => ({ ...member, teamMemberId: "team_member_bound" })),
+    });
+
+    expect(normalized.teamMembers.filter((member) => member.email === "owner@example.com")).toHaveLength(1);
+    expect(normalized.projectMembers[0].teamMemberId).toBe("team_member_bound");
+  });
+
+  it("defaults legacy tasks without a stage to requirements", () => {
+    const state = createInitialState();
+    const legacyTask = { ...state.tasks[0] };
+    delete (legacyTask as Partial<typeof legacyTask>).stage;
+    const normalized = normalizeAppStatePayload({ ...state, tasks: [legacyTask] });
+
+    expect(normalized.tasks[0].stage).toBe("requirements");
+  });
+
+  it("does not transfer project owner role when repairing duplicated login identities", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      auth: {
+        ...state.auth,
+        account: {
+          id: "account_wangshuo",
+          workspaceId: "workspace_test",
+          name: "王硕",
+          email: "wangshuo",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+      },
+      teamMembers: [
+        {
+          id: "team_member_account_owner",
+          accountId: "account_owner",
+          name: "王硕",
+          email: "wangshuo",
+          status: "active",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+        {
+          id: "team_member_wangshuo",
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          status: "active",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+      ],
+      projectMembers: [
+        {
+          id: "member_stale_owner",
+          projectId,
+          teamMemberId: "team_member_account_owner",
+          accountId: "account_owner",
+          name: "王硕",
+          email: "wangshuo",
+          roles: ["project_owner", "executor"],
+          status: "active",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(normalized.teamMembers.filter((member) => member.email === "wangshuo")).toHaveLength(1);
+    expect(normalized.teamMembers[0]).toMatchObject({ id: "team_member_wangshuo", accountId: "account_wangshuo" });
+    expect(normalized.projectMembers[0]).toMatchObject({
+      teamMemberId: "team_member_wangshuo",
+      accountId: "account_wangshuo",
+      roles: ["executor"],
+    });
+  });
+
   it("summarizes imports, creates backups, and exports CSV", () => {
     const state = createInitialState();
     const summary = summarizeImportPayload(state);
@@ -873,6 +1377,35 @@ describe("data portability and long planning", () => {
     const imported = mergeImportedState(state, { ...state, tasks: [] }, backup);
     expect(imported.tasks).toHaveLength(0);
     expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
+  });
+
+  it("keeps newer local daily plan committed tasks when remote sync is older", () => {
+    const state = createInitialState();
+    const localPlan = {
+      ...state.dailyPlans[0],
+      id: "plan_sync_today",
+      date: "2026-05-10",
+      committedTaskIds: [],
+      updatedAt: "2026-05-10T12:00:00.000Z",
+    };
+    const remotePlan = {
+      ...localPlan,
+      committedTaskIds: ["task_write_prd"],
+      updatedAt: "2026-05-10T09:00:00.000Z",
+    };
+    const row: SyncRow = {
+      entity: "daily_plan",
+      id: localPlan.id,
+      device_id: "other_browser",
+      updated_at: remotePlan.updatedAt,
+      payload: remotePlan,
+      revision: 12,
+      version: 1,
+    };
+
+    const merged = mergeRowsIntoState({ ...state, dailyPlans: [localPlan] }, [row], 12);
+
+    expect(merged.dailyPlans[0].committedTaskIds).toEqual([]);
   });
 
   it("builds calendar summaries and template tasks", () => {

@@ -14,6 +14,7 @@ const baseCommands: CommandItem[] = [
   { action: "navigate_workspace", label: "打开项目总览", hint: "查看项目进度、执行中任务和风险" },
   { action: "navigate_focus", label: "打开我的任务", hint: "查看分配给我的任务并开始工作" },
   { action: "navigate_calendar", label: "打开排期", hint: "查看长期计划和模板" },
+  { action: "navigate_daily", label: "打开每日总结", hint: "填写日终回顾、阻碍和明日注意事项" },
   { action: "navigate_reports", label: "打开洞察", hint: "查看项目与执行趋势" },
   { action: "start_focus", label: "开始工作", hint: "从工作队列启动一段工作会话" },
   { action: "toggle_timer", label: "暂停/继续计时", hint: "控制当前计时器" },
@@ -122,6 +123,7 @@ function CommandIcon({ action }: { action: CommandAction }) {
   if (action === "navigate_focus") return <UserCheck size={17} />;
   if (action === "start_focus" || action === "toggle_timer") return <Focus size={17} />;
   if (action === "navigate_calendar") return <CalendarDays size={17} />;
+  if (action === "navigate_daily") return <ListChecks size={17} />;
   if (action === "navigate_reports") return <BarChart3 size={17} />;
   if (action === "navigate_settings") return <FolderKanban size={17} />;
   if (action === "open_sync_settings") return <Settings size={17} />;
