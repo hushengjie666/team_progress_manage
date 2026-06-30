@@ -7,25 +7,32 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 1421",
+    "remote:gateway": "node scripts/remote-gateway.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "mcp:build": "esbuild mcp-server/src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=mcp-server/dist/index.js",
+    "mcp:server": "npm run mcp:build --silent && node mcp-server/dist/index.js",
     "sync:build": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync .",
     "sync:build:windows": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync.exe .",
-    "sync:server": "./sync-server/bin/timemanage-sync",
+    "sync:server": "./sync-server/bin/timemanage-sync serve --config sync-server/config.local.json",
     "tauri": "tauri"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@tauri-apps/api": "^2.9.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@tauri-apps/cli": "^2.9.0",
+    "@types/node": "^26.0.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "esbuild": "^0.25.12",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",
     "vitest": "^4.1.5"

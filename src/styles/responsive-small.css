@@ -1,0 +1,29 @@
+@media (max-width: 430px) {
+  :root {
+    --mobile-page-padding: 10px;
+  }
+
+  .mobile-topbar-actions .account-chip {
+    max-width: 104px;
+  }
+
+  .mobile-bottom-nav button {
+    font-size: 10px;
+  }
+
+  .project-overview-metrics,
+  .project-detail-stats,
+  .compact-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .calendar-week,
+  .calendar-month {
+    grid-template-columns: 1fr;
+  }
+
+  .project-overview-card-header h2,
+  .my-project-card-main h2 {
+    font-size: 18px;
+  }
+}

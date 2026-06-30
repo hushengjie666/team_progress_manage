@@ -1,0 +1,57 @@
+.permission-checklist,
+.sync-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.permission-checklist span,
+.sync-steps span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #667074;
+  background: #ede6dc;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.permission-checklist .ok,
+.sync-steps .active {
+  color: #12423d;
+  background: #d8ece6;
+}
+
+.reports-layout,
+.settings-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-layout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  align-items: start;
+}
+
+.settings-layout > .settings-hub,
+.settings-layout > .settings-panel,
+.settings-layout > .data-management,
+.settings-layout > .settings-panel:last-child {
+  grid-column: 1 / -1;
+}
+
+.settings-hub {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, auto);
+  gap: 18px;
+  align-items: center;
+  background: #f7efe2;
+}
+
+.settings-section-tabs {
+  justify-self: end;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

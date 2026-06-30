@@ -1,5 +1,12 @@
 import { createInitialState, defaultNativeCapabilities, defaultTaskTemplates } from "./seed";
 import { isTauri } from "./env";
+import {
+  attachTeamMembersToProjectMembers,
+  dedupeProjectMemberBindings,
+  dedupeTeamMembers,
+  migrateTeamMembers,
+  normalizeProjectMember,
+} from "./storageTeamMembers";
 import type {
   ActiveTimer,
   AppState,
@@ -10,7 +17,6 @@ import type {
   ExecutionSignalType,
   Project,
   ProjectMember,
-  ProjectMemberRole,
   RepeatRule,
   Settings,
   StrictCheckResult,
@@ -45,144 +51,6 @@ const normalizeProject = (project: Partial<Project>, fallback: Project, index: n
     updatedAt: timestamp,
     archivedAt: project.archivedAt,
   };
-};
-
-const normalizeTeamMember = (member: Partial<TeamMember>, fallback: TeamMember, index: number): TeamMember => {
-  const timestamp = member.updatedAt ?? member.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
-  return {
-    id: member.id ?? (index === 0 ? fallback.id : `team_member_migrated_${index}`),
-    accountId: member.accountId ?? (index === 0 ? fallback.accountId : undefined),
-    name: member.name?.trim() || fallback.name,
-    email: member.email,
-    status: member.status ?? "active",
-    createdAt: member.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-};
-
-const memberIdentityKey = (member: Pick<ProjectMember, "teamMemberId" | "accountId" | "email" | "id">) => {
-  if (member.teamMemberId) return member.teamMemberId;
-  if (member.accountId) return `team_member_${member.accountId}`;
-  if (member.email) return `team_member_email_${member.email.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`;
-  return `team_member_${member.id}`;
-};
-
-const normalizeProjectMember = (member: Partial<ProjectMember>, fallback: ProjectMember, projectId: string, index: number): ProjectMember => {
-  const timestamp = member.updatedAt ?? member.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
-  const allowedRoles: ProjectMemberRole[] = ["project_owner", "executor"];
-  const roles = (member.roles ?? fallback.roles ?? ["project_owner", "executor"]).filter((role): role is ProjectMemberRole => allowedRoles.includes(role));
-  return {
-    id: member.id ?? (index === 0 ? fallback.id : `member_migrated_${index}`),
-    projectId: member.projectId ?? projectId,
-    teamMemberId: member.teamMemberId,
-    accountId: member.accountId ?? (index === 0 ? fallback.accountId : undefined),
-    name: member.name?.trim() || fallback.name,
-    email: member.email,
-    roles: roles.length ? roles : ["executor"],
-    status: member.status ?? "active",
-    createdAt: member.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-};
-
-const migrateTeamMembers = (projectMembers: ProjectMember[], parsedTeamMembers: Partial<TeamMember>[] | undefined, fallback: TeamMember) => {
-  const teamMembers = parsedTeamMembers?.length ? parsedTeamMembers.map((member, index) => normalizeTeamMember(member, fallback, index)) : [];
-  const byId = new Map(teamMembers.map((member) => [member.id, member]));
-  for (const projectMember of projectMembers) {
-    const id = memberIdentityKey(projectMember);
-    if (!byId.has(id)) {
-      byId.set(id, {
-        id,
-        accountId: projectMember.accountId,
-        name: projectMember.name,
-        email: projectMember.email,
-        status: projectMember.status ?? "active",
-        createdAt: projectMember.createdAt,
-        updatedAt: projectMember.updatedAt,
-      });
-    }
-  }
-  return Array.from(byId.values());
-};
-
-const teamMemberIdentityKey = (member: Pick<TeamMember, "accountId" | "email" | "id">) => {
-  if (member.email) return `login:${member.email.trim().toLowerCase()}`;
-  if (member.accountId) return `account:${member.accountId}`;
-  return `id:${member.id}`;
-};
-
-const dedupeTeamMembers = (teamMembers: TeamMember[], projectMembers: ProjectMember[], preferredAccountId?: string) => {
-  const projectCountByTeamMemberId = new Map<string, number>();
-  projectMembers.forEach((member) => {
-    if (!member.teamMemberId || member.status === "disabled") return;
-    projectCountByTeamMemberId.set(member.teamMemberId, (projectCountByTeamMemberId.get(member.teamMemberId) ?? 0) + 1);
-  });
-  const byKey = new Map<string, TeamMember>();
-  const aliasById = new Map<string, string>();
-
-  const pickWinner = (left: TeamMember, right: TeamMember) => {
-    if (preferredAccountId) {
-      if (left.accountId === preferredAccountId && right.accountId !== preferredAccountId) return left;
-      if (right.accountId === preferredAccountId && left.accountId !== preferredAccountId) return right;
-    }
-    const leftCount = projectCountByTeamMemberId.get(left.id) ?? 0;
-    const rightCount = projectCountByTeamMemberId.get(right.id) ?? 0;
-    if (leftCount !== rightCount) return leftCount > rightCount ? left : right;
-    return left.updatedAt >= right.updatedAt ? left : right;
-  };
-
-  teamMembers.forEach((member) => {
-    const key = teamMemberIdentityKey(member);
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, member);
-      return;
-    }
-    const winner = pickWinner(existing, member);
-    const loser = winner.id === existing.id ? member : existing;
-    byKey.set(key, {
-      ...winner,
-      accountId: winner.accountId ?? loser.accountId,
-      name: winner.name || loser.name,
-      email: winner.email ?? loser.email,
-      status: winner.status === "active" || loser.status === "active" ? "active" : winner.status,
-    });
-    aliasById.set(loser.id, winner.id);
-  });
-
-  const dedupedMembers = Array.from(byKey.values());
-  const dedupedProjectMembers = projectMembers.map((member) => ({
-    ...member,
-    teamMemberId: member.teamMemberId ? aliasById.get(member.teamMemberId) ?? member.teamMemberId : member.teamMemberId,
-  }));
-
-  return { teamMembers: dedupedMembers, projectMembers: dedupedProjectMembers };
-};
-
-const attachTeamMembersToProjectMembers = (projectMembers: ProjectMember[], teamMembers: TeamMember[]) => {
-  const byId = new Map(teamMembers.map((member) => [member.id, member]));
-  const byAccount = new Map(teamMembers.filter((member) => member.accountId).map((member) => [member.accountId, member]));
-  const byEmail = new Map(teamMembers.filter((member) => member.email).map((member) => [member.email?.toLowerCase(), member]));
-  return projectMembers.map((projectMember) => {
-    const teamMember =
-      (projectMember.teamMemberId ? byId.get(projectMember.teamMemberId) : undefined) ??
-      (projectMember.accountId ? byAccount.get(projectMember.accountId) : undefined) ??
-      (projectMember.email ? byEmail.get(projectMember.email.toLowerCase()) : undefined) ??
-      byId.get(memberIdentityKey(projectMember));
-    const accountChanged = Boolean(projectMember.accountId && teamMember?.accountId && projectMember.accountId !== teamMember.accountId);
-    const roles = accountChanged
-      ? projectMember.roles.filter((role) => role !== "project_owner")
-      : projectMember.roles;
-    return {
-      ...projectMember,
-      teamMemberId: teamMember?.id ?? projectMember.teamMemberId,
-      accountId: teamMember?.accountId ?? projectMember.accountId,
-      name: teamMember?.name ?? projectMember.name,
-      email: teamMember?.email ?? projectMember.email,
-      roles: roles.length ? roles : ["executor"],
-      status: projectMember.status ?? teamMember?.status ?? "active",
-    };
-  });
 };
 
 const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
@@ -363,7 +231,7 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
   const migratedTeamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
   const deduped = dedupeTeamMembers(migratedTeamMembers, rawProjectMembers, parsed.auth?.account?.id);
   const teamMembers = deduped.teamMembers;
-  const projectMembers = attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers);
+  const projectMembers = dedupeProjectMemberBindings(attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers));
   const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
     ? parsed.currentMemberId
     : projectMembers[0]?.id;
@@ -371,6 +239,16 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     const taskProjectId = task.projectId && projects.some((project) => project.id === task.projectId) ? task.projectId : starterProjectId;
     return normalizeTask(task, index, taskProjectId);
   }));
+  const syncToken = parsed.auth?.token ?? parsed.sync?.token;
+  const normalizedSync = {
+    ...initial.sync,
+    ...parsed.sync,
+    enabled: Boolean(syncToken) || parsed.sync?.enabled || initial.sync.enabled,
+    autoSync: syncToken ? true : (parsed.sync?.autoSync ?? initial.sync.autoSync),
+    token: syncToken ?? parsed.sync?.token,
+    tombstones: parsed.sync?.tombstones ?? [],
+    conflicts: parsed.sync?.conflicts ?? [],
+  };
   return {
     ...initial,
     ...parsed,
@@ -392,7 +270,7 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     templateInstances: parsed.templateInstances ?? [],
     nativeCapabilities: parsed.nativeCapabilities?.length ? parsed.nativeCapabilities : defaultNativeCapabilities,
     activeTimer: normalizeActiveTimer(parsed.activeTimer),
-    sync: { ...initial.sync, ...parsed.sync, tombstones: parsed.sync?.tombstones ?? [], conflicts: parsed.sync?.conflicts ?? [] },
+    sync: normalizedSync,
   } as AppState;
 };
 

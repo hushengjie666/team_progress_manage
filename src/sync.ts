@@ -19,6 +19,9 @@ import type {
   WorkSession,
   ExecutionSignal,
 } from "./types";
+import { normalizeAppStatePayload } from "./storage";
+import { applySyncRowToState } from "./syncEntityMerge";
+import { ensureTodayPlan } from "./appModel";
 
 type SyncEntity =
   | "settings"
@@ -65,6 +68,8 @@ export interface SyncRow extends SyncChange {
   revision: number;
   version: number;
 }
+
+export const REQUIRED_FULL_RECONCILE_VERSION = 3;
 
 interface LoginResponse {
   token: string;
@@ -131,6 +136,10 @@ interface PushResponse {
 
 interface PullResponse {
   changes: SyncRow[];
+  current_revision: number;
+}
+
+interface RevisionResponse {
   current_revision: number;
 }
 
@@ -299,6 +308,15 @@ export async function loginToSyncServer(sync: SyncState, password: string): Prom
   });
 }
 
+export async function getSyncRevision(sync: SyncState, token?: string): Promise<number> {
+  const authToken = token ?? sync.token;
+  if (!authToken) throw new Error("请先登录团队工作区");
+  const payload = await requestJson<RevisionResponse>(apiUrl(sync.serverUrl, "/sync/revision"), {
+    headers: authHeaders(authToken),
+  });
+  return payload.current_revision;
+}
+
 export async function createMemberAccount(sync: SyncState, token: string, payload: MemberAccountPayload): Promise<ProjectMember> {
   const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, "/members"), {
     method: "POST",
@@ -368,8 +386,19 @@ export async function updateTeamMemberAccount(
   return result.member.payload as TeamMember;
 }
 
-export function flattenStateToChanges(state: AppState): SyncChange[] {
+const isAfter = (value: string, baseline?: string) => !baseline || value > baseline;
+
+const activeWorkSessionTaskIds = (state: AppState) =>
+  new Set(
+    state.workSessions
+      .filter((session) => session.status === "active" || session.status === "paused")
+      .map((session) => session.taskId),
+  );
+
+export function flattenStateToChanges(state: AppState, options: { changedAfter?: string } = {}): SyncChange[] {
   const deviceID = state.sync.deviceId;
+  const changedAfter = options.changedAfter;
+  const activeTaskIds = activeWorkSessionTaskIds(state);
   const changes: SyncChange[] = [
     {
       entity: "settings",
@@ -472,6 +501,7 @@ export function flattenStateToChanges(state: AppState): SyncChange[] {
   ];
 
   for (const tombstone of state.sync.tombstones ?? []) {
+    if (!isAfter(tombstone.deletedAt, changedAfter)) continue;
     changes.push({
       entity: tombstone.entity as SyncEntity,
       id: tombstone.id,
@@ -482,7 +512,12 @@ export function flattenStateToChanges(state: AppState): SyncChange[] {
     });
   }
 
-  return changes;
+  return changes.filter((change) => {
+    if (isAfter(change.updated_at, changedAfter)) return true;
+    if (change.entity === "work_session" && (change.payload as WorkSession).status !== "ended") return true;
+    if (change.entity === "task" && activeTaskIds.has(change.id)) return true;
+    return false;
+  });
 }
 
 export function syncableStateFingerprint(state: AppState): string {
@@ -577,7 +612,7 @@ export function mergeSyncedStateIntoLatest(latest: AppState, source: AppState, s
   const latestHasLocalSingletonChanges = latest.updatedAt > source.updatedAt;
   const syncedTombstoneKeys = new Set((synced.sync.tombstones ?? []).map((item) => `${item.entity}:${item.id}`));
   const localTombstones = (latest.sync.tombstones ?? []).filter((item) => !syncedTombstoneKeys.has(`${item.entity}:${item.id}`));
-  return {
+  return normalizeAppStatePayload({
     ...synced,
     auth: latest.auth,
     activeTimer: latest.activeTimer,
@@ -601,192 +636,65 @@ export function mergeSyncedStateIntoLatest(latest: AppState, source: AppState, s
       tombstones: [...(synced.sync.tombstones ?? []), ...localTombstones],
     },
     updatedAt: latest.updatedAt > source.updatedAt ? latest.updatedAt : synced.updatedAt,
-  };
+  });
 }
 
-const mergeDailyPlan = (local: DailyPlan, remote: DailyPlan, remoteUpdatedAt: string, stateUpdatedAt: string): DailyPlan => {
-  const localUpdatedAt = timestampFor("daily_plan", local, stateUpdatedAt);
-  const remoteWins = remoteUpdatedAt >= localUpdatedAt;
-  if (!remoteWins) return local;
-  return {
-    ...local,
-    ...remote,
-    committedTaskIds: remote.committedTaskIds ?? [],
-  };
-};
-
-const removeById = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
-const removeMemberReferences = (tasks: Task[], memberId: string) =>
-  tasks.map((task) => ({
-    ...task,
-    creatorMemberId: task.creatorMemberId === memberId ? undefined : task.creatorMemberId,
-    primaryExecutorMemberId: task.primaryExecutorMemberId === memberId ? undefined : task.primaryExecutorMemberId,
-    collaboratorMemberIds: task.collaboratorMemberIds?.filter((id) => id !== memberId) ?? [],
-  }));
-
-export function mergeRowsIntoState(state: AppState, rows: SyncRow[], currentRevision: number): AppState {
+export function mergeRowsIntoState(
+  state: AppState,
+  rows: SyncRow[],
+  currentRevision: number,
+  options: { forceRemote?: boolean; fullPulledAt?: string; fullReconcileVersion?: number } = {},
+): AppState {
   let next = { ...state };
   let tombstones = [...(state.sync.tombstones ?? [])];
 
   for (const row of rows) {
-    if (row.deleted_at) {
-      if (row.entity === "project") {
-        next = { ...next, projects: removeById(next.projects, row.id) };
-      } else if (row.entity === "team_member") {
-        next = { ...next, teamMembers: removeById(next.teamMembers, row.id) };
-      } else if (row.entity === "project_member") {
-        const projectMembers = removeById(next.projectMembers, row.id);
-        next = {
-          ...next,
-          projectMembers,
-          currentMemberId: next.currentMemberId === row.id ? projectMembers[0]?.id : next.currentMemberId,
-          tasks: removeMemberReferences(next.tasks, row.id),
-        };
-      } else if (row.entity === "task") {
-        next = {
-          ...next,
-          tasks: removeById(next.tasks, row.id),
-          dailyPlans: next.dailyPlans.map((plan) => ({
-            ...plan,
-            committedTaskIds: plan.committedTaskIds.filter((taskId) => taskId !== row.id),
-          })),
-        };
-      } else if (row.entity === "work_session") {
-        next = { ...next, workSessions: removeById(next.workSessions, row.id) };
-      } else if (row.entity === "execution_signal") {
-        next = { ...next, executionSignals: removeById(next.executionSignals, row.id) };
-      } else if (row.entity === "daily_plan") {
-        next = { ...next, dailyPlans: removeById(next.dailyPlans, row.id) };
-      } else if (row.entity === "focus_session") {
-        next = { ...next, focusSessions: removeById(next.focusSessions, row.id) };
-      } else if (row.entity === "interruption") {
-        next = { ...next, interruptions: removeById(next.interruptions, row.id) };
-      } else if (row.entity === "strict_violation") {
-        next = { ...next, strictViolations: removeById(next.strictViolations, row.id) };
-      } else if (row.entity === "block_profile") {
-        next = { ...next, blockProfiles: removeById(next.blockProfiles, row.id) };
-      }
-      tombstones = tombstones.filter((item) => !(item.entity === row.entity && item.id === row.id));
-      continue;
-    }
-
-    const payload = row.payload;
-    if (!isObject(payload)) continue;
-
-    if (row.entity === "settings" && shouldAcceptRemote(row, next.settings, next.updatedAt)) {
-      next = { ...next, settings: payload as unknown as Settings };
-    } else if (row.entity === "onboarding" && shouldAcceptRemoteOnboarding(row, next.onboarding, next.updatedAt)) {
-      next = { ...next, onboarding: payload as unknown as Onboarding };
-    } else if (row.entity === "reward_state" && shouldAcceptRemote(row, next.rewardState, next.updatedAt)) {
-      next = { ...next, rewardState: payload as unknown as RewardState };
-    } else if (row.entity === "project") {
-      const incoming = payload as unknown as Project;
-      const existing = next.projects.find((project) => project.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, projects: upsert(row.entity, next.projects, incoming, row.updated_at, next.updatedAt) };
-    } else if (row.entity === "team_member") {
-      const incoming = payload as unknown as TeamMember;
-      const existing = next.teamMembers.find((member) => member.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = {
-          ...next,
-          teamMembers: upsert(row.entity, next.teamMembers, incoming, row.updated_at, next.updatedAt),
-          projectMembers: next.projectMembers.map((member) =>
-            member.teamMemberId === incoming.id
-              ? { ...member, accountId: incoming.accountId ?? member.accountId, name: incoming.name, email: incoming.email, status: incoming.status ?? member.status }
-              : member,
-          ),
-        };
-      }
-    } else if (row.entity === "project_member") {
-      const incoming = payload as unknown as ProjectMember;
-      const existing = next.projectMembers.find((member) => member.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, projectMembers: upsert(row.entity, next.projectMembers, incoming, row.updated_at, next.updatedAt) };
-    } else if (row.entity === "task") {
-      const incoming = payload as unknown as Task;
-      const existing = next.tasks.find((task) => task.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) next = { ...next, tasks: upsert(row.entity, next.tasks, incoming, row.updated_at, next.updatedAt) };
-    } else if (row.entity === "work_session") {
-      const incoming = payload as unknown as WorkSession;
-      const existing = next.workSessions.find((session) => session.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, workSessions: upsert(row.entity, next.workSessions, incoming, row.updated_at, next.updatedAt) };
-      }
-    } else if (row.entity === "execution_signal") {
-      const incoming = payload as unknown as ExecutionSignal;
-      const existing = next.executionSignals.find((signal) => signal.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, executionSignals: upsert(row.entity, next.executionSignals, incoming, row.updated_at, next.updatedAt) };
-      }
-    } else if (row.entity === "daily_plan") {
-      const incoming = payload as unknown as DailyPlan;
-      const existing = next.dailyPlans.find((plan) => plan.id === row.id);
-      if (existing) {
-        next = {
-          ...next,
-          dailyPlans: next.dailyPlans.map((plan) => (plan.id === row.id ? mergeDailyPlan(plan, incoming, row.updated_at, next.updatedAt) : plan)),
-        };
-      } else if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, dailyPlans: [incoming, ...next.dailyPlans] };
-      }
-    } else if (row.entity === "focus_session") {
-      const incoming = payload as unknown as FocusSession;
-      const existing = next.focusSessions.find((session) => session.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, focusSessions: upsert(row.entity, next.focusSessions, incoming, row.updated_at, next.updatedAt) };
-      }
-    } else if (row.entity === "interruption") {
-      const incoming = payload as unknown as Interruption;
-      const existing = next.interruptions.find((interruption) => interruption.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, interruptions: upsert(row.entity, next.interruptions, incoming, row.updated_at, next.updatedAt) };
-      }
-    } else if (row.entity === "strict_violation") {
-      const incoming = payload as unknown as StrictViolation;
-      const existing = next.strictViolations.find((violation) => violation.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, strictViolations: upsert(row.entity, next.strictViolations, incoming, row.updated_at, next.updatedAt) };
-      }
-    } else if (row.entity === "block_profile") {
-      const incoming = payload as unknown as BlockProfile;
-      const existing = next.blockProfiles.find((profile) => profile.id === row.id);
-      if (shouldAcceptRemote(row, existing, next.updatedAt)) {
-        next = { ...next, blockProfiles: upsert(row.entity, next.blockProfiles, incoming, row.updated_at, next.updatedAt) };
-      }
-    }
+    const result = applySyncRowToState(next, row, tombstones, { forceRemote: options.forceRemote });
+    next = result.state;
+    tombstones = result.tombstones;
   }
 
   const timestamp = nowIso();
-  return {
+  return normalizeAppStatePayload({
     ...next,
     sync: withStatus(next.sync, {
       lastPulledRevision: currentRevision,
+      lastFullPulledAt: options.fullPulledAt ?? next.sync.lastFullPulledAt,
+      lastFullReconcileVersion: options.fullReconcileVersion ?? next.sync.lastFullReconcileVersion,
       tombstones,
       lastSyncedAt: timestamp,
     }),
     updatedAt: timestamp,
-  };
+  });
 }
 
 export async function syncAppState(state: AppState): Promise<AppState> {
-  const token = state.auth.token ?? state.sync.token;
+  const source = ensureTodayPlan(state);
+  const token = source.auth.token ?? source.sync.token;
   if (!token) throw new Error("请先登录团队工作区");
   const syncStartedAt = nowIso();
-  const changes = flattenStateToChanges(state);
-  const pushResponse = await fetch(apiUrl(state.sync.serverUrl, "/sync/push"), {
+  const needsFullReconcile = source.sync.lastFullReconcileVersion !== REQUIRED_FULL_RECONCILE_VERSION;
+  const changes = source.sync.lastSyncedAt ? flattenStateToChanges(source, { changedAfter: source.sync.lastSyncedAt }) : [];
+  const pushResponse = await fetch(apiUrl(source.sync.serverUrl, "/sync/push"), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
-      device_id: state.sync.deviceId,
+      device_id: source.sync.deviceId,
       changes,
     }),
   });
   const pushed = await readResponse<PushResponse>(pushResponse);
 
-  const pullResponse = await fetch(apiUrl(state.sync.serverUrl, `/sync/pull?since=${state.sync.lastPulledRevision}`), {
+  const pullSince = needsFullReconcile ? 0 : source.sync.lastPulledRevision;
+  const pullResponse = await fetch(apiUrl(source.sync.serverUrl, `/sync/pull?since=${pullSince}`), {
     headers: authHeaders(token),
   });
   const pulled = await readResponse<PullResponse>(pullResponse);
-  const merged = mergeRowsIntoState(state, pulled.changes, pulled.current_revision);
+  const merged = mergeRowsIntoState(source, pulled.changes, pulled.current_revision, {
+    forceRemote: needsFullReconcile,
+    fullPulledAt: needsFullReconcile ? syncStartedAt : undefined,
+    fullReconcileVersion: needsFullReconcile ? REQUIRED_FULL_RECONCILE_VERSION : undefined,
+  });
   const acceptedDeletions = new Set(
     pushed.accepted.filter((row) => row.deleted_at).map((row) => `${row.entity}:${row.id}`),
   );
@@ -798,10 +706,12 @@ export async function syncAppState(state: AppState): Promise<AppState> {
       status: "synced",
       message: `已同步 ${pushed.accepted.length} 条本地变更，拉取 ${pulled.changes.length} 条远端变更`,
       conflictCount: pushed.conflicts.length,
-      conflicts: pushed.conflicts.map((row) => conflictFromRow(state, row)),
+      conflicts: pushed.conflicts.map((row) => conflictFromRow(source, row)),
       retryCount: 0,
       nextRetryAt: undefined,
       lastSyncedAt: syncStartedAt,
+      lastFullPulledAt: merged.sync.lastFullPulledAt,
+      lastFullReconcileVersion: merged.sync.lastFullReconcileVersion,
       lastPulledRevision: Math.max(pushed.current_revision, pulled.current_revision),
       tombstones,
     }),

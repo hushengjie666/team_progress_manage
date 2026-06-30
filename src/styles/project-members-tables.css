@@ -1,0 +1,302 @@
+.project-kanban.compact-kanban {
+  gap: 7px;
+}
+
+.project-kanban-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 180px;
+  padding: 12px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.compact-kanban .project-kanban-column {
+  gap: 6px;
+  min-height: 72px;
+  padding: 7px;
+}
+
+.compact-kanban .board-section-heading {
+  min-height: 22px;
+}
+
+.compact-kanban .empty {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.project-task-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.project-task-card strong,
+.project-task-row strong,
+.project-member-card strong {
+  color: #263236;
+}
+
+.project-task-card span,
+.project-task-card p,
+.project-task-row span,
+.project-member-card span,
+.project-member-card small {
+  color: #667074;
+  line-height: 1.45;
+}
+
+.project-task-card p {
+  margin: 0;
+}
+
+.compact-task-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 7px 8px;
+}
+
+.compact-task-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.compact-task-main strong {
+  overflow: hidden;
+  font-size: 15px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-task-main span {
+  overflow: hidden;
+  color: #667074;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-task-progress {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee7dc;
+}
+
+.compact-task-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #8acfc3;
+}
+
+.compact-task-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.compact-task-actions .small-button,
+.compact-task-actions .icon-button.small {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.project-task-table {
+  display: grid;
+  gap: 8px;
+}
+
+.project-task-table-head,
+.project-task-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.5fr) minmax(120px, 0.6fr) minmax(120px, 0.6fr) minmax(86px, 0.4fr) minmax(72px, 0.35fr) minmax(180px, 0.8fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.project-task-table-head {
+  padding: 0 12px;
+  color: #667074;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-task-row {
+  padding: 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.project-task-row > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.project-member-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.project-member-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-member-summary-card {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #d8eee8;
+  border-radius: 8px;
+  background: #f7fcfa;
+}
+
+.project-member-summary-card span {
+  color: #526065;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-member-summary-card strong {
+  color: #184d48;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.project-member-summary-card small {
+  color: #667074;
+  font-size: 12px;
+}
+
+.project-member-summary-card.attention {
+  border-color: #efcf91;
+  background: #fff8e8;
+}
+
+.project-member-summary-card.attention strong {
+  color: #a56415;
+}
+
+.project-member-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.member-card {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.2fr) minmax(220px, 0.8fr) minmax(260px, 0.9fr);
+  align-items: end;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.owner-card {
+  border-color: #b7d8d1;
+  background: #f5fbf8;
+}
+
+.team-member-card {
+  grid-template-columns: minmax(320px, 1.2fr) minmax(260px, 0.8fr) minmax(280px, 0.9fr);
+}
+
+.member-profile-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.member-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.member-role-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 0 0 8px;
+}
+
+.member-role-row .secondary-button,
+.member-role-row .small-button {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.member-validation {
+  margin: 0;
+  color: #b6543d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.member-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.member-modal {
+  width: min(1240px, calc(100vw - 48px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+}
+
+.modal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-heading h2 {
+  margin: 2px 0 0;
+  color: #263236;
+  font-size: 28px;
+}
+
+.member-modal-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.member-modal-section,
+.member-create-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.member-create-panel .settings-grid {
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(180px, 1fr);
+}

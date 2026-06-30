@@ -3,6 +3,8 @@ dist
 target
 src-tauri/target
 sync-server/bin
+sync-server/config.local.json
+.codegraph
 .DS_Store
 *.log
 test-results

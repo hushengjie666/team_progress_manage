@@ -31,7 +31,7 @@ npm run tauri dev
 TM_SYNC_USER=demo \
 TM_SYNC_PASSWORD=demo \
 TM_SYNC_ADDR=0.0.0.0:8787 \
-TM_SYNC_DATA=/var/lib/timemanage/store.json \
+TM_SYNC_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/timemanage_sync?parseTime=true&charset=utf8mb4' \
 ./timemanage-sync
 ```
 

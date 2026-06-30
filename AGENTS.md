@@ -30,6 +30,18 @@ Use TypeScript for frontend code and keep React components in PascalCase, such a
 
 No formatter or linter config is checked in. Match the existing style: two-space indentation, semicolons, double quotes, and explicit exported types where helpful.
 
+## Modular Architecture Guidelines
+
+Prefer modular development with high cohesion, low coupling, and clear ownership. A module should have one clear reason to change, hide its implementation behind a small interface, and keep related behavior together. Avoid adding pass-through modules that only rename calls without concentrating behavior.
+
+- Keep page containers focused on composition, state wiring, and side effects. Move pure state transitions, sorting, grouping, filtering, and derived view models into `.ts` modules.
+- Keep UI components focused on rendering and local interaction. Split large views into feature submodules when a section can be named by a product concept, such as Focus timer, current task, task list, project progress, or member status.
+- Keep styles close to feature ownership through `src/styles/*.css` modules imported by `src/styles.css`. Preserve import order when splitting CSS so cascade behavior remains stable.
+- Prefer deep modules: callers should learn a small interface and get meaningful behavior. If deleting a module would simply inline one function call, it is probably too shallow.
+- Avoid cross-feature coupling. Shared helpers belong in shared domain/view-model modules only when at least two features use them; otherwise keep them inside the feature folder.
+- During refactors, preserve public props, persisted state shape, CSS class names, and visible behavior unless the task explicitly asks for behavior changes.
+- When a file grows beyond roughly 500 lines for UI or 1,000 lines for styles, consider splitting by cohesive product concept before adding more behavior.
+
 ## Testing Guidelines
 
 Vitest is used for unit tests; Playwright is used for browser workflows. Place unit tests next to the module under test using `*.test.ts`, for example `src/domain.test.ts`. Place end-to-end scenarios in `tests/e2e/*.spec.ts`.
@@ -44,7 +56,7 @@ Pull requests should include a short summary, test results, and screenshots for 
 
 ## Security & Configuration Tips
 
-The default local sync endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production sync data, or machine-specific paths. Use environment variables such as `TM_SYNC_USER`, `TM_SYNC_PASSWORD`, `TM_SYNC_ADDR`, and `TM_SYNC_DATA` for sync-server configuration.
+The default local sync endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production sync data, or machine-specific paths. Use environment variables such as `TM_SYNC_USER`, `TM_SYNC_PASSWORD`, `TM_SYNC_ADDR`, and `TM_SYNC_MYSQL_DSN` for sync-server configuration.
 
 ## Agent skills
 

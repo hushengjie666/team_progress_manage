@@ -4,6 +4,7 @@ const STORAGE_KEY = "timemanage.app_state.v1";
 
 const authenticatedState = () => {
   const now = new Date().toISOString();
+  const today = now.slice(0, 10);
   return {
     auth: {
       status: "authenticated",
@@ -36,6 +37,53 @@ const authenticatedState = () => {
     onboarding: {
       completed: true,
     },
+    tasks: [
+      {
+        id: "task_e2e_prd",
+        title: "整理时间管理系统 PRD",
+        notes: "把方法论、竞品图和旧系统升级点沉淀成可执行范围。",
+        tags: ["方法论", "产品"],
+        projectId: "project_starter",
+        project: "TimeManage",
+        creatorMemberId: "member_owner",
+        primaryExecutorMemberId: "member_owner",
+        collaboratorMemberIds: [],
+        progressPercent: 0,
+        progressNote: "",
+        priority: "urgent",
+        severity: "high",
+        stage: "requirements",
+        estimatePomodoros: 3,
+        status: "committed",
+        repeatRule: "none",
+        subtasks: [],
+        sortOrder: 10,
+        actualPomodoros: 0,
+        estimateHistory: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    dailyPlans: [
+      {
+        id: `plan_${today}`,
+        date: today,
+        capacityPomodoros: 8,
+        committedTaskIds: ["task_e2e_prd"],
+        completedPomodoros: 0,
+        suggestedTaskIds: [],
+        reflection: "",
+        review: {
+          mood: "normal",
+          wins: "",
+          blockers: "",
+          interruptionPattern: "",
+          tomorrowFocus: "",
+        },
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
     updatedAt: now,
   };
 };
@@ -80,7 +128,7 @@ test("opens a project and creates a task with the unified task form", async ({ p
   await openApp(page);
 
   await page.getByRole("button", { name: "进入项目" }).first().click();
-  await expect(page.getByRole("heading", { name: "任务状态看板" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "任务阶段总览" })).toBeVisible();
 
   await page.getByRole("button", { name: "添加任务" }).click();
   const dialog = page.getByRole("dialog", { name: "添加项目任务" });
@@ -88,10 +136,10 @@ test("opens a project and creates a task with the unified task form", async ({ p
   await expect(dialog.getByLabel("标题")).toBeVisible();
   await expect(dialog.getByLabel("主执行人")).toBeVisible();
   await expect(dialog.getByLabel("估算时长（小时）")).toBeVisible();
-  await expect(dialog.getByLabel("阶段")).toBeVisible();
+  await expect(dialog.getByRole("radiogroup", { name: "任务阶段" })).toBeVisible();
 
   await dialog.getByLabel("标题").fill("E2E 项目弹窗任务");
-  await dialog.getByLabel("阶段").selectOption("development");
+  await dialog.getByRole("radio", { name: "开发" }).click();
   await dialog.getByLabel("估算时长（小时）").fill("2");
   await dialog.getByRole("button", { name: "创建任务" }).click();
 
@@ -145,8 +193,8 @@ test("opens calendar, daily review, reports and command palette", async ({ page 
   await openApp(page);
 
   const nav = page.getByLabel("页面导航");
-  await nav.getByRole("button", { name: "排期日历" }).click();
-  await expect(page.getByRole("heading", { name: "长期计划日历" })).toBeVisible();
+  await nav.getByRole("button", { name: "历史日报" }).click();
+  await expect(page.getByRole("heading", { name: "历史日报" })).toBeVisible();
 
   await nav.getByRole("button", { name: "每日总结" }).click();
   await expect(page.getByRole("heading", { name: "日终回顾" })).toBeVisible();

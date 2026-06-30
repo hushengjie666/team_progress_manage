@@ -1,6 +1,6 @@
 # TimeManage Sync Server
 
-P0 personal sync service. It is a small Go HTTP server with JSON-file persistence, designed to be built as a single binary for low-memory servers.
+P0 personal sync service. It is a small Go HTTP server with MySQL persistence, designed to be built as a single binary for low-memory servers that already have MySQL available.
 
 ## Build
 
@@ -15,7 +15,7 @@ go build -trimpath -ldflags="-s -w" -o bin/timemanage-sync .
 TM_SYNC_USER=demo \
 TM_SYNC_PASSWORD=demo \
 TM_SYNC_ADDR=127.0.0.1:8787 \
-TM_SYNC_DATA=sync-server/data/store.json \
+TM_SYNC_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/timemanage_sync?parseTime=true&charset=utf8mb4' \
 ./sync-server/bin/timemanage-sync serve
 ```
 
@@ -66,8 +66,16 @@ TM_SYNC_USER=<user> \
 TM_SYNC_PASSWORD=<strong-password> \
 TM_SYNC_SECRET=<long-random-secret> \
 TM_SYNC_ADDR=127.0.0.1:8787 \
-TM_SYNC_DATA=/var/lib/timemanage/store.json \
+TM_SYNC_MYSQL_DSN='<user>:<password>@tcp(127.0.0.1:3306)/timemanage_sync?parseTime=true&charset=utf8mb4' \
 ./timemanage-sync-linux-amd64
+```
+
+The service creates the database and tables on startup when the configured MySQL account has permission:
+
+```sql
+CREATE DATABASE timemanage_sync
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 ```
 
 Caddy example:
@@ -90,10 +98,9 @@ The script installs:
 
 - binary: `/opt/timemanage-sync/timemanage-sync`
 - config: `/etc/timemanage-sync/sync.json`
-- data: `/var/lib/timemanage-sync/store.json`
 - unit: `/etc/systemd/system/timemanage-sync.service`
 
-After editing `/etc/timemanage-sync/sync.json`, restart with:
+After editing `/etc/timemanage-sync/sync.json` and setting `mysql_dsn`, restart with:
 
 ```bash
 sudo systemctl restart timemanage-sync

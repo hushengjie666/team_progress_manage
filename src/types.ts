@@ -389,7 +389,7 @@ export interface BadgeRule {
 
 export interface SyncServerConfig {
   addr: string;
-  dataPath: string;
+  mysqlDsn: string;
   username: string;
   password: string;
   secret: string;
@@ -535,6 +535,8 @@ export interface SyncState {
   nextRetryAt?: string;
   lastPulledRevision: number;
   lastSyncedAt?: string;
+  lastFullPulledAt?: string;
+  lastFullReconcileVersion?: number;
   status: SyncStatus;
   message: string;
   conflictCount: number;

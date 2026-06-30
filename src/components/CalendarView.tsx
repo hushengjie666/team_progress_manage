@@ -63,8 +63,8 @@ export function CalendarView(props: {
     <div className="calendar-layout">
       <section className="band calendar-toolbar">
         <div>
-          <p className="eyebrow">排期日历</p>
-          <h2>长期计划日历</h2>
+          <p className="eyebrow">历史日报</p>
+          <h2>历史日报</h2>
           <p className="muted compact-copy">选择日期后查看当天计划、番茄记录、提醒和回顾。</p>
         </div>
         <div className="segmented">

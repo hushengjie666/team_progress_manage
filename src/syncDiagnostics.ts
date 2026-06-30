@@ -23,8 +23,8 @@ export const deploymentCommands = (serverUrl: string) => {
       ".\\timemanage-sync.exe install --config C:\\TimeManage\\sync.json",
       ".\\timemanage-sync.exe start",
     ],
-    proxy: [`反向代理到 ${normalized}，建议开启 HTTPS，并把数据文件目录加入服务器备份。`],
-    dataPath: "默认数据文件：sync-server/data/sync.db；服务器建议放到 /var/lib/timemanage 或 C:\\TimeManage\\data。",
+    proxy: [`反向代理到 ${normalized}，建议开启 HTTPS，并把 MySQL 数据库和同步配置加入服务器备份。`],
+    storage: "同步服务使用 MySQL 存储；请在 sync.json 中配置 mysql_dsn，并定期备份 timemanage_sync 数据库。",
   };
 };
 

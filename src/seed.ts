@@ -1,4 +1,4 @@
-import type { AppState, BlockProfile, DailyPlan, NativeCapabilityState, Project, ProjectMember, Task, TaskTemplate, TeamMember } from "./types";
+import type { AppState, BlockProfile, NativeCapabilityState, Project, ProjectMember, TaskTemplate, TeamMember } from "./types";
 
 export const todayKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
@@ -12,124 +12,15 @@ export const uid = (prefix: string) => {
 
 const now = () => new Date().toISOString();
 
-const sampleTasks: Task[] = [
-  {
-    id: "task_write_prd",
-    title: "整理时间管理系统 PRD",
-    notes: "把方法论、竞品图和旧系统升级点沉淀成可执行范围。",
-    tags: ["方法论", "产品"],
-    projectId: "project_starter",
-    project: "TimeManage",
-    creatorMemberId: "member_owner",
-    primaryExecutorMemberId: "member_owner",
-    collaboratorMemberIds: [],
-    progressPercent: 0,
-    progressNote: "",
-    priority: "urgent",
-    severity: "high",
-    stage: "requirements",
-    estimatePomodoros: 3,
-    status: "committed",
-    dueAt: `${todayKey()}T18:00:00.000Z`,
-    repeatRule: "none",
-    subtasks: [
-      {
-        id: "subtask_prd_scope",
-        title: "确认首版范围",
-        completed: true,
-        createdAt: now(),
-        completedAt: now(),
-      },
-      {
-        id: "subtask_prd_sync",
-        title: "补齐同步验收",
-        completed: false,
-        createdAt: now(),
-      },
-    ],
-    sortOrder: 10,
-    actualPomodoros: 0,
-    estimateHistory: [],
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "task_block_apps",
-    title: "配置分心源屏蔽清单",
-    notes: "先覆盖短视频、社交、资讯和容易误点的网站。",
-    tags: ["严格模式", "Apple"],
-    projectId: "project_starter",
-    project: "自律系统",
-    creatorMemberId: "member_owner",
-    primaryExecutorMemberId: "member_owner",
-    collaboratorMemberIds: [],
-    progressPercent: 0,
-    progressNote: "",
-    priority: "high",
-    severity: "very_high",
-    stage: "development",
-    estimatePomodoros: 2,
-    status: "committed",
-    reminderAt: `${todayKey()}T09:30:00.000Z`,
-    repeatRule: "daily",
-    repeatIntervalDays: 1,
-    subtasks: [],
-    sortOrder: 20,
-    actualPomodoros: 0,
-    estimateHistory: [],
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "task_report_model",
-    title: "设计番茄报表指标",
-    notes: "包含日流量、估算偏差、内外中断、热力图和年度墙。",
-    tags: ["报表", "复盘"],
-    projectId: "project_starter",
-    project: "TimeManage",
-    creatorMemberId: "member_owner",
-    primaryExecutorMemberId: "member_owner",
-    collaboratorMemberIds: [],
-    progressPercent: 0,
-    progressNote: "",
-    priority: "medium",
-    severity: "medium",
-    stage: "design",
-    estimatePomodoros: 5,
-    status: "pool",
-    repeatRule: "none",
-    subtasks: [],
-    sortOrder: 30,
-    actualPomodoros: 0,
-    estimateHistory: [],
-    createdAt: now(),
-    updatedAt: now(),
-  },
-  {
-    id: "task_split_large",
-    title: "拆分移动端严格模式实现",
-    notes: "超过 7 个番茄的任务需要拆分，避免估算失真。",
-    tags: ["iOS", "技术"],
-    projectId: "project_starter",
-    project: "原生插件",
-    creatorMemberId: "member_owner",
-    collaboratorMemberIds: [],
-    progressPercent: 0,
-    progressNote: "",
-    priority: "medium",
-    severity: "high",
-    stage: "development",
-    estimatePomodoros: 8,
-    status: "pool",
-    repeatRule: "none",
-    subtasks: [],
-    sortOrder: 40,
-    actualPomodoros: 0,
-    estimateHistory: [],
-    createdAt: now(),
-    updatedAt: now(),
-  },
-];
+export const defaultSyncServerUrl = () => {
+  if (typeof window === "undefined") return "http://127.0.0.1:8787";
+  const { protocol, hostname, origin } = window.location;
+  if (protocol === "http:" || protocol === "https:") {
+    const isLocalHost = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+    if (!isLocalHost) return origin;
+  }
+  return "http://127.0.0.1:8787";
+};
 
 export const starterProject: Project = {
   id: "project_starter",
@@ -171,28 +62,6 @@ const defaultProfile: BlockProfile = {
   schedule: "专注番茄期间",
   strictness: "locked",
   platformPermissionState: "unknown",
-  createdAt: now(),
-  updatedAt: now(),
-};
-
-const todayPlan: DailyPlan = {
-  id: `plan_${todayKey()}`,
-  date: todayKey(),
-  capacityPomodoros: 8,
-  committedTaskIds: ["task_write_prd", "task_block_apps"],
-  completedPomodoros: 0,
-  recommendedCapacityPomodoros: 8,
-  suggestedCapacityPomodoros: 8,
-  suggestedTaskIds: ["task_report_model", "task_split_large"],
-  overloadAcknowledged: false,
-  reflection: "",
-  review: {
-    mood: "normal",
-    wins: "",
-    blockers: "",
-    interruptionPattern: "",
-    tomorrowFocus: "",
-  },
   createdAt: now(),
   updatedAt: now(),
 };
@@ -322,8 +191,8 @@ export const createInitialState = (): AppState => ({
   projects: [starterProject],
   teamMembers: [starterTeamMember],
   projectMembers: [starterProjectMember],
-  tasks: sampleTasks,
-  dailyPlans: [todayPlan],
+  tasks: [],
+  dailyPlans: [],
   focusSessions: [],
   workSessions: [],
   executionSignals: [],
@@ -339,7 +208,7 @@ export const createInitialState = (): AppState => ({
   },
   sync: {
     enabled: false,
-    serverUrl: "http://127.0.0.1:8787",
+    serverUrl: defaultSyncServerUrl(),
     username: "demo",
     deviceId: uid("device"),
     autoSync: true,

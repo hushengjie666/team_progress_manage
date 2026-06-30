@@ -1,14 +1,6 @@
 import {
-  BarChart3,
-  CalendarDays,
-  Focus,
-  FolderKanban,
-  LayoutDashboard,
-  ListChecks,
-  Settings,
   ShieldCheck,
   ShieldQuestion,
-  UserCheck,
   TimerReset,
   Search,
 } from "lucide-react";
@@ -19,11 +11,9 @@ import {
   defaultReview,
   deriveRewardState,
   generateRecurringTask,
-  nextBreakMode,
   pauseTimer,
   planCapacityHint,
   planPressure,
-  restoreTimer,
   suggestedCapacity,
   suggestedTasks,
   taskSuggestions,
@@ -35,9 +25,11 @@ import {
   createSyncEventSource,
   createTeamMemberAccount,
   getAuthStatus,
+  getSyncRevision,
   loginToSyncServer,
   loginToWorkspace,
   mergeSyncedStateIntoLatest,
+  REQUIRED_FULL_RECONCILE_VERSION,
   type SyncRevisionEvent,
   syncableStateFingerprint,
   syncAppState,
@@ -63,7 +55,19 @@ import {
   updateTaskProgressInState,
 } from "./teamProgress";
 import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
-import { uid } from "./seed";
+import { defaultSyncServerUrl, uid } from "./seed";
+import { bindAccountToMembers } from "./authModel";
+import { shouldUseRemoteOriginForSync } from "./syncModel";
+import {
+  committedTasksForPlan,
+  currentMemberForState,
+  currentTaskForFocus,
+  focusTasksForMember,
+  poolTasksForFilters,
+  taskById,
+} from "./workbenchModel";
+import { addTaskToTodayInState } from "./workSessionTransitions";
+import { getTeamRevision, loadTeamState, pushTeamChanges } from "./teamApi";
 import type {
   AppState,
   AuthState,
@@ -94,16 +98,17 @@ import type {
   ExecutionSignal,
 } from "./types";
 import { WorkspaceView } from "./components/WorkspaceView";
-import { ProjectDetailView, type ProjectDetailTab } from "./components/ProjectDetailView";
+import { MemberStatusView, ProjectDetailView, type ProjectDetailTab } from "./components/ProjectDetailView";
 import { FocusView, MiniTimer } from "./components/FocusView";
 import { ConfirmDialog, ShortcutHelpDialog, SplitTaskDialog } from "./components/Dialogs";
 import { ReportsView } from "./components/ReportsView";
-import { SettingsView } from "./components/SettingsView";
+import { SettingsView, type SettingsSection } from "./components/SettingsView";
 import { CalendarView } from "./components/CalendarView";
 import { CommandPalette } from "./components/CommandPalette";
 import { AuthGate } from "./components/AuthGate";
 import { DailyReviewView } from "./components/DailyReviewView";
 import { AppTopbar } from "./components/AppTopbar";
+import { createAppNavigation, mobileTitleForNavigation } from "./appNavigation";
 import {
   emptyTaskDefaults,
   endSessionInState,
@@ -114,7 +119,10 @@ import {
   modeLabel,
   formatTime,
   parseDateTimeLocal,
-  priorityWeight,
+  removeTaskFromTodayInState,
+  finishExpiredTimerInState,
+  restoreTimerInState,
+  shouldFinishExpiredTimerInState,
   startTimerInState,
   today,
   toggleTimerInState,
@@ -133,6 +141,11 @@ function shouldShowStrictStatusToast(status: StrictModeStatus) {
 const LOCAL_SYNC_DEBOUNCE_MS = 800;
 const REMOTE_SYNC_DEBOUNCE_MS = 250;
 const REMOTE_SYNC_BUSY_RETRY_MS = 1000;
+const REMOTE_REVISION_POLL_MS = 1000;
+const LEGACY_SYNC_ENABLED = false;
+const TEAM_REVISION_POLL_MS = 1000;
+const hasLiveWork = (state: AppState) =>
+  Boolean(state.activeTimer) || state.workSessions.some((session) => session.status === "active" || session.status === "paused");
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -157,7 +170,7 @@ export function App() {
   const [syncDiagnostic, setSyncDiagnostic] = useState<SyncDiagnosticResult | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showShortcutHelp, setShowShortcutHelp] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<"members" | "projects" | "timer" | "focus" | "sync" | "data" | "system">("members");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("members");
   const stateRef = useRef<AppState | null>(null);
   const pendingImportPayloadRef = useRef<unknown>(null);
   const syncInFlightRef = useRef(false);
@@ -173,72 +186,6 @@ export function App() {
   const undoTimerRef = useRef<number | null>(null);
   const tabRef = useRef<Tab>("workspace");
   const selectedTaskIdRef = useRef<string | null>(null);
-
-  const bindAccountToMembers = (value: AppState, auth: AuthState): AppState => {
-    const account = auth.account;
-    if (!account) return value;
-    const timestamp = nowIso();
-    const existingTeamMember =
-      value.teamMembers.find((member) => member.accountId === account.id) ??
-      value.teamMembers.find((member) => !member.accountId && member.email?.toLowerCase() === account.email.toLowerCase());
-    const teamMember: TeamMember = existingTeamMember
-      ? {
-          ...existingTeamMember,
-          accountId: account.id,
-          name: existingTeamMember.name || account.name,
-          email: existingTeamMember.email ?? account.email,
-          status: existingTeamMember.status ?? "active",
-          updatedAt: timestamp,
-        }
-      : {
-          id: uid("team_member"),
-          accountId: account.id,
-          name: account.name,
-          email: account.email,
-          status: "active",
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        };
-    const teamMembers = existingTeamMember
-      ? value.teamMembers.map((member) => (member.id === existingTeamMember.id ? teamMember : member))
-      : [teamMember, ...value.teamMembers];
-    const hasAccountOwnerForProject = (projectId: string) =>
-      value.projectMembers.some((member) => member.projectId === projectId && member.accountId === account.id && member.roles.includes("project_owner"));
-    const projectMembers = value.projectMembers.map((member) =>
-      member.accountId === account.id ||
-      (!member.accountId && member.roles.includes("project_owner") && !hasAccountOwnerForProject(member.projectId) && (!member.email || member.email === account.email))
-        ? {
-            ...member,
-            teamMemberId: teamMember.id,
-            accountId: account.id,
-            name: member.name || account.name,
-            email: member.email ?? account.email,
-            status: member.status ?? "active",
-            updatedAt: timestamp,
-          }
-        : { ...member, status: member.status ?? "active" },
-    );
-    const currentMember =
-      projectMembers.find((member) => member.id === value.currentMemberId && member.accountId === account.id) ??
-      projectMembers.find((member) => member.accountId === account.id) ??
-      projectMembers[0];
-    return {
-      ...value,
-      auth,
-      teamMembers,
-      currentMemberId: currentMember?.id,
-      projectMembers,
-      sync: {
-        ...value.sync,
-        enabled: true,
-        token: auth.token,
-        username: account.email,
-        message: auth.message,
-        status: "idle",
-      },
-      updatedAt: timestamp,
-    };
-  };
 
   const setAuthPatch = (patch: Partial<AuthState>) => {
     setState((current) =>
@@ -256,7 +203,8 @@ export function App() {
     stateRef.current = state;
   }, [state]);
 
-  const requestSync = (reason: string, options: { delayMs?: number; showToast?: boolean; targetRevision?: number } = {}) => {
+  const requestSync = (reason: string, options: { delayMs?: number; showToast?: boolean; targetRevision?: number; bypassRetry?: boolean } = {}) => {
+    if (!LEGACY_SYNC_ENABLED) return;
     const current = stateRef.current;
     const token = current?.auth.token ?? current?.sync.token;
     if (!current?.sync.enabled || !token || !current.sync.autoSync) return;
@@ -297,7 +245,7 @@ export function App() {
       );
       return;
     }
-    if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
+    if (!options.bypassRetry && current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
     if (current.sync.status === "authenticating") return;
     if (syncDebounceRef.current !== null) window.clearTimeout(syncDebounceRef.current);
     syncDebounceRef.current = window.setTimeout(() => {
@@ -317,6 +265,36 @@ export function App() {
           }
         : value,
     );
+  };
+
+  const persistTeamChanges = (before: AppState, after: AppState) => {
+    const token = before.auth.token ?? before.sync.token;
+    if (!token) return;
+    void pushTeamChanges(before.sync, token, before, after)
+      .then((revision) => {
+        if (!revision) return;
+        setState((value) =>
+          value
+            ? {
+                ...value,
+                sync: {
+                  ...value.sync,
+                  lastPulledRevision: Math.max(value.sync.lastPulledRevision, revision),
+                  status: "synced",
+                  message: "团队在线数据已保存",
+                },
+              }
+            : value,
+        );
+      })
+      .catch((error) => {
+        setToast(error instanceof Error ? `团队数据保存失败：${error.message}` : "团队数据保存失败");
+      });
+  };
+
+  const commitTeamState = (before: AppState, after: AppState) => {
+    setState(after);
+    persistTeamChanges(before, after);
   };
 
   useEffect(() => {
@@ -491,7 +469,16 @@ export function App() {
           setLoaded(true);
           return;
         }
-        let next = ensureTodayPlan({ ...value, activeTimer: restoreTimer(value.activeTimer) });
+        let next = ensureTodayPlan(restoreTimerInState(value));
+        if (shouldUseRemoteOriginForSync(next.sync.serverUrl)) {
+          next = {
+            ...next,
+            sync: {
+              ...next.sync,
+              serverUrl: defaultSyncServerUrl(),
+            },
+          };
+        }
         try {
           const status = await getAuthStatus(next.sync.serverUrl);
           next = {
@@ -515,6 +502,19 @@ export function App() {
         }
         if (next.auth.account && next.auth.token) {
           next = bindAccountToMembers(next, { ...next.auth, status: "authenticated" });
+          try {
+            next = await loadTeamState(next);
+          } catch (error) {
+            next = {
+              ...next,
+              sync: {
+                ...next.sync,
+                status: "error",
+                message: error instanceof Error ? `团队数据加载失败：${error.message}` : "团队数据加载失败",
+              },
+            };
+            setToast(next.sync.message);
+          }
         }
         setState(next);
         setLoaded(true);
@@ -531,6 +531,37 @@ export function App() {
     }, 250);
     return () => window.clearTimeout(handle);
   }, [state, loaded]);
+
+  useEffect(() => {
+    const token = state?.auth.token ?? state?.sync.token;
+    if (!loaded || !state || !token) return;
+    let cancelled = false;
+    let inFlight = false;
+    const refreshIfNeeded = async () => {
+      if (cancelled || inFlight) return;
+      const current = stateRef.current;
+      const currentToken = current?.auth.token ?? current?.sync.token;
+      if (!current || !currentToken) return;
+      inFlight = true;
+      try {
+        const revision = await getTeamRevision(current.sync, currentToken);
+        if (cancelled || revision <= current.sync.lastPulledRevision) return;
+        const next = await loadTeamState(current);
+        if (!cancelled) setState(ensureTodayPlan(next));
+      } catch {
+        if (!cancelled) setState((value) => (value ? { ...value, sync: { ...value.sync, status: "error", message: "团队数据刷新失败" } } : value));
+      } finally {
+        inFlight = false;
+      }
+    };
+    const immediate = window.setTimeout(() => void refreshIfNeeded(), TEAM_REVISION_POLL_MS);
+    const interval = window.setInterval(() => void refreshIfNeeded(), TEAM_REVISION_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(immediate);
+      window.clearInterval(interval);
+    };
+  }, [loaded, state?.auth.token, state?.sync.token, state?.sync.serverUrl]);
 
   useEffect(() => {
     const flushState = () => {
@@ -562,6 +593,7 @@ export function App() {
             updatedAt: nowIso(),
           };
         }
+        const timestamp = nowIso();
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         const body =
           current.activeTimer.mode === "focus"
@@ -571,20 +603,9 @@ export function App() {
         playTimerSound(current.settings);
         void sendTimerNotification(current.settings, title, body);
         stopStrictMode().then(setStrictStatus).catch(() => undefined);
-        if (current.activeTimer.mode === "focus" && current.settings.autoStartBreaks) {
-          const ended = endSessionInState(current, "completed");
-          return startTimerInState(ended, nextBreakMode(ended), undefined, nowIso());
-        }
-        if (current.activeTimer.mode !== "focus" && current.settings.autoStartFocus) {
-          const ended = endSessionInState(current, "completed");
-          const nextTask = ended.tasks.find((task) => task.status === "committed" || task.status === "in_progress");
-          return startTimerInState(ended, "focus", nextTask?.id, nowIso(), ended.settings.activeBlockProfileId);
-        }
-        return {
-          ...current,
-          activeTimer: { ...current.activeTimer, remaining: 0, isRunning: false, pendingSettlement: "pending" },
-          updatedAt: nowIso(),
-        };
+        const next = finishExpiredTimerInState(current, timestamp);
+        persistTeamChanges(current, next);
+        return next;
       });
     }, 1000);
     return () => window.clearInterval(handle);
@@ -592,7 +613,19 @@ export function App() {
 
   useEffect(() => {
     const handle = () => {
-      setState((current) => (current?.activeTimer ? { ...current, activeTimer: restoreTimer(current.activeTimer), updatedAt: nowIso() } : current));
+      setState((current) => {
+        if (!current?.activeTimer) return current;
+        const timestamp = nowIso();
+        const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
+        if (shouldFinish) {
+          const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+          setToast(`${title}，已自动记录`);
+          stopStrictMode().then(setStrictStatus).catch(() => undefined);
+        }
+        const next = restoreTimerInState(current, timestamp);
+        if (shouldFinish) persistTeamChanges(current, next);
+        return next;
+      });
     };
     document.addEventListener("visibilitychange", handle);
     window.addEventListener("focus", handle);
@@ -634,7 +667,6 @@ export function App() {
       const currentToken = current?.auth.token ?? current?.sync.token;
       if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
       if (payload.current_revision <= current.sync.lastPulledRevision) return;
-      if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
       if (current.sync.status === "authenticating") return;
       setState((value) =>
         value
@@ -652,6 +684,7 @@ export function App() {
       requestSync(event.type === "hello" ? "sse-hello" : "sse-revision", {
         targetRevision: payload.current_revision,
         delayMs: syncInFlightRef.current || current.sync.status === "syncing" ? REMOTE_SYNC_BUSY_RETRY_MS : REMOTE_SYNC_DEBOUNCE_MS,
+        bypassRetry: true,
       });
     };
 
@@ -677,7 +710,65 @@ export function App() {
   }, [state?.sync.enabled, state?.sync.autoSync, state?.sync.serverUrl, state?.sync.deviceId, eventSourceToken]);
 
   useEffect(() => {
+    if (!state?.sync.enabled || !state.sync.autoSync || !eventSourceToken) return;
+    let cancelled = false;
+    let inFlight = false;
+
+    const pollRevision = async () => {
+      if (inFlight || cancelled) return;
+      const current = stateRef.current;
+      const currentToken = current?.auth.token ?? current?.sync.token;
+      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
+      if (current.sync.status === "authenticating") return;
+
+      inFlight = true;
+      try {
+        const revision = await getSyncRevision(current.sync, currentToken);
+        if (cancelled) return;
+        if (revision <= current.sync.lastPulledRevision) return;
+        setState((value) =>
+          value
+            ? {
+                ...value,
+                sync: {
+                  ...value.sync,
+                  lastReceivedRevision: Math.max(value.sync.lastReceivedRevision ?? 0, revision),
+                  pendingRemoteRevision: Math.max(value.sync.pendingRemoteRevision ?? 0, revision),
+                },
+              }
+            : value,
+        );
+        requestSync("revision-poll", {
+          targetRevision: revision,
+          delayMs: syncInFlightRef.current || current.sync.status === "syncing" ? REMOTE_SYNC_BUSY_RETRY_MS : REMOTE_SYNC_DEBOUNCE_MS,
+          bypassRetry: true,
+        });
+      } catch {
+        if (!cancelled) {
+          setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: value.sync.sseStatus ?? "error" } } : value));
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    const immediate = window.setTimeout(() => void pollRevision(), REMOTE_REVISION_POLL_MS);
+    const interval = window.setInterval(() => void pollRevision(), REMOTE_REVISION_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(immediate);
+      window.clearInterval(interval);
+    };
+  }, [state?.sync.enabled, state?.sync.autoSync, state?.sync.serverUrl, state?.sync.deviceId, eventSourceToken]);
+
+  useEffect(() => {
     if (!state) return;
+
+    const repaired = ensureTodayPlan(state);
+    if (repaired !== state) {
+      commitTeamState(state, repaired);
+      return;
+    }
 
     const fingerprint = syncableStateFingerprint(state);
     if (syncFingerprintRef.current === null) {
@@ -689,11 +780,18 @@ export function App() {
 
     const token = state.auth.token ?? state.sync.token;
     if (!state.sync.enabled || !token || !state.sync.autoSync) return;
-    if (state.sync.nextRetryAt && Date.now() < new Date(state.sync.nextRetryAt).getTime()) return;
+    const bypassRetry = hasLiveWork(state);
+    if (!bypassRetry && state.sync.nextRetryAt && Date.now() < new Date(state.sync.nextRetryAt).getTime()) return;
     if (state.sync.status === "authenticating") return;
 
-    requestSync("local-change", { delayMs: LOCAL_SYNC_DEBOUNCE_MS });
+    requestSync("local-change", { delayMs: LOCAL_SYNC_DEBOUNCE_MS, bypassRetry });
   }, [state]);
+
+  useEffect(() => {
+    const token = state?.auth.token ?? state?.sync.token;
+    if (!loaded || !state?.sync.enabled || !token || !state.sync.autoSync || state.sync.lastFullReconcileVersion === REQUIRED_FULL_RECONCILE_VERSION) return;
+    requestSync("full-reconcile", { delayMs: 0, bypassRetry: true });
+  }, [loaded, state?.sync.enabled, state?.sync.autoSync, state?.sync.lastFullReconcileVersion, state?.auth.token, state?.sync.token]);
 
   useEffect(() => {
     return () => {
@@ -746,17 +844,19 @@ export function App() {
         if (!Number.isNaN(reminderTime) && reminderTime <= now) {
           reminderSentRef.current.add(task.id);
           void sendTimerNotification(current.settings, "任务提醒", task.title);
-          setState((value) =>
-            value
-              ? {
-                  ...value,
-                  tasks: value.tasks.map((item) =>
-                    item.id === task.id ? { ...item, lastReminderSentAt: nowIso(), updatedAt: nowIso() } : item,
-                  ),
-                  updatedAt: nowIso(),
-                }
-              : value,
-          );
+          setState((value) => {
+            if (!value) return value;
+            const timestamp = nowIso();
+            const next = {
+              ...value,
+              tasks: value.tasks.map((item) =>
+                item.id === task.id ? { ...item, lastReminderSentAt: timestamp, updatedAt: timestamp } : item,
+              ),
+              updatedAt: timestamp,
+            };
+            persistTeamChanges(value, next);
+            return next;
+          });
         }
       }
     }, 30_000);
@@ -812,12 +912,14 @@ export function App() {
         };
         setState((value) => {
           if (!value?.activeTimer) return value;
-          return {
+          const next = {
             ...value,
             strictViolations: [violation, ...value.strictViolations],
             activeTimer: shouldPause ? pauseTimer(value.activeTimer, now) : value.activeTimer,
             updatedAt: now,
           };
+          persistTeamChanges(value, next);
+          return next;
         });
         setToast(shouldAbort ? "严格模式连续违规，当前番茄已作废" : `检测到分心源：${violation.matchedValue}`);
         if (shouldAbort) void finishTimer("aborted");
@@ -835,48 +937,32 @@ export function App() {
 
   const committedTasks = useMemo(() => {
     if (!state || !todayPlan) return [];
-    return todayPlan.committedTaskIds
-      .map((id) => state.tasks.find((task) => task.id === id))
-      .filter((task): task is Task => task !== undefined && task.status !== "split" && task.status !== "archived");
+    return committedTasksForPlan(state, todayPlan);
   }, [state, todayPlan]);
+
+  const currentMember = useMemo(() => {
+    if (!state) return undefined;
+    return currentMemberForState(state);
+  }, [state]);
+
+  const focusCommittedTasks = useMemo(() => {
+    if (!state) return [];
+    return focusTasksForMember(state, committedTasks, currentMember);
+  }, [state, committedTasks, currentMember]);
 
   const poolTasks = useMemo(() => {
     if (!state || !todayPlan) return [];
-    const query = taskFilters.query.trim().toLowerCase();
-    const filtered = state.tasks.filter((task) => {
-      const matchesQuery =
-        !query ||
-        task.title.toLowerCase().includes(query) ||
-        task.notes.toLowerCase().includes(query) ||
-        task.project.toLowerCase().includes(query) ||
-        task.tags.some((tag) => tag.toLowerCase().includes(query));
-      return (
-        task.status !== "completed" &&
-        task.status !== "split" &&
-        task.status !== "archived" &&
-        !todayPlan.committedTaskIds.includes(task.id) &&
-        matchesQuery &&
-        (taskFilters.project === "all" || task.project === taskFilters.project) &&
-        (taskFilters.tag === "all" || task.tags.includes(taskFilters.tag)) &&
-        (taskFilters.priority === "all" || task.priority === taskFilters.priority)
-      );
-    });
-    return [...filtered].sort((left, right) => {
-      if (taskFilters.sort === "dueAt") return (left.dueAt ?? "9999").localeCompare(right.dueAt ?? "9999");
-      if (taskFilters.sort === "priority") return priorityWeight[right.priority] - priorityWeight[left.priority];
-      if (taskFilters.sort === "estimate") return right.estimatePomodoros - left.estimatePomodoros;
-      return left.sortOrder - right.sortOrder;
-    });
+    return poolTasksForFilters(state, todayPlan, taskFilters);
   }, [state, todayPlan, taskFilters]);
 
   const currentTask = useMemo(() => {
-    if (!state?.activeTimer?.taskId) return committedTasks.find((task) => task.status !== "completed" && task.status !== "split");
-    return state.tasks.find((task) => task.id === state.activeTimer?.taskId && task.status !== "split");
-  }, [state, committedTasks]);
+    if (!state) return undefined;
+    return currentTaskForFocus(state, focusCommittedTasks);
+  }, [state, focusCommittedTasks]);
 
   const selectedTask = useMemo(() => {
-    if (!state || !selectedTaskId) return undefined;
-    return state.tasks.find((task) => task.id === selectedTaskId);
+    if (!state) return undefined;
+    return taskById(state, selectedTaskId);
   }, [state, selectedTaskId]);
 
   if (!state || !todayPlan) {
@@ -891,7 +977,10 @@ export function App() {
   }
 
   const updateState = (updater: (value: AppState) => AppState) => {
-    setState((current) => (current ? ensureTodayPlan(updater(current)) : current));
+    const current = stateRef.current;
+    if (!current) return;
+    const next = ensureTodayPlan(updater(current));
+    commitTeamState(current, next);
   };
   const currentProjectId = state.projects[0]?.id ?? "project_starter";
 
@@ -944,49 +1033,15 @@ export function App() {
 
   const commitTask = (taskId: string) => {
     updateState((value) => {
-      const plan = getTodayPlan(value);
-      const nextPlan = {
-        ...plan,
-        committedTaskIds: Array.from(new Set([...plan.committedTaskIds, taskId])),
-        updatedAt: nowIso(),
-      };
-      return {
-        ...value,
-        tasks: value.tasks.map((task) =>
-          task.id === taskId && task.status === "pool"
-            ? { ...task, status: "committed", updatedAt: nowIso() }
-            : task,
-        ),
-        dailyPlans: value.dailyPlans.some((item) => item.id === nextPlan.id)
-          ? value.dailyPlans.map((item) => (item.id === nextPlan.id ? nextPlan : item))
-          : [...value.dailyPlans, nextPlan],
-        updatedAt: nowIso(),
-      };
+      return addTaskToTodayInState(value, taskId, nowIso());
     });
     setToast("已加入工作队列");
   };
 
   const removeCommittedTask = (taskId: string) => {
+    const timestamp = nowIso();
     updateState((value) => {
-      const plan = getTodayPlan(value);
-      return {
-        ...value,
-        dailyPlans: value.dailyPlans.map((item) =>
-          item.id === plan.id
-            ? {
-                ...item,
-                committedTaskIds: item.committedTaskIds.filter((id) => id !== taskId),
-                updatedAt: nowIso(),
-              }
-            : item,
-        ),
-        tasks: value.tasks.map((task) =>
-          task.id === taskId && task.status === "committed"
-            ? { ...task, status: "pool", updatedAt: nowIso() }
-            : task,
-        ),
-        updatedAt: nowIso(),
-      };
+      return removeTaskFromTodayInState(value, taskId, timestamp);
     });
   };
 
@@ -1525,20 +1580,6 @@ export function App() {
     });
   };
 
-  const acknowledgeOverload = () => {
-    const timestamp = nowIso();
-    updateState((value) => {
-      const plan = getTodayPlan(value);
-      return {
-        ...value,
-        dailyPlans: value.dailyPlans.map((item) =>
-          item.id === plan.id ? { ...item, overloadAcknowledged: true, updatedAt: timestamp } : item,
-        ),
-        updatedAt: timestamp,
-      };
-    });
-  };
-
   const generateTodayPlan = () => {
     const timestamp = nowIso();
     updateState((value) => {
@@ -1715,18 +1756,19 @@ export function App() {
     }
   };
 
-  const applySession = (session: { token: string; expiresAt: string; account: AuthState["account"]; workspace: AuthState["workspace"] }, message: string) => {
-    updateState((value) =>
-      bindAccountToMembers(value, {
-        status: "authenticated",
-        token: session.token,
-        expiresAt: session.expiresAt,
-        account: session.account,
-        workspace: session.workspace,
-        bootstrapped: true,
-        message,
-      }),
-    );
+  const applySession = async (session: { token: string; expiresAt: string; account: AuthState["account"]; workspace: AuthState["workspace"] }, message: string) => {
+    const source = stateRef.current ?? state;
+    if (!source) throw new Error("本地状态尚未加载");
+    const bound = bindAccountToMembers(source, {
+      status: "authenticated",
+      token: session.token,
+      expiresAt: session.expiresAt,
+      account: session.account,
+      workspace: session.workspace,
+      bootstrapped: true,
+      message,
+    });
+    setState(ensureTodayPlan(await loadTeamState(bound)));
   };
 
   const handleWorkspaceBootstrap = async (payload: { workspaceName: string; name: string; email: string; password: string }) => {
@@ -1745,9 +1787,8 @@ export function App() {
         bootstrapped: true,
         message,
       });
-      setState(ensureTodayPlan(nextState));
+      setState(ensureTodayPlan(await loadTeamState(nextState)));
       setToast(message);
-      window.setTimeout(() => void runSync(true), 100);
     } catch (error) {
       const message = error instanceof Error ? error.message : "初始化失败";
       setAuthPatch({ status: "error", message });
@@ -1761,9 +1802,8 @@ export function App() {
       const source = stateRef.current ?? state;
       if (!source) throw new Error("本地状态尚未加载");
       const session = await loginToWorkspace(source.sync, email, password);
-      applySession(session, `已登录 ${session.workspace.name}`);
+      await applySession(session, `已登录 ${session.workspace.name}`);
       setToast("团队工作区已登录");
-      window.setTimeout(() => void runSync(true), 100);
     } catch (error) {
       const message = error instanceof Error ? error.message : "登录失败";
       setAuthPatch({ status: "error", message });
@@ -1775,7 +1815,6 @@ export function App() {
     updateState((current) => ({
       ...current,
       sync: { ...current.sync, ...patch, tombstones: patch.tombstones ?? current.sync.tombstones },
-      updatedAt: nowIso(),
     }));
   };
 
@@ -1862,7 +1901,10 @@ export function App() {
       const current = stateRef.current;
       const hasPendingRemote = current ? remoteSyncTargetRevisionRef.current > current.sync.lastPulledRevision : remoteSyncTargetRevisionRef.current > 0;
       if (pendingLocalSyncRef.current || hasPendingRemote) {
-        requestSync(pendingLocalSyncRef.current ? "pending-local" : "pending-remote", { delayMs: 0 });
+        requestSync(pendingLocalSyncRef.current ? "pending-local" : "pending-remote", {
+          delayMs: 0,
+          bypassRetry: hasPendingRemote || Boolean(current && hasLiveWork(current)),
+        });
       }
     }
   };
@@ -1915,7 +1957,7 @@ export function App() {
     const backup = createBackupSnapshot(state, "before_import");
     downloadText(`timemanage-before-import-${today()}.json`, exportStateJson(state), "application/json;charset=utf-8");
     try {
-      setState(ensureTodayPlan(mergeImportedState(state, pendingImportPayloadRef.current, backup)));
+      commitTeamState(state, ensureTodayPlan(mergeImportedState(state, pendingImportPayloadRef.current, backup)));
       pendingImportPayloadRef.current = null;
       setImportSummary(null);
       setToast("导入完成，已自动备份导入前数据");
@@ -1934,7 +1976,7 @@ export function App() {
     try {
       const payload = JSON.parse(backup.payload);
       const restorePoint = createBackupSnapshot(state, "auto");
-      setState(ensureTodayPlan(mergeImportedState(state, payload, restorePoint)));
+      commitTeamState(state, ensureTodayPlan(mergeImportedState(state, payload, restorePoint)));
       setToast("已从备份恢复，恢复前状态也已保留为自动备份");
     } catch {
       setToast("备份内容无法解析");
@@ -2171,18 +2213,6 @@ export function App() {
   const openDailyReview = () => {
     setTab("daily");
   };
-  const primaryNavItems = [
-    { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard },
-    { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench },
-    { key: "admin", label: "管理中心", icon: <FolderKanban size={18} />, onClick: () => openAdmin("members") },
-  ];
-  const secondaryNavItems = [
-    { key: "focus", label: "开始工作", icon: <Focus size={18} />, onClick: () => setTab("focus") },
-    { key: "calendar", label: "排期日历", icon: <CalendarDays size={18} />, onClick: () => setTab("calendar") },
-    { key: "daily", label: "每日总结", icon: <ListChecks size={18} />, onClick: openDailyReview },
-    { key: "reports", label: "复盘洞察", icon: <BarChart3 size={18} />, onClick: () => setTab("reports") },
-  ];
-  const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
 
   const logout = () => {
     updateState((value) => ({
@@ -2202,6 +2232,19 @@ export function App() {
     }));
     setToast("已退出登录");
   };
+  const activeProject = state.projects.find((project) => project.id === activeProjectId);
+  const { topbarNavItems, mobileNavItems, mobileMoreItems } = createAppNavigation({
+    openBoard,
+    openMemberStatus: () => setTab("member_status"),
+    openWorkbench,
+    openFocus: () => setTab("focus"),
+    openDailyReview,
+    openReports: () => setTab("reports"),
+    openCalendar: () => setTab("calendar"),
+    openAdmin: () => openAdmin("members"),
+    logout,
+  });
+  const { title: mobileTitle, subtitle: mobileSubtitle } = mobileTitleForNavigation({ tab, activeNavKey, activeProject });
 
   if (state.auth.status !== "authenticated" || !state.auth.token) {
     return (
@@ -2223,12 +2266,13 @@ export function App() {
       <section className="main-panel">
         <AppTopbar
           navItems={topbarNavItems}
+          mobileNavItems={mobileNavItems}
+          mobileMoreItems={mobileMoreItems}
           activeNavKey={activeNavKey}
+          mobileTitle={mobileTitle}
+          mobileSubtitle={mobileSubtitle}
           actions={(
             <>
-              <button className="secondary-button" onClick={loadDemoData}>
-                演示数据
-              </button>
               <button className="secondary-button" onClick={logout}>
                 账号：{state.auth.account?.name ?? "退出"}
               </button>
@@ -2237,6 +2281,16 @@ export function App() {
               </button>
               <button className="icon-button" title="严格模式权限" onClick={askPermissions}>
                 {strictStatus?.permission_state === "granted" ? <ShieldCheck size={18} /> : <ShieldQuestion size={18} />}
+              </button>
+            </>
+          )}
+          mobileActions={(
+            <>
+              <button className="secondary-button account-chip" onClick={logout}>
+                {state.auth.account?.name ?? "账号"}
+              </button>
+              <button className="icon-button" title="命令面板" onClick={() => setCommandPaletteOpen(true)}>
+                <Search size={18} />
               </button>
             </>
           )}
@@ -2258,8 +2312,6 @@ export function App() {
             committedTasks={committedTasks}
             todayPlan={todayPlan}
             selectedTask={selectedTask}
-            taskFilters={taskFilters}
-            setTaskFilters={setTaskFilters}
             totalCommittedEstimate={totalCommittedEstimate}
             commitTask={commitTask}
             removeCommittedTask={removeCommittedTask}
@@ -2273,7 +2325,6 @@ export function App() {
             returnTaskForReview={returnTaskForReview}
             moveCommittedTask={moveCommittedTask}
             updatePlanCapacity={updatePlanCapacity}
-            acknowledgeOverload={acknowledgeOverload}
             generateTodayPlan={generateTodayPlan}
             dismissCoachStep={dismissCoachStep}
             splitTask={splitTask}
@@ -2285,6 +2336,13 @@ export function App() {
             openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
             resolveInterruption={resolveInterruption}
             convertInterruptionToTask={convertInterruptionToTask}
+          />
+        )}
+
+        {tab === "member_status" && (
+          <MemberStatusView
+            state={state}
+            selectTask={setSelectedTaskId}
           />
         )}
 
@@ -2323,7 +2381,7 @@ export function App() {
           <FocusView
             state={state}
             currentTask={currentTask}
-            committedTasks={committedTasks}
+            committedTasks={focusCommittedTasks}
             beginTimer={beginTimer}
             toggleTimer={toggleTimer}
             resetTimer={resetTimer}
@@ -2417,6 +2475,7 @@ export function App() {
             confirmImport={confirmImport}
             restoreBackup={restoreBackup}
             resolveSyncConflict={resolveSyncConflict}
+            loadDemoData={loadDemoData}
           />
         )}
       </section>
@@ -2426,7 +2485,6 @@ export function App() {
           task={currentTask}
           toggleTimer={toggleTimer}
           finishTimer={finishTimer}
-          openFocus={() => setTab("focus")}
         />
       )}
       {deletedTaskSnapshot && (

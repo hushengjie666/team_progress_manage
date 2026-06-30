@@ -19,8 +19,18 @@ import {
   taskSuggestions,
   computeStreak,
 } from "./domain";
-import { createInitialState, todayKey } from "./seed";
-import { endSessionInState, startTimerInState, toggleTimerInState } from "./appModel";
+import { createInitialState as createEmptyInitialState, todayKey } from "./seed";
+import {
+  endSessionInState,
+  ensureTodayPlan,
+  finishExpiredTimerInState,
+  getTodayPlan,
+  removeTaskFromTodayInState,
+  shouldFinishExpiredTimerInState,
+  startTimerInState,
+  toggleTimerInState,
+} from "./appModel";
+import { addTaskToTodayInState } from "./workSessionTransitions";
 import { buildCsvBundle, createBackupSnapshot, mergeImportedState, summarizeImportPayload } from "./dataPortability";
 import { calendarSummaries, filteredStateForReport, instantiateTemplate, parseQuickInput, reviewSummary } from "./planning";
 import { normalizeAppStatePayload } from "./storage";
@@ -37,19 +47,147 @@ import {
   updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
-import { buildProjectOverviewTaskBoard, createProjectTaskInState, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
+import { buildProjectOverviewTaskBoard, createProjectTaskInState, deriveProjectDetailModel, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
 import {
   buildMyProjectTaskCards,
   buildProjectOverviewCards,
+  filterTodayCommittedTasksForMember,
   filterMyTasksByProjectSelection,
   quickAddProjectIdForSelection,
 } from "./projectOverview";
-import type { ActiveTimer, AppState, FocusSession, ProjectMember, TaskTemplate } from "./types";
+import { bindAccountToMembers } from "./authModel";
+import type { ActiveTimer, AppState, DailyPlan, FocusSession, ProjectMember, Task, TaskTemplate } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
+const createInitialState = (): AppState => {
+  const state = createEmptyInitialState();
+  const now = `${todayKey()}T08:00:00.000Z`;
+  const tasks: Task[] = [
+    {
+      id: "task_write_prd",
+      title: "整理时间管理系统 PRD",
+      notes: "测试任务备注。",
+      tags: ["方法论", "产品"],
+      projectId: "project_starter",
+      project: "TimeManage",
+      creatorMemberId: "member_owner",
+      primaryExecutorMemberId: "member_owner",
+      collaboratorMemberIds: [],
+      progressPercent: 0,
+      progressNote: "",
+      priority: "urgent",
+      severity: "high",
+      stage: "requirements",
+      estimatePomodoros: 3,
+      status: "committed",
+      dueAt: iso("2026-05-10T18:00:00Z"),
+      repeatRule: "none",
+      subtasks: [],
+      sortOrder: 10,
+      actualPomodoros: 0,
+      estimateHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "task_block_apps",
+      title: "配置分心源屏蔽清单",
+      notes: "测试任务备注。",
+      tags: ["严格模式", "Apple"],
+      projectId: "project_starter",
+      project: "自律系统",
+      creatorMemberId: "member_owner",
+      primaryExecutorMemberId: "member_owner",
+      collaboratorMemberIds: [],
+      progressPercent: 0,
+      progressNote: "",
+      priority: "high",
+      severity: "very_high",
+      stage: "development",
+      estimatePomodoros: 2,
+      status: "committed",
+      repeatRule: "none",
+      subtasks: [],
+      sortOrder: 20,
+      actualPomodoros: 0,
+      estimateHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "task_report_model",
+      title: "设计番茄报表指标",
+      notes: "测试任务备注。",
+      tags: ["报表", "复盘"],
+      projectId: "project_starter",
+      project: "TimeManage",
+      creatorMemberId: "member_owner",
+      primaryExecutorMemberId: "member_owner",
+      collaboratorMemberIds: [],
+      progressPercent: 0,
+      progressNote: "",
+      priority: "medium",
+      severity: "medium",
+      stage: "design",
+      estimatePomodoros: 5,
+      status: "pool",
+      repeatRule: "none",
+      subtasks: [],
+      sortOrder: 30,
+      actualPomodoros: 0,
+      estimateHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: "task_split_large",
+      title: "拆分移动端严格模式实现",
+      notes: "测试任务备注。",
+      tags: ["iOS", "技术"],
+      projectId: "project_starter",
+      project: "原生插件",
+      creatorMemberId: "member_owner",
+      collaboratorMemberIds: [],
+      progressPercent: 0,
+      progressNote: "",
+      priority: "medium",
+      severity: "high",
+      stage: "development",
+      estimatePomodoros: 8,
+      status: "pool",
+      repeatRule: "none",
+      subtasks: [],
+      sortOrder: 40,
+      actualPomodoros: 0,
+      estimateHistory: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+  const dailyPlan: DailyPlan = {
+    id: "plan_test_today",
+    date: todayKey(),
+    capacityPomodoros: 8,
+    committedTaskIds: ["task_write_prd", "task_block_apps"],
+    completedPomodoros: 0,
+    suggestedTaskIds: ["task_report_model", "task_split_large"],
+    reflection: "",
+    review: {
+      mood: "normal",
+      wins: "",
+      blockers: "",
+      interruptionPattern: "",
+      tomorrowFocus: "",
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+  return { ...state, tasks, dailyPlans: [dailyPlan], updatedAt: now };
+};
+
 describe("timer domain", () => {
-  it("restores an expired running timer into pending settlement", () => {
+  it("restores an expired running timer without opening settlement", () => {
     const timer: ActiveTimer = {
       sessionId: "session_1",
       mode: "focus",
@@ -62,11 +200,39 @@ describe("timer domain", () => {
       cycleIndex: 1,
       strictStarted: true,
     };
-    expect(restoreTimer(timer, new Date("2026-05-10T08:30:00Z"))).toMatchObject({
+    const restored = restoreTimer(timer, new Date("2026-05-10T08:30:00Z"));
+    expect(restored).toMatchObject({
       remaining: 0,
       isRunning: false,
-      pendingSettlement: "pending",
     });
+    expect(restored?.pendingSettlement).toBeUndefined();
+  });
+
+  it("finishes an expired active timer through the app model", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_expired_model",
+    );
+    const timestamp = `${todayKey()}T08:30:00.000Z`;
+
+    expect(shouldFinishExpiredTimerInState(started, timestamp)).toBe(true);
+
+    const finished = finishExpiredTimerInState(started, timestamp);
+    const finishedTask = finished.tasks.find((task) => task.id === taskId);
+    const finishedSession = finished.focusSessions.find((session) => session.id === "session_expired_model");
+    const workSession = finished.workSessions.find((session) => session.focusSessionId === "session_expired_model");
+
+    expect(finished.activeTimer).toBeUndefined();
+    expect(finishedTask?.actualPomodoros).toBe(1);
+    expect(finishedTask?.status).toBe("in_progress");
+    expect(finishedSession?.outcome).toBe("completed");
+    expect(workSession?.status).toBe("ended");
   });
 
   it("extends planned end time after pause and resume", () => {
@@ -137,6 +303,288 @@ describe("timer domain", () => {
     ]);
   });
 
+  it("adds a focused task to today's queue when starting work", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[1].id;
+    const initialPlan = getTodayPlan(state);
+    const withoutTaskInToday: AppState = {
+      ...state,
+      tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, status: "pool" as const } : task)),
+      dailyPlans: state.dailyPlans.some((plan) => plan.id === initialPlan.id)
+        ? state.dailyPlans.map((plan) => (plan.id === initialPlan.id ? { ...plan, committedTaskIds: [] } : plan))
+        : [{ ...initialPlan, committedTaskIds: [] }],
+    };
+
+    const started = startTimerInState(
+      withoutTaskInToday,
+      "focus",
+      taskId,
+      "2026-05-10T08:00:00.000Z",
+      undefined,
+      "session_queue_start",
+    );
+
+    expect(getTodayPlan(started).committedTaskIds).toContain(taskId);
+    expect(started.tasks.find((task) => task.id === taskId)).toMatchObject({ status: "in_progress" });
+    expect(started.workSessions[0]).toMatchObject({ taskId, status: "active" });
+  });
+
+  it("claims an unassigned task for the current member when starting focus", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[3].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-05-10T08:00:00.000Z",
+      undefined,
+      "session_claim_unassigned",
+    );
+
+    expect(started.tasks.find((task) => task.id === taskId)).toMatchObject({
+      primaryExecutorMemberId: "member_owner",
+      status: "in_progress",
+    });
+    expect(started.workSessions[0]).toMatchObject({
+      taskId,
+      executorMemberId: "member_owner",
+    });
+  });
+
+  it("claims an unassigned task for the current member when adding it to today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[3].id;
+
+    const queued = addTaskToTodayInState(state, taskId, "2026-05-10T08:00:00.000Z");
+
+    expect(getTodayPlan(queued).committedTaskIds).toContain(taskId);
+    expect(queued.tasks.find((task) => task.id === taskId)).toMatchObject({
+      primaryExecutorMemberId: "member_owner",
+      status: "committed",
+    });
+  });
+
+  it("claims a cross-project unassigned task with the current account's project member", () => {
+    const state = createInitialState();
+    const withSecondProject = createProjectInState(
+      state,
+      "图像识别",
+      "第二项目",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_queue_claim`,
+      { accountId: "account_owner", name: "项目负责人", email: "owner@example.com" },
+    );
+    const secondMember = withSecondProject.projectMembers.find((member) => member.projectId === "project_queue_claim")!;
+    const task: Task = {
+      ...state.tasks[3],
+      id: "queue_cross_project_unassigned",
+      projectId: "project_queue_claim",
+      project: "图像识别",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "pool",
+    };
+
+    const queued = addTaskToTodayInState(
+      { ...withSecondProject, currentMemberId: "member_owner", tasks: [task] },
+      task.id,
+      "2026-05-10T09:10:00.000Z",
+    );
+
+    expect(queued.tasks.find((item) => item.id === task.id)?.primaryExecutorMemberId).toBe(secondMember.id);
+  });
+
+  it("ends active work sessions when removing a task from today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-05-10T08:00:00.000Z",
+      undefined,
+      "session_remove_today",
+    );
+
+    const removed = removeTaskFromTodayInState(started, taskId, "2026-05-10T08:12:00.000Z");
+
+    expect(getTodayPlan(removed).committedTaskIds).not.toContain(taskId);
+    expect(removed.activeTimer).toBeUndefined();
+    expect(removed.workSessions.find((session) => session.taskId === taskId)).toMatchObject({
+      status: "ended",
+      endedAt: "2026-05-10T08:12:00.000Z",
+    });
+    expect(removed.executionSignals[0]).toMatchObject({
+      taskId,
+      type: "work_ended",
+      payload: expect.objectContaining({ reason: "removed_from_today" }),
+    });
+  });
+
+  it("repairs active work sessions that are missing from today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_repair_today",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      dailyPlans: started.dailyPlans.map((plan) =>
+        plan.date === todayKey() ? { ...plan, committedTaskIds: [] } : plan,
+      ),
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(getTodayPlan(repaired).committedTaskIds).toContain(taskId);
+  });
+
+  it("repairs a focus active timer that is missing its work session", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_missing_work_session",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      workSessions: [],
+      executionSignals: [],
+      activeTimer: started.activeTimer ? { ...started.activeTimer, workSessionId: undefined } : undefined,
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(repaired.activeTimer?.workSessionId).toBeDefined();
+    expect(repaired.workSessions[0]).toMatchObject({
+      taskId,
+      focusSessionId: "session_missing_work_session",
+      status: "active",
+    });
+    expect(repaired.executionSignals[0]).toMatchObject({
+      taskId,
+      type: "work_started",
+      payload: expect.objectContaining({ source: "active_timer_repair" }),
+    });
+  });
+
+  it("ends a cross-day active timer even when its work session is missing", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const yesterday = new Date(`${todayKey()}T00:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const inconsistent: AppState = {
+      ...state,
+      tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, status: "in_progress" as const } : task)),
+      workSessions: [],
+      executionSignals: [],
+      activeTimer: {
+        sessionId: "session_missing_cross_day",
+        taskId,
+        mode: "focus",
+        duration: 1500,
+        remaining: 600,
+        isRunning: true,
+        startedAt: `${yesterdayKey}T23:40:00.000Z`,
+        plannedEndAt: `${yesterdayKey}T23:55:00.000Z`,
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+        strictStarted: false,
+      },
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(repaired.activeTimer).toBeUndefined();
+    expect(repaired.workSessions[0]).toMatchObject({
+      taskId,
+      focusSessionId: "session_missing_cross_day",
+      status: "ended",
+    });
+    expect(repaired.executionSignals.map((signal) => signal.type).slice(0, 2)).toEqual(["work_ended", "work_started"]);
+  });
+
+  it("marks project detail tasks active from the local active timer even before work session repair", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_project_active_timer",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      workSessions: [],
+    };
+
+    const model = deriveProjectDetailModel(inconsistent, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(model?.activeProjectTaskIds).toContain(taskId);
+  });
+
+  it("ends stale active work sessions instead of adding them to today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const yesterday = new Date(new Date(`${todayKey()}T08:00:00.000Z`).getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const stale: AppState = {
+      ...state,
+      workSessions: [
+        {
+          id: "work_stale_today_queue",
+          taskId,
+          executorMemberId: "member_owner",
+          focusSessionId: "session_stale_today_queue",
+          status: "active",
+          startedAt: yesterday,
+          totalPausedSeconds: 0,
+          createdAt: yesterday,
+          updatedAt: yesterday,
+        },
+      ],
+      focusSessions: [
+        {
+          id: "session_stale_today_queue",
+          taskId,
+          mode: "focus",
+          duration: 1500,
+          startedAt: yesterday,
+          interruptionCounts: { internal: 0, external: 0 },
+        },
+      ],
+      dailyPlans: state.dailyPlans.map((plan) => (plan.date === todayKey() ? { ...plan, committedTaskIds: [] } : plan)),
+    };
+
+    const repaired = ensureTodayPlan(stale);
+
+    expect(getTodayPlan(repaired).committedTaskIds).not.toContain(taskId);
+    expect(repaired.workSessions[0]).toMatchObject({ status: "ended" });
+    expect(repaired.executionSignals[0]).toMatchObject({
+      taskId,
+      type: "work_ended",
+      payload: expect.objectContaining({ reason: "stale_active_session" }),
+    });
+  });
+
   it("enforces one active work session per executor when starting work", () => {
     const state = createInitialState();
     const firstTaskId = state.tasks[0].id;
@@ -182,6 +630,37 @@ describe("timer domain", () => {
       "work_started",
     ]);
     expect(switched.executionSignals[1].payload).toMatchObject({ reason: "task_switch", nextTaskId: secondTaskId });
+  });
+
+  it("ends a paused work session for the same executor when starting another task", () => {
+    const state = createInitialState();
+    const firstTaskId = state.tasks[0].id;
+    const secondTaskId = state.tasks[1].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      firstTaskId,
+      "2026-05-10T08:00:00.000Z",
+      undefined,
+      "session_paused_first",
+    );
+    const paused = toggleTimerInState(started, "2026-05-10T08:03:00.000Z");
+
+    const switched = startTimerInState(
+      paused,
+      "focus",
+      secondTaskId,
+      "2026-05-10T08:05:00.000Z",
+      undefined,
+      "session_after_pause",
+    );
+
+    expect(switched.workSessions.filter((session) => session.status === "active" || session.status === "paused")).toHaveLength(1);
+    expect(switched.workSessions[0]).toMatchObject({ taskId: secondTaskId, status: "active" });
+    expect(switched.workSessions.find((session) => session.taskId === firstTaskId)).toMatchObject({
+      status: "ended",
+      endedAt: "2026-05-10T08:05:00.000Z",
+    });
   });
 });
 
@@ -618,7 +1097,7 @@ describe("progress board", () => {
     ]);
   });
 
-  it("keeps project overview today work empty when no daily plan tasks are provided", () => {
+  it("shows active project work even when it is missing from the current user's daily plan", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
     const owner = state.projectMembers.find((member) => member.id === "member_owner")!;
@@ -636,10 +1115,48 @@ describe("progress board", () => {
       {
         memberId: owner.id,
         memberName: owner.name,
-        tasks: [],
-        hasActiveTask: false,
+        tasks: [tasks[1]],
+        hasActiveTask: true,
       },
     ]);
+  });
+
+  it("sorts accepted project detail tasks by newest review acceptance", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const baseTask = state.tasks[0];
+    const acceptedOld = {
+      ...baseTask,
+      id: "accepted_old",
+      projectId,
+      status: "completed" as const,
+      reviewAcceptedAt: "2026-05-10T09:00:00.000Z",
+      completedAt: "2026-05-10T09:00:00.000Z",
+    };
+    const acceptedNew = {
+      ...baseTask,
+      id: "accepted_new",
+      projectId,
+      status: "completed" as const,
+      reviewAcceptedAt: "2026-05-10T11:00:00.000Z",
+      completedAt: "2026-05-10T11:00:00.000Z",
+    };
+    const manuallyCompleted = {
+      ...baseTask,
+      id: "manual_done",
+      projectId,
+      status: "completed" as const,
+      reviewAcceptedAt: undefined,
+      completedAt: "2026-05-10T12:00:00.000Z",
+    };
+    const model = deriveProjectDetailModel(
+      { ...state, tasks: [manuallyCompleted, acceptedOld, acceptedNew, ...state.tasks] },
+      projectId,
+      { query: "", status: "all", executor: "all", priority: "all", sort: "status" },
+      todayKey(),
+    );
+
+    expect(model?.acceptedTasks.map((task) => task.id)).toEqual(["accepted_new", "accepted_old"]);
   });
 
   it("builds my project task cards from active participations only", () => {
@@ -694,6 +1211,227 @@ describe("progress board", () => {
     expect(cards.some((card) => card.projectId === "project_disabled")).toBe(false);
   });
 
+  it("filters today committed tasks to the current member for the focus todo list", () => {
+    const state = createInitialState();
+    const owner = state.projectMembers.find((member) => member.id === "member_owner")!;
+    const teammate: ProjectMember = {
+      ...owner,
+      id: "member_teammate",
+      teamMemberId: "team_member_teammate",
+      accountId: "account_teammate",
+      name: "胡圣杰",
+      email: "husj",
+      roles: ["executor"],
+    };
+    const ownerTask = {
+      ...state.tasks[0],
+      id: "today_owner_task",
+      primaryExecutorMemberId: owner.id,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const teammateTask = {
+      ...state.tasks[1],
+      id: "today_teammate_task",
+      primaryExecutorMemberId: teammate.id,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const unassignedTask = {
+      ...state.tasks[2],
+      id: "today_unassigned_task",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const next: AppState = {
+      ...state,
+      currentMemberId: owner.id,
+      projectMembers: [...state.projectMembers, teammate],
+      tasks: [ownerTask, teammateTask, unassignedTask],
+      dailyPlans: [
+        {
+          ...getTodayPlan(state),
+          committedTaskIds: [ownerTask.id, teammateTask.id, unassignedTask.id],
+        },
+      ],
+    };
+
+    const committedTasks = next.dailyPlans[0].committedTaskIds
+      .map((id) => next.tasks.find((task) => task.id === id))
+      .filter((task): task is Task => Boolean(task));
+
+    expect(filterTodayCommittedTasksForMember(next, committedTasks, owner).map((task) => task.id)).toEqual([ownerTask.id]);
+  });
+
+  it("keeps old unassigned committed tasks visible only for the member who has worked on them", () => {
+    const state = createInitialState();
+    const owner = state.projectMembers.find((member) => member.id === "member_owner")!;
+    const teammate: ProjectMember = {
+      ...owner,
+      id: "member_teammate",
+      teamMemberId: "team_member_teammate",
+      accountId: "account_teammate",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      roles: ["executor"],
+    };
+    const unassignedTask = {
+      ...state.tasks[0],
+      id: "today_worked_unassigned_task",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "in_progress" as const,
+    };
+    const next: AppState = {
+      ...state,
+      projectMembers: [...state.projectMembers, teammate],
+      tasks: [unassignedTask],
+      workSessions: [
+        {
+          id: "work_session_owner_unassigned",
+          taskId: unassignedTask.id,
+          executorMemberId: owner.id,
+          focusSessionId: "focus_owner_unassigned",
+          status: "ended",
+          startedAt: "2026-05-10T09:00:00.000Z",
+          endedAt: "2026-05-10T09:25:00.000Z",
+          totalPausedSeconds: 0,
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:25:00.000Z",
+        },
+      ],
+      dailyPlans: [
+        {
+          ...getTodayPlan(state),
+          committedTaskIds: [unassignedTask.id],
+        },
+      ],
+    };
+    const committedTasks = next.dailyPlans[0].committedTaskIds
+      .map((id) => next.tasks.find((task) => task.id === id))
+      .filter((task): task is Task => Boolean(task));
+
+    expect(filterTodayCommittedTasksForMember(next, committedTasks, owner).map((task) => task.id)).toEqual([unassignedTask.id]);
+    expect(filterTodayCommittedTasksForMember(next, committedTasks, teammate).map((task) => task.id)).toEqual([]);
+  });
+
+  it("keeps focus tasks visible after login binds same-email executor memberships", () => {
+    const state = createInitialState();
+    const firstProjectId = state.projects[0].id;
+    const withSecondProject = createProjectInState(
+      state,
+      "图像识别",
+      "第二项目",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_login_bind`,
+    );
+    const secondMember = withSecondProject.projectMembers.find((member) => member.projectId === "project_login_bind")!;
+    const todayPlan = getTodayPlan(withSecondProject);
+    const firstTask = {
+      ...state.tasks[0],
+      id: "login_bind_first",
+      projectId: firstProjectId,
+      project: "TimeManage",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const secondTask = {
+      ...state.tasks[1],
+      id: "login_bind_second",
+      projectId: "project_login_bind",
+      project: "图像识别",
+      primaryExecutorMemberId: secondMember.id,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const loggedIn = bindAccountToMembers(
+      {
+        ...withSecondProject,
+        currentMemberId: "member_owner",
+        projectMembers: withSecondProject.projectMembers.map((member) =>
+          member.projectId === "project_login_bind"
+            ? {
+                ...member,
+                accountId: undefined,
+                teamMemberId: undefined,
+                email: "owner@example.com",
+                roles: ["executor"],
+              }
+            : member,
+        ),
+        tasks: [firstTask, secondTask],
+        dailyPlans: [{ ...todayPlan, committedTaskIds: [firstTask.id, secondTask.id] }],
+      },
+      {
+        status: "authenticated",
+        token: "login_bind_token",
+        bootstrapped: true,
+        message: "已登录",
+        account: {
+          id: "account_owner",
+          workspaceId: "workspace_test",
+          name: "项目负责人",
+          email: "owner@example.com",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      "2026-05-10T09:10:00.000Z",
+    );
+    const currentMember = loggedIn.projectMembers.find((member) => member.id === loggedIn.currentMemberId);
+    const committedTasks = loggedIn.dailyPlans[0].committedTaskIds
+      .map((id) => loggedIn.tasks.find((task) => task.id === id))
+      .filter((task): task is Task => Boolean(task));
+
+    expect(loggedIn.projectMembers.find((member) => member.id === secondMember.id)).toMatchObject({
+      accountId: "account_owner",
+      teamMemberId: "team_member_owner",
+    });
+    expect(filterTodayCommittedTasksForMember(loggedIn, committedTasks, currentMember).map((task) => task.id)).toEqual([secondTask.id]);
+  });
+
+  it("clears sync retry backoff when binding an authenticated account", () => {
+    const state = createInitialState();
+    const loggedIn = bindAccountToMembers(
+      {
+        ...state,
+        sync: {
+          ...state.sync,
+          enabled: true,
+          autoSync: false,
+          status: "error",
+          retryCount: 3,
+          nextRetryAt: "2026-05-10T10:00:00.000Z",
+        },
+      },
+      {
+        status: "authenticated",
+        token: "retry_clear_token",
+        bootstrapped: true,
+        message: "已登录",
+        account: {
+          id: "account_owner",
+          workspaceId: "workspace_test",
+          name: "项目负责人",
+          email: "owner@example.com",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      "2026-05-10T09:10:00.000Z",
+    );
+
+    expect(loggedIn.sync).toMatchObject({
+      enabled: true,
+      autoSync: true,
+      status: "idle",
+      retryCount: 0,
+      nextRetryAt: undefined,
+    });
+  });
+
   it("filters my tasks by selected projects and derives single quick-add project", () => {
     const state = createInitialState();
     const firstProjectId = state.projects[0].id;
@@ -713,6 +1451,7 @@ describe("progress board", () => {
       tasks: [
         { ...state.tasks[0], id: "selected_first", projectId: firstProjectId, status: "committed", primaryExecutorMemberId: "member_owner" },
         { ...state.tasks[1], id: "selected_second", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: secondMember?.id },
+        { ...state.tasks[2], id: "selected_unassigned", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: undefined, collaboratorMemberIds: [] },
         { ...state.tasks[1], id: "selected_split_parent", projectId: "project_filter_card", project: "第二项目", status: "split", primaryExecutorMemberId: secondMember?.id },
         { ...state.tasks[2], id: "selected_archived", projectId: "project_filter_card", project: "第二项目", status: "archived", primaryExecutorMemberId: secondMember?.id },
         { ...state.tasks[3], id: "selected_other_member", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: "member_other" },
@@ -1296,6 +2035,82 @@ describe("data portability and long planning", () => {
     expect(normalized.projectMembers[0].teamMemberId).toBe("team_member_bound");
   });
 
+  it("reenables automatic sync when normalizing an authenticated team state", () => {
+    const state = createInitialState();
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      auth: {
+        status: "authenticated",
+        token: "stored_auth_token",
+        bootstrapped: true,
+        message: "已登录",
+        account: {
+          id: "account_wangshuo",
+          workspaceId: "workspace_test",
+          name: "王硕",
+          email: "wangshuo@example.com",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      sync: {
+        ...state.sync,
+        enabled: false,
+        autoSync: false,
+        token: undefined,
+      },
+    });
+
+    expect(normalized.sync.enabled).toBe(true);
+    expect(normalized.sync.autoSync).toBe(true);
+    expect(normalized.sync.token).toBe("stored_auth_token");
+  });
+
+  it("deduplicates project member bindings for the same project and login identity", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      teamMembers: [
+        {
+          ...state.teamMembers[0],
+          id: "team_member_wangshuo",
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
+      ],
+      projectMembers: [
+        {
+          ...state.projectMembers[0],
+          id: "member_wangshuo_old",
+          projectId,
+          teamMemberId: "team_member_wangshuo",
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          roles: ["project_owner", "executor"],
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+        {
+          ...state.projectMembers[0],
+          id: "member_wangshuo_latest",
+          projectId,
+          teamMemberId: "team_member_wangshuo",
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          roles: ["executor"],
+          updatedAt: "2026-05-10T11:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(normalized.projectMembers.filter((member) => member.teamMemberId === "team_member_wangshuo")).toHaveLength(1);
+    expect(normalized.projectMembers[0]).toMatchObject({ id: "member_wangshuo_latest", roles: ["executor"] });
+  });
+
   it("defaults legacy tasks without a stage to requirements", () => {
     const state = createInitialState();
     const legacyTask = { ...state.tasks[0] };
@@ -1373,7 +2188,7 @@ describe("data portability and long planning", () => {
     expect(summary.taskCount).toBe(state.tasks.length);
     expect(buildCsvBundle(state)).toContain("# tasks.csv");
     const backup = createBackupSnapshot(state, "before_import", "2026-05-10T10:00:00.000Z");
-    expect(backup.payload).toContain("task_write_prd");
+    expect(backup.payload).toContain("project_starter");
     const imported = mergeImportedState(state, { ...state, tasks: [] }, backup);
     expect(imported.tasks).toHaveLength(0);
     expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
@@ -1382,7 +2197,7 @@ describe("data portability and long planning", () => {
   it("keeps newer local daily plan committed tasks when remote sync is older", () => {
     const state = createInitialState();
     const localPlan = {
-      ...state.dailyPlans[0],
+      ...getTodayPlan(state),
       id: "plan_sync_today",
       date: "2026-05-10",
       committedTaskIds: [],
@@ -1410,7 +2225,8 @@ describe("data portability and long planning", () => {
 
   it("builds calendar summaries and template tasks", () => {
     const state = createInitialState();
-    const summaries = calendarSummaries(state, state.dailyPlans[0].date, 7);
+    const todayPlan = { ...getTodayPlan(state), committedTaskIds: ["task_calendar_test"] };
+    const summaries = calendarSummaries({ ...state, dailyPlans: [todayPlan] }, todayPlan.date, 7);
     expect(summaries).toHaveLength(7);
     expect(summaries[0].committedTaskIds.length).toBeGreaterThan(0);
     expect(summaries[0].review).toBeTruthy();

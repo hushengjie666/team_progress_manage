@@ -84,11 +84,22 @@ export const projectMemberIdentityIds = (state: AppState, currentMember?: Projec
   );
 };
 
-export const taskAssignedToMemberIdentity = (task: Task, memberIds: Set<string>) =>
-  Boolean(
+export const taskAssignedToMemberIdentity = (task: Task, memberIds: Set<string>, options: { includeUnassigned?: boolean } = {}) => {
+  const collaboratorMemberIds = task.collaboratorMemberIds ?? [];
+  const isUnassigned = !task.primaryExecutorMemberId && collaboratorMemberIds.length === 0;
+
+  return Boolean(
+    (options.includeUnassigned && isUnassigned) ||
     (task.primaryExecutorMemberId && memberIds.has(task.primaryExecutorMemberId)) ||
-    task.collaboratorMemberIds?.some((memberId) => memberIds.has(memberId)),
+    collaboratorMemberIds.some((memberId) => memberIds.has(memberId)),
   );
+};
+
+const taskWorkedByMemberIdentity = (state: AppState, task: Task, memberIds: Set<string>) =>
+  state.workSessions.some((session) => session.taskId === task.id && session.executorMemberId && memberIds.has(session.executorMemberId));
+
+const taskBelongsToMemberIdentity = (state: AppState, task: Task, memberIds: Set<string>) =>
+  taskAssignedToMemberIdentity(task, memberIds) || taskWorkedByMemberIdentity(state, task, memberIds);
 
 export const filterMyTasksByProjectSelection = (
   state: AppState,
@@ -110,8 +121,18 @@ export const filterMyTasksByProjectSelection = (
       task.status !== "completed" &&
       task.status !== "split" &&
       task.status !== "archived" &&
-      taskAssignedToMemberIdentity(task, memberIds),
+      taskBelongsToMemberIdentity(state, task, memberIds),
   );
+};
+
+export const filterTodayCommittedTasksForMember = (
+  state: AppState,
+  tasks: Task[],
+  currentMember: ProjectMember | undefined,
+) => {
+  const memberIds = projectMemberIdentityIds(state, currentMember);
+  if (memberIds.size === 0) return [];
+  return tasks.filter((task) => taskBelongsToMemberIdentity(state, task, memberIds));
 };
 
 export const quickAddProjectIdForSelection = (selectedProjectIds: string[]) =>
@@ -135,7 +156,7 @@ export const buildMyProjectTaskCards = (state: AppState, currentMember?: Project
           task.status !== "completed" &&
           task.status !== "split" &&
           task.status !== "archived" &&
-          taskAssignedToMemberIdentity(task, memberIds),
+          taskBelongsToMemberIdentity(state, task, memberIds),
       );
       const board = buildProgressBoard(state, project.id);
 

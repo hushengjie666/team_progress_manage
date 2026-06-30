@@ -1,8 +1,11 @@
 import { emptyTaskDefaults, nowIso, priorityWeight } from "./appModel";
+import { buildProgressBoard } from "./domain";
 import { uid } from "./seed";
 import type { AppState, Priority, ProjectMember, RepeatRule, Severity, Task, TaskStage, TaskStatus } from "./types";
 
 type IdFactory = (prefix: string) => string;
+
+const projectTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
 
 export type ProjectAccess = {
   canView: boolean;
@@ -51,6 +54,14 @@ export type ProjectOverviewTaskBoard = {
   todayWorkGroups: ProjectOverviewTaskGroup[];
 };
 
+export type ProjectTaskFilters = {
+  query: string;
+  status: "all" | TaskStatus;
+  executor: "all" | "unassigned" | string;
+  priority: "all" | Priority;
+  sort: "status" | "priority" | "dueAt" | "updatedAt";
+};
+
 export const projectTasksForProject = (state: AppState, projectId: string) =>
   state.tasks
     .filter((task) => task.projectId === projectId)
@@ -71,13 +82,7 @@ export const projectTasksForProject = (state: AppState, projectId: string) =>
 
 export const filterProjectTasks = (
   tasks: Task[],
-  filters: {
-    query: string;
-    status: "all" | TaskStatus;
-    executor: "all" | "unassigned" | string;
-    priority: "all" | Priority;
-    sort: "status" | "priority" | "dueAt" | "updatedAt";
-  },
+  filters: ProjectTaskFilters,
 ) => {
   const query = filters.query.trim().toLowerCase();
   const filtered = tasks.filter((task) => {
@@ -102,6 +107,65 @@ export const filterProjectTasks = (
   });
 };
 
+export const deriveProjectDetailModel = (state: AppState, projectId: string, filters: ProjectTaskFilters, date = nowIso().slice(0, 10)) => {
+  const project = state.projects.find((item) => item.id === projectId);
+  if (!project) return undefined;
+
+  const access = projectAccessForCurrentMember(state, project.id);
+  const projectMembers = state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
+  const projectTeamMemberIds = new Set(projectMembers.map((member) => member.teamMemberId).filter((id): id is string => Boolean(id)));
+  const activeTeamMembers = state.teamMembers.filter((member) => member.status !== "disabled");
+  const addableTeamMembers = activeTeamMembers.filter((member) => !projectTeamMemberIds.has(member.id));
+  const executors = projectMembers.filter((member) => member.roles.includes("executor"));
+  const allProjectTasks = projectTasksForProject(state, project.id);
+  const overviewTasks = allProjectTasks.filter((task) => task.status !== "split" && task.status !== "archived");
+  const acceptedTasks = allProjectTasks
+    .filter((task) => task.status === "completed" && Boolean(task.reviewAcceptedAt))
+    .sort((left, right) => (right.reviewAcceptedAt ?? "").localeCompare(left.reviewAcceptedAt ?? ""));
+  const todayPlan = state.dailyPlans.find((plan) => plan.date === date);
+  const allProjectTaskIds = new Set(allProjectTasks.map((task) => task.id));
+  const activeProjectTaskIds = state.workSessions
+    .filter((session) => session.status === "active" && allProjectTaskIds.has(session.taskId))
+    .map((session) => session.taskId);
+  if (state.activeTimer?.mode === "focus" && state.activeTimer.taskId && allProjectTaskIds.has(state.activeTimer.taskId)) {
+    activeProjectTaskIds.push(state.activeTimer.taskId);
+  }
+  const filteredTasks = filterProjectTasks(allProjectTasks, filters);
+  const board = buildProgressBoard(state, project.id);
+  const riskSections = board.sections.filter((section) => section.kind !== "normal" && section.kind !== "pending_review" && section.tasks.length > 0);
+  const riskTaskCount = riskSections.reduce((sum, section) => sum + section.tasks.length, 0);
+  const taskCounts = projectTaskStatuses.reduce<Record<TaskStatus, number>>((acc, status) => {
+    acc[status] = allProjectTasks.filter((task) => task.status === status).length;
+    return acc;
+  }, { pool: 0, committed: 0, in_progress: 0, pending_review: 0, completed: 0, split: 0, archived: 0 });
+  const memberOverviewStats = [
+    { label: "项目成员", value: projectMembers.length, helper: "已绑定成员" },
+    { label: "项目负责人", value: projectMembers.filter((member) => member.roles.includes("project_owner")).length, helper: "负责验收与成员维护" },
+    { label: "执行者", value: executors.length, helper: "可承接任务" },
+    { label: "待验收", value: taskCounts.pending_review, helper: "等待负责人确认" },
+  ];
+
+  return {
+    project,
+    access,
+    projectMembers,
+    activeTeamMembers,
+    addableTeamMembers,
+    executors,
+    allProjectTasks,
+    overviewTasks,
+    acceptedTasks,
+    todayPlan,
+    activeProjectTaskIds,
+    filteredTasks,
+    board,
+    riskSections,
+    riskTaskCount,
+    taskCounts,
+    memberOverviewStats,
+  };
+};
+
 export const buildProjectOverviewTaskBoard = (
   tasks: Task[],
   members: ProjectMember[],
@@ -114,7 +178,7 @@ export const buildProjectOverviewTaskBoard = (
   const inProgressTasks = visibleTasks.filter((task) => task.status === "in_progress");
   const activeTaskIdSet = typeof activeTaskIds === "string" ? new Set([activeTaskIds]) : new Set(activeTaskIds ?? []);
   const todayTaskIdSet = new Set(todayTaskIds);
-  const todayWorkTasks = visibleTasks.filter((task) => todayTaskIdSet.has(task.id));
+  const todayWorkTasks = visibleTasks.filter((task) => todayTaskIdSet.has(task.id) || activeTaskIdSet.has(task.id));
   const membersById = new Map(members.map((member) => [member.id, member]));
   const memberOrder = new Map(members.map((member, index) => [member.id, index]));
   const groupsByKey = new Map<string, ProjectOverviewTaskGroup>();

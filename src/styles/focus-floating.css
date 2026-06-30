@@ -1,0 +1,50 @@
+.mini-timer-panel {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px 14px;
+  padding: 14px;
+  border: 1px solid #d6cdc1;
+  border-radius: 8px;
+  background: rgba(255, 253, 250, 0.96);
+  box-shadow: 0 16px 40px rgba(41, 46, 48, 0.18);
+}
+
+.mini-timer-panel p,
+.mini-timer-panel span {
+  margin: 0;
+  color: #657176;
+  font-size: 12px;
+}
+
+.mini-timer-panel strong {
+  display: block;
+  margin: 3px 0;
+  color: #20343d;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.mini-timer-progress {
+  grid-column: 1 / -1;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ece5da;
+}
+
+.mini-timer-progress span {
+  display: block;
+  height: 100%;
+  background: #f0b35a;
+}
+
+.mini-timer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

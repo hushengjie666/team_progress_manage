@@ -1,0 +1,404 @@
+@media (max-width: 1180px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar-nav {
+    justify-self: start;
+  }
+
+  .topbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .workspace-grid,
+  .focus-layout,
+  .calendar-detail-grid,
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-layout {
+    height: auto;
+    min-height: 0;
+  }
+
+  .focus-stage,
+  .focus-side {
+    grid-column: auto;
+    grid-row: auto;
+    height: auto;
+  }
+
+  .focus-stage {
+    min-height: auto;
+  }
+
+  .focus-stage-inner {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .focus-current-panel {
+    align-content: start;
+    padding: 32px;
+    border-right: 0;
+    border-bottom: 1px solid #e3dacd;
+  }
+
+  .focus-current-content {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .focus-current-content > div:first-child,
+  .focus-current-content .pomodoro-progress {
+    grid-column: 1 / -1;
+  }
+
+  .project-card-board {
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  }
+
+  .my-project-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
+  }
+
+  .project-overview-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .project-card,
+  .member-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-card-main,
+  .project-card-side {
+    margin: 0 16px 16px;
+  }
+
+  .project-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-binding-row,
+  .add-project-member-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .add-project-member-tools {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .add-project-member-tools > span {
+    justify-self: start;
+  }
+
+  .member-card {
+    grid-template-columns: 1fr;
+  }
+
+  .member-role-row {
+    padding-bottom: 0;
+  }
+
+  .member-create-panel .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-layout > .settings-hub,
+  .settings-layout > .settings-panel,
+  .settings-layout > .data-management,
+  .settings-layout > .settings-panel:last-child {
+    grid-column: auto;
+  }
+
+  .settings-hub {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-section-tabs {
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
+
+  .capability-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .main-panel {
+    padding: 16px;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .topbar-nav {
+    width: 100%;
+    justify-self: stretch;
+    overflow-x: auto;
+  }
+
+  .topbar-nav button {
+    flex: 1 0 auto;
+  }
+
+  .global-toast {
+    top: 72px;
+    right: 16px;
+    bottom: auto;
+    left: auto;
+    max-width: min(520px, 100%);
+  }
+
+  .bar-chart {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .bar-item small,
+  .estimate-day small {
+    max-width: 18px;
+    font-size: 10px;
+    writing-mode: vertical-rl;
+  }
+
+  .estimate-bars {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .hero-workflow,
+  .metric-row,
+  .review-summary-grid,
+  .distribution-grid,
+  .reward-grid,
+  .stepper,
+  .review-stats,
+  .workbench-stats,
+  .board-summary,
+  .board-section-list,
+  .calendar-toolbar,
+  .deploy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-card-board {
+    grid-template-columns: 1fr;
+  }
+
+  .my-project-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .project-overview-card-header,
+  .project-overview-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .project-overview-card-header {
+    align-items: stretch;
+  }
+
+  .project-overview-progress-inline {
+    min-width: 0;
+    min-height: 48px;
+  }
+
+  .project-overview-actions {
+    display: grid;
+  }
+
+  .project-overview-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-week,
+  .calendar-month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-form,
+  .settings-grid,
+  .filter-grid,
+  .detail-grid,
+  .notification-grid,
+    .sync-grid,
+  .review-grid,
+  .diagnostic-step {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .task-form label:first-child,
+  .task-form label:nth-child(3) {
+    grid-column: 1 / -1;
+  }
+
+  .coach-step,
+  .suggestion-item {
+    grid-column: 1 / -1;
+  }
+
+  .coach-step,
+  .suggestion-item {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .coach-step .link-button,
+  .suggestion-item .small-button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .task-item {
+    grid-template-columns: 1fr;
+  }
+
+  .next-action-item,
+  .hotspot-item,
+  .template-item,
+  .schedule-box {
+    grid-template-columns: 1fr;
+  }
+
+  .task-actions {
+    grid-template-columns: auto auto;
+    justify-content: flex-start;
+  }
+
+  .active-work-line {
+    display: grid;
+  }
+
+  .board-task {
+    display: grid;
+  }
+
+  .progress-signal-layout,
+  .signal-task-row {
+    grid-template-columns: 1fr;
+  }
+
+  .signal-kind-badge {
+    justify-content: flex-start;
+    width: max-content;
+  }
+
+  .focus-stage {
+    grid-column: auto;
+    grid-row: auto;
+    min-height: auto;
+  }
+
+  .focus-stage-inner {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .focus-current-panel {
+    align-content: start;
+    padding: 32px;
+    border-right: 0;
+    border-bottom: 1px solid #e3dacd;
+  }
+
+  .focus-current-content {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+
+  .focus-current-content > div:first-child,
+  .focus-current-content .pomodoro-progress {
+    grid-column: 1 / -1;
+  }
+
+  .focus-side {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .focus-orbit {
+    width: min(82vw, 360px);
+  }
+
+  .sync-table {
+    grid-template-columns: 1fr auto;
+  }
+
+  .mini-timer-panel {
+    right: 16px;
+    bottom: 16px;
+  }
+
+}
+
+@media (max-width: 520px) {
+  .task-form,
+  .settings-grid,
+  .filter-grid,
+  .detail-grid,
+  .notification-grid,
+  .member-card-main,
+  .sync-grid,
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .timer-face strong {
+    font-size: 52px;
+  }
+
+  .focus-stage {
+    padding: 0;
+  }
+
+  .focus-current-panel {
+    padding: 20px 16px 18px;
+  }
+
+  .focus-current-content {
+    grid-template-columns: 1fr;
+  }
+
+  .focus-current-content strong {
+    font-size: 22px;
+  }
+
+  .focus-current-content .small-button {
+    width: 100%;
+  }
+
+  .focus-orbit {
+    width: min(64vw, 240px);
+  }
+
+  .focus-timer-panel {
+    gap: 16px;
+    padding: 28px 14px calc(var(--mobile-bottom-nav-height) + 28px + env(safe-area-inset-bottom));
+  }
+
+  .calendar-week,
+  .calendar-month {
+    grid-template-columns: 1fr;
+  }
+
+  .template-editor {
+    grid-template-columns: 1fr;
+  }
+}

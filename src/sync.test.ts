@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "./seed";
-import { flattenStateToChanges, mergeRowsIntoState, mergeSyncedStateIntoLatest, syncableStateFingerprint, syncAppState, type SyncRow } from "./sync";
-import type { AppState, ExecutionSignal, Project, ProjectMember, Task, WorkSession } from "./types";
+import { createInitialState, todayKey } from "./seed";
+import { flattenStateToChanges, mergeRowsIntoState, mergeSyncedStateIntoLatest, REQUIRED_FULL_RECONCILE_VERSION, syncableStateFingerprint, syncAppState, type SyncRow } from "./sync";
+import type { AppState, ExecutionSignal, Project, ProjectMember, Task, TeamMember, WorkSession } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
@@ -89,6 +89,97 @@ afterEach(() => {
 });
 
 describe("team progress sync", () => {
+  it("deduplicates pulled team members by login identity", () => {
+    const base = createInitialState();
+    const existingMember: TeamMember = {
+      id: "team_member_wangshuo",
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo",
+      status: "active",
+      createdAt: iso("2026-06-18T09:00:00Z"),
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const duplicateMember: TeamMember = {
+      ...existingMember,
+      id: "team_member_duplicate",
+      accountId: undefined,
+      updatedAt: iso("2026-06-18T10:00:00Z"),
+    };
+    const projectMember: ProjectMember = {
+      ...base.projectMembers[0],
+      id: "project_member_wangshuo",
+      teamMemberId: existingMember.id,
+      accountId: existingMember.accountId,
+      name: existingMember.name,
+      email: existingMember.email,
+      roles: ["executor"],
+      updatedAt: iso("2026-06-18T09:05:00Z"),
+    };
+
+    const merged = mergeRowsIntoState(
+      {
+        ...base,
+        teamMembers: [existingMember],
+        projectMembers: [projectMember],
+        currentMemberId: projectMember.id,
+        updatedAt: iso("2026-06-18T09:10:00Z"),
+      },
+      [
+        row({
+          entity: "team_member",
+          id: duplicateMember.id,
+          updated_at: duplicateMember.updatedAt,
+          payload: duplicateMember,
+          revision: 50,
+        }),
+      ],
+      50,
+    );
+
+    expect(merged.teamMembers.filter((member) => member.email?.toLowerCase() === "wangshuo")).toHaveLength(1);
+    expect(merged.teamMembers[0]).toMatchObject({ id: existingMember.id, accountId: existingMember.accountId });
+    expect(merged.projectMembers[0].teamMemberId).toBe(existingMember.id);
+  });
+
+  it("deduplicates team members when a full synced snapshot is merged back into the latest state", () => {
+    const source = teamState();
+    const existingMember: TeamMember = {
+      id: "team_member_owner_a",
+      accountId: "account_owner_a",
+      name: "项目负责人",
+      email: "owner@example.com",
+      status: "active",
+      createdAt: iso("2026-06-18T09:00:00Z"),
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const duplicateMember: TeamMember = {
+      ...existingMember,
+      id: "team_member_owner_b",
+      accountId: undefined,
+      updatedAt: iso("2026-06-18T09:30:00Z"),
+    };
+    const projectMember: ProjectMember = {
+      ...source.projectMembers[0],
+      teamMemberId: existingMember.id,
+      accountId: existingMember.accountId,
+      email: existingMember.email,
+      name: existingMember.name,
+      roles: ["executor"],
+    };
+    const synced = {
+      ...source,
+      teamMembers: [existingMember, duplicateMember],
+      projectMembers: [projectMember],
+      updatedAt: iso("2026-06-18T09:35:00Z"),
+    };
+
+    const merged = mergeSyncedStateIntoLatest(source, source, synced);
+
+    expect(merged.teamMembers.filter((member) => member.email?.toLowerCase() === "owner@example.com")).toHaveLength(1);
+    expect(merged.projectMembers[0].teamMemberId).toBe(existingMember.id);
+  });
+
   it("represents team progress entities in push payloads", () => {
     const state = teamState();
     const changes = flattenStateToChanges(state);
@@ -107,6 +198,97 @@ describe("team progress sync", () => {
     });
     expect(byKey.get("work_session:work_session_sync")?.payload).toMatchObject({ status: "active", executorMemberId: "member_sync" });
     expect(byKey.get("execution_signal:signal_sync")?.payload).toMatchObject({ type: "work_started", payload: { mode: "focus" } });
+  });
+
+  it("pushes only rows changed after the last successful sync when requested", () => {
+    const state = teamState();
+    const changed = {
+      ...state,
+      sync: {
+        ...state.sync,
+        tombstones: [
+          { entity: "task", id: "task_old_deleted", deletedAt: iso("2026-05-10T16:20:00Z") },
+          { entity: "task", id: "task_new_deleted", deletedAt: iso("2026-05-10T16:45:00Z") },
+        ],
+      },
+      tasks: state.tasks.map((task) =>
+        task.id === "task_sync"
+          ? {
+              ...task,
+              progressPercent: 90,
+              updatedAt: iso("2026-05-10T16:40:00Z"),
+            }
+          : task,
+      ),
+    };
+
+    const changes = flattenStateToChanges(changed, { changedAfter: iso("2026-05-10T16:35:00Z") });
+    const keys = changes.map((change) => `${change.entity}:${change.id}`);
+
+    expect(keys).toContain("task:task_sync");
+    expect(keys).toContain("task:task_new_deleted");
+    expect(keys).not.toContain("project:project_sync");
+    expect(keys).not.toContain("task:task_old_deleted");
+  });
+
+  it("still pushes active work sessions and their tasks when their timestamps are older than last sync", () => {
+    const state = teamState();
+    const changes = flattenStateToChanges(state, { changedAfter: iso("2026-05-10T16:35:00Z") });
+    const keys = changes.map((change) => `${change.entity}:${change.id}`);
+
+    expect(keys).toContain("work_session:work_session_sync");
+    expect(keys).toContain("task:task_sync");
+    expect(keys).not.toContain("project:project_sync");
+  });
+
+  it("repairs a missing active work session before pushing sync changes", async () => {
+    const state = teamState();
+    const inconsistent: AppState = {
+      ...state,
+      workSessions: [],
+      executionSignals: [],
+      activeTimer: {
+        sessionId: "focus_missing_sync",
+        taskId: state.tasks[0].id,
+        mode: "focus",
+        duration: 1500,
+        remaining: 1200,
+        isRunning: true,
+        startedAt: `${todayKey()}T16:40:00.000Z`,
+        plannedEndAt: `${todayKey()}T17:05:00.000Z`,
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+        strictStarted: false,
+      },
+      sync: {
+        ...state.sync,
+        lastSyncedAt: iso("2026-05-10T16:50:00Z"),
+        lastFullReconcileVersion: REQUIRED_FULL_RECONCILE_VERSION,
+      },
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ accepted: [], conflicts: [], current_revision: 80 }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ changes: [], current_revision: 80 }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const synced = await syncAppState(inconsistent);
+    const pushBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as { changes: SyncRow[] };
+    const keys = pushBody.changes.map((change) => `${change.entity}:${change.id}`);
+
+    expect(keys).toContain(`task:${state.tasks[0].id}`);
+    expect(pushBody.changes.some((change) => change.entity === "work_session" && (change.payload as WorkSession).status === "active")).toBe(true);
+    expect(pushBody.changes.some((change) => change.entity === "execution_signal" && (change.payload as ExecutionSignal).type === "work_started")).toBe(true);
+    expect(synced.workSessions[0]).toMatchObject({
+      taskId: state.tasks[0].id,
+      focusSessionId: "focus_missing_sync",
+      status: "active",
+    });
   });
 
   it("keeps the sync fingerprint stable for sync-only timestamps", () => {
@@ -283,6 +465,76 @@ describe("team progress sync", () => {
     expect(synced.sync.lastPulledRevision).toBe(31);
   });
 
+  it("does a versioned full reconciliation and lets remote rows repair stale local task status", async () => {
+    const local = teamState();
+    const staleTask = {
+      ...local.tasks[0],
+      status: "pending_review" as const,
+      reviewSubmittedAt: iso("2026-05-10T16:30:00Z"),
+      reviewAcceptedAt: undefined,
+      reviewAcceptedByMemberId: undefined,
+      completedAt: undefined,
+      updatedAt: iso("2026-05-10T16:40:00Z"),
+    };
+    const remoteCompletedTask = {
+      ...staleTask,
+      status: "completed" as const,
+      reviewAcceptedAt: iso("2026-05-10T16:35:00Z"),
+      reviewAcceptedByMemberId: "member_sync",
+      completedAt: iso("2026-05-10T16:35:00Z"),
+      updatedAt: iso("2026-05-10T16:35:00Z"),
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          accepted: [],
+          conflicts: [],
+          current_revision: 100,
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          changes: [
+            row({
+              entity: "task",
+              id: remoteCompletedTask.id,
+              updated_at: remoteCompletedTask.updatedAt,
+              payload: remoteCompletedTask,
+              revision: 50,
+            }),
+          ],
+          current_revision: 100,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const synced = await syncAppState({
+      ...local,
+      tasks: [staleTask],
+      workSessions: [],
+      sync: {
+        ...local.sync,
+        lastPulledRevision: 100,
+        lastSyncedAt: iso("2026-05-10T16:50:00Z"),
+        lastFullPulledAt: iso("2026-05-10T16:55:00Z"),
+        lastFullReconcileVersion: REQUIRED_FULL_RECONCILE_VERSION - 1,
+      },
+    });
+
+    const pushBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as { changes: SyncRow[] };
+    expect(pushBody.changes.some((change) => change.entity === "task" && change.id === staleTask.id)).toBe(false);
+    expect(String(fetchMock.mock.calls[1][0])).toContain("/sync/pull?since=0");
+    expect(synced.tasks[0]).toMatchObject({
+      status: "completed",
+      reviewAcceptedAt: iso("2026-05-10T16:35:00Z"),
+      completedAt: iso("2026-05-10T16:35:00Z"),
+    });
+    expect(synced.sync.lastFullPulledAt).toBeDefined();
+    expect(synced.sync.lastFullReconcileVersion).toBe(REQUIRED_FULL_RECONCILE_VERSION);
+  });
+
   it("keeps local changes made while a sync request is in flight", () => {
     const source = teamState();
     const synced = {
@@ -322,6 +574,51 @@ describe("team progress sync", () => {
 
     expect(merged.tasks[0].title).toBe("同步期间本地修改");
     expect(merged.sync.lastPulledRevision).toBe(42);
+  });
+
+  it("keeps full reconcile task repairs when only sync status changed in flight", () => {
+    const source = teamState();
+    const staleTask = {
+      ...source.tasks[0],
+      status: "pending_review" as const,
+      reviewSubmittedAt: iso("2026-05-10T16:30:00Z"),
+      reviewAcceptedAt: undefined,
+      completedAt: undefined,
+      updatedAt: iso("2026-05-10T16:40:00Z"),
+    };
+    const remoteCompletedTask = {
+      ...staleTask,
+      status: "completed" as const,
+      reviewAcceptedAt: iso("2026-05-10T16:35:00Z"),
+      completedAt: iso("2026-05-10T16:35:00Z"),
+      updatedAt: iso("2026-05-10T16:35:00Z"),
+    };
+    const requestSource = { ...source, tasks: [staleTask] };
+    const latest = {
+      ...requestSource,
+      sync: {
+        ...requestSource.sync,
+        status: "syncing" as const,
+        message: "正在推送与拉取变更",
+      },
+    };
+    const synced = {
+      ...requestSource,
+      sync: {
+        ...requestSource.sync,
+        status: "synced" as const,
+        lastFullReconcileVersion: REQUIRED_FULL_RECONCILE_VERSION,
+      },
+      tasks: [remoteCompletedTask],
+    };
+
+    const merged = mergeSyncedStateIntoLatest(latest, requestSource, synced);
+
+    expect(merged.tasks[0]).toMatchObject({
+      status: "completed",
+      reviewAcceptedAt: iso("2026-05-10T16:35:00Z"),
+      completedAt: iso("2026-05-10T16:35:00Z"),
+    });
   });
 
   it("does not resurrect remote-deleted rows when latest local state is unchanged", () => {

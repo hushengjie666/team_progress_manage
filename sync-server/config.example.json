@@ -1,8 +1,7 @@
 {
   "addr": "0.0.0.0:8787",
-  "data_path": "C:\\TimeManage\\sync\\store.json",
+  "mysql_dsn": "timemanage:change-me@tcp(127.0.0.1:3306)/timemanage_sync?parseTime=true&charset=utf8mb4",
   "username": "demo",
   "password": "change-me",
   "secret": "change-me-token-secret"
 }
-

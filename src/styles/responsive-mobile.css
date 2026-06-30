@@ -1,0 +1,678 @@
+@media (max-width: 768px) {
+  html,
+  body {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom));
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 40px;
+    max-width: 100%;
+  }
+
+  textarea {
+    min-height: 96px;
+  }
+
+  .app-shell {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .member-status-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .member-status-column {
+    height: auto;
+  }
+
+  .member-task-list {
+    overflow-y: visible;
+  }
+
+  .main-panel {
+    width: 100%;
+    padding: var(--mobile-page-padding);
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + 22px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+  }
+
+  .schedule-calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-calendar-toolbar .button-row {
+    justify-content: stretch;
+  }
+
+  .schedule-calendar-toolbar .button-row button {
+    flex: 1;
+  }
+
+  .schedule-board {
+    grid-template-columns: 76px minmax(1080px, 1fr);
+    margin-inline: calc(var(--mobile-page-padding) * -1);
+    border-radius: 0;
+  }
+
+  .schedule-stage-row {
+    grid-template-columns: 76px minmax(1080px, 1fr);
+  }
+
+  .schedule-stage-label {
+    padding: 8px;
+  }
+
+  .unscheduled-task-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 35;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    min-height: var(--mobile-topbar-height);
+    margin: calc(var(--mobile-page-padding) * -1) calc(var(--mobile-page-padding) * -1) 10px;
+    padding: 8px var(--mobile-page-padding);
+    border-bottom: 1px solid #e2d9cc;
+    background: rgba(247, 244, 239, 0.96);
+    backdrop-filter: blur(12px);
+  }
+
+  .topbar-nav,
+  .topbar-actions {
+    display: none;
+  }
+
+  .mobile-topbar-title {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .mobile-menu-mark {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: #263236;
+    background: #ede6dc;
+  }
+
+  .mobile-topbar-title > div {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+  }
+
+  .mobile-topbar-title strong,
+  .mobile-topbar-title span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-topbar-title strong {
+    color: #263236;
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .mobile-topbar-title span {
+    color: #667074;
+    font-size: 12px;
+  }
+
+  .mobile-topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .mobile-topbar-actions .account-chip {
+    max-width: 132px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-bottom-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 80;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+    min-height: var(--mobile-bottom-nav-height);
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-top: 1px solid #d8cfc2;
+    background: rgba(251, 250, 246, 0.98);
+    box-shadow: 0 -12px 28px rgba(38, 50, 54, 0.12);
+    backdrop-filter: blur(14px);
+  }
+
+  .mobile-bottom-nav button {
+    min-width: 0;
+    min-height: 48px;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 3px;
+    border: 0;
+    border-radius: 8px;
+    color: #526065;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .mobile-bottom-nav button.active {
+    color: #123c3a;
+    background: #d8ece6;
+  }
+
+  .mobile-bottom-nav span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-more-menu {
+    position: fixed;
+    right: 10px;
+    bottom: calc(var(--mobile-bottom-nav-height) + 12px + env(safe-area-inset-bottom));
+    left: 10px;
+    z-index: 79;
+    display: grid;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid #d8cfc2;
+    border-radius: 8px;
+    background: #fffdfa;
+    box-shadow: 0 18px 48px rgba(38, 50, 54, 0.2);
+  }
+
+  .mobile-more-menu button {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 0;
+    border-radius: 8px;
+    padding: 0 12px;
+    color: #38454a;
+    background: transparent;
+    font-weight: 800;
+    text-align: left;
+  }
+
+  .mobile-more-menu button.active {
+    color: #123c3a;
+    background: #d8ece6;
+  }
+
+  .global-toast {
+    top: calc(var(--mobile-topbar-height) + 16px + env(safe-area-inset-top));
+    bottom: auto;
+    right: auto;
+    left: 50%;
+    width: calc(100vw - 20px);
+    max-width: none;
+    z-index: 90;
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 14px;
+    transform: translateX(-50%);
+    animation-name: mobile-toast-enter;
+  }
+
+  @keyframes mobile-toast-enter {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  .band,
+  .panel,
+  .settings-panel,
+  .data-management,
+  .settings-hub,
+  .project-overview-card,
+  .task-column,
+  .project-stage-overview,
+  .project-members-panel,
+  .project-settings-panel,
+  .report-filter-panel,
+  .review-panel {
+    border-radius: 8px;
+  }
+
+  .content-grid,
+  .workspace-grid,
+  .focus-layout,
+  .reports-layout,
+  .settings-layout,
+  .settings-hub,
+  .calendar-layout,
+  .calendar-toolbar,
+  .calendar-detail-grid,
+  .project-detail-layout,
+  .project-detail-hero,
+  .project-stage-row,
+  .project-card,
+  .project-card-board,
+  .project-card-side,
+  .project-overview-card-header,
+  .project-overview-actions,
+  .project-task-filters,
+  .project-task-create-primary,
+  .project-task-create-primary-grid,
+  .project-task-create-dialog-form,
+  .project-task-create-dialog-form.advanced,
+  .project-task-create-advanced,
+  .project-task-create-collaboration,
+  .member-modal-grid,
+  .member-create-panel .settings-grid,
+  .member-card,
+  .project-binding-row,
+  .add-project-member-row,
+  .settings-grid,
+  .filter-grid,
+  .detail-grid,
+  .detail-summary,
+  .notification-grid,
+  .sync-grid,
+  .sync-summary-grid,
+  .review-grid,
+  .review-summary-grid,
+  .distribution-grid,
+  .reward-grid,
+  .deploy-grid,
+  .capability-grid,
+  .compact-metrics,
+  .project-member-grid,
+  .project-member-summary-grid,
+  .task-form {
+    grid-template-columns: 1fr;
+  }
+
+  .project-card-board,
+  .my-project-card-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--mobile-card-gap);
+  }
+
+  .my-project-task-panel {
+    padding: 8px;
+  }
+
+  .my-project-task-card {
+    min-height: auto;
+    padding: 10px;
+  }
+
+  .my-project-mini-metrics,
+  .project-status-strip,
+  .project-overview-signal {
+    gap: 5px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .my-project-mini-metrics::-webkit-scrollbar,
+  .project-status-strip::-webkit-scrollbar,
+  .project-overview-signal::-webkit-scrollbar {
+    display: none;
+  }
+
+  .my-project-mini-metrics span,
+  .project-status-pill,
+  .project-overview-signal span {
+    flex: 0 0 auto;
+  }
+
+  .project-overview-card {
+    padding: 13px;
+  }
+
+  .project-overview-card-header {
+    gap: 10px;
+  }
+
+  .project-overview-progress-inline {
+    min-width: 0;
+    min-height: 44px;
+    grid-template-columns: auto auto;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .project-overview-metrics,
+  .project-detail-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-overview-actions,
+  .modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .task-item {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .task-title-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .task-title-main {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .task-title-badges {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .task-inline-progress {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .task-progress-meta-row {
+    grid-template-columns: 1fr;
+  }
+
+  .task-actions {
+    max-width: none;
+    justify-content: flex-start;
+    grid-template-columns: 1fr;
+  }
+
+  .task-primary-actions,
+  .task-secondary-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .project-overview-actions button,
+  .modal-actions button {
+    width: 100%;
+  }
+
+  .project-detail-hero {
+    position: sticky;
+    top: var(--mobile-topbar-height);
+    z-index: 24;
+    margin: 0 0 10px;
+    padding: 8px;
+    gap: 8px;
+    background: rgba(251, 250, 246, 0.98);
+  }
+
+  .project-detail-tabs {
+    width: 100%;
+    overflow-x: auto;
+    grid-auto-columns: minmax(72px, 1fr);
+  }
+
+  .project-detail-tabs button {
+    white-space: nowrap;
+  }
+
+  .project-detail-stats > div {
+    min-height: 44px;
+    padding: 8px;
+  }
+
+  .project-stage-row,
+  .project-stage-task-list {
+    grid-template-columns: 1fr;
+  }
+
+  .project-accepted-list,
+  .project-accepted-card {
+    grid-template-columns: 1fr;
+  }
+
+  .project-accepted-card {
+    align-items: start;
+  }
+
+  .project-accepted-time {
+    justify-items: start;
+  }
+
+  .project-stage-label {
+    grid-template-columns: auto auto;
+    justify-content: space-between;
+  }
+
+  .project-task-table-head {
+    display: none;
+  }
+
+  .project-task-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .project-task-row > * {
+    min-width: 0;
+  }
+
+  .project-task-row select,
+  .project-task-row button {
+    width: 100%;
+  }
+
+  .project-member-card,
+  .member-card,
+  .project-binding-row,
+  .add-project-member-row {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .member-role-row,
+  .owner-card {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .settings-section-tabs,
+  .segmented {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    justify-self: stretch;
+    justify-content: start;
+    grid-auto-columns: max-content;
+    scrollbar-width: none;
+  }
+
+  .settings-hub,
+  .settings-section-tabs {
+    min-width: 0;
+  }
+
+  .settings-section-tabs::-webkit-scrollbar,
+  .segmented::-webkit-scrollbar {
+    display: none;
+  }
+
+  .calendar-week,
+  .calendar-month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-day {
+    min-height: 78px;
+    padding: 8px;
+  }
+
+  .calendar-detail-grid {
+    gap: 10px;
+  }
+
+  .filter-grid,
+  .report-filter-panel .filter-grid {
+    gap: 10px;
+  }
+
+  .modal-backdrop {
+    z-index: 90;
+    place-items: end stretch;
+    padding: 0;
+  }
+
+  .modal-panel,
+  .modal-panel.member-modal,
+  .modal-panel.task-detail-modal,
+  .modal-panel.project-task-create-modal,
+  .split-modal {
+    width: 100%;
+    max-width: none;
+    height: min(100dvh, 100vh);
+    max-height: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 8px 8px 0 0;
+    background: #fbfaf6;
+    overflow: hidden;
+  }
+
+  .modal-panel {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 0;
+  }
+
+  .modal-panel.add-project-member-modal {
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 0;
+  }
+
+  .modal-panel.add-project-member-modal.no-search {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .add-project-member-tools {
+    margin: 0 14px;
+  }
+
+  .add-project-member-list {
+    padding: 0 14px 14px;
+  }
+
+  .modal-heading,
+  .project-task-create-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid #e3dacd;
+    background: #fffdfa;
+  }
+
+  .modal-heading h2 {
+    font-size: 22px;
+  }
+
+  .task-detail-modal .task-detail,
+  .member-modal,
+  .modal-panel > form,
+  .modal-panel > .task-detail,
+  .modal-panel > .member-modal-grid,
+  .project-task-create-body {
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .task-detail-modal .task-detail {
+    min-height: 100%;
+    height: 100%;
+    padding: 16px;
+    border-radius: 0;
+    background: #fbfaf6;
+    box-shadow: none;
+  }
+
+  .project-task-create-body {
+    padding: 14px;
+  }
+
+  .project-task-create-primary,
+  .project-task-create-section {
+    padding: 12px;
+  }
+
+  .project-task-create-modal .modal-actions,
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    margin: 0;
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid #e3dacd;
+    background: #fffdfa;
+  }
+
+  .task-detail .detail-section {
+    padding: 12px;
+  }
+
+  .detail-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .mini-timer-panel {
+    right: 10px;
+    bottom: calc(var(--mobile-bottom-nav-height) + 10px + env(safe-area-inset-bottom));
+    left: 10px;
+    width: auto;
+  }
+
+  .undo-banner {
+    right: 10px;
+    bottom: calc(var(--mobile-bottom-nav-height) + 10px + env(safe-area-inset-bottom));
+    left: 10px;
+    width: auto;
+  }
+}
