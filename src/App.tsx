@@ -7,10 +7,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateRemaining,
-  buildProgressBoard,
   defaultReview,
   deriveRewardState,
-  generateRecurringTask,
   pauseTimer,
   planCapacityHint,
   planPressure,
@@ -18,6 +16,8 @@ import {
   suggestedTasks,
   taskSuggestions,
 } from "./domain";
+import { generateRecurringTask } from "./recurrence";
+import { buildProgressBoard } from "./progressBoard";
 import { requestTimerNotifications } from "./notifications";
 import { checkStrictModeViolation, loadState, requestStrictPermissions, saveState, startStrictMode, stopStrictMode } from "./storage";
 import {
@@ -56,6 +56,7 @@ import { applyAuthStatusFailure, applyTeamStateLoadFailure } from "./appBoot";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
 import { announceTimerEnd, runDueTaskReminders, stopWhiteNoise, syncWhiteNoise, updateActiveTimerPresence } from "./timerRuntime";
+import { createKeyboardRuntime } from "./keyboardRuntime";
 import {
   acceptTaskInState,
   bindTeamMemberToProjectInState,
@@ -71,7 +72,13 @@ import {
   updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
-import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
+import {
+  createProjectTaskInState,
+  deriveProjectDetailModel,
+  initialProjectTaskFilters,
+  type ProjectTaskFilters,
+  type ProjectTaskInput,
+} from "./projectDetail";
 import { defaultSyncServerUrl, uid } from "./seed";
 import { clearRememberedAuth, readRememberedAuth, saveRememberedAuth } from "./rememberedAuth";
 import { bindAccountToMembers } from "./authModel";
@@ -81,6 +88,7 @@ import {
   committedTasksForPlan,
   currentMemberForState,
   currentTaskForFocus,
+  deriveWorkspaceModel,
   focusTasksForMember,
   poolTasksForFilters,
   taskById,
@@ -178,6 +186,7 @@ export function App() {
   const [workspaceMode, setWorkspaceMode] = useState<"board" | "workbench">("board");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectDetailTab, setProjectDetailTab] = useState<ProjectDetailTab>("overview");
+  const [projectTaskFilters, setProjectTaskFilters] = useState<ProjectTaskFilters>(initialProjectTaskFilters);
   const [draft, setDraft] = useState<TaskDraft>(initialDraft);
   const [loaded, setLoaded] = useState(false);
   const [strictStatus, setStrictStatus] = useState<StrictModeStatus | null>(null);
@@ -189,6 +198,7 @@ export function App() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [preferredFocusTaskId, setPreferredFocusTaskId] = useState<string | null>(null);
   const [taskFilters, setTaskFilters] = useState<TaskFilters>(initialFilters);
+  const [selectedWorkbenchProjectIds, setSelectedWorkbenchProjectIds] = useState<string[]>([]);
   const [pendingDeleteTask, setPendingDeleteTask] = useState<Task | null>(null);
   const [pendingSplit, setPendingSplit] = useState<SplitDraft | null>(null);
   const [pendingReset, setPendingReset] = useState(false);
@@ -331,139 +341,22 @@ export function App() {
     }
   }, [state?.auth.workspace?.id, state?.auth.workspace?.type, tab]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const current = stateRef.current;
-      const currentTab = tabRef.current;
-      const target = event.target as HTMLElement | null;
-      const editing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT";
-      const isSlash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
-
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setCommandPaletteOpen(true);
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
-        if (event.key === "1") {
-          event.preventDefault();
-          setSettingsSection("projects");
-          setTab("settings");
-          return;
-        }
-        if (event.key === "2") {
-          event.preventDefault();
-          setWorkspaceMode("board");
-          setTab("workspace");
-          return;
-        }
-        if (event.key === "3") {
-          event.preventDefault();
-          setWorkspaceMode("workbench");
-          setTab("workspace");
-          return;
-        }
-        if (event.key === "4") {
-          event.preventDefault();
-          setTab("calendar");
-          return;
-        }
-        if (event.key === "5") {
-          event.preventDefault();
-          setTab("daily");
-          return;
-        }
-        if (event.key === "6") {
-          event.preventDefault();
-          setTab("reports");
-          return;
-        }
-      }
-      if (event.key === "Escape") {
-        setCommandPaletteOpen(false);
-        setShowShortcutHelp(false);
-        return;
-      }
-      if (!editing && isSlash) {
-        event.preventDefault();
-        setCommandPaletteOpen(true);
-        return;
-      }
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        const plan = current ? getTodayPlan(current) : null;
-        if (current && plan && !plan.reviewedAt && currentTab === "daily") {
-          completeReview();
-        }
-        return;
-      }
-
-      if (editing || !current) return;
-
-      if (event.code === "Space" || event.key === " ") {
-        event.preventDefault();
-        if (event.shiftKey) {
-          if (current.activeTimer) setPendingReset(true);
-          return;
-        }
-        if (!current.activeTimer) {
-          if (currentTab !== "workspace") return;
-          const plan = getTodayPlan(current);
-          const selected = selectedTaskIdRef.current && plan.committedTaskIds.includes(selectedTaskIdRef.current)
-            ? selectedTaskIdRef.current
-            : plan.committedTaskIds[0];
-          if (selected) {
-            setTab("focus");
-            void beginTimer("focus", selected);
-          }
-          return;
-        }
-        toggleTimer();
-        return;
-      }
-
-      const plan = getTodayPlan(current);
-      const committedIds = plan.committedTaskIds;
-
-      if (currentTab === "workspace" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
-        event.preventDefault();
-        const direction: -1 | 1 = event.key === "ArrowUp" ? -1 : 1;
-        const currentSelected = selectedTaskIdRef.current;
-        if (!committedIds.length) return;
-
-        const selectedId = currentSelected && committedIds.includes(currentSelected) ? currentSelected : committedIds[0];
-        if (!selectedId) return;
-        setSelectedTaskId(selectedId);
-
-        if (currentSelected && committedIds.includes(currentSelected)) {
-          const currentIndex = committedIds.indexOf(currentSelected);
-          const nextIndex = currentIndex + direction;
-          if (nextIndex < 0 || nextIndex >= committedIds.length) return;
-          moveCommittedTask(currentSelected, direction);
-          setSelectedTaskId(committedIds[nextIndex]);
-        }
-        return;
-      }
-
-      if (event.key === "Enter" && currentTab === "workspace" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        const selectedId = selectedTaskIdRef.current && committedIds.includes(selectedTaskIdRef.current)
-          ? selectedTaskIdRef.current
-          : committedIds[0];
-        if (!selectedId || current.activeTimer) return;
-        setTab("focus");
-        void beginTimer("focus", selectedId);
-      }
-
-      if (event.key === "q" && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey && currentTab === "focus") {
-        event.preventDefault();
-        setTab("workspace");
-        return;
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  useEffect(() => createKeyboardRuntime({
+    getState: () => stateRef.current,
+    getCurrentTab: () => tabRef.current,
+    getSelectedTaskId: () => selectedTaskIdRef.current,
+    setCommandPaletteOpen,
+    setShowShortcutHelp,
+    setSettingsSection,
+    setWorkspaceMode,
+    setTab,
+    setPendingReset,
+    setSelectedTaskId,
+    completeReview: () => completeReview(),
+    beginTimer: (mode, taskId) => beginTimer(mode, taskId),
+    toggleTimer: () => toggleTimer(),
+    moveCommittedTask: (taskId, direction) => moveCommittedTask(taskId, direction),
+  }).attach(), []);
 
   useEffect(() => {
     loadState()
@@ -863,6 +756,11 @@ export function App() {
     return committedTasksForPlan(state, todayPlan);
   }, [state, todayPlan]);
 
+  const totalCommittedEstimate = useMemo(
+    () => committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0),
+    [committedTasks],
+  );
+
   const currentMember = useMemo(() => {
     if (!state) return undefined;
     return currentMemberForState(state);
@@ -889,6 +787,31 @@ export function App() {
     return poolTasksForFilters(state, todayPlan, taskFilters);
   }, [state, todayPlan, taskFilters]);
 
+  const workspaceModel = useMemo(() => {
+    if (!state || !todayPlan) return null;
+    return deriveWorkspaceModel(state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds);
+  }, [state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds]);
+
+  useEffect(() => {
+    setSelectedWorkbenchProjectIds([]);
+  }, [workspaceModel?.currentMember?.id]);
+
+  useEffect(() => {
+    setSelectedWorkbenchProjectIds((current) => {
+      const available = new Set(workspaceModel?.availableWorkbenchProjectIds ?? []);
+      const next = current.filter((projectId) => available.has(projectId));
+      return next.length === current.length ? current : next;
+    });
+  }, [workspaceModel?.availableWorkbenchProjectIds.join("|")]);
+
+  const toggleWorkbenchProject = (projectId: string) => {
+    setSelectedWorkbenchProjectIds((current) => {
+      return current.includes(projectId)
+        ? current.filter((item) => item !== projectId)
+        : [...current, projectId];
+    });
+  };
+
   const currentTask = useMemo(() => {
     if (!state) return undefined;
     return currentTaskForFocus(state, focusCommittedTasks, preferredFocusTaskId);
@@ -899,7 +822,21 @@ export function App() {
     return taskById(state, selectedTaskId);
   }, [state, selectedTaskId]);
 
-  if (!state || !todayPlan) {
+  const primaryProjectId = state?.projects[0]?.id ?? "";
+  const activeProjectId = selectedProjectId && state?.projects.some((project) => project.id === selectedProjectId)
+    ? selectedProjectId
+    : primaryProjectId;
+  const projectDetailDate = today();
+  const projectDetailModel = useMemo(() => {
+    if (!state || !activeProjectId) return undefined;
+    return deriveProjectDetailModel(state, activeProjectId, projectTaskFilters, projectDetailDate);
+  }, [state, activeProjectId, projectTaskFilters, projectDetailDate]);
+  const currentProjectMemberId = useMemo(() => {
+    if (!state || !activeProjectId) return undefined;
+    return resolveMemberIdForProject(state, activeProjectId);
+  }, [state, activeProjectId]);
+
+  if (!state || !todayPlan || !workspaceModel) {
     return (
       <main className="boot">
         <div className="boot-mark">
@@ -2229,16 +2166,20 @@ export function App() {
     }
   };
 
-  const totalCommittedEstimate = committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0);
   const capacityHint = planCapacityHint(state);
-  const primaryProjectId = state.projects[0]?.id ?? "";
-  const activeProjectId = selectedProjectId && state.projects.some((project) => project.id === selectedProjectId)
-    ? selectedProjectId
-    : primaryProjectId;
   const currentWorkspaceType = state.auth.workspace?.type ?? "shared";
   const isPrivateWorkspace = currentWorkspaceType === "private";
   const isSuperAdmin = state.auth.account?.id === "account_admin" || state.auth.account?.email?.trim().toLowerCase() === "admin";
   const canManageMembers = isSuperAdmin;
+  const settingsDataSummary = {
+    projectCount: state.projects.length,
+    taskCount: state.tasks.length,
+    projectMemberCount: state.projectMembers.length,
+    focusSessionCount: state.focusSessions.length,
+    workSessionCount: state.workSessions.length,
+    executionSignalCount: state.executionSignals.length,
+    interruptionCount: state.interruptions.length,
+  };
   const workspaceOptions = state.auth.workspaces?.length
     ? state.auth.workspaces
     : state.auth.workspace
@@ -2389,15 +2330,18 @@ export function App() {
         {tab === "workspace" && (
           <WorkspaceView
             mode={workspaceMode}
-            state={state}
+            model={workspaceModel}
             draft={draft}
             setDraft={setDraft}
             addTask={addTask}
-            poolTasks={poolTasks}
-            committedTasks={committedTasks}
-            todayPlan={todayPlan}
+            selectedWorkbenchProjectIds={selectedWorkbenchProjectIds}
+            toggleWorkbenchProject={toggleWorkbenchProject}
+            goalLabel={state.onboarding.desiredHabit}
+            todayCapacityPomodoros={todayPlan.capacityPomodoros}
+            activeTimer={state.activeTimer}
+            projects={state.projects}
+            projectMembers={state.projectMembers}
             selectedTask={selectedTask}
-            totalCommittedEstimate={totalCommittedEstimate}
             commitTask={commitTask}
             removeCommittedTask={removeCommittedTask}
             completeTask={completeTask}
@@ -2434,8 +2378,12 @@ export function App() {
 
         {tab === "project" && activeProjectId && (
           <ProjectDetailView
-            state={state}
-            projectId={activeProjectId}
+            model={projectDetailModel}
+            filters={projectTaskFilters}
+            setFilters={setProjectTaskFilters}
+            allProjects={state.projects}
+            allProjectMembers={state.projectMembers}
+            currentProjectMemberId={currentProjectMemberId}
             activeTab={projectDetailTab}
             setActiveTab={setProjectDetailTab}
             selectedTask={selectedTask}
@@ -2531,7 +2479,15 @@ export function App() {
 
         {tab === "settings" && (
           <SettingsView
-            state={state}
+            projects={state.projects}
+            projectMembers={state.projectMembers}
+            teamMembers={state.teamMembers}
+            settings={state.settings}
+            onboarding={state.onboarding}
+            sync={state.sync}
+            backupSnapshots={state.backupSnapshots}
+            nativeCapabilities={state.nativeCapabilities}
+            dataSummary={settingsDataSummary}
             activeSection={settingsSection}
             setActiveSection={setSettingsSection}
             activeProfile={activeProfile}

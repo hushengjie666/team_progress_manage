@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, CheckCircle2, ChevronRight, Eye, Plus, Search, Settings, SlidersHorizontal, UserPlus, UserRoundPen, Users, X } from "lucide-react";
-import { labelPriority, labelTaskStage, nowIso, taskStageOptions, today } from "../appModel";
+import { labelPriority, labelTaskStage, nowIso, taskStageOptions } from "../appModel";
 import {
   projectTaskStatusColumns,
   stageTaskCardClassName,
@@ -9,12 +9,11 @@ import {
   stageTaskStatusLabel,
 } from "../projectTaskDisplay";
 import {
-  deriveProjectDetailModel,
   type ProjectTaskInput,
   type ProjectTaskFilters,
+  type ProjectDetailModel,
 } from "../projectDetail";
-import { resolveMemberIdForProject } from "../memberIdentity";
-import type { AppState, Project, ProjectMember, ProjectMemberRole, Task, TaskStatus, TeamMember } from "../types";
+import type { Project, ProjectMember, ProjectMemberRole, Task, TaskStatus, TeamMember } from "../types";
 import { TaskDetailModal } from "./WorkspaceView";
 import { ScheduleCalendarView } from "./ScheduleCalendarView";
 import { ProjectTaskCreateDialog } from "./projectDetail/ProjectTaskCreateDialog";
@@ -29,14 +28,6 @@ export {
 export type ProjectDetailTab = "overview" | "schedule" | "tasks" | "members" | "settings";
 
 const statusColumns = projectTaskStatusColumns;
-
-const initialFilters: ProjectTaskFilters = {
-  query: "",
-  status: "all",
-  executor: "all",
-  priority: "all",
-  sort: "status",
-};
 
 const createEmptyProjectTaskDraft = (): ProjectTaskInput => ({
   title: "",
@@ -53,8 +44,12 @@ const createEmptyProjectTaskDraft = (): ProjectTaskInput => ({
 });
 
 export function ProjectDetailView(props: {
-  state: AppState;
-  projectId: string;
+  model?: ProjectDetailModel;
+  filters: ProjectTaskFilters;
+  setFilters: (filters: ProjectTaskFilters) => void;
+  allProjects: Project[];
+  allProjectMembers: ProjectMember[];
+  currentProjectMemberId?: string;
   activeTab: ProjectDetailTab;
   setActiveTab: (tab: ProjectDetailTab) => void;
   selectedTask?: Task;
@@ -75,13 +70,13 @@ export function ProjectDetailView(props: {
   backToAdmin: () => void;
   openMemberSettings: () => void;
 }) {
-  const [filters, setFilters] = useState<ProjectTaskFilters>(initialFilters);
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
   const [addMemberRolesById, setAddMemberRolesById] = useState<Record<string, ProjectMemberRole[]>>({});
   const [draft, setDraft] = useState<ProjectTaskInput>(createEmptyProjectTaskDraft);
-  const model = deriveProjectDetailModel(props.state, props.projectId, filters, today());
+  const { filters, setFilters } = props;
+  const model = props.model;
   const canManageMembers = props.canManageMembers ?? true;
   const activeTab = !canManageMembers && props.activeTab === "members" ? "overview" : props.activeTab;
 
@@ -130,12 +125,12 @@ export function ProjectDetailView(props: {
   };
 
   const updateStatus = (taskId: string, status: TaskStatus) => {
-    const task = props.state.tasks.find((item) => item.id === taskId);
+    const task = allProjectTasks.find((item) => item.id === taskId);
     props.updateTask(taskId, {
       status,
       completedAt: status === "completed" ? nowIso() : undefined,
       reviewSubmittedAt: status === "pending_review" ? nowIso() : undefined,
-      reviewSubmittedByMemberId: status === "pending_review" && task ? resolveMemberIdForProject(props.state, task.projectId) : undefined,
+      reviewSubmittedByMemberId: status === "pending_review" && task ? props.currentProjectMemberId : undefined,
     });
   };
   const updateMemberRole = (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => {
@@ -354,9 +349,10 @@ export function ProjectDetailView(props: {
       {activeTab === "schedule" && (
         <section className="band project-schedule-panel">
           <ScheduleCalendarView
-            state={props.state}
             tasks={allProjectTasks}
             members={projectMembers}
+            activeTaskIds={activeProjectTaskIds}
+            todayTaskIds={todayPlan?.committedTaskIds ?? []}
             embedded
             title={`${project.name}排期`}
             subtitle="按阶段查看当前项目任务的排期、负责人、今日任务和运行状态。"
@@ -389,7 +385,7 @@ export function ProjectDetailView(props: {
           <ProjectMemberBindingPanel
             project={project}
             teamMembers={activeTeamMembers}
-            projectMembers={props.state.projectMembers}
+            projectMembers={props.allProjectMembers}
             canManage={access.canReviewTasks}
             updateMemberRole={updateMemberRole}
             updateProjectMember={props.updateProjectMember}
@@ -447,8 +443,8 @@ export function ProjectDetailView(props: {
 
       <TaskDetailModal
         task={props.selectedTask?.projectId === project.id ? props.selectedTask : undefined}
-        projects={props.state.projects}
-        projectMembers={props.state.projectMembers}
+        projects={props.allProjects}
+        projectMembers={props.allProjectMembers}
         updateTask={props.updateTask}
         updateTaskAssignment={props.updateTaskAssignment}
         updateTaskProgress={props.updateTaskProgress}

@@ -1,10 +1,10 @@
-import { buildProgressBoard } from "./domain";
 import {
   projectMemberIdentityIds,
   sameMemberIdentity,
   taskAssignedToMemberIdentity,
   taskBelongsToMemberIdentity,
 } from "./memberIdentity";
+import { buildProgressBoard } from "./progressBoard";
 import type { AppState, Project, ProjectMember, Task, TaskStatus } from "./types";
 
 export { projectMemberIdentityIds, sameMemberIdentity, taskAssignedToMemberIdentity } from "./memberIdentity";

@@ -94,6 +94,12 @@ export const deriveWorkspaceModel = (
   const inbox = unresolvedInterruptions(state).slice(0, 6);
   const pressure = planPressure(state, todayPlan);
   const suggestions = taskSuggestions(state, todayPlan.date, 5);
+  const suggestionItems = suggestions
+    .map((suggestion) => {
+      const task = state.tasks.find((item) => item.id === suggestion.taskId);
+      return task ? { suggestion, task } : undefined;
+    })
+    .filter((item): item is { suggestion: typeof suggestions[number]; task: Task } => Boolean(item));
   const guideSteps = coachSteps(state, todayPlan.date).filter((step) => !(state.settings.dismissedCoachSteps ?? []).includes(step.id));
   const nextGuideStep = guideSteps.find((step) => !step.completed);
   const currentMember = currentMemberForState(state);
@@ -136,6 +142,7 @@ export const deriveWorkspaceModel = (
     inbox,
     pressure,
     suggestions,
+    suggestionItems,
     guideSteps,
     nextGuideStep,
     currentMember,
@@ -147,3 +154,5 @@ export const deriveWorkspaceModel = (
     projectOverviewCards,
   };
 };
+
+export type WorkspaceViewModel = ReturnType<typeof deriveWorkspaceModel>;

@@ -1,15 +1,17 @@
 import { Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AppState, TeamMember } from "../../types";
+import type { ProjectMember, TeamMember } from "../../types";
 
 export function SettingsMembersSection({
-  state,
+  teamMembers,
+  projectMembers,
   createTeamMember,
   updateTeamMember,
   updateTeamMemberPassword,
   deleteTeamMember,
 }: {
-  state: AppState;
+  teamMembers: TeamMember[];
+  projectMembers: ProjectMember[];
   createTeamMember: (name: string, email: string, password?: string) => void;
   updateTeamMember: (member: TeamMember) => void;
   updateTeamMemberPassword: (member: TeamMember, password: string) => void;
@@ -19,7 +21,7 @@ export function SettingsMembersSection({
   const [memberDraftWarning, setMemberDraftWarning] = useState("");
   const [memberPasswordDrafts, setMemberPasswordDrafts] = useState<Record<string, string>>({});
   const canManageWorkspaceProjects = true;
-  const activeTeamMembers = state.teamMembers.filter((member) => member.status !== "disabled");
+  const activeTeamMembers = teamMembers.filter((member) => member.status !== "disabled");
   const normalizedMemberDraftEmail = memberDraft.email.trim().toLowerCase();
   const memberDraftEmailExists = Boolean(
     normalizedMemberDraftEmail &&
@@ -113,7 +115,7 @@ export function SettingsMembersSection({
             key={member.id}
             member={member}
             teamMembers={activeTeamMembers}
-            projectCount={state.projectMembers.filter((binding) => binding.teamMemberId === member.id && binding.status !== "disabled").length}
+            projectCount={projectMembers.filter((binding) => binding.teamMemberId === member.id && binding.status !== "disabled").length}
             canManage={canManageWorkspaceProjects}
             passwordDraft={memberPasswordDrafts[member.id] ?? ""}
             updateMember={updateTeamMember}

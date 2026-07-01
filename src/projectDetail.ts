@@ -1,6 +1,6 @@
 import { emptyTaskDefaults, nowIso, priorityWeight } from "./appModel";
-import { buildProgressBoard } from "./domain";
 import { resolveMemberForProject, resolveMemberIdForProject } from "./memberIdentity";
+import { buildProgressBoard } from "./progressBoard";
 import { uid } from "./seed";
 import type { AppState, Priority, ProjectMember, RepeatRule, Severity, Task, TaskStage, TaskStatus } from "./types";
 
@@ -61,6 +61,14 @@ export type ProjectTaskFilters = {
   executor: "all" | "unassigned" | string;
   priority: "all" | Priority;
   sort: "status" | "priority" | "dueAt" | "updatedAt";
+};
+
+export const initialProjectTaskFilters: ProjectTaskFilters = {
+  query: "",
+  status: "all",
+  executor: "all",
+  priority: "all",
+  sort: "status",
 };
 
 export const projectTasksForProject = (state: AppState, projectId: string) =>
@@ -167,6 +175,8 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
     memberOverviewStats,
   };
 };
+
+export type ProjectDetailModel = NonNullable<ReturnType<typeof deriveProjectDetailModel>>;
 
 export const buildProjectOverviewTaskBoard = (
   tasks: Task[],

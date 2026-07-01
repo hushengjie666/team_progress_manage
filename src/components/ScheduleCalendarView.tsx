@@ -2,7 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { useMemo, useState } from "react";
 import { labelPriority, labelTaskStage, taskStageOptions } from "../appModel";
 import { todayKey } from "../seed";
-import type { AppState, ProjectMember, Task } from "../types";
+import type { ProjectMember, Task } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 42;
@@ -96,9 +96,10 @@ const buildScheduleItems = (tasks: Task[], windowStart: string, windowDays: numb
 };
 
 export function ScheduleCalendarView(props: {
-  state: AppState;
-  tasks?: Task[];
-  members?: ProjectMember[];
+  tasks: Task[];
+  members: ProjectMember[];
+  activeTaskIds?: string[];
+  todayTaskIds?: string[];
   title?: string;
   subtitle?: string;
   embedded?: boolean;
@@ -108,19 +109,11 @@ export function ScheduleCalendarView(props: {
   const windowStart = startOfWindow(cursor);
   const days = useMemo(() => Array.from({ length: WINDOW_DAYS }, (_, index) => addDays(windowStart, index)), [windowStart]);
   const activeTaskIds = useMemo(
-    () =>
-      new Set(
-        props.state.workSessions
-          .filter((session) => session.status === "active")
-          .map((session) => session.taskId),
-      ),
-    [props.state.workSessions],
+    () => new Set(props.activeTaskIds ?? []),
+    [props.activeTaskIds],
   );
-  const todayPlan = props.state.dailyPlans.find((plan) => plan.date === todayKey());
-  const todayTaskIds = new Set(todayPlan?.committedTaskIds ?? []);
-  const sourceTasks = props.tasks ?? props.state.tasks;
-  const members = props.members ?? props.state.projectMembers;
-  const tasks = sourceTasks
+  const todayTaskIds = new Set(props.todayTaskIds ?? []);
+  const tasks = props.tasks
     .filter((task) => task.status !== "split" && task.status !== "archived")
     .sort((left, right) => {
       const leftDate = taskDateRange(left)?.start ?? "9999-12-31";
@@ -217,7 +210,7 @@ export function ScheduleCalendarView(props: {
                         {item.clippedStart && "…"}{task.title}{item.clippedEnd && "…"}
                       </span>
                       <span className="schedule-task-tags">
-                        <i>{memberName(members, task.primaryExecutorMemberId)}</i>
+                        <i>{memberName(props.members, task.primaryExecutorMemberId)}</i>
                         <i>{labelPriority[task.priority]}</i>
                         {isToday && <i className="today">今日</i>}
                         {isActive && <i className="active">执行中</i>}
@@ -245,7 +238,7 @@ export function ScheduleCalendarView(props: {
           {unscheduledTasks.map((task) => (
             <button className="unscheduled-task-card" key={task.id} onClick={() => props.openTask(task.id)} type="button">
               <strong>{task.title}</strong>
-              <span>{task.project} · {labelTaskStage[task.stage]} · {memberName(members, task.primaryExecutorMemberId)}</span>
+              <span>{task.project} · {labelTaskStage[task.stage]} · {memberName(props.members, task.primaryExecutorMemberId)}</span>
             </button>
           ))}
           {unscheduledTasks.length === 0 && <p className="empty">所有任务都已经有排期。</p>}

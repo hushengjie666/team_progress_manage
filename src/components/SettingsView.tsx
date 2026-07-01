@@ -2,18 +2,50 @@ import { AlarmClock, Bell, Cloud, DatabaseBackup, Download, LogIn, RefreshCw, Se
 import { useRef, useState } from "react";
 import { nowIso } from "../appModel";
 import { deploymentCommands } from "../syncDiagnostics";
-import type { AppState, BlockProfile, ImportSummary, Project, ProjectMember, StrictModeStatus, SyncConflict, SyncDiagnosticResult, SyncState, TeamMember } from "../types";
+import type {
+  BackupSnapshot,
+  BlockProfile,
+  ImportSummary,
+  NativeCapabilityState,
+  Onboarding,
+  Project,
+  ProjectMember,
+  Settings,
+  StrictModeStatus,
+  SyncConflict,
+  SyncDiagnosticResult,
+  SyncState,
+  TeamMember,
+} from "../types";
 import { SettingsMembersSection } from "./settings/SettingsMembersSection";
 
 export type SettingsSection = "members" | "projects" | "timer" | "focus" | "sync" | "data" | "system" | "demo";
 
+export type SettingsDataSummary = {
+  projectCount: number;
+  taskCount: number;
+  projectMemberCount: number;
+  focusSessionCount: number;
+  workSessionCount: number;
+  executionSignalCount: number;
+  interruptionCount: number;
+};
+
 export function SettingsView(props: {
-  state: AppState;
+  projects: Project[];
+  projectMembers: ProjectMember[];
+  teamMembers: TeamMember[];
+  settings: Settings;
+  onboarding: Pick<Onboarding, "dailyGoalPomodoros" | "preferredFocusMinutes">;
+  sync: SyncState;
+  backupSnapshots: BackupSnapshot[];
+  nativeCapabilities: NativeCapabilityState[];
+  dataSummary: SettingsDataSummary;
   activeSection: SettingsSection;
   setActiveSection: (section: SettingsSection) => void;
   activeProfile?: BlockProfile;
   strictStatus: StrictModeStatus | null;
-  updateSettings: <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => void;
+  updateSettings: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   createProject: (name: string, description: string) => void;
   updateProject: (project: Project) => void;
   createTeamMember: (name: string, email: string, password?: string) => void;
@@ -43,7 +75,15 @@ export function SettingsView(props: {
   loadDemoData: () => void;
 }) {
   const {
-    state,
+    projects,
+    projectMembers,
+    teamMembers,
+    settings,
+    onboarding,
+    sync,
+    backupSnapshots,
+    nativeCapabilities,
+    dataSummary,
     activeSection,
     setActiveSection,
     activeProfile,
@@ -78,7 +118,7 @@ export function SettingsView(props: {
   } = props;
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [projectDraft, setProjectDraft] = useState({ name: "", description: "" });
-  const commands = deploymentCommands(state.sync.serverUrl);
+  const commands = deploymentCommands(sync.serverUrl);
   const strictPlatform = strictStatus?.platform ?? "browser";
   const supportsSystemChecks = strictPlatform === "tauri_macos" || strictPlatform === "ios";
   const supportsUrlChecks = strictPlatform === "tauri_macos";
@@ -132,7 +172,8 @@ export function SettingsView(props: {
 
       {effectiveSection === "members" && (
         <SettingsMembersSection
-          state={state}
+          teamMembers={teamMembers}
+          projectMembers={projectMembers}
           createTeamMember={createTeamMember}
           updateTeamMember={updateTeamMember}
           updateTeamMemberPassword={updateTeamMemberPassword}
@@ -177,8 +218,8 @@ export function SettingsView(props: {
           新建项目
         </button>
         <div className="backup-list">
-          {state.projects.map((project) => {
-            const members = state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
+          {projects.map((project) => {
+            const members = projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
             const ownerMembers = members.filter((member) => member.roles.includes("project_owner"));
             const regularMembers = members.filter((member) => !member.roles.includes("project_owner"));
             const canManage = canManageProject(project.id);
@@ -263,7 +304,7 @@ export function SettingsView(props: {
           <Sparkles size={20} />
         </div>
         <p className="muted">
-          当前个人计时节奏：每天 {state.onboarding.dailyGoalPomodoros} 个番茄；偏好 {state.onboarding.preferredFocusMinutes} 分钟。
+          当前个人计时节奏：每天 {onboarding.dailyGoalPomodoros} 个番茄；偏好 {onboarding.preferredFocusMinutes} 分钟。
         </p>
       </section>
 
@@ -282,7 +323,7 @@ export function SettingsView(props: {
               type="number"
               min="5"
               max="90"
-              value={state.settings.focusMinutes}
+              value={settings.focusMinutes}
               onChange={(event) => updateSettings("focusMinutes", Number(event.target.value))}
             />
           </label>
@@ -292,7 +333,7 @@ export function SettingsView(props: {
               type="number"
               min="1"
               max="30"
-              value={state.settings.shortBreakMinutes}
+              value={settings.shortBreakMinutes}
               onChange={(event) => updateSettings("shortBreakMinutes", Number(event.target.value))}
             />
           </label>
@@ -302,7 +343,7 @@ export function SettingsView(props: {
               type="number"
               min="5"
               max="60"
-              value={state.settings.longBreakMinutes}
+              value={settings.longBreakMinutes}
               onChange={(event) => updateSettings("longBreakMinutes", Number(event.target.value))}
             />
           </label>
@@ -312,7 +353,7 @@ export function SettingsView(props: {
               type="number"
               min="2"
               max="8"
-              value={state.settings.longBreakEvery}
+              value={settings.longBreakEvery}
               onChange={(event) => updateSettings("longBreakEvery", Number(event.target.value))}
             />
           </label>
@@ -321,7 +362,7 @@ export function SettingsView(props: {
           <label>
             <input
               type="checkbox"
-              checked={state.settings.strictModeEnabled}
+              checked={settings.strictModeEnabled}
               onChange={(event) => updateSettings("strictModeEnabled", event.target.checked)}
             />
             专注时自动启用严格模式
@@ -329,7 +370,7 @@ export function SettingsView(props: {
           <label>
             <input
               type="checkbox"
-              checked={state.settings.autoStartBreaks}
+              checked={settings.autoStartBreaks}
               onChange={(event) => updateSettings("autoStartBreaks", event.target.checked)}
             />
             自动开始休息
@@ -339,7 +380,7 @@ export function SettingsView(props: {
           <label className="inline-toggle">
             <input
               type="checkbox"
-              checked={state.settings.notificationsEnabled}
+              checked={settings.notificationsEnabled}
               onChange={(event) => updateSettings("notificationsEnabled", event.target.checked)}
             />
             系统通知
@@ -347,14 +388,14 @@ export function SettingsView(props: {
           <label className="inline-toggle">
             <input
               type="checkbox"
-              checked={state.settings.soundEnabled}
+              checked={settings.soundEnabled}
               onChange={(event) => updateSettings("soundEnabled", event.target.checked)}
             />
             声音
           </label>
           <label>
             结束音效
-            <select value={state.settings.timerEndSound} onChange={(event) => updateSettings("timerEndSound", event.target.value as AppState["settings"]["timerEndSound"])}>
+            <select value={settings.timerEndSound} onChange={(event) => updateSettings("timerEndSound", event.target.value as Settings["timerEndSound"])}>
               <option value="soft">柔和</option>
               <option value="bell">铃声</option>
               <option value="digital">电子</option>
@@ -362,7 +403,7 @@ export function SettingsView(props: {
           </label>
           <label>
             白噪音
-            <select value={state.settings.whiteNoise} onChange={(event) => updateSettings("whiteNoise", event.target.value as AppState["settings"]["whiteNoise"])}>
+            <select value={settings.whiteNoise} onChange={(event) => updateSettings("whiteNoise", event.target.value as Settings["whiteNoise"])}>
               <option value="off">关闭</option>
               <option value="rain">雨声</option>
               <option value="brown">棕噪音</option>
@@ -375,7 +416,7 @@ export function SettingsView(props: {
               type="range"
               min="0"
               max="100"
-              value={state.settings.whiteNoiseVolume}
+              value={settings.whiteNoiseVolume}
               onChange={(event) => updateSettings("whiteNoiseVolume", Number(event.target.value))}
             />
           </label>
@@ -384,7 +425,7 @@ export function SettingsView(props: {
             检查通知
           </button>
         </div>
-        <p className="muted">通知权限：{state.settings.notificationSettings.permissionState}</p>
+        <p className="muted">通知权限：{settings.notificationSettings.permissionState}</p>
       </section>
       </>}
 
@@ -505,7 +546,7 @@ export function SettingsView(props: {
           </div>
         )}
         <div className="backup-list">
-          {state.backupSnapshots.slice(0, 4).map((backup) => (
+          {backupSnapshots.slice(0, 4).map((backup) => (
             <article className="backup-item" key={backup.id}>
               <strong>{new Date(backup.createdAt).toLocaleString()}</strong>
               <span>{backup.reason === "before_import" ? "导入前备份" : backup.reason === "manual_export" ? "手动导出" : "自动备份"}</span>
@@ -515,7 +556,7 @@ export function SettingsView(props: {
               </button>
             </article>
           ))}
-          {!state.backupSnapshots.length && <p className="empty">还没有备份记录。</p>}
+          {!backupSnapshots.length && <p className="empty">还没有备份记录。</p>}
         </div>
       </section>}
 
@@ -531,51 +572,51 @@ export function SettingsView(props: {
           <div>
             <span>当前状态</span>
             <strong>
-              {state.sync.status === "synced"
+              {sync.status === "synced"
                 ? "已同步"
-                : state.sync.status === "syncing"
+                : sync.status === "syncing"
                   ? "同步中"
-                  : state.sync.status === "authenticating"
+                  : sync.status === "authenticating"
                     ? "登录中"
-                    : state.sync.status === "error"
+                    : sync.status === "error"
                       ? "异常"
-                      : state.sync.token
+                      : sync.token
                         ? "已登录"
                         : "未登录"}
             </strong>
           </div>
           <div>
             <span>服务地址</span>
-            <strong>{state.sync.serverUrl.replace(/^https?:\/\//, "")}</strong>
+            <strong>{sync.serverUrl.replace(/^https?:\/\//, "")}</strong>
           </div>
           <div>
             <span>远端版本</span>
-            <strong>{state.sync.lastPulledRevision}</strong>
+            <strong>{sync.lastPulledRevision}</strong>
           </div>
           <div>
             <span>上次同步</span>
-            <strong>{state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleTimeString() : "未同步"}</strong>
+            <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "未同步"}</strong>
           </div>
         </div>
         <div className="sync-steps">
           <span className="active">1 服务地址</span>
-          <span className={state.sync.status !== "idle" ? "active" : ""}>2 健康检查</span>
-          <span className={state.sync.token ? "active" : ""}>3 登录</span>
-          <span className={state.sync.lastSyncedAt ? "active" : ""}>4 同步</span>
-          <span className={state.sync.autoSync ? "active" : ""}>5 自动同步</span>
+          <span className={sync.status !== "idle" ? "active" : ""}>2 健康检查</span>
+          <span className={sync.token ? "active" : ""}>3 登录</span>
+          <span className={sync.lastSyncedAt ? "active" : ""}>4 同步</span>
+          <span className={sync.autoSync ? "active" : ""}>5 自动同步</span>
         </div>
         <div className="sync-grid">
           <label>
             服务地址
             <input
-              value={state.sync.serverUrl}
+              value={sync.serverUrl}
               onChange={(event) => updateSyncSetting("serverUrl", event.target.value)}
               placeholder="http://127.0.0.1:8787"
             />
           </label>
           <label>
             账号
-            <input value={state.sync.username} onChange={(event) => updateSyncSetting("username", event.target.value)} />
+            <input value={sync.username} onChange={(event) => updateSyncSetting("username", event.target.value)} />
           </label>
           <label>
             密码
@@ -583,13 +624,13 @@ export function SettingsView(props: {
           </label>
           <label>
             设备 ID
-            <input value={state.sync.deviceId} onChange={(event) => updateSyncSetting("deviceId", event.target.value)} />
+            <input value={sync.deviceId} onChange={(event) => updateSyncSetting("deviceId", event.target.value)} />
           </label>
         </div>
         <div className="sync-actions">
           <button
             className="secondary-button"
-            disabled={state.sync.status === "syncing"}
+            disabled={sync.status === "syncing"}
             onClick={() => void checkSyncHealth()}
           >
             <Cloud size={16} />
@@ -597,7 +638,7 @@ export function SettingsView(props: {
           </button>
           <button
             className="primary-button"
-            disabled={state.sync.status === "authenticating"}
+            disabled={sync.status === "authenticating"}
             onClick={() => void handleSyncLogin()}
           >
             <LogIn size={16} />
@@ -605,7 +646,7 @@ export function SettingsView(props: {
           </button>
           <button
             className="secondary-button"
-            disabled={!state.sync.token || state.sync.status === "syncing"}
+            disabled={!sync.token || sync.status === "syncing"}
             onClick={() => void handleSyncNow()}
           >
               <RefreshCw size={16} />
@@ -614,7 +655,7 @@ export function SettingsView(props: {
           <label className="inline-toggle">
             <input
               type="checkbox"
-              checked={state.sync.autoSync}
+              checked={sync.autoSync}
               onChange={(event) => updateSyncSetting("autoSync", event.target.checked)}
             />
             自动同步
@@ -629,23 +670,23 @@ export function SettingsView(props: {
               type="number"
               min="30"
               max="3600"
-              value={state.sync.intervalSeconds}
+              value={sync.intervalSeconds}
               onChange={(event) => updateSyncSetting("intervalSeconds", Number(event.target.value))}
             />
           </label>
-          <span className={`sync-status sync-status-${state.sync.status}`}>
-            {state.sync.status === "synced"
+          <span className={`sync-status sync-status-${sync.status}`}>
+            {sync.status === "synced"
               ? "已同步"
-              : state.sync.status === "syncing"
+              : sync.status === "syncing"
                 ? "同步中"
-                : state.sync.status === "authenticating"
+                : sync.status === "authenticating"
                   ? "登录中"
-                  : state.sync.status === "error"
+                  : sync.status === "error"
                     ? "异常"
                     : "待连接"}
           </span>
         </div>
-        <p className="muted">{state.sync.message}</p>
+        <p className="muted">{sync.message}</p>
         {syncDiagnostic && (
           <div className="diagnostic-panel">
             <strong>诊断结果：{new Date(syncDiagnostic.checkedAt).toLocaleString()}</strong>
@@ -659,7 +700,7 @@ export function SettingsView(props: {
             ))}
           </div>
         )}
-        {state.settings.advancedSyncVisible && <div className="deploy-helper">
+        {settings.advancedSyncVisible && <div className="deploy-helper">
           <div className="section-title compact-title">
             <div>
               <p className="eyebrow">部署提示</p>
@@ -673,57 +714,57 @@ export function SettingsView(props: {
           <p className="muted">{commands.proxy[0]}</p>
           <p className="muted">{commands.storage}</p>
         </div>}
-        <button className="link-button" onClick={() => updateSettings("advancedSyncVisible", !state.settings.advancedSyncVisible)}>
-          {state.settings.advancedSyncVisible ? "收起高级状态" : "展开高级状态"}
+        <button className="link-button" onClick={() => updateSettings("advancedSyncVisible", !settings.advancedSyncVisible)}>
+          {settings.advancedSyncVisible ? "收起高级状态" : "展开高级状态"}
         </button>
-        {state.settings.advancedSyncVisible && (
+        {settings.advancedSyncVisible && (
           <>
             <div className="sync-table">
               <span>项目</span>
-              <strong>{state.projects.length}</strong>
+              <strong>{projects.length}</strong>
               <span>成员</span>
-              <strong>{state.projectMembers.length}</strong>
+              <strong>{projectMembers.length}</strong>
               <span>任务</span>
-              <strong>{state.tasks.length}</strong>
+              <strong>{dataSummary.taskCount}</strong>
               <span>工作会话</span>
-              <strong>{state.workSessions.length}</strong>
+              <strong>{dataSummary.workSessionCount}</strong>
               <span>执行信号</span>
-              <strong>{state.executionSignals.length}</strong>
+              <strong>{dataSummary.executionSignalCount}</strong>
               <span>番茄记录</span>
-              <strong>{state.focusSessions.length}</strong>
+              <strong>{dataSummary.focusSessionCount}</strong>
               <span>中断</span>
-              <strong>{state.interruptions.length}</strong>
+              <strong>{dataSummary.interruptionCount}</strong>
               <span>远端版本</span>
-              <strong>{state.sync.lastPulledRevision}</strong>
+              <strong>{sync.lastPulledRevision}</strong>
               <span>SSE 状态</span>
               <strong>
-                {state.sync.sseStatus === "open"
+                {sync.sseStatus === "open"
                   ? "已连接"
-                  : state.sync.sseStatus === "connecting"
+                  : sync.sseStatus === "connecting"
                     ? "连接中"
-                    : state.sync.sseStatus === "error"
+                    : sync.sseStatus === "error"
                       ? "异常"
                       : "未连接"}
               </strong>
               <span>收到版本</span>
-              <strong>{state.sync.lastReceivedRevision ?? 0}</strong>
+              <strong>{sync.lastReceivedRevision ?? 0}</strong>
               <span>待补推</span>
-              <strong>{state.sync.pendingLocalSync ? "是" : "否"}</strong>
+              <strong>{sync.pendingLocalSync ? "是" : "否"}</strong>
               <span>待补拉</span>
-              <strong>{state.sync.pendingRemoteRevision ?? "无"}</strong>
+              <strong>{sync.pendingRemoteRevision ?? "无"}</strong>
               <span>触发原因</span>
-              <strong>{state.sync.lastSyncReason ?? "无"}</strong>
+              <strong>{sync.lastSyncReason ?? "无"}</strong>
               <span>冲突</span>
-              <strong>{state.sync.conflictCount}</strong>
+              <strong>{sync.conflictCount}</strong>
               <span>上次同步</span>
-              <strong>{state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleTimeString() : "未同步"}</strong>
+              <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "未同步"}</strong>
               <span>重试次数</span>
-              <strong>{state.sync.retryCount}</strong>
+              <strong>{sync.retryCount}</strong>
               <span>下次重试</span>
-              <strong>{state.sync.nextRetryAt ? new Date(state.sync.nextRetryAt).toLocaleTimeString() : "无"}</strong>
+              <strong>{sync.nextRetryAt ? new Date(sync.nextRetryAt).toLocaleTimeString() : "无"}</strong>
             </div>
             <div className="conflict-list">
-              {state.sync.conflicts.slice(0, 5).map((conflict) => (
+              {sync.conflicts.slice(0, 5).map((conflict) => (
                 <article className="conflict-item" key={`${conflict.entity}-${conflict.id}-${conflict.revision}`}>
                   <strong>
                     {conflict.entity}/{conflict.id}
@@ -746,7 +787,7 @@ export function SettingsView(props: {
                   </div>
                 </article>
               ))}
-              {state.sync.conflicts.length === 0 && <p className="empty">暂无同步冲突。</p>}
+              {sync.conflicts.length === 0 && <p className="empty">暂无同步冲突。</p>}
             </div>
           </>
         )}
@@ -761,7 +802,7 @@ export function SettingsView(props: {
           <Sparkles size={20} />
         </div>
         <div className="capability-grid">
-          {state.nativeCapabilities.map((capability) => (
+          {nativeCapabilities.map((capability) => (
             <article className="capability-item" key={capability.platform}>
               <strong>{capability.label}</strong>
               <span>{capability.available ? "当前可用/可验收" : "适配层已保留"}</span>
@@ -786,19 +827,19 @@ export function SettingsView(props: {
         <div className="sync-summary-grid">
           <div>
             <span>当前项目</span>
-            <strong>{state.projects.length}</strong>
+            <strong>{projects.length}</strong>
           </div>
           <div>
             <span>当前任务</span>
-            <strong>{state.tasks.length}</strong>
+            <strong>{dataSummary.taskCount}</strong>
           </div>
           <div>
             <span>成员绑定</span>
-            <strong>{state.projectMembers.length}</strong>
+            <strong>{projectMembers.length}</strong>
           </div>
           <div>
             <span>工作记录</span>
-            <strong>{state.focusSessions.length + state.workSessions.length}</strong>
+            <strong>{dataSummary.focusSessionCount + dataSummary.workSessionCount}</strong>
           </div>
         </div>
         <div className="button-row">

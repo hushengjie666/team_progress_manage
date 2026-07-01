@@ -3,8 +3,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Activity, Check, ChevronRight, PanelRight, Play, Sparkles, Split, Target, Trash2, X } from "lucide-react";
 import { labelPriority, labelTaskStage, type TaskDraft } from "../appModel";
 import { type MyProjectTaskCard, type ProjectOverviewCard } from "../projectOverview";
-import { deriveWorkspaceModel } from "../workbenchModel";
-import type { ActiveTimer, AppState, CoachStepId, DailyPlan, ProjectMember, Task, TaskStatus } from "../types";
+import type { WorkspaceViewModel } from "../workbenchModel";
+import type { ActiveTimer, CoachStepId, Project, ProjectMember, Task, TaskStatus } from "../types";
 import { TaskDetailModal } from "./TaskDetailPanel";
 export { TaskDetailModal, TaskDetailPanel } from "./TaskDetailPanel";
 
@@ -13,15 +13,18 @@ const isUnassignedTask = (task: Task) =>
 
 export function WorkspaceView(props: {
   mode: "board" | "workbench";
-  state: AppState;
+  model: WorkspaceViewModel;
   draft: TaskDraft;
   setDraft: (draft: TaskDraft) => void;
   addTask: (projectId?: string) => void;
-  poolTasks: Task[];
-  committedTasks: Task[];
-  todayPlan: DailyPlan;
+  selectedWorkbenchProjectIds: string[];
+  toggleWorkbenchProject: (projectId: string) => void;
+  goalLabel: string;
+  todayCapacityPomodoros: number;
+  activeTimer?: ActiveTimer;
+  projects: Project[];
+  projectMembers: ProjectMember[];
   selectedTask?: Task;
-  totalCommittedEstimate: number;
   commitTask: (taskId: string) => void;
   removeCommittedTask: (taskId: string) => void;
   completeTask: (taskId: string) => void;
@@ -45,12 +48,15 @@ export function WorkspaceView(props: {
   convertInterruptionToTask: (interruptionId: string) => void;
 }) {
   const {
-    state,
-    poolTasks,
-    committedTasks,
-    todayPlan,
+    model,
+    selectedWorkbenchProjectIds,
+    toggleWorkbenchProject,
+    goalLabel,
+    todayCapacityPomodoros,
+    activeTimer,
+    projects,
+    projectMembers,
     selectedTask,
-    totalCommittedEstimate,
     commitTask,
     removeCommittedTask,
     completeTask,
@@ -71,45 +77,23 @@ export function WorkspaceView(props: {
     convertInterruptionToTask,
   } = props;
 
-  const [selectedWorkbenchProjectIds, setSelectedWorkbenchProjectIds] = useState<string[]>([]);
   const [showUnassignedPoolTasks, setShowUnassignedPoolTasks] = useState(true);
   const {
-    remainingEstimate,
     inbox,
     pressure,
-    suggestions,
+    suggestionItems,
     guideSteps,
     nextGuideStep,
-    currentMember,
     myProjectTaskCards,
-    availableWorkbenchProjectIds,
-    effectiveWorkbenchProjectIds,
     committedWorkbenchTasks,
     poolWorkbenchTasks,
     projectOverviewCards,
-  } = deriveWorkspaceModel(state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds);
+  } = model;
   const [showGuidance, setShowGuidance] = useState(false);
   const visiblePoolWorkbenchTasks = showUnassignedPoolTasks
     ? poolWorkbenchTasks
     : poolWorkbenchTasks.filter((task) => !isUnassignedTask(task));
   const hiddenUnassignedPoolTaskCount = poolWorkbenchTasks.length - visiblePoolWorkbenchTasks.length;
-  useEffect(() => {
-    setSelectedWorkbenchProjectIds([]);
-  }, [currentMember?.id]);
-  useEffect(() => {
-    setSelectedWorkbenchProjectIds((current) => {
-      const available = new Set(availableWorkbenchProjectIds);
-      const next = current.filter((projectId) => available.has(projectId));
-      return next.length === current.length ? current : next;
-    });
-  }, [availableWorkbenchProjectIds.join("|")]);
-  const toggleWorkbenchProject = (projectId: string) => {
-    setSelectedWorkbenchProjectIds((current) => {
-      return current.includes(projectId)
-        ? current.filter((item) => item !== projectId)
-        : [...current, projectId];
-    });
-  };
   const workbenchPanel = (
     <MyProjectTaskFilterPanel
       cards={myProjectTaskCards}
@@ -161,7 +145,7 @@ export function WorkspaceView(props: {
             </article>
           ))}
         </div>
-        <p className="muted">目标：{state.onboarding.desiredHabit}</p>
+        <p className="muted">目标：{goalLabel}</p>
       </section>}
 
       {showGuidance && <section className={`band plan-assistant pressure-${pressure.level}`}>
@@ -181,12 +165,10 @@ export function WorkspaceView(props: {
             <Sparkles size={16} />
             一键生成今日计划
           </button>
-          <span>工作队列 {pressure.totalEstimate} / 容量 {todayPlan.capacityPomodoros}，剩余 {pressure.remainingEstimate}</span>
+          <span>工作队列 {pressure.totalEstimate} / 容量 {todayCapacityPomodoros}，剩余 {pressure.remainingEstimate}</span>
         </div>
         <div className="suggestion-list">
-          {suggestions.slice(0, 3).map((suggestion) => {
-            const task = state.tasks.find((item) => item.id === suggestion.taskId);
-            if (!task) return null;
+          {suggestionItems.slice(0, 3).map(({ suggestion, task }) => {
             return (
               <article className="suggestion-item" key={suggestion.taskId}>
                 <div>
@@ -205,7 +187,7 @@ export function WorkspaceView(props: {
               </article>
             );
           })}
-          {suggestions.length === 0 && <p className="empty">任务池没有可推荐任务。</p>}
+          {suggestionItems.length === 0 && <p className="empty">任务池没有可推荐任务。</p>}
         </div>
       </section>}
 
@@ -242,7 +224,7 @@ export function WorkspaceView(props: {
         onDelete={deleteTask}
         onSelect={selectTask}
         onSplit={splitTask}
-        activeTimer={state.activeTimer}
+        activeTimer={activeTimer}
       />
 
       <TaskColumn
@@ -258,15 +240,15 @@ export function WorkspaceView(props: {
         onSelect={selectTask}
         onSplit={splitTask}
         onMove={moveCommittedTask}
-        activeTimer={state.activeTimer}
+        activeTimer={activeTimer}
       />
         </>
       )}
 
       <TaskDetailModal
         task={selectedTask}
-        projects={state.projects}
-        projectMembers={state.projectMembers}
+        projects={projects}
+        projectMembers={projectMembers}
         updateTask={updateTask}
         updateTaskAssignment={updateTaskAssignment}
         updateTaskProgress={updateTaskProgress}

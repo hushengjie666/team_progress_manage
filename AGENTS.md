@@ -21,6 +21,19 @@ Keep routine changes scoped so Codex does not exhaust context on generated outpu
 - Do not use `src-tauri/target`, `sync-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
 - When a test fails, summarize the failing test name, assertion, and relevant stack line instead of pasting full traces or large logs.
 
+## Frontend Module Map
+
+Start with the smallest module that owns the product concept before opening app-shell files.
+
+- Workspace / Personal Workbench: `src/workbenchModel.ts`, `src/components/WorkspaceView.tsx`, and `src/timerDomain.test.ts` for timer-adjacent workbench behavior.
+- Project Detail: `src/projectDetail.ts`, `src/components/ProjectDetailView.tsx`, and `src/projectOverview.test.ts`.
+- Project Overview cards and my project filters: `src/projectOverview.ts` and `src/projectOverview.test.ts`.
+- Progress Board: `src/progressBoard.ts` and `src/progressBoard.test.ts`.
+- Recurring tasks: `src/recurrence.ts` and `src/recurrence.test.ts`.
+- App shell keyboard shortcuts: `src/keyboardRuntime.ts`; only open `src/App.tsx` for wiring changes.
+- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/syncRuntime.ts`, and `src/timerRuntime.ts`.
+- Test setup data: use `src/test/fixtures.ts` instead of copying full `AppState` literals.
+
 ## Build, Test, and Development Commands
 
 - `npm install`: install dependencies.
