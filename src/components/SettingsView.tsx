@@ -20,6 +20,7 @@ export function SettingsView(props: {
   updateTeamMember: (member: TeamMember) => void;
   updateTeamMemberPassword: (member: TeamMember, password: string) => void;
   deleteTeamMember: (teamMemberId: string) => void;
+  canManageMembers?: boolean;
   openProjectDetail: (projectId: string, tab?: "overview" | "tasks" | "members" | "settings") => void;
   updateProfile: (profile: BlockProfile) => void;
   askPermissions: () => Promise<void>;
@@ -54,6 +55,7 @@ export function SettingsView(props: {
     updateTeamMember,
     updateTeamMemberPassword,
     deleteTeamMember,
+    canManageMembers = true,
     openProjectDetail,
     updateProfile,
     askNotificationPermissions,
@@ -80,16 +82,18 @@ export function SettingsView(props: {
   const strictPlatform = strictStatus?.platform ?? "browser";
   const supportsSystemChecks = strictPlatform === "tauri_macos" || strictPlatform === "ios";
   const supportsUrlChecks = strictPlatform === "tauri_macos";
-  const sectionNav: { key: SettingsSection; label: string }[] = [
+  const effectiveSection = !canManageMembers && activeSection === "members" ? "projects" : activeSection;
+  const allSections: { key: SettingsSection; label: string }[] = [
     { key: "members", label: "成员管理" },
     { key: "projects", label: "项目管理" },
     { key: "timer", label: "计时偏好" },
     { key: "focus", label: "防分心" },
-    { key: "sync", label: "团队同步" },
+    { key: "sync", label: "团队后台" },
     { key: "data", label: "备份恢复" },
     { key: "system", label: "系统环境" },
     { key: "demo", label: "演示数据" },
   ];
+  const sectionNav = allSections.filter((section) => canManageMembers || section.key !== "members");
 
   const editProfileList = (key: "apps" | "websites", raw: string) => {
     if (!activeProfile) return;
@@ -116,7 +120,7 @@ export function SettingsView(props: {
         <div className="segmented settings-section-tabs">
           {sectionNav.map((section) => (
             <button
-              className={activeSection === section.key ? "active" : ""}
+              className={effectiveSection === section.key ? "active" : ""}
               key={section.key}
               onClick={() => setActiveSection(section.key)}
             >
@@ -126,7 +130,7 @@ export function SettingsView(props: {
         </div>
       </section>
 
-      {activeSection === "members" && (
+      {effectiveSection === "members" && (
         <SettingsMembersSection
           state={state}
           createTeamMember={createTeamMember}
@@ -136,7 +140,7 @@ export function SettingsView(props: {
         />
       )}
 
-      {activeSection === "projects" && <section className="band settings-panel">
+      {effectiveSection === "projects" && <section className="band settings-panel">
         <div className="section-title">
           <div>
             <p className="eyebrow">项目管理</p>
@@ -249,7 +253,7 @@ export function SettingsView(props: {
         </div>
       </section>}
 
-      {activeSection === "timer" && <>
+      {effectiveSection === "timer" && <>
       <section className="band settings-panel">
         <div className="section-title">
           <div>
@@ -384,7 +388,7 @@ export function SettingsView(props: {
       </section>
       </>}
 
-      {activeSection === "focus" && <section className="band settings-panel strict-config">
+      {effectiveSection === "focus" && <section className="band settings-panel strict-config">
         <div className="section-title">
           <div>
             <p className="eyebrow">防分心</p>
@@ -449,7 +453,7 @@ export function SettingsView(props: {
         </p>
       </section>}
 
-      {activeSection === "data" && <section className="band settings-panel data-management">
+      {effectiveSection === "data" && <section className="band settings-panel data-management">
         <div className="section-title">
           <div>
             <p className="eyebrow">数据安全</p>
@@ -515,11 +519,11 @@ export function SettingsView(props: {
         </div>
       </section>}
 
-      {activeSection === "sync" && <section className="band settings-panel">
+      {effectiveSection === "sync" && <section className="band settings-panel">
         <div className="section-title">
           <div>
-            <p className="eyebrow">团队同步</p>
-            <h2>团队同步状态</h2>
+            <p className="eyebrow">团队后台</p>
+            <h2>团队后台状态</h2>
           </div>
           <Cloud size={20} />
         </div>
@@ -597,7 +601,7 @@ export function SettingsView(props: {
             onClick={() => void handleSyncLogin()}
           >
             <LogIn size={16} />
-            登录团队服务
+            登录团队后台
           </button>
           <button
             className="secondary-button"
@@ -617,7 +621,7 @@ export function SettingsView(props: {
           </label>
           <button className="secondary-button" onClick={() => void runSyncDiagnostics()}>
             <Server size={16} />
-            运行同步诊断
+            运行后台诊断
           </button>
           <label className="compact-input">
             间隔秒
@@ -748,7 +752,7 @@ export function SettingsView(props: {
         )}
       </section>}
 
-      {activeSection === "system" && <section className="band settings-panel native-roadmap">
+      {effectiveSection === "system" && <section className="band settings-panel native-roadmap">
         <div className="section-title">
           <div>
             <p className="eyebrow">系统环境</p>
@@ -768,7 +772,7 @@ export function SettingsView(props: {
         </div>
       </section>}
 
-      {activeSection === "demo" && <section className="band settings-panel demo-data-panel">
+      {effectiveSection === "demo" && <section className="band settings-panel demo-data-panel">
         <div className="section-title">
           <div>
             <p className="eyebrow">演示数据</p>
@@ -777,7 +781,7 @@ export function SettingsView(props: {
           <DatabaseBackup size={20} />
         </div>
         <p className="muted section-helper">
-          用一套内置样例快速体验项目总览、成员状况、工作队列、专注计时和复盘页面。加载演示数据会替换当前本地状态。
+          用一套内置样例快速体验项目总览、成员状况、工作队列、专注计时和复盘页面。加载演示数据会添加到当前项目，不会退出登录或替换现有数据。
         </p>
         <div className="sync-summary-grid">
           <div>

@@ -38,9 +38,22 @@ func scanAccount(row interface{ Scan(...any) error }) (accountRecord, error) {
 
 func scanWorkspace(row interface{ Scan(...any) error }) (workspaceData, error) {
 	var workspace workspaceData
-	err := row.Scan(&workspace.ID, &workspace.Name, &workspace.CreatedAt, &workspace.UpdatedAt)
+	var ownerAccountID sql.NullString
+	err := row.Scan(&workspace.ID, &workspace.Name, &workspace.Type, &ownerAccountID, &workspace.CreatedAt, &workspace.UpdatedAt)
+	if workspace.Type == "" {
+		workspace.Type = "shared"
+	}
+	if ownerAccountID.Valid {
+		workspace.OwnerAccountID = ownerAccountID.String
+	}
 	workspace.Rows = map[string]syncRow{}
 	return workspace, err
+}
+
+func scanWorkspaceMembership(row interface{ Scan(...any) error }) (workspaceMembershipRecord, error) {
+	var membership workspaceMembershipRecord
+	err := row.Scan(&membership.ID, &membership.WorkspaceID, &membership.AccountID, &membership.Role, &membership.Status, &membership.CreatedAt, &membership.UpdatedAt)
+	return membership, err
 }
 
 func scanSyncRows(rows *sql.Rows) ([]syncRow, error) {
@@ -99,7 +112,7 @@ func mysqlSetNextRevision(ctx context.Context, tx *sql.Tx, nextRevision int64) e
 }
 
 func mysqlFirstWorkspace(ctx context.Context, q sqlRunner) (workspaceData, bool, error) {
-	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, created_at, updated_at FROM workspaces ORDER BY created_at ASC LIMIT 1`))
+	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at FROM workspaces ORDER BY created_at ASC LIMIT 1`))
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspaceData{}, false, nil
 	}
@@ -107,7 +120,7 @@ func mysqlFirstWorkspace(ctx context.Context, q sqlRunner) (workspaceData, bool,
 }
 
 func mysqlWorkspaceByID(ctx context.Context, q sqlRunner, workspaceID string) (workspaceData, bool, error) {
-	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, created_at, updated_at FROM workspaces WHERE id = ?`, workspaceID))
+	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at FROM workspaces WHERE id = ?`, workspaceID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspaceData{}, false, nil
 	}
@@ -144,12 +157,197 @@ func mysqlAccountByEmailInWorkspace(ctx context.Context, q sqlRunner, workspaceI
 	return account, err == nil, err
 }
 
+func mysqlMembershipByAccountAndWorkspace(ctx context.Context, q sqlRunner, accountID string, workspaceID string) (workspaceMembershipRecord, bool, error) {
+	membership, err := scanWorkspaceMembership(q.QueryRowContext(
+		ctx,
+		`SELECT id, workspace_id, account_id, role, status, created_at, updated_at FROM workspace_memberships WHERE account_id = ? AND workspace_id = ?`,
+		accountID,
+		workspaceID,
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return workspaceMembershipRecord{}, false, nil
+	}
+	return membership, err == nil, err
+}
+
+func mysqlActiveMembershipByAccountAndWorkspace(ctx context.Context, q sqlRunner, accountID string, workspaceID string) (workspaceMembershipRecord, bool, error) {
+	membership, ok, err := mysqlMembershipByAccountAndWorkspace(ctx, q, accountID, workspaceID)
+	if err != nil || !ok || membership.Status != "active" {
+		return workspaceMembershipRecord{}, false, err
+	}
+	return membership, true, nil
+}
+
+func mysqlMembershipSummaryByAccountAndWorkspace(ctx context.Context, q sqlRunner, accountID string, workspaceID string) (workspaceMembershipSummary, bool, error) {
+	var result workspaceMembershipSummary
+	err := q.QueryRowContext(
+		ctx,
+		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at
+		 FROM workspace_memberships m
+		 JOIN accounts a ON a.id = m.account_id
+		 WHERE m.account_id = ? AND m.workspace_id = ? AND m.status = 'active'`,
+		accountID,
+		workspaceID,
+	).Scan(&result.ID, &result.WorkspaceID, &result.AccountID, &result.Name, &result.Email, &result.Role, &result.Status, &result.CreatedAt, &result.UpdatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return workspaceMembershipSummary{}, false, nil
+	}
+	return result, err == nil, err
+}
+
+func mysqlWorkspaceSummariesForAccount(ctx context.Context, q sqlRunner, accountID string) ([]workspaceSummary, error) {
+	rows, err := q.QueryContext(
+		ctx,
+		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
+		 FROM workspace_memberships m
+		 JOIN workspaces w ON w.id = m.workspace_id
+		 WHERE m.account_id = ? AND m.status = 'active'
+		 ORDER BY CASE WHEN w.type = 'private' THEN 0 ELSE 1 END, w.created_at ASC`,
+		accountID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []workspaceSummary{}
+	for rows.Next() {
+		var workspace workspaceData
+		var ownerAccountID sql.NullString
+		if err := rows.Scan(&workspace.ID, &workspace.Name, &workspace.Type, &ownerAccountID, &workspace.CreatedAt, &workspace.UpdatedAt); err != nil {
+			return nil, err
+		}
+		if ownerAccountID.Valid {
+			workspace.OwnerAccountID = ownerAccountID.String
+		}
+		result = append(result, publicWorkspace(workspace))
+	}
+	return result, rows.Err()
+}
+
+func mysqlWorkspaceMembershipSummaries(ctx context.Context, q sqlRunner, workspaceID string) ([]workspaceMembershipSummary, error) {
+	rows, err := q.QueryContext(
+		ctx,
+		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at
+		 FROM workspace_memberships m
+		 JOIN accounts a ON a.id = m.account_id
+		 WHERE m.workspace_id = ?
+		 ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, a.name ASC`,
+		workspaceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []workspaceMembershipSummary{}
+	for rows.Next() {
+		var item workspaceMembershipSummary
+		if err := rows.Scan(&item.ID, &item.WorkspaceID, &item.AccountID, &item.Name, &item.Email, &item.Role, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, rows.Err()
+}
+
+func mysqlUpsertWorkspaceMembership(ctx context.Context, tx *sql.Tx, membership workspaceMembershipRecord) error {
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE role = VALUES(role), status = VALUES(status), updated_at = VALUES(updated_at)`,
+		membership.ID,
+		membership.WorkspaceID,
+		membership.AccountID,
+		fallback(membership.Role, "member"),
+		fallback(membership.Status, "active"),
+		membership.CreatedAt,
+		membership.UpdatedAt,
+	)
+	return err
+}
+
+func mysqlEnsureWorkspaceMembership(ctx context.Context, tx *sql.Tx, workspaceID string, accountID string, role string, status string, now string) error {
+	return mysqlUpsertWorkspaceMembership(ctx, tx, workspaceMembershipRecord{
+		ID:          "membership_" + workspaceID + "_" + accountID,
+		WorkspaceID: workspaceID,
+		AccountID:   accountID,
+		Role:        fallback(role, "member"),
+		Status:      fallback(status, "active"),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	})
+}
+
+func privateWorkspaceID(accountID string) string {
+	return "workspace_private_" + accountID
+}
+
+func mysqlEnsurePrivateWorkspaceForAccount(ctx context.Context, tx *sql.Tx, account accountRecord, now string) (workspaceData, error) {
+	workspace := workspaceData{
+		ID:             privateWorkspaceID(account.ID),
+		Name:           fallback(account.Name, account.Email) + "的私人工作区",
+		Type:           "private",
+		OwnerAccountID: account.ID,
+		Rows:           map[string]syncRow{},
+		CreatedAt:      fallback(account.CreatedAt, now),
+		UpdatedAt:      now,
+	}
+	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+		return workspaceData{}, err
+	}
+	if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspace.ID, account.ID, "owner", "active", now); err != nil {
+		return workspaceData{}, err
+	}
+	return workspace, nil
+}
+
+func mysqlDefaultWorkspaceForAccount(ctx context.Context, q sqlRunner, account accountRecord) (workspaceData, bool, error) {
+	if account.WorkspaceID != "" {
+		if _, ok, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, q, account.ID, account.WorkspaceID); err != nil {
+			return workspaceData{}, false, err
+		} else if ok {
+			return mysqlWorkspaceByID(ctx, q, account.WorkspaceID)
+		}
+	}
+	privateID := privateWorkspaceID(account.ID)
+	if _, ok, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, q, account.ID, privateID); err != nil {
+		return workspaceData{}, false, err
+	} else if ok {
+		return mysqlWorkspaceByID(ctx, q, privateID)
+	}
+	rows, err := q.QueryContext(
+		ctx,
+		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
+		 FROM workspace_memberships m
+		 JOIN workspaces w ON w.id = m.workspace_id
+		 WHERE m.account_id = ? AND m.status = 'active'
+		 ORDER BY w.created_at ASC LIMIT 1`,
+		account.ID,
+	)
+	if err != nil {
+		return workspaceData{}, false, err
+	}
+	defer rows.Close()
+	if rows.Next() {
+		workspace, err := scanWorkspace(rows)
+		return workspace, err == nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return workspaceData{}, false, err
+	}
+	return workspaceData{}, false, nil
+}
+
 func mysqlUpsertWorkspace(ctx context.Context, tx *sql.Tx, workspace workspaceData) error {
 	_, err := tx.ExecContext(
 		ctx,
-		`INSERT INTO workspaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE name = VALUES(name), updated_at = VALUES(updated_at)`,
+		`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), owner_account_id = VALUES(owner_account_id), updated_at = VALUES(updated_at)`,
 		workspace.ID,
 		workspace.Name,
+		fallback(workspace.Type, "shared"),
+		nullString(workspace.OwnerAccountID),
 		workspace.CreatedAt,
 		workspace.UpdatedAt,
 	)
@@ -281,6 +479,67 @@ func mysqlRollback(tx *sql.Tx) {
 	_ = tx.Rollback()
 }
 
+const defaultAdminAccountID = "account_admin"
+const defaultAdminUsername = "admin"
+const defaultAdminName = "超级管理员"
+const defaultAdminPassword = "hu626699"
+
+func isDefaultAdminAuth(auth authContext) bool {
+	return auth.AccountID == defaultAdminAccountID
+}
+
+func ensureDefaultAdminAccount(ctx context.Context, db *sql.DB) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer mysqlRollback(tx)
+	if _, err := mysqlNextRevisionForUpdate(ctx, tx); err != nil {
+		return err
+	}
+	count, err := mysqlAccountCount(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return tx.Commit()
+	}
+	hash, err := hashPassword(defaultAdminPassword)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	accountID := defaultAdminAccountID
+	workspace := workspaceData{
+		ID:             privateWorkspaceID(accountID),
+		Name:           defaultAdminName + "的私人工作区",
+		Type:           "private",
+		OwnerAccountID: accountID,
+		Rows:           map[string]syncRow{},
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	account := accountRecord{
+		ID:           accountID,
+		WorkspaceID:  workspace.ID,
+		Name:         defaultAdminName,
+		Email:        defaultAdminUsername,
+		PasswordHash: hash,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+		return err
+	}
+	if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+		return err
+	}
+	if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspace.ID, account.ID, "owner", "active", now); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (a *app) handleAuthStatusMySQL(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -353,13 +612,27 @@ func (a *app) handleBootstrapMySQL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	workspace := workspaceData{ID: newID("workspace"), Name: fallback(strings.TrimSpace(req.WorkspaceName), "默认团队"), Rows: map[string]syncRow{}, CreatedAt: now, UpdatedAt: now}
-	account := accountRecord{ID: newID("account"), WorkspaceID: workspace.ID, Name: fallback(strings.TrimSpace(req.Name), "项目负责人"), Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
+	accountID := newID("account")
+	accountName := fallback(strings.TrimSpace(req.Name), "用户")
+	workspace := workspaceData{
+		ID:             privateWorkspaceID(accountID),
+		Name:           firstNonEmpty(strings.TrimSpace(req.WorkspaceName), accountName+"的私人工作区"),
+		Type:           "private",
+		OwnerAccountID: accountID,
+		Rows:           map[string]syncRow{},
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	account := accountRecord{ID: accountID, WorkspaceID: workspace.ID, Name: accountName, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
 	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspace.ID, account.ID, "owner", "active", now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
@@ -389,7 +662,7 @@ func (a *app) handleLoginMySQL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "email is required")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	account, found, err := mysqlAccountByEmail(ctx, a.db, email)
 	if err != nil {
@@ -400,12 +673,204 @@ func (a *app) handleLoginMySQL(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
-	workspace, found, err := mysqlWorkspaceByID(ctx, a.db, account.WorkspaceID)
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "login failed")
+		return
+	}
+	defer mysqlRollback(tx)
+	now := time.Now().UTC().Format(time.RFC3339)
+	if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
+		writeError(w, http.StatusInternalServerError, "login failed")
+		return
+	}
+	workspace, found, err := mysqlDefaultWorkspaceForAccount(ctx, tx, account)
 	if err != nil || !found {
 		writeError(w, http.StatusUnauthorized, "workspace not found")
 		return
 	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "login failed")
+		return
+	}
 	a.writeLoginResponse(w, req.DeviceID, account, workspace)
+}
+
+func (a *app) handleSwitchWorkspaceMySQL(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req workspaceSwitchRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	workspaceID := strings.TrimSpace(req.WorkspaceID)
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, "workspace_id is required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	account, found, err := mysqlAccountByID(ctx, a.db, auth.AccountID)
+	if err != nil || !found || account.DisabledAt != "" {
+		writeError(w, http.StatusUnauthorized, "account not found")
+		return
+	}
+	if _, found, err = mysqlActiveMembershipByAccountAndWorkspace(ctx, a.db, auth.AccountID, workspaceID); err != nil {
+		writeError(w, http.StatusInternalServerError, "load workspace membership failed")
+		return
+	} else if !found {
+		writeError(w, http.StatusForbidden, "workspace access denied")
+		return
+	}
+	workspace, found, err := mysqlWorkspaceByID(ctx, a.db, workspaceID)
+	if err != nil || !found {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	account.WorkspaceID = workspace.ID
+	account.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if _, err := a.db.ExecContext(ctx, `UPDATE accounts SET workspace_id = ?, updated_at = ? WHERE id = ?`, account.WorkspaceID, account.UpdatedAt, account.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	a.writeLoginResponse(w, "", account, workspace)
+}
+
+func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth authContext) {
+	switch r.Method {
+	case http.MethodGet:
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		workspaces, err := mysqlWorkspaceSummariesForAccount(ctx, a.db, auth.AccountID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load workspaces failed")
+			return
+		}
+		memberships, err := mysqlWorkspaceMembershipSummaries(ctx, a.db, auth.WorkspaceID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load workspace members failed")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": workspaces, "memberships": memberships})
+	case http.MethodPost:
+		var req workspaceCreateRequest
+		if err := decodeJSON(w, r, &req); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
+			writeError(w, http.StatusBadRequest, "workspace name is required")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		account, found, err := mysqlAccountByID(ctx, a.db, auth.AccountID)
+		if err != nil || !found || account.DisabledAt != "" {
+			writeError(w, http.StatusUnauthorized, "account not found")
+			return
+		}
+		tx, err := a.db.BeginTx(ctx, nil)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		defer mysqlRollback(tx)
+		now := time.Now().UTC().Format(time.RFC3339)
+		workspace := workspaceData{
+			ID:             newID("workspace"),
+			Name:           name,
+			Type:           "shared",
+			OwnerAccountID: account.ID,
+			Rows:           map[string]syncRow{},
+			CreatedAt:      now,
+			UpdatedAt:      now,
+		}
+		if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspace.ID, account.ID, "owner", "active", now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		account.WorkspaceID = workspace.ID
+		account.UpdatedAt = now
+		if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		a.writeLoginResponse(w, "", account, workspace)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func (a *app) handleWorkspaceByIDMySQL(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if r.Method != http.MethodPatch {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	workspaceID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/workspaces/"), "/")
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, "workspace id is required")
+		return
+	}
+	var req workspaceCreateRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "workspace name is required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	membership, found, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, a.db, auth.AccountID, workspaceID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "load workspace membership failed")
+		return
+	}
+	if !found || (membership.Role != "owner" && membership.Role != "admin") {
+		writeError(w, http.StatusForbidden, "workspace access denied")
+		return
+	}
+	tx, err := a.db.BeginTx(ctx, nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	defer mysqlRollback(tx)
+	workspace, found, err := mysqlWorkspaceByID(ctx, tx, workspaceID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, "workspace not found")
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	workspace.Name = name
+	workspace.UpdatedAt = now
+	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"workspace": publicWorkspace(workspace)})
 }
 
 func (a *app) handleMeMySQL(w http.ResponseWriter, r *http.Request, auth authContext) {
@@ -421,9 +886,23 @@ func (a *app) handleMeMySQL(w http.ResponseWriter, r *http.Request, auth authCon
 		writeError(w, http.StatusUnauthorized, "workspace not found")
 		return
 	}
+	publicAccount := account
+	publicAccount.PasswordHash = ""
+	membership, found, err := mysqlMembershipSummaryByAccountAndWorkspace(ctx, a.db, account.ID, workspace.ID)
+	if err != nil || !found {
+		writeError(w, http.StatusUnauthorized, "workspace access denied")
+		return
+	}
+	workspaces, err := mysqlWorkspaceSummariesForAccount(ctx, a.db, account.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "load workspaces failed")
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"account":   account,
-		"workspace": publicWorkspace(workspace),
+		"account":    publicAccount,
+		"workspace":  publicWorkspace(workspace),
+		"membership": membership,
+		"workspaces": workspaces,
 	})
 }
 
@@ -577,7 +1056,7 @@ func (a *app) handlePushMySQL(w http.ResponseWriter, r *http.Request, auth authC
 	}
 	if !found {
 		now := time.Now().UTC().Format(time.RFC3339)
-		workspace = workspaceData{ID: auth.WorkspaceID, Name: "默认团队", Rows: map[string]syncRow{}, CreatedAt: now, UpdatedAt: now}
+		workspace = workspaceData{ID: auth.WorkspaceID, Name: "默认团队", Type: "shared", Rows: map[string]syncRow{}, CreatedAt: now, UpdatedAt: now}
 		if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
@@ -684,6 +1163,10 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !isDefaultAdminAuth(auth) {
+		writeError(w, http.StatusForbidden, "admin account required")
+		return
+	}
 	var req memberRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -691,8 +1174,8 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 	}
 	projectID := strings.TrimSpace(req.ProjectID)
 	email := normalizeEmail(req.Email)
-	if email == "" || strings.TrimSpace(req.Password) == "" {
-		writeError(w, http.StatusBadRequest, "email and password are required")
+	if email == "" {
+		writeError(w, http.StatusBadRequest, "email is required")
 		return
 	}
 
@@ -714,12 +1197,8 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	if found && account.WorkspaceID != auth.WorkspaceID {
-		writeError(w, http.StatusConflict, "email belongs to another workspace")
-		return
-	}
-	if found && projectID == "" {
-		writeError(w, http.StatusConflict, "email already exists")
+	if !found && strings.TrimSpace(req.Password) == "" {
+		writeError(w, http.StatusBadRequest, "password is required for a new account")
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -734,6 +1213,36 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
+		if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+	} else {
+		account.Name = fallback(strings.TrimSpace(req.Name), account.Name)
+		account.Email = email
+		account.DisabledAt = ""
+		account.UpdatedAt = now
+		if strings.TrimSpace(req.Password) != "" {
+			hash, err := hashPassword(req.Password)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "password hashing failed")
+				return
+			}
+			account.PasswordHash = hash
+		}
+		if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+	}
+	status := fallback(strings.TrimSpace(req.Status), "active")
+	if err := mysqlEnsureWorkspaceMembership(ctx, tx, auth.WorkspaceID, account.ID, "member", status, now); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
 	}
 
 	teamMemberID := "team_member_" + account.ID
@@ -747,11 +1256,18 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	if projectID == "" {
-		if _, exists := rows[key("team_member", teamMemberID)]; exists {
-			writeError(w, http.StatusConflict, "member account already exists")
-			return
+	existingTeamMemberRow, teamMemberExists := rows[key("team_member", teamMemberID)]
+	existingTeamMemberDisabled := false
+	if teamMemberExists {
+		var existingTeamMemberPayload map[string]any
+		if err := json.Unmarshal(existingTeamMemberRow.Payload, &existingTeamMemberPayload); err != nil {
+			existingTeamMemberDisabled = false
+		} else if value, ok := existingTeamMemberPayload["status"].(string); ok {
+			existingTeamMemberDisabled = strings.EqualFold(strings.TrimSpace(value), "disabled")
 		}
+	}
+	teamMemberCanRecreate := !teamMemberExists || existingTeamMemberRow.DeletedAt != "" || existingTeamMemberDisabled
+	if projectID == "" {
 		row := makeTeamMemberRow(auth, account, teamMemberID, req.Name, req.Status, now, nextRevision)
 		nextRevision++
 		if err := mysqlUpsertSyncRow(ctx, tx, row); err != nil {
@@ -778,7 +1294,7 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusConflict, "account already belongs to this project")
 		return
 	}
-	if _, exists := rows[key("team_member", teamMemberID)]; !exists {
+	if teamMemberCanRecreate {
 		teamRow := makeTeamMemberRow(auth, account, teamMemberID, req.Name, req.Status, now, nextRevision)
 		nextRevision++
 		if err := mysqlUpsertSyncRow(ctx, tx, teamRow); err != nil {
@@ -842,6 +1358,10 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !isDefaultAdminAuth(auth) {
+		writeError(w, http.StatusForbidden, "admin account required")
+		return
+	}
 	memberID := strings.Trim(strings.TrimPrefix(r.URL.Path, "/members/"), "/")
 	if memberID == "" {
 		writeError(w, http.StatusBadRequest, "member id is required")
@@ -877,7 +1397,15 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
-		if ok && account.WorkspaceID == auth.WorkspaceID {
+		if ok {
+			if _, allowed, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, tx, account.ID, auth.WorkspaceID); err != nil {
+				writeError(w, http.StatusInternalServerError, "save failed")
+				return
+			} else if !allowed {
+				ok = false
+			}
+		}
+		if ok {
 			timestamp := time.Now().UTC().Format(time.RFC3339)
 			status := "active"
 			if account.DisabledAt != "" {
@@ -914,7 +1442,7 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 		if existing.Entity == "team_member" {
 			accountID, _ := payload["accountId"].(string)
 			if accountID != "" {
-				account, ok, err := mysqlAccountByEmailInWorkspace(ctx, tx, auth.WorkspaceID, email)
+				account, ok, err := mysqlAccountByEmail(ctx, tx, email)
 				if err != nil {
 					writeError(w, http.StatusInternalServerError, "save failed")
 					return
@@ -949,12 +1477,18 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
-		if !ok || account.WorkspaceID != auth.WorkspaceID {
+		if ok {
+			if err := mysqlEnsureWorkspaceMembership(ctx, tx, auth.WorkspaceID, account.ID, "member", "active", now); err != nil {
+				writeError(w, http.StatusInternalServerError, "save failed")
+				return
+			}
+		}
+		if !ok {
 			if existing.Entity != "team_member" || normalizeEmail(email) == "" {
 				writeError(w, http.StatusNotFound, "member account not found")
 				return
 			}
-			if conflict, ok, err := mysqlAccountByEmailInWorkspace(ctx, tx, auth.WorkspaceID, email); err != nil {
+			if conflict, ok, err := mysqlAccountByEmail(ctx, tx, email); err != nil {
 				writeError(w, http.StatusInternalServerError, "save failed")
 				return
 			} else if ok && conflict.ID != accountID {
@@ -981,6 +1515,15 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
+		if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+		memberStatus, _ := payload["status"].(string)
+		if err := mysqlEnsureWorkspaceMembership(ctx, tx, auth.WorkspaceID, account.ID, "member", fallback(memberStatus, "active"), now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
 	}
 	if existing.Entity == "team_member" {
 		accountID, _ := payload["accountId"].(string)
@@ -990,12 +1533,22 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 				writeError(w, http.StatusInternalServerError, "save failed")
 				return
 			}
-			if ok && account.WorkspaceID == auth.WorkspaceID {
+			if ok {
+				status, _ := payload["status"].(string)
+				if err := mysqlEnsureWorkspaceMembership(ctx, tx, auth.WorkspaceID, account.ID, "member", fallback(status, "active"), now); err != nil {
+					writeError(w, http.StatusInternalServerError, "save failed")
+					return
+				}
 				if name, ok := payload["name"].(string); ok && strings.TrimSpace(name) != "" {
 					account.Name = strings.TrimSpace(name)
 				}
 				if email, ok := payload["email"].(string); ok && strings.TrimSpace(email) != "" {
 					account.Email = normalizeEmail(email)
+				}
+				if strings.EqualFold(strings.TrimSpace(status), "disabled") {
+					account.DisabledAt = now
+				} else if strings.EqualFold(strings.TrimSpace(status), "active") {
+					account.DisabledAt = ""
 				}
 				account.UpdatedAt = now
 				if err := mysqlUpsertAccount(ctx, tx, account); err != nil {

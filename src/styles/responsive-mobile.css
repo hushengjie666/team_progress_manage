@@ -152,6 +152,10 @@
     white-space: nowrap;
   }
 
+  .mobile-workspace-select {
+    max-width: 150px;
+  }
+
   .mobile-bottom-nav {
     position: fixed;
     right: 0;
@@ -406,25 +410,37 @@
     justify-content: flex-end;
   }
 
-  .task-inline-progress {
-    flex: 1 1 100%;
+  .task-progress-panel {
     min-width: 0;
+    max-width: none;
   }
 
-  .task-progress-meta-row {
+  .task-card-side {
     grid-template-columns: 1fr;
+    justify-content: stretch;
+    gap: 9px;
+    padding-top: 10px;
+    padding-left: 0;
+    border-top: 1px solid rgba(215, 207, 196, 0.72);
+    border-left: 0;
   }
 
   .task-actions {
     max-width: none;
     justify-content: flex-start;
-    grid-template-columns: 1fr;
+    flex-wrap: wrap;
   }
 
   .task-primary-actions,
   .task-secondary-actions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+
+  .task-secondary-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
   }
 
   .project-overview-actions button,

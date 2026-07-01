@@ -27,6 +27,14 @@ describe("stageTaskStatePills", () => {
   it("shows review exactly once", () => {
     expect(stageTaskStatePills("pending_review", false)).toEqual([{ className: "review", label: "待验收" }]);
   });
+
+  it("does not show running and review at the same time", () => {
+    expect(stageTaskStatePills("pending_review", true)).toEqual([{ className: "review", label: "待验收" }]);
+  });
+
+  it("does not show running for completed tasks", () => {
+    expect(stageTaskStatePills("completed", true)).toEqual([]);
+  });
 });
 
 describe("stageTaskCardClassName", () => {
@@ -36,7 +44,8 @@ describe("stageTaskCardClassName", () => {
   });
 
   it("uses only one emphasis class by priority", () => {
-    expect(stageTaskCardClassName("pending_review", true, true)).toBe("project-stage-task-card active");
+    expect(stageTaskCardClassName("pending_review", true, true)).toBe("project-stage-task-card review");
+    expect(stageTaskCardClassName("completed", true, true)).toBe("project-stage-task-card today");
     expect(stageTaskCardClassName("pending_review", false, true)).toBe("project-stage-task-card review");
     expect(stageTaskCardClassName("committed", false, true)).toBe("project-stage-task-card today");
     expect(stageTaskCardClassName("pending_review", false, false)).toBe("project-stage-task-card review");
@@ -51,6 +60,7 @@ describe("stageTaskSortRank", () => {
 
   it("keeps active tasks before today tasks after review tasks", () => {
     expect(stageTaskSortRank("in_progress", true, false)).toBeLessThan(stageTaskSortRank("committed", false, true));
+    expect(stageTaskSortRank("completed", true, true)).toBe(stageTaskSortRank("completed", false, true));
     expect(stageTaskSortRank("committed", false, true)).toBeLessThan(stageTaskSortRank("pool", false, false));
   });
 });

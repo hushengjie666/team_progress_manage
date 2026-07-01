@@ -650,7 +650,7 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
     "get_sync_diagnostics",
     {
       title: "Get Sync Diagnostics",
-      description: "读取 MCP 视角下的同步诊断，包括本地 revision、远端 revision、实体数量和冲突数。",
+      description: "读取 MCP 视角下的后台诊断，包括本地 revision、远端 revision、实体数量和冲突数。",
       inputSchema: {},
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

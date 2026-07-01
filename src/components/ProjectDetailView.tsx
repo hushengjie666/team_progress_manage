@@ -13,6 +13,7 @@ import {
   type ProjectTaskInput,
   type ProjectTaskFilters,
 } from "../projectDetail";
+import { resolveMemberIdForProject } from "../memberIdentity";
 import type { AppState, Project, ProjectMember, ProjectMemberRole, Task, TaskStatus, TeamMember } from "../types";
 import { TaskDetailModal } from "./WorkspaceView";
 import { ScheduleCalendarView } from "./ScheduleCalendarView";
@@ -69,6 +70,7 @@ export function ProjectDetailView(props: {
   beginFocus: (taskId: string) => void;
   bindTeamMemberToProject: (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => void;
   updateProjectMember: (member: ProjectMember) => void;
+  canManageMembers?: boolean;
   backToBoard: () => void;
   backToAdmin: () => void;
   openMemberSettings: () => void;
@@ -80,6 +82,8 @@ export function ProjectDetailView(props: {
   const [addMemberRolesById, setAddMemberRolesById] = useState<Record<string, ProjectMemberRole[]>>({});
   const [draft, setDraft] = useState<ProjectTaskInput>(createEmptyProjectTaskDraft);
   const model = deriveProjectDetailModel(props.state, props.projectId, filters, today());
+  const canManageMembers = props.canManageMembers ?? true;
+  const activeTab = !canManageMembers && props.activeTab === "members" ? "overview" : props.activeTab;
 
   if (!model) {
     return (
@@ -126,11 +130,12 @@ export function ProjectDetailView(props: {
   };
 
   const updateStatus = (taskId: string, status: TaskStatus) => {
+    const task = props.state.tasks.find((item) => item.id === taskId);
     props.updateTask(taskId, {
       status,
       completedAt: status === "completed" ? nowIso() : undefined,
       reviewSubmittedAt: status === "pending_review" ? nowIso() : undefined,
-      reviewSubmittedByMemberId: status === "pending_review" ? props.state.currentMemberId : undefined,
+      reviewSubmittedByMemberId: status === "pending_review" && task ? resolveMemberIdForProject(props.state, task.projectId) : undefined,
     });
   };
   const updateMemberRole = (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => {
@@ -164,8 +169,8 @@ export function ProjectDetailView(props: {
             ["tasks", "任务"],
             ["members", "成员"],
             ["settings", "设置"],
-          ] as const).map(([tab, label]) => (
-            <button className={props.activeTab === tab ? "active" : ""} key={tab} onClick={() => props.setActiveTab(tab)}>
+          ] as const).filter(([tab]) => canManageMembers || tab !== "members").map(([tab, label]) => (
+            <button className={activeTab === tab ? "active" : ""} key={tab} onClick={() => props.setActiveTab(tab)}>
               {label}
             </button>
           ))}
@@ -178,7 +183,7 @@ export function ProjectDetailView(props: {
         </div>
       </section>
 
-      {props.activeTab === "overview" && (
+      {activeTab === "overview" && (
         <>
           <section className="band project-task-workspace project-overview-task-board">
             <div className="section-title">
@@ -253,7 +258,7 @@ export function ProjectDetailView(props: {
         </>
       )}
 
-      {props.activeTab === "tasks" && (
+      {activeTab === "tasks" && (
         <section className="band project-task-workspace">
           <div className="section-title">
             <div>
@@ -346,7 +351,7 @@ export function ProjectDetailView(props: {
         </section>
       )}
 
-      {props.activeTab === "schedule" && (
+      {activeTab === "schedule" && (
         <section className="band project-schedule-panel">
           <ScheduleCalendarView
             state={props.state}
@@ -360,7 +365,7 @@ export function ProjectDetailView(props: {
         </section>
       )}
 
-      {props.activeTab === "members" && (
+      {activeTab === "members" && (
         <section className="band project-members-panel">
           <div className="section-title">
             <div>
@@ -404,7 +409,7 @@ export function ProjectDetailView(props: {
         </section>
       )}
 
-      {props.activeTab === "settings" && (
+      {activeTab === "settings" && (
         <section className="band project-settings-panel">
           <div className="section-title">
             <div>
@@ -563,13 +568,14 @@ function ProjectOverviewTaskBoard(props: {
 
   const renderStageTask = (task: Task) => {
     const isActive = activeTaskIdSet.has(task.id);
+    const showsActiveState = isActive && task.status === "in_progress";
     const isTodayTask = todayTaskIdSet.has(task.id);
     const statusLabel = stageTaskStatusLabel(task.status);
-    const statePills = stageTaskStatePills(task.status, isActive);
+    const statePills = stageTaskStatePills(task.status, showsActiveState);
     const executorName = task.primaryExecutorMemberId ? membersById.get(task.primaryExecutorMemberId)?.name ?? "已分配" : undefined;
     return (
       <button
-        className={stageTaskCardClassName(task.status, isActive, isTodayTask)}
+        className={stageTaskCardClassName(task.status, showsActiveState, isTodayTask)}
         key={task.id}
         onClick={() => props.selectTask(task.id)}
         type="button"
@@ -578,7 +584,7 @@ function ProjectOverviewTaskBoard(props: {
           <strong>{task.title}</strong>
           <span>{statusLabel} · {labelPriority[task.priority]} · {task.progressPercent ?? 0}% · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
         </div>
-        {isActive && (
+        {showsActiveState && (
           <span className="working-indicator" aria-label="当前任务执行中">
             <UserRoundPen size={32} />
           </span>

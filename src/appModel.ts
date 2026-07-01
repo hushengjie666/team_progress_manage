@@ -1,4 +1,5 @@
 import { calculateRemaining, completedFocusSessions, defaultReview, deriveRewardState, nextBreakMode, pauseTimer, restoreTimer, resumeTimer, suggestedTasks } from "./domain";
+import { resolveCurrentMember, resolveMemberIdForProject } from "./memberIdentity";
 import { todayKey, uid } from "./seed";
 import type { AppState, DailyPlan, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, TaskStage, WorkSession } from "./types";
 import {
@@ -330,7 +331,14 @@ export const startTimerInState = (
     strictProfileId: mode === "focus" ? strictProfileId : undefined,
   };
   const task = taskId ? state.tasks.find((item) => item.id === taskId) : undefined;
-  const executorMemberId = task ? claimTaskForCurrentMemberIfUnassigned(state, task) : state.currentMemberId;
+  if (
+    mode === "focus" &&
+    task &&
+    (task.status === "pending_review" || task.status === "completed" || task.status === "split" || task.status === "archived")
+  ) {
+    return state;
+  }
+  const executorMemberId = task ? claimTaskForCurrentMemberIfUnassigned(state, task) : resolveCurrentMember(state)?.id;
   const timerWorkSession = activeWorkSession(state);
   const currentWorkSession = timerWorkSession?.status === "active" && timerWorkSession.executorMemberId === executorMemberId
     ? timerWorkSession
@@ -446,7 +454,7 @@ export const ensureTodayPlan = (state: AppState): AppState => {
           const workSession: WorkSession = {
             id: activeTimer.workSessionId ?? uid("work_session"),
             taskId: activeTimerTask.id,
-            executorMemberId: activeTimerTask.primaryExecutorMemberId ?? state.currentMemberId,
+            executorMemberId: activeTimerTask.primaryExecutorMemberId ?? resolveMemberIdForProject(state, activeTimerTask.projectId),
             focusSessionId: activeTimer.sessionId,
             status: activeTimer.isRunning ? "active" : "paused",
             startedAt: activeTimer.startedAt,

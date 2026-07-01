@@ -21,13 +21,23 @@ export const upcomingBreakMode = (state: AppState): SessionMode =>
     ? "long_break"
     : "short_break";
 
+const isVisibleFocusTask = (task: Task) =>
+  task.status === "committed" || task.status === "in_progress" || task.status === "pending_review" || task.status === "completed";
+
+const focusTaskStatusRank = (task: Task) => {
+  if (task.status === "in_progress") return 0;
+  if (task.status === "committed") return 1;
+  if (task.status === "pending_review") return 2;
+  return 3;
+};
+
 export const buildFocusTaskList = (currentTask: Task | undefined, committedTasks: Task[], _activeTaskId?: string) =>
   [
     ...(currentTask && !committedTasks.some((task) => task.id === currentTask.id) ? [currentTask] : []),
     ...committedTasks,
   ]
-    .filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived")
-    .sort((left, right) => left.sortOrder - right.sortOrder);
+    .filter(isVisibleFocusTask)
+    .sort((left, right) => focusTaskStatusRank(left) - focusTaskStatusRank(right) || left.sortOrder - right.sortOrder);
 
 export const groupFocusTasksByProject = (tasks: Task[]) =>
   tasks.reduce<FocusTaskGroup[]>((groups, task) => {

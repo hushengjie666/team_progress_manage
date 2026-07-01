@@ -41,6 +41,7 @@ import {
   assignTaskInState,
   createProjectInState,
   deleteTeamMemberInState,
+  reorderProjectsInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectMemberInState,
@@ -48,6 +49,7 @@ import {
   updateTaskProgressInState,
 } from "./teamProgress";
 import { buildProjectOverviewTaskBoard, createProjectTaskInState, deriveProjectDetailModel, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
+import { resolveMemberIdForProject } from "./memberIdentity";
 import {
   buildMyProjectTaskCards,
   buildProjectOverviewCards,
@@ -540,6 +542,62 @@ describe("timer domain", () => {
     });
 
     expect(model?.activeProjectTaskIds).toContain(taskId);
+  });
+
+  it("does not mark pending-review project tasks active from stale runtime state", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_pending_review_runtime",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      tasks: started.tasks.map((task) => task.id === taskId ? { ...task, status: "pending_review" as const } : task),
+    };
+
+    const model = deriveProjectDetailModel(inconsistent, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(model?.activeProjectTaskIds).not.toContain(taskId);
+  });
+
+  it("does not mark completed project tasks active from stale runtime state", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      undefined,
+      "session_completed_runtime",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      tasks: started.tasks.map((task) => task.id === taskId ? { ...task, status: "completed" as const } : task),
+    };
+
+    const model = deriveProjectDetailModel(inconsistent, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(model?.activeProjectTaskIds).not.toContain(taskId);
   });
 
   it("ends stale active work sessions instead of adding them to today's queue", () => {
@@ -1047,6 +1105,55 @@ describe("progress board", () => {
     });
   });
 
+  it("keeps project overview cards in persisted sort order", () => {
+    const state = createInitialState();
+    const withSecondProject = createProjectInState(
+      state,
+      "图像识别",
+      "yolo识别",
+      iso("2026-05-11T08:00:00Z"),
+      (prefix) => `${prefix}_overview_order`,
+      { accountId: "account_owner", name: "项目负责人", email: "owner@example.com" },
+    );
+    const reordered: AppState = {
+      ...withSecondProject,
+      projects: withSecondProject.projects.map((project) =>
+        project.id === "project_overview_order"
+          ? { ...project, sortOrder: 0, updatedAt: iso("2026-05-11T08:00:00Z") }
+          : { ...project, sortOrder: 1000, updatedAt: iso("2026-05-12T08:00:00Z") },
+      ),
+    };
+
+    expect(buildProjectOverviewCards(reordered).map((card) => card.projectId)).toEqual([
+      "project_overview_order",
+      state.projects[0].id,
+    ]);
+  });
+
+  it("stores dragged project overview order on projects", () => {
+    const state = createInitialState();
+    const withSecondProject = createProjectInState(
+      state,
+      "图像识别",
+      "yolo识别",
+      iso("2026-05-11T08:00:00Z"),
+      (prefix) => `${prefix}_drag_order`,
+      { accountId: "account_owner", name: "项目负责人", email: "owner@example.com" },
+    );
+    const reordered = reorderProjectsInState(
+      withSecondProject,
+      ["project_drag_order", state.projects[0].id],
+      iso("2026-05-12T08:00:00Z"),
+    );
+
+    expect(reordered.projects.find((project) => project.id === "project_drag_order")?.sortOrder).toBe(0);
+    expect(reordered.projects.find((project) => project.id === state.projects[0].id)?.sortOrder).toBe(1000);
+    expect(buildProjectOverviewCards(reordered).map((card) => card.projectId)).toEqual([
+      "project_drag_order",
+      state.projects[0].id,
+    ]);
+  });
+
   it("builds the project detail overview board from pooled work and member today work groups", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
@@ -1156,6 +1263,9 @@ describe("progress board", () => {
       todayKey(),
     );
 
+    expect(model?.overviewTasks.map((task) => task.id)).not.toContain("accepted_new");
+    expect(model?.overviewTasks.map((task) => task.id)).not.toContain("accepted_old");
+    expect(model?.overviewTasks.map((task) => task.id)).not.toContain("manual_done");
     expect(model?.acceptedTasks.map((task) => task.id)).toEqual(["accepted_new", "accepted_old"]);
   });
 
@@ -1390,6 +1500,74 @@ describe("progress board", () => {
       teamMemberId: "team_member_owner",
     });
     expect(filterTodayCommittedTasksForMember(loggedIn, committedTasks, currentMember).map((task) => task.id)).toEqual([secondTask.id]);
+  });
+
+  it("does not bind a stale selected project member to a different authenticated account", () => {
+    const state = createInitialState();
+    const staleMember: ProjectMember = {
+      ...state.projectMembers[0],
+      id: "member_stale_selected",
+      teamMemberId: undefined,
+      accountId: undefined,
+      name: "王硕",
+      email: undefined,
+      roles: ["project_owner", "executor"],
+    };
+    const loggedIn = bindAccountToMembers(
+      {
+        ...state,
+        currentMemberId: staleMember.id,
+        projectMembers: [staleMember, ...state.projectMembers],
+      },
+      {
+        status: "authenticated",
+        token: "stale_bind_token",
+        bootstrapped: true,
+        message: "已登录",
+        account: {
+          id: "account_hushengjie",
+          workspaceId: "workspace_test",
+          name: "胡圣杰",
+          email: "hushengjie@example.com",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      "2026-05-10T09:10:00.000Z",
+    );
+
+    expect(loggedIn.projectMembers.find((member) => member.id === staleMember.id)?.accountId).toBeUndefined();
+    expect(loggedIn.currentMemberId).toBeUndefined();
+  });
+
+  it("does not create a team member just because an account logged in", () => {
+    const state = createInitialState();
+    const loggedIn = bindAccountToMembers(
+      {
+        ...state,
+        currentMemberId: undefined,
+        teamMembers: [],
+        projectMembers: [],
+      },
+      {
+        status: "authenticated",
+        token: "no_member_token",
+        bootstrapped: true,
+        message: "已登录",
+        account: {
+          id: "account_no_member",
+          workspaceId: "workspace_test",
+          name: "仅登录账号",
+          email: "account-only@example.com",
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      "2026-05-10T09:10:00.000Z",
+    );
+
+    expect(loggedIn.teamMembers).toEqual([]);
+    expect(loggedIn.currentMemberId).toBeUndefined();
   });
 
   it("clears sync retry backoff when binding an authenticated account", () => {
@@ -1901,6 +2079,56 @@ describe("data portability and long planning", () => {
     expect(accepted.tasks[0].estimateHistory).toHaveLength(1);
   });
 
+  it("creates and reviews tasks with the authenticated project member when currentMemberId is stale", () => {
+    const state = createInitialState();
+    const owner = state.projectMembers[0];
+    const teammate: ProjectMember = {
+      ...owner,
+      id: "member_teammate",
+      teamMemberId: "team_member_teammate",
+      accountId: "account_teammate",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      roles: ["executor"],
+    };
+    const loggedInState: AppState = {
+      ...state,
+      currentMemberId: teammate.id,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        account: {
+          id: owner.accountId!,
+          workspaceId: "workspace_test",
+          name: owner.name,
+          email: owner.email!,
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      projectMembers: [teammate, owner],
+    };
+    const actorMemberId = resolveMemberIdForProject(loggedInState, owner.projectId);
+    const created = createProjectTaskInState(
+      loggedInState,
+      owner.projectId,
+      { title: "登录人创建的任务" },
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_identity_create`,
+    );
+    const taskId = created.tasks[0].id;
+    const committed = {
+      ...created,
+      tasks: created.tasks.map((task) => (task.id === taskId ? { ...task, status: "in_progress" as const } : task)),
+    };
+    const submitted = submitTaskForReviewInState(committed, taskId, actorMemberId, "2026-05-10T11:00:00.000Z");
+    const accepted = acceptTaskInState(submitted, taskId, actorMemberId, "2026-05-10T12:00:00.000Z");
+
+    expect(created.tasks[0].creatorMemberId).toBe(owner.id);
+    expect(submitted.tasks[0].reviewSubmittedByMemberId).toBe(owner.id);
+    expect(accepted.tasks[0].reviewAcceptedByMemberId).toBe(owner.id);
+  });
+
   it("does not resubmit tasks already waiting for review", () => {
     const state = createInitialState();
     const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
@@ -1922,6 +2150,112 @@ describe("data portability and long planning", () => {
       reviewSubmittedAt: "2026-05-10T10:00:00.000Z",
       reviewSubmittedByMemberId: "member_owner",
       updatedAt: "2026-05-10T10:00:00.000Z",
+    });
+  });
+
+  it("does not start a timer for tasks waiting for review", () => {
+    const state = createInitialState();
+    const pendingReviewState = {
+      ...state,
+      tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "pending_review" as const } : task),
+    };
+
+    const started = startTimerInState(
+      pendingReviewState,
+      "focus",
+      state.tasks[0].id,
+      "2026-05-10T10:00:00.000Z",
+      undefined,
+      "session_pending_review",
+    );
+
+    expect(started.activeTimer).toBeUndefined();
+    expect(started.tasks[0].status).toBe("pending_review");
+    expect(started.workSessions).toHaveLength(0);
+  });
+
+  it("claims unassigned tasks for the authenticated account instead of a stale current member", () => {
+    const state = createInitialState();
+    const owner = state.projectMembers[0];
+    const teammate: ProjectMember = {
+      ...owner,
+      id: "member_teammate",
+      teamMemberId: "team_member_teammate",
+      accountId: "account_teammate",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      roles: ["executor"],
+    };
+    const taskId = state.tasks[0].id;
+    const loggedInState: AppState = {
+      ...state,
+      currentMemberId: teammate.id,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        account: {
+          id: owner.accountId!,
+          workspaceId: "workspace_test",
+          name: owner.name,
+          email: owner.email!,
+          createdAt: "2026-05-10T09:00:00.000Z",
+          updatedAt: "2026-05-10T09:00:00.000Z",
+        },
+      },
+      projectMembers: [teammate, owner],
+      tasks: state.tasks.map((task, index) =>
+        index === 0
+          ? { ...task, primaryExecutorMemberId: undefined, collaboratorMemberIds: [], status: "pool" as const }
+          : task,
+      ),
+    };
+
+    const started = startTimerInState(
+      loggedInState,
+      "focus",
+      taskId,
+      "2026-05-10T10:00:00.000Z",
+      undefined,
+      "session_identity_claim",
+    );
+
+    expect(started.tasks.find((task) => task.id === taskId)?.primaryExecutorMemberId).toBe(owner.id);
+    expect(started.workSessions.find((session) => session.taskId === taskId)?.executorMemberId).toBe(owner.id);
+  });
+
+  it("ends active work when submitting an in-progress task for review", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-05-10T10:00:00.000Z",
+      undefined,
+      "session_review_submit",
+    );
+    const workSessionId = started.activeTimer?.workSessionId;
+
+    const submitted = submitTaskForReviewInState(
+      started,
+      taskId,
+      "member_owner",
+      "2026-05-10T10:05:00.000Z",
+    );
+
+    expect(submitted.tasks.find((task) => task.id === taskId)).toMatchObject({
+      status: "pending_review",
+      progressPercent: 100,
+      reviewSubmittedAt: "2026-05-10T10:05:00.000Z",
+    });
+    expect(submitted.activeTimer).toBeUndefined();
+    expect(submitted.workSessions.find((session) => session.id === workSessionId)).toMatchObject({
+      status: "ended",
+      endedAt: "2026-05-10T10:05:00.000Z",
+    });
+    expect(submitted.focusSessions.find((session) => session.id === "session_review_submit")).toMatchObject({
+      endedAt: "2026-05-10T10:05:00.000Z",
+      outcome: "skipped",
     });
   });
 

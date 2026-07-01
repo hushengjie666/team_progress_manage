@@ -1,5 +1,13 @@
 import { buildProgressBoard } from "./domain";
-import type { AppState, ProjectMember, Task, TaskStatus } from "./types";
+import {
+  projectMemberIdentityIds,
+  sameMemberIdentity,
+  taskAssignedToMemberIdentity,
+  taskBelongsToMemberIdentity,
+} from "./memberIdentity";
+import type { AppState, Project, ProjectMember, Task, TaskStatus } from "./types";
+
+export { projectMemberIdentityIds, sameMemberIdentity, taskAssignedToMemberIdentity } from "./memberIdentity";
 
 export type ProjectOverviewCard = {
   projectId: string;
@@ -38,8 +46,21 @@ const emptyStatusCounts = (): Record<TaskStatus, number> => ({
   archived: 0,
 });
 
+const projectCreatedAtRank = (project: Project) => {
+  const value = new Date(project.createdAt).getTime();
+  return Number.isFinite(value) ? value : 0;
+};
+
+export const projectOverviewSortOrder = (project: Project) =>
+  Number.isFinite(project.sortOrder) ? project.sortOrder! : projectCreatedAtRank(project);
+
+export const compareProjectsForOverview = (left: Project, right: Project) =>
+  projectOverviewSortOrder(left) - projectOverviewSortOrder(right) ||
+  projectCreatedAtRank(left) - projectCreatedAtRank(right) ||
+  left.id.localeCompare(right.id);
+
 export const buildProjectOverviewCards = (state: AppState): ProjectOverviewCard[] =>
-  state.projects.map((project) => {
+  [...state.projects].sort(compareProjectsForOverview).map((project) => {
     const tasks = state.tasks.filter((task) => task.projectId === project.id);
     const statusCounts = tasks.reduce<Record<TaskStatus, number>>((counts, task) => {
       counts[task.status] += 1;
@@ -66,40 +87,6 @@ export const buildProjectOverviewCards = (state: AppState): ProjectOverviewCard[
       statusCounts,
     };
   });
-
-const sameMemberIdentity = (left: ProjectMember, right: ProjectMember) => {
-  if (left.id === right.id) return true;
-  if (left.accountId && right.accountId && left.accountId === right.accountId) return true;
-  if (left.teamMemberId && right.teamMemberId && left.teamMemberId === right.teamMemberId) return true;
-  if (left.email && right.email && left.email.toLowerCase() === right.email.toLowerCase()) return true;
-  return false;
-};
-
-export const projectMemberIdentityIds = (state: AppState, currentMember?: ProjectMember) => {
-  if (!currentMember) return new Set<string>();
-  return new Set(
-    state.projectMembers
-      .filter((member) => member.status !== "disabled" && sameMemberIdentity(member, currentMember))
-      .map((member) => member.id),
-  );
-};
-
-export const taskAssignedToMemberIdentity = (task: Task, memberIds: Set<string>, options: { includeUnassigned?: boolean } = {}) => {
-  const collaboratorMemberIds = task.collaboratorMemberIds ?? [];
-  const isUnassigned = !task.primaryExecutorMemberId && collaboratorMemberIds.length === 0;
-
-  return Boolean(
-    (options.includeUnassigned && isUnassigned) ||
-    (task.primaryExecutorMemberId && memberIds.has(task.primaryExecutorMemberId)) ||
-    collaboratorMemberIds.some((memberId) => memberIds.has(memberId)),
-  );
-};
-
-const taskWorkedByMemberIdentity = (state: AppState, task: Task, memberIds: Set<string>) =>
-  state.workSessions.some((session) => session.taskId === task.id && session.executorMemberId && memberIds.has(session.executorMemberId));
-
-const taskBelongsToMemberIdentity = (state: AppState, task: Task, memberIds: Set<string>) =>
-  taskAssignedToMemberIdentity(task, memberIds) || taskWorkedByMemberIdentity(state, task, memberIds);
 
 export const filterMyTasksByProjectSelection = (
   state: AppState,
@@ -129,10 +116,27 @@ export const filterTodayCommittedTasksForMember = (
   state: AppState,
   tasks: Task[],
   currentMember: ProjectMember | undefined,
+  options: { includeProjectOwnerUnassigned?: boolean; includeUnassigned?: boolean } = {},
 ) => {
   const memberIds = projectMemberIdentityIds(state, currentMember);
   if (memberIds.size === 0) return [];
-  return tasks.filter((task) => taskBelongsToMemberIdentity(state, task, memberIds));
+  return tasks.filter((task) => taskBelongsToMemberIdentity(state, task, memberIds, options));
+};
+
+export const filterTodayCompletedTasksForMember = (
+  state: AppState,
+  date: string,
+  currentMember: ProjectMember | undefined,
+  options: { includeProjectOwnerUnassigned?: boolean; includeUnassigned?: boolean } = {},
+) => {
+  const memberIds = projectMemberIdentityIds(state, currentMember);
+  if (memberIds.size === 0) return [];
+  return state.tasks.filter(
+    (task) =>
+      task.status === "completed" &&
+      task.completedAt?.slice(0, 10) === date &&
+      taskBelongsToMemberIdentity(state, task, memberIds, options),
+  );
 };
 
 export const quickAddProjectIdForSelection = (selectedProjectIds: string[]) =>

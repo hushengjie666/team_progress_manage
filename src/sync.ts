@@ -16,6 +16,7 @@ import type {
   Task,
   TeamMember,
   Workspace,
+  WorkspaceMembership,
   WorkSession,
   ExecutionSignal,
 } from "./types";
@@ -77,6 +78,8 @@ interface LoginResponse {
   expires_at: string;
   account: ServerAccount;
   workspace: ServerWorkspace;
+  membership?: ServerWorkspaceMembership;
+  workspaces?: ServerWorkspace[];
 }
 
 interface ServerAccount {
@@ -92,6 +95,20 @@ interface ServerAccount {
 interface ServerWorkspace {
   id: string;
   name: string;
+  type?: "private" | "shared";
+  owner_account_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ServerWorkspaceMembership {
+  id: string;
+  workspace_id: string;
+  account_id: string;
+  name: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  status: "active" | "disabled";
   created_at: string;
   updated_at: string;
 }
@@ -107,6 +124,8 @@ export interface AuthSession {
   expiresAt: string;
   account: Account;
   workspace: Workspace;
+  membership?: WorkspaceMembership;
+  workspaces: Workspace[];
 }
 
 export interface BootstrapPayload {
@@ -122,6 +141,7 @@ export interface MemberAccountPayload {
   email: string;
   password: string;
   roles: ProjectMember["roles"];
+  status?: "active" | "disabled";
 }
 
 interface MemberResponse {
@@ -235,7 +255,7 @@ const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Pro
     return readResponse<T>(response);
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error("无法连接团队服务，请检查服务地址是否正确，并确认同步服务已启动");
+      throw new Error("无法连接团队后台，请检查服务地址是否正确，并确认后台服务已启动");
     }
     throw error;
   }
@@ -254,8 +274,22 @@ const mapAccount = (account: ServerAccount): Account => ({
 const mapWorkspace = (workspace: ServerWorkspace): Workspace => ({
   id: workspace.id,
   name: workspace.name,
+  type: workspace.type === "private" ? "private" : "shared",
+  ownerAccountId: workspace.owner_account_id || undefined,
   createdAt: workspace.created_at,
   updatedAt: workspace.updated_at,
+});
+
+const mapWorkspaceMembership = (membership: ServerWorkspaceMembership): WorkspaceMembership => ({
+  id: membership.id,
+  workspaceId: membership.workspace_id,
+  accountId: membership.account_id,
+  name: membership.name,
+  email: membership.email,
+  role: membership.role,
+  status: membership.status,
+  createdAt: membership.created_at,
+  updatedAt: membership.updated_at,
 });
 
 const sessionFromLogin = (payload: LoginResponse): AuthSession => ({
@@ -263,6 +297,8 @@ const sessionFromLogin = (payload: LoginResponse): AuthSession => ({
   expiresAt: payload.expires_at,
   account: mapAccount(payload.account),
   workspace: mapWorkspace(payload.workspace),
+  membership: payload.membership ? mapWorkspaceMembership(payload.membership) : undefined,
+  workspaces: (payload.workspaces ?? [payload.workspace]).map(mapWorkspace),
 });
 
 export async function getAuthStatus(serverUrl: string): Promise<AuthStatusResponse> {
@@ -291,6 +327,31 @@ export async function loginToWorkspace(sync: SyncState, email: string, password:
     body: JSON.stringify({
       email: email.trim(),
       password,
+      device_id: sync.deviceId,
+    }),
+  });
+  return sessionFromLogin(payload);
+}
+
+export async function switchWorkspace(sync: SyncState, token: string, workspaceId: string): Promise<AuthSession> {
+  const payload = await requestJson<LoginResponse>(apiUrl(sync.serverUrl, "/auth/switch-workspace"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      device_id: sync.deviceId,
+    }),
+  });
+  return sessionFromLogin(payload);
+}
+
+export async function createWorkspace(sync: SyncState, token: string, name: string): Promise<AuthSession> {
+  const payload = await requestJson<LoginResponse>(apiUrl(sync.serverUrl, "/workspaces"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name,
+      type: "shared",
       device_id: sync.deviceId,
     }),
   });
@@ -335,17 +396,21 @@ export async function createMemberAccount(sync: SyncState, token: string, payloa
 export async function createTeamMemberAccount(
   sync: SyncState,
   token: string,
-  payload: Omit<MemberAccountPayload, "projectId" | "roles">,
+  payload: Omit<MemberAccountPayload, "projectId" | "roles"> & { forceRecreate?: boolean },
 ): Promise<TeamMember> {
-  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, "/members"), {
-    method: "POST",
-    headers: authHeaders(token),
-    body: JSON.stringify({
-      name: payload.name,
-      email: payload.email,
-      password: payload.password,
-    }),
-  });
+  const { forceRecreate, ...memberPayload } = payload;
+  const result = await requestJson<MemberResponse>(
+    forceRecreate ? `${apiUrl(sync.serverUrl, "/members")}?force_recreate=1` : apiUrl(sync.serverUrl, "/members"),
+    {
+      method: "POST",
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        name: memberPayload.name,
+        email: memberPayload.email,
+        password: memberPayload.password,
+      }),
+    },
+  );
   return result.member.payload as TeamMember;
 }
 
@@ -381,6 +446,7 @@ export async function updateTeamMemberAccount(
       name: payload.name,
       email: payload.email,
       password: payload.password,
+      status: payload.status,
     }),
   });
   return result.member.payload as TeamMember;

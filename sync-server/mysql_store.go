@@ -21,15 +21,33 @@ func emptyStore() store {
 }
 
 func openMySQLStore(dsn string) (*sql.DB, store, error) {
+	db, err := openMySQLDB(dsn)
+	if err != nil {
+		return nil, store{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := ensureMySQLSchema(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, store{}, err
+	}
+	if err := ensureDefaultAdminAccount(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, store{}, err
+	}
+	return db, emptyStore(), nil
+}
+
+func openMySQLDB(dsn string) (*sql.DB, error) {
 	if dsn == "" {
-		return nil, store{}, errors.New("mysql_dsn is required")
+		return nil, errors.New("mysql_dsn is required")
 	}
 	if err := ensureMySQLDatabase(dsn); err != nil {
-		return nil, store{}, err
+		return nil, err
 	}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		return nil, store{}, err
+		return nil, err
 	}
 	db.SetMaxOpenConns(5)
 	db.SetMaxIdleConns(2)
@@ -39,13 +57,9 @@ func openMySQLStore(dsn string) (*sql.DB, store, error) {
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, store{}, err
+		return nil, err
 	}
-	if err := ensureMySQLSchema(ctx, db); err != nil {
-		_ = db.Close()
-		return nil, store{}, err
-	}
-	return db, emptyStore(), nil
+	return db, nil
 }
 
 func ensureMySQLDatabase(dsn string) error {
@@ -73,82 +87,90 @@ func ensureMySQLDatabase(dsn string) error {
 }
 
 func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
+	return applyMySQLMigrations(ctx, db)
+}
+
+func ensureMySQLColumn(ctx context.Context, db *sql.DB, tableName string, columnName string, alterStatement string) error {
+	var count int
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+		tableName,
+		columnName,
+	).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := db.ExecContext(ctx, alterStatement)
+	return err
+}
+
+func ensureMySQLIndex(ctx context.Context, db *sql.DB, tableName string, indexName string, alterStatement string) error {
+	var count int
+	if err := db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+		tableName,
+		indexName,
+	).Scan(&count); err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	_, err := db.ExecContext(ctx, alterStatement)
+	return err
+}
+
+func migrateMySQLWorkspaces(ctx context.Context, db *sql.DB) error {
 	statements := []string{
-		`CREATE TABLE IF NOT EXISTS sync_meta (
-			key_name VARCHAR(64) NOT NULL PRIMARY KEY,
-			value_bigint BIGINT NOT NULL
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS workspaces (
-			id VARCHAR(128) NOT NULL PRIMARY KEY,
-			name VARCHAR(255) NOT NULL,
-			created_at VARCHAR(40) NOT NULL,
-			updated_at VARCHAR(40) NOT NULL
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS accounts (
-			id VARCHAR(128) NOT NULL PRIMARY KEY,
-			workspace_id VARCHAR(128) NOT NULL,
-			name VARCHAR(255) NOT NULL,
-			email VARCHAR(255) NOT NULL,
-			password_hash VARCHAR(255) NOT NULL,
-			disabled_at VARCHAR(40) NULL,
-			created_at VARCHAR(40) NOT NULL,
-			updated_at VARCHAR(40) NOT NULL,
-			UNIQUE KEY idx_accounts_email (email),
-			KEY idx_accounts_workspace (workspace_id)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS sync_rows (
-			workspace_id VARCHAR(128) NOT NULL,
-			entity VARCHAR(64) NOT NULL,
-			entity_id VARCHAR(128) NOT NULL,
-			user_id VARCHAR(128) NULL,
-			account_id VARCHAR(128) NULL,
-			device_id VARCHAR(128) NOT NULL,
-			updated_at VARCHAR(40) NOT NULL,
-			deleted_at VARCHAR(40) NULL,
-			version INT NOT NULL,
-			revision BIGINT NOT NULL,
-			payload JSON NOT NULL,
-			PRIMARY KEY (workspace_id, entity, entity_id),
-			KEY idx_sync_rows_workspace_revision (workspace_id, revision),
-			KEY idx_sync_rows_entity_id (entity, entity_id)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS team_projects (
-			workspace_id VARCHAR(128) NOT NULL,
-			id VARCHAR(128) NOT NULL,
-			user_id VARCHAR(128) NULL,
-			account_id VARCHAR(128) NULL,
-			device_id VARCHAR(128) NOT NULL,
-			project_id VARCHAR(128) NULL,
-			task_id VARCHAR(128) NULL,
-			account_ref VARCHAR(128) NULL,
-			status VARCHAR(64) NULL,
-			kind VARCHAR(64) NULL,
-			row_date VARCHAR(32) NULL,
-			updated_at VARCHAR(40) NOT NULL,
-			deleted_at VARCHAR(40) NULL,
-			version INT NOT NULL,
-			revision BIGINT NOT NULL,
-			payload JSON NOT NULL,
-			PRIMARY KEY (workspace_id, id),
-			KEY idx_team_projects_revision (workspace_id, revision),
-			KEY idx_team_projects_project (workspace_id, project_id),
-			KEY idx_team_projects_task (workspace_id, task_id),
-			KEY idx_team_projects_status (workspace_id, status)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS team_team_members LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_project_members LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_tasks LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_daily_plans LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_focus_sessions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_work_sessions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_execution_signals LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_interruptions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_strict_violations LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_block_profiles LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_settings LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_onboarding LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_reward_state LIKE team_projects`,
-		`INSERT IGNORE INTO sync_meta (key_name, value_bigint) VALUES ('next_revision', 1)`,
+		`UPDATE workspaces SET type = 'shared' WHERE type IS NULL OR type = ''`,
+		`UPDATE workspaces w
+		 SET owner_account_id = (
+		  SELECT a.id FROM accounts a WHERE a.workspace_id = w.id ORDER BY a.created_at ASC LIMIT 1
+		 )
+		 WHERE (w.owner_account_id IS NULL OR w.owner_account_id = '') AND w.type = 'shared'`,
+		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
+		 SELECT CONCAT('membership_', a.workspace_id, '_', a.id),
+		  a.workspace_id,
+		  a.id,
+		  CASE WHEN w.owner_account_id = a.id THEN 'owner' ELSE 'member' END,
+		  CASE WHEN a.disabled_at IS NULL OR a.disabled_at = '' THEN 'active' ELSE 'disabled' END,
+		  a.created_at,
+		  a.updated_at
+		 FROM accounts a
+		 JOIN workspaces w ON w.id = a.workspace_id
+		 ON DUPLICATE KEY UPDATE
+		  role = IF(workspace_memberships.role = '', VALUES(role), workspace_memberships.role),
+		  status = VALUES(status),
+		  updated_at = VALUES(updated_at)`,
+		`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at)
+		 SELECT CONCAT('workspace_private_', a.id),
+		  CONCAT(a.name, '的私人工作区'),
+		  'private',
+		  a.id,
+		  a.created_at,
+		  a.updated_at
+		 FROM accounts a
+		 ON DUPLICATE KEY UPDATE
+		  type = 'private',
+		  owner_account_id = VALUES(owner_account_id),
+		  updated_at = VALUES(updated_at)`,
+		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
+		 SELECT CONCAT('membership_workspace_private_', a.id, '_', a.id),
+		  CONCAT('workspace_private_', a.id),
+		  a.id,
+		  'owner',
+		  CASE WHEN a.disabled_at IS NULL OR a.disabled_at = '' THEN 'active' ELSE 'disabled' END,
+		  a.created_at,
+		  a.updated_at
+		 FROM accounts a
+		 ON DUPLICATE KEY UPDATE
+		  role = 'owner',
+		  status = VALUES(status),
+		  updated_at = VALUES(updated_at)`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
@@ -167,15 +189,19 @@ func loadStoreFromMySQL(ctx context.Context, db *sql.DB) (store, error) {
 		s.NextRevision = 1
 	}
 
-	workspaceRows, err := db.QueryContext(ctx, `SELECT id, name, created_at, updated_at FROM workspaces`)
+	workspaceRows, err := db.QueryContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at FROM workspaces`)
 	if err != nil {
 		return s, err
 	}
 	defer workspaceRows.Close()
 	for workspaceRows.Next() {
 		var workspace workspaceData
-		if err := workspaceRows.Scan(&workspace.ID, &workspace.Name, &workspace.CreatedAt, &workspace.UpdatedAt); err != nil {
+		var ownerAccountID sql.NullString
+		if err := workspaceRows.Scan(&workspace.ID, &workspace.Name, &workspace.Type, &ownerAccountID, &workspace.CreatedAt, &workspace.UpdatedAt); err != nil {
 			return s, err
+		}
+		if ownerAccountID.Valid {
+			workspace.OwnerAccountID = ownerAccountID.String
 		}
 		workspace.Rows = map[string]syncRow{}
 		s.Workspaces[workspace.ID] = workspace
@@ -230,8 +256,12 @@ func loadStoreFromMySQL(ctx context.Context, db *sql.DB) (store, error) {
 		if workspace.ID == "" {
 			workspace.ID = row.WorkspaceID
 			workspace.Name = "默认团队"
+			workspace.Type = "shared"
 			workspace.CreatedAt = time.Now().UTC().Format(time.RFC3339)
 			workspace.UpdatedAt = workspace.CreatedAt
+		}
+		if workspace.Type == "" {
+			workspace.Type = "shared"
 		}
 		if workspace.Rows == nil {
 			workspace.Rows = map[string]syncRow{}
@@ -263,7 +293,7 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 	); err != nil {
 		return err
 	}
-	for _, statement := range []string{`DELETE FROM sync_rows`, `DELETE FROM accounts`, `DELETE FROM workspaces`} {
+	for _, statement := range []string{`DELETE FROM sync_rows`, `DELETE FROM workspace_memberships`, `DELETE FROM accounts`, `DELETE FROM workspaces`} {
 		if _, err := tx.ExecContext(ctx, statement); err != nil {
 			return err
 		}
@@ -272,9 +302,11 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 	for _, workspace := range s.Workspaces {
 		if _, err := tx.ExecContext(
 			ctx,
-			`INSERT INTO workspaces (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`,
+			`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
 			workspace.ID,
 			workspace.Name,
+			fallback(workspace.Type, "shared"),
+			nullString(workspace.OwnerAccountID),
 			workspace.CreatedAt,
 			workspace.UpdatedAt,
 		); err != nil {
@@ -296,6 +328,55 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 			account.UpdatedAt,
 		); err != nil {
 			return fmt.Errorf("insert account %s: %w", account.ID, err)
+		}
+		privateWorkspaceID := "workspace_private_" + account.ID
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at) VALUES (?, ?, 'private', ?, ?, ?)
+			ON DUPLICATE KEY UPDATE type = 'private', owner_account_id = VALUES(owner_account_id), updated_at = VALUES(updated_at)`,
+			privateWorkspaceID,
+			fallback(account.Name, account.Email)+"的私人工作区",
+			account.ID,
+			account.CreatedAt,
+			account.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("insert private workspace %s: %w", account.ID, err)
+		}
+		workspaceID := fallback(account.WorkspaceID, "workspace_private_"+account.ID)
+		role := "member"
+		if workspace := s.Workspaces[workspaceID]; workspace.OwnerAccountID == account.ID {
+			role = "owner"
+		}
+		status := "active"
+		if account.DisabledAt != "" {
+			status = "disabled"
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE role = VALUES(role), status = VALUES(status), updated_at = VALUES(updated_at)`,
+			"membership_"+workspaceID+"_"+account.ID,
+			workspaceID,
+			account.ID,
+			role,
+			status,
+			account.CreatedAt,
+			account.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("insert workspace membership %s: %w", account.ID, err)
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at) VALUES (?, ?, ?, 'owner', ?, ?, ?)
+			ON DUPLICATE KEY UPDATE role = 'owner', status = VALUES(status), updated_at = VALUES(updated_at)`,
+			"membership_"+privateWorkspaceID+"_"+account.ID,
+			privateWorkspaceID,
+			account.ID,
+			status,
+			account.CreatedAt,
+			account.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("insert private workspace membership %s: %w", account.ID, err)
 		}
 	}
 

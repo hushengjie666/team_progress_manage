@@ -1,4 +1,5 @@
 import { defaultReview } from "./domain";
+import { resolveMemberIdForProject } from "./memberIdentity";
 import { todayKey, uid } from "./seed";
 import type {
   AppState,
@@ -64,18 +65,7 @@ export const ensurePlanInState = (state: AppState, date: string, timestamp: stri
 export const ensureTodayPlanInState = (state: AppState, timestamp: string) => ensurePlanInState(state, todayKey(), timestamp);
 
 export const currentProjectMemberIdForTask = (state: AppState, task: Task) => {
-  const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId);
-  if (!currentMember) return state.currentMemberId;
-  if (currentMember.projectId === task.projectId) return currentMember.id;
-  return state.projectMembers.find((member) =>
-    member.projectId === task.projectId &&
-    member.status !== "disabled" &&
-    (
-      (currentMember.accountId && member.accountId === currentMember.accountId) ||
-      (currentMember.teamMemberId && member.teamMemberId === currentMember.teamMemberId) ||
-      (currentMember.email && member.email?.toLowerCase() === currentMember.email.toLowerCase())
-    ),
-  )?.id ?? state.currentMemberId;
+  return resolveMemberIdForProject(state, task.projectId);
 };
 
 export const claimTaskForCurrentMemberIfUnassigned = (state: AppState, task: Task) => {
@@ -237,13 +227,13 @@ export const startWorkSessionInState = (
 ) => {
   const task = state.tasks.find((item) => item.id === taskId);
   if (!task) throw new Error(`Task not found: ${taskId}`);
-  if (task.status === "completed" || task.status === "archived" || task.status === "split") {
+  if (task.status === "pending_review" || task.status === "completed" || task.status === "archived" || task.status === "split") {
     throw new Error(`Task ${taskId} cannot be started from status ${task.status}.`);
   }
 
   let next = addTaskToTodayInState(state, taskId, timestamp);
   const currentTask = next.tasks.find((item) => item.id === taskId)!;
-  const executorMemberId = currentTask.primaryExecutorMemberId ?? next.currentMemberId;
+  const executorMemberId = currentTask.primaryExecutorMemberId ?? resolveMemberIdForProject(next, currentTask.projectId);
   const activeForExecutor = executorMemberId
     ? next.workSessions.find((session) => session.status === "active" && session.executorMemberId === executorMemberId)
     : undefined;

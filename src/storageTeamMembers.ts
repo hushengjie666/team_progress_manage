@@ -109,7 +109,9 @@ export const dedupeTeamMembers = (teamMembers: TeamMember[], projectMembers: Pro
     teamMemberId: member.teamMemberId ? aliasById.get(member.teamMemberId) ?? member.teamMemberId : member.teamMemberId,
   }));
 
-  return { teamMembers: dedupedMembers, projectMembers: dedupedProjectMembers };
+  const teamMemberAliases = Array.from(aliasById.entries()).map(([id, canonicalId]) => ({ id, canonicalId }));
+
+  return { teamMembers: dedupedMembers, projectMembers: dedupedProjectMembers, teamMemberAliases };
 };
 
 export const attachTeamMembersToProjectMembers = (projectMembers: ProjectMember[], teamMembers: TeamMember[]): ProjectMember[] => {
@@ -143,8 +145,9 @@ const projectMemberBindingKey = (member: ProjectMember) => {
   return `${member.projectId}:${identity}`;
 };
 
-export const dedupeProjectMemberBindings = (projectMembers: ProjectMember[]) => {
+export const dedupeProjectMemberBindingsWithAliases = (projectMembers: ProjectMember[]) => {
   const byBinding = new Map<string, ProjectMember>();
+  const aliasById = new Map<string, string>();
   projectMembers.forEach((member) => {
     const key = projectMemberBindingKey(member);
     const existing = byBinding.get(key);
@@ -154,10 +157,32 @@ export const dedupeProjectMemberBindings = (projectMembers: ProjectMember[]) => 
     }
     if (existing.status === "disabled" && member.status !== "disabled") {
       byBinding.set(key, member);
+      aliasById.set(existing.id, member.id);
       return;
     }
-    if (member.status === "disabled" && existing.status !== "disabled") return;
-    byBinding.set(key, member.updatedAt >= existing.updatedAt ? member : existing);
+    if (member.status === "disabled" && existing.status !== "disabled") {
+      aliasById.set(member.id, existing.id);
+      return;
+    }
+    const winner = member.updatedAt >= existing.updatedAt ? member : existing;
+    const loser = winner.id === existing.id ? member : existing;
+    byBinding.set(key, winner);
+    aliasById.set(loser.id, winner.id);
   });
-  return Array.from(byBinding.values());
+  const resolveCanonicalId = (id: string): string => {
+    let current = id;
+    const seen = new Set<string>();
+    while (aliasById.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = aliasById.get(current)!;
+    }
+    return current;
+  };
+  return {
+    projectMembers: Array.from(byBinding.values()),
+    projectMemberAliases: Array.from(aliasById.entries()).map(([id]) => ({ id, canonicalId: resolveCanonicalId(id) })),
+  };
 };
+
+export const dedupeProjectMemberBindings = (projectMembers: ProjectMember[]) =>
+  dedupeProjectMemberBindingsWithAliases(projectMembers).projectMembers;

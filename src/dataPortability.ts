@@ -87,7 +87,7 @@ export const mergeImportedState = (current: AppState, payload: unknown, backup: 
       ...current.sync,
       ...incoming.sync,
       status: "idle",
-      message: "已从 JSON 导入本地数据，建议立即执行一次同步。",
+      message: "已从 JSON 导入数据，请同步到团队后台确认保存。",
       conflicts: incoming.sync?.conflicts ?? current.sync.conflicts ?? [],
       tombstones: incoming.sync?.tombstones ?? current.sync.tombstones ?? [],
     },

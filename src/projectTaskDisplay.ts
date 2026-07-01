@@ -12,6 +12,8 @@ export const projectTaskStatusColumns: { status: TaskStatus; title: string }[] =
 
 const statusTitleByStatus = Object.fromEntries(projectTaskStatusColumns.map((column) => [column.status, column.title])) as Record<TaskStatus, string>;
 
+const canShowActiveState = (status: TaskStatus) => status === "in_progress";
+
 export const stageTaskStatusLabel = (status: TaskStatus) => {
   if (status === "in_progress") return "已开始";
   return statusTitleByStatus[status];
@@ -19,19 +21,19 @@ export const stageTaskStatusLabel = (status: TaskStatus) => {
 
 export const stageTaskStatePills = (status: TaskStatus, isActive: boolean) => {
   const pills: { className: string; label: string }[] = [];
-  if (isActive) pills.push({ className: "running", label: "执行中" });
-  if (status === "pending_review") pills.push({ className: "review", label: "待验收" });
+  if (status === "pending_review") return [{ className: "review", label: "待验收" }];
+  if (isActive && canShowActiveState(status)) pills.push({ className: "running", label: "执行中" });
   return pills;
 };
 
 export const stageTaskCardClassName = (status: TaskStatus, isActive: boolean, isTodayTask: boolean) => {
-  const emphasis = isActive ? "active" : status === "pending_review" ? "review" : isTodayTask ? "today" : "";
+  const emphasis = status === "pending_review" ? "review" : isActive && canShowActiveState(status) ? "active" : isTodayTask ? "today" : "";
   return ["project-stage-task-card", emphasis].filter(Boolean).join(" ");
 };
 
 export const stageTaskSortRank = (status: TaskStatus, isActive: boolean, isTodayTask: boolean) => {
   if (status === "pending_review") return 0;
-  if (isActive) return 1;
+  if (isActive && canShowActiveState(status)) return 1;
   if (isTodayTask) return 2;
   return 3;
 };

@@ -23,6 +23,7 @@ export type AppNavigationHandlers = {
   openCalendar: () => void;
   openAdmin: () => void;
   logout: () => void;
+  showMemberStatus?: boolean;
 };
 
 export const createAppNavigation = ({
@@ -35,6 +36,7 @@ export const createAppNavigation = ({
   openCalendar,
   openAdmin,
   logout,
+  showMemberStatus = true,
 }: AppNavigationHandlers) => {
   const adminNavItem: AppTopbarNavItem = {
     key: "admin",
@@ -45,7 +47,7 @@ export const createAppNavigation = ({
 
   const primaryNavItems: AppTopbarNavItem[] = [
     { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard },
-    { key: "member_status", label: "成员状况", icon: <Users size={18} />, onClick: openMemberStatus },
+    ...(showMemberStatus ? [{ key: "member_status", label: "成员状况", icon: <Users size={18} />, onClick: openMemberStatus }] : []),
     { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench },
   ];
 
@@ -58,7 +60,7 @@ export const createAppNavigation = ({
   ];
 
   const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
-  const mobileNavItems = [primaryNavItems[0], primaryNavItems[1], primaryNavItems[2], secondaryNavItems[0]];
+  const mobileNavItems = [...primaryNavItems.slice(0, 3), secondaryNavItems[0]].slice(0, 4);
   const mobileMoreItems: AppTopbarNavItem[] = [
     secondaryNavItems[1],
     secondaryNavItems[2],

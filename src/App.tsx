@@ -18,10 +18,10 @@ import {
   suggestedTasks,
   taskSuggestions,
 } from "./domain";
-import { playTimerSound, requestTimerNotifications, sendTimerNotification, startWhiteNoise } from "./notifications";
+import { requestTimerNotifications } from "./notifications";
 import { checkStrictModeViolation, loadState, requestStrictPermissions, saveState, startStrictMode, stopStrictMode } from "./storage";
 import {
-  bootstrapWorkspace,
+  createWorkspace,
   createSyncEventSource,
   createTeamMemberAccount,
   getAuthStatus,
@@ -30,16 +30,32 @@ import {
   loginToWorkspace,
   mergeSyncedStateIntoLatest,
   REQUIRED_FULL_RECONCILE_VERSION,
-  type SyncRevisionEvent,
   syncableStateFingerprint,
   syncAppState,
+  switchWorkspace,
   updateTeamMemberAccount,
+  type AuthSession,
 } from "./sync";
+import {
+  applyRemoteRevisionReceipt,
+  canRunAutoSync,
+  clearRemoteSyncDebounce,
+  clearSyncRuntimeTimers,
+  parseSyncRevisionEvent,
+  remoteRevisionDelay,
+  retryIsWaiting,
+  shouldRequestFullReconcile,
+  shouldRequestIntervalSync,
+  shouldRequestRemoteRevision,
+  syncTokenForState,
+  withSseStatus,
+} from "./syncRuntime";
 import { buildCsvBundle, createBackupSnapshot, exportStateJson, mergeImportedState, summarizeImportPayload } from "./dataPortability";
-import { createDemoState } from "./demoData";
+import { demoTaskIdForProject, mergeDemoDataIntoState } from "./demoData";
+import { applyAuthStatusFailure, applyTeamStateLoadFailure } from "./appBoot";
 import { instantiateTemplate, parseQuickInput } from "./planning";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
-import { updateDesktopTimerPresence } from "./nativeDesktop";
+import { announceTimerEnd, runDueTaskReminders, stopWhiteNoise, syncWhiteNoise, updateActiveTimerPresence } from "./timerRuntime";
 import {
   acceptTaskInState,
   bindTeamMemberToProjectInState,
@@ -47,6 +63,7 @@ import {
   deleteTeamMemberInState,
   assignTaskInState,
   createProjectInState,
+  reorderProjectsInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectInState,
@@ -56,7 +73,9 @@ import {
 } from "./teamProgress";
 import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
 import { defaultSyncServerUrl, uid } from "./seed";
+import { clearRememberedAuth, readRememberedAuth, saveRememberedAuth } from "./rememberedAuth";
 import { bindAccountToMembers } from "./authModel";
+import { resolveMemberIdForProject } from "./memberIdentity";
 import { shouldUseRemoteOriginForSync } from "./syncModel";
 import {
   committedTasksForPlan,
@@ -67,7 +86,8 @@ import {
   taskById,
 } from "./workbenchModel";
 import { addTaskToTodayInState } from "./workSessionTransitions";
-import { getTeamRevision, loadTeamState, pushTeamChanges } from "./teamApi";
+import { getTeamRevision, loadTeamState } from "./teamApi";
+import { createTeamStateRuntime } from "./teamStateRuntime";
 import type {
   AppState,
   AuthState,
@@ -147,6 +167,11 @@ const TEAM_REVISION_POLL_MS = 1000;
 const hasLiveWork = (state: AppState) =>
   Boolean(state.activeTimer) || state.workSessions.some((session) => session.status === "active" || session.status === "paused");
 
+const actorMemberIdForTask = (state: AppState, taskId: string) => {
+  const task = state.tasks.find((item) => item.id === taskId);
+  return task ? resolveMemberIdForProject(state, task.projectId) : undefined;
+};
+
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [tab, setTab] = useState<Tab>("workspace");
@@ -156,11 +181,13 @@ export function App() {
   const [draft, setDraft] = useState<TaskDraft>(initialDraft);
   const [loaded, setLoaded] = useState(false);
   const [strictStatus, setStrictStatus] = useState<StrictModeStatus | null>(null);
-  const [toast, setToast] = useState("本地优先模式已就绪");
-  const [toastVisible, setToastVisible] = useState(true);
+  const [toast, setToast] = useState("");
+  const [toastVisible, setToastVisible] = useState(false);
   const [quickNote, setQuickNote] = useState("");
   const [syncPassword, setSyncPassword] = useState("demo");
+  const [suppressAutoLogin, setSuppressAutoLogin] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [preferredFocusTaskId, setPreferredFocusTaskId] = useState<string | null>(null);
   const [taskFilters, setTaskFilters] = useState<TaskFilters>(initialFilters);
   const [pendingDeleteTask, setPendingDeleteTask] = useState<Task | null>(null);
   const [pendingSplit, setPendingSplit] = useState<SplitDraft | null>(null);
@@ -186,6 +213,11 @@ export function App() {
   const undoTimerRef = useRef<number | null>(null);
   const tabRef = useRef<Tab>("workspace");
   const selectedTaskIdRef = useRef<string | null>(null);
+  const { persistTeamChanges, commitTeamState } = createTeamStateRuntime({
+    getState: () => stateRef.current,
+    setState,
+    setToast,
+  });
 
   const setAuthPatch = (patch: Partial<AuthState>) => {
     setState((current) =>
@@ -267,36 +299,6 @@ export function App() {
     );
   };
 
-  const persistTeamChanges = (before: AppState, after: AppState) => {
-    const token = before.auth.token ?? before.sync.token;
-    if (!token) return;
-    void pushTeamChanges(before.sync, token, before, after)
-      .then((revision) => {
-        if (!revision) return;
-        setState((value) =>
-          value
-            ? {
-                ...value,
-                sync: {
-                  ...value.sync,
-                  lastPulledRevision: Math.max(value.sync.lastPulledRevision, revision),
-                  status: "synced",
-                  message: "团队在线数据已保存",
-                },
-              }
-            : value,
-        );
-      })
-      .catch((error) => {
-        setToast(error instanceof Error ? `团队数据保存失败：${error.message}` : "团队数据保存失败");
-      });
-  };
-
-  const commitTeamState = (before: AppState, after: AppState) => {
-    setState(after);
-    persistTeamChanges(before, after);
-  };
-
   useEffect(() => {
     if (!toast) {
       setToastVisible(false);
@@ -321,6 +323,13 @@ export function App() {
   useEffect(() => {
     selectedTaskIdRef.current = selectedTaskId;
   }, [selectedTaskId]);
+
+  useEffect(() => {
+    if (state?.auth.workspace?.type === "private" && tab === "member_status") {
+      setWorkspaceMode("board");
+      setTab("workspace");
+    }
+  }, [state?.auth.workspace?.id, state?.auth.workspace?.type, tab]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -462,14 +471,8 @@ export function App() {
         const params = new URLSearchParams(window.location.search);
         const shouldLoadDemo = params.get("demo") === "1" || sessionStorage.getItem("timemanage.load_demo") === "1";
         if (params.get("demo") === "1") sessionStorage.setItem("timemanage.load_demo", "1");
-        if (shouldLoadDemo) {
-          setState(ensureTodayPlan(createDemoState()));
-          window.history.replaceState(null, "", window.location.pathname);
-          setToast("已加载演示数据");
-          setLoaded(true);
-          return;
-        }
         let next = ensureTodayPlan(restoreTimerInState(value));
+        if (shouldLoadDemo) window.history.replaceState(null, "", window.location.pathname);
         if (shouldUseRemoteOriginForSync(next.sync.serverUrl)) {
           next = {
             ...next,
@@ -487,47 +490,44 @@ export function App() {
               ...next.auth,
               status: next.auth.token ? "authenticated" : "signed_out",
               bootstrapped: status.bootstrapped,
-              message: status.bootstrapped ? "请登录团队工作区" : "当前服务还没有团队，请先初始化",
+              message: "请使用管理员分配的账号登录",
             },
           };
         } catch (error) {
-          next = {
-            ...next,
-            auth: {
-              ...next.auth,
-              status: "error",
-              message: error instanceof Error ? `认证服务不可用：${error.message}` : "认证服务不可用",
-            },
-          };
+          next = applyAuthStatusFailure(next, error);
         }
         if (next.auth.account && next.auth.token) {
           next = bindAccountToMembers(next, { ...next.auth, status: "authenticated" });
           try {
             next = await loadTeamState(next);
           } catch (error) {
-            next = {
-              ...next,
-              sync: {
-                ...next.sync,
-                status: "error",
-                message: error instanceof Error ? `团队数据加载失败：${error.message}` : "团队数据加载失败",
-              },
-            };
-            setToast(next.sync.message);
+            next = applyTeamStateLoadFailure(next, error);
+          }
+        }
+        if (shouldLoadDemo && next.auth.status === "authenticated" && next.auth.token) {
+          const demoState = ensureTodayPlan(mergeDemoDataIntoState(next, next.projects[0]?.id));
+          const saved = await persistTeamChanges(next, demoState, { applySuccessState: false, refreshAfterSave: true });
+          if (saved) {
+            next = saved;
+            sessionStorage.removeItem("timemanage.load_demo");
+            setToast("已将演示数据写入团队后台");
+          } else {
+            setLoaded(true);
+            return;
           }
         }
         setState(next);
         setLoaded(true);
       })
       .catch(() => {
-        setToast("读取本地状态失败，已加载默认数据");
+        setToast("读取应用缓存失败，已加载默认数据");
       });
   }, []);
 
   useEffect(() => {
     if (!state || !loaded) return;
     const handle = window.setTimeout(() => {
-      saveState(state).catch(() => setToast("保存失败，请检查本地权限"));
+      saveState(state).catch(() => setToast("保存应用缓存失败，请检查存储权限"));
     }, 250);
     return () => window.clearTimeout(handle);
   }, [state, loaded]);
@@ -548,8 +548,8 @@ export function App() {
         if (cancelled || revision <= current.sync.lastPulledRevision) return;
         const next = await loadTeamState(current);
         if (!cancelled) setState(ensureTodayPlan(next));
-      } catch {
-        if (!cancelled) setState((value) => (value ? { ...value, sync: { ...value.sync, status: "error", message: "团队数据刷新失败" } } : value));
+      } catch (error) {
+        if (!cancelled) setState((value) => (value ? applyTeamStateLoadFailure(value, error) : value));
       } finally {
         inFlight = false;
       }
@@ -583,49 +583,48 @@ export function App() {
   useEffect(() => {
     if (!state?.activeTimer?.isRunning) return;
     const handle = window.setInterval(() => {
-      setState((current) => {
-        if (!current?.activeTimer?.isRunning) return current;
-        const nextRemaining = calculateRemaining(current.activeTimer);
-        if (nextRemaining > 0) {
-          return {
-            ...current,
-            activeTimer: { ...current.activeTimer, remaining: nextRemaining },
-            updatedAt: nowIso(),
-          };
-        }
-        const timestamp = nowIso();
-        const title = `${modeLabel[current.activeTimer.mode]}已结束`;
-        const body =
-          current.activeTimer.mode === "focus"
-            ? "记录一个番茄，休息一下再继续。"
-            : "休息结束，可以回到当下清单。";
-        setToast(title);
-        playTimerSound(current.settings);
-        void sendTimerNotification(current.settings, title, body);
-        stopStrictMode().then(setStrictStatus).catch(() => undefined);
-        const next = finishExpiredTimerInState(current, timestamp);
-        persistTeamChanges(current, next);
-        return next;
-      });
+      const current = stateRef.current;
+      if (!current?.activeTimer?.isRunning) return;
+      if (current.sync.status === "syncing") return;
+      const nextRemaining = calculateRemaining(current.activeTimer);
+      if (nextRemaining > 0) {
+        setState({
+          ...current,
+          activeTimer: { ...current.activeTimer, remaining: nextRemaining },
+          updatedAt: nowIso(),
+        });
+        return;
+      }
+      const timestamp = nowIso();
+      const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+      const body =
+        current.activeTimer.mode === "focus"
+          ? "记录一个番茄，休息一下再继续。"
+          : "休息结束，可以回到当下清单。";
+      setToast(title);
+      announceTimerEnd(current.settings, title, body);
+      stopStrictMode().then(setStrictStatus).catch(() => undefined);
+      commitTeamState(current, finishExpiredTimerInState(current, timestamp));
     }, 1000);
     return () => window.clearInterval(handle);
   }, [state?.activeTimer?.isRunning]);
 
   useEffect(() => {
     const handle = () => {
-      setState((current) => {
-        if (!current?.activeTimer) return current;
-        const timestamp = nowIso();
-        const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
-        if (shouldFinish) {
-          const title = `${modeLabel[current.activeTimer.mode]}已结束`;
-          setToast(`${title}，已自动记录`);
-          stopStrictMode().then(setStrictStatus).catch(() => undefined);
-        }
-        const next = restoreTimerInState(current, timestamp);
-        if (shouldFinish) persistTeamChanges(current, next);
-        return next;
-      });
+      const current = stateRef.current;
+      if (!current?.activeTimer) return;
+      if (current.sync.status === "syncing") return;
+      const timestamp = nowIso();
+      const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
+      const next = restoreTimerInState(current, timestamp);
+      if (shouldFinish) {
+        const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+        setToast(`${title}，已自动记录`);
+        stopStrictMode().then(setStrictStatus).catch(() => undefined);
+        commitTeamState(current, next);
+        return;
+      }
+      setState(next);
     };
     document.addEventListener("visibilitychange", handle);
     window.addEventListener("focus", handle);
@@ -636,116 +635,81 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    const token = state?.auth.token ?? state?.sync.token;
-    if (!state?.sync.enabled || !token || !state.sync.autoSync) return;
+    const token = syncTokenForState(state);
+    if (!state || !canRunAutoSync(state, token)) return;
     const intervalMs = Math.max(30, state.sync.intervalSeconds) * 1000;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
-      const currentToken = current?.auth.token ?? current?.sync.token;
-      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
-      if (current.sync.nextRetryAt && Date.now() < new Date(current.sync.nextRetryAt).getTime()) return;
-      if (current.sync.status === "syncing" || current.sync.status === "authenticating") return;
+      const currentToken = syncTokenForState(current);
+      if (!shouldRequestIntervalSync(current, currentToken)) return;
       requestSync("interval", { delayMs: 0 });
     }, intervalMs);
     return () => window.clearInterval(handle);
   }, [state?.sync.enabled, state?.auth.token, state?.sync.token, state?.sync.autoSync, state?.sync.intervalSeconds]);
 
-  const eventSourceToken = state?.auth.token ?? state?.sync.token;
+  const eventSourceToken = syncTokenForState(state);
   useEffect(() => {
-    if (!state?.sync.enabled || !state.sync.autoSync || !eventSourceToken) return;
+    if (!state || !eventSourceToken || !canRunAutoSync(state, eventSourceToken)) return;
     const eventSource = createSyncEventSource(state.sync, eventSourceToken);
     if (!eventSource) return;
 
     const handleSyncEvent = (event: MessageEvent<string>) => {
-      let payload: SyncRevisionEvent;
-      try {
-        payload = JSON.parse(event.data) as SyncRevisionEvent;
-      } catch {
-        return;
-      }
+      const payload = parseSyncRevisionEvent(event.data);
+      if (!payload) return;
       const current = stateRef.current;
-      const currentToken = current?.auth.token ?? current?.sync.token;
-      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
-      if (payload.current_revision <= current.sync.lastPulledRevision) return;
-      if (current.sync.status === "authenticating") return;
-      setState((value) =>
-        value
-          ? {
-              ...value,
-              sync: {
-                ...value.sync,
-                sseStatus: "open",
-                lastReceivedRevision: Math.max(value.sync.lastReceivedRevision ?? 0, payload.current_revision),
-                pendingRemoteRevision: Math.max(value.sync.pendingRemoteRevision ?? 0, payload.current_revision),
-              },
-            }
-          : value,
-      );
+      const currentToken = syncTokenForState(current);
+      if (!current || !currentToken || !shouldRequestRemoteRevision(current, currentToken, payload.current_revision)) return;
+      setState((value) => (value ? applyRemoteRevisionReceipt(value, payload.current_revision, "open") : value));
       requestSync(event.type === "hello" ? "sse-hello" : "sse-revision", {
         targetRevision: payload.current_revision,
-        delayMs: syncInFlightRef.current || current.sync.status === "syncing" ? REMOTE_SYNC_BUSY_RETRY_MS : REMOTE_SYNC_DEBOUNCE_MS,
+        delayMs: remoteRevisionDelay(syncInFlightRef.current, current.sync.status, REMOTE_SYNC_BUSY_RETRY_MS, REMOTE_SYNC_DEBOUNCE_MS),
         bypassRetry: true,
       });
     };
 
-    setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "connecting" } } : value));
+    setState((value) => (value ? withSseStatus(value, "connecting") : value));
     eventSource.addEventListener("hello", handleSyncEvent);
     eventSource.addEventListener("revision", handleSyncEvent);
     eventSource.addEventListener("open", () => {
-      setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "open" } } : value));
+      setState((value) => (value ? withSseStatus(value, "open") : value));
     });
     eventSource.addEventListener("error", () => {
-      setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: "error" } } : value));
+      setState((value) => (value ? withSseStatus(value, "error") : value));
     });
     return () => {
       eventSource.removeEventListener("hello", handleSyncEvent);
       eventSource.removeEventListener("revision", handleSyncEvent);
       eventSource.close();
-      if (remoteSyncDebounceRef.current !== null) {
-        window.clearTimeout(remoteSyncDebounceRef.current);
-        remoteSyncDebounceRef.current = null;
-      }
-      remoteSyncTargetRevisionRef.current = 0;
+      clearRemoteSyncDebounce(remoteSyncDebounceRef, remoteSyncTargetRevisionRef, window.clearTimeout);
     };
   }, [state?.sync.enabled, state?.sync.autoSync, state?.sync.serverUrl, state?.sync.deviceId, eventSourceToken]);
 
   useEffect(() => {
-    if (!state?.sync.enabled || !state.sync.autoSync || !eventSourceToken) return;
+    if (!state || !eventSourceToken || !canRunAutoSync(state, eventSourceToken)) return;
     let cancelled = false;
     let inFlight = false;
 
     const pollRevision = async () => {
       if (inFlight || cancelled) return;
       const current = stateRef.current;
-      const currentToken = current?.auth.token ?? current?.sync.token;
-      if (!current?.sync.enabled || !currentToken || !current.sync.autoSync) return;
+      const currentToken = syncTokenForState(current);
+      if (!current || !currentToken || !canRunAutoSync(current, currentToken)) return;
       if (current.sync.status === "authenticating") return;
 
       inFlight = true;
       try {
         const revision = await getSyncRevision(current.sync, currentToken);
         if (cancelled) return;
-        if (revision <= current.sync.lastPulledRevision) return;
-        setState((value) =>
-          value
-            ? {
-                ...value,
-                sync: {
-                  ...value.sync,
-                  lastReceivedRevision: Math.max(value.sync.lastReceivedRevision ?? 0, revision),
-                  pendingRemoteRevision: Math.max(value.sync.pendingRemoteRevision ?? 0, revision),
-                },
-              }
-            : value,
-        );
+        if (!shouldRequestRemoteRevision(current, currentToken, revision)) return;
+        setState((value) => (value ? applyRemoteRevisionReceipt(value, revision) : value));
         requestSync("revision-poll", {
           targetRevision: revision,
-          delayMs: syncInFlightRef.current || current.sync.status === "syncing" ? REMOTE_SYNC_BUSY_RETRY_MS : REMOTE_SYNC_DEBOUNCE_MS,
+          delayMs: remoteRevisionDelay(syncInFlightRef.current, current.sync.status, REMOTE_SYNC_BUSY_RETRY_MS, REMOTE_SYNC_DEBOUNCE_MS),
           bypassRetry: true,
         });
       } catch {
         if (!cancelled) {
-          setState((value) => (value ? { ...value, sync: { ...value.sync, sseStatus: value.sync.sseStatus ?? "error" } } : value));
+          setState((value) => (value ? withSseStatus(value, value.sync.sseStatus ?? "error") : value));
         }
       } finally {
         inFlight = false;
@@ -778,44 +742,30 @@ export function App() {
     if (syncFingerprintRef.current === fingerprint) return;
     syncFingerprintRef.current = fingerprint;
 
-    const token = state.auth.token ?? state.sync.token;
-    if (!state.sync.enabled || !token || !state.sync.autoSync) return;
+    const token = syncTokenForState(state);
+    if (!canRunAutoSync(state, token)) return;
     const bypassRetry = hasLiveWork(state);
-    if (!bypassRetry && state.sync.nextRetryAt && Date.now() < new Date(state.sync.nextRetryAt).getTime()) return;
+    if (!bypassRetry && retryIsWaiting(state.sync)) return;
     if (state.sync.status === "authenticating") return;
 
     requestSync("local-change", { delayMs: LOCAL_SYNC_DEBOUNCE_MS, bypassRetry });
   }, [state]);
 
   useEffect(() => {
-    const token = state?.auth.token ?? state?.sync.token;
-    if (!loaded || !state?.sync.enabled || !token || !state.sync.autoSync || state.sync.lastFullReconcileVersion === REQUIRED_FULL_RECONCILE_VERSION) return;
+    const token = syncTokenForState(state);
+    if (!shouldRequestFullReconcile(loaded, state, token, REQUIRED_FULL_RECONCILE_VERSION)) return;
     requestSync("full-reconcile", { delayMs: 0, bypassRetry: true });
   }, [loaded, state?.sync.enabled, state?.sync.autoSync, state?.sync.lastFullReconcileVersion, state?.auth.token, state?.sync.token]);
 
   useEffect(() => {
     return () => {
-      if (syncDebounceRef.current !== null) {
-        window.clearTimeout(syncDebounceRef.current);
-        syncDebounceRef.current = null;
-      }
-      if (remoteSyncDebounceRef.current !== null) {
-        window.clearTimeout(remoteSyncDebounceRef.current);
-        remoteSyncDebounceRef.current = null;
-      }
-      remoteSyncTargetRevisionRef.current = 0;
+      clearSyncRuntimeTimers(syncDebounceRef, remoteSyncDebounceRef, remoteSyncTargetRevisionRef, window.clearTimeout);
     };
   }, []);
 
   useEffect(() => {
-    stopNoiseRef.current?.();
-    stopNoiseRef.current = null;
-    if (!state?.activeTimer?.isRunning || !state.settings.soundEnabled || state.settings.whiteNoise === "off") return;
-    stopNoiseRef.current = startWhiteNoise(state.settings.whiteNoise, state.settings.whiteNoiseVolume);
-    return () => {
-      stopNoiseRef.current?.();
-      stopNoiseRef.current = null;
-    };
+    syncWhiteNoise(state, stopNoiseRef);
+    return () => stopWhiteNoise(stopNoiseRef);
   }, [
     state?.activeTimer?.isRunning,
     state?.activeTimer?.mode,
@@ -825,40 +775,15 @@ export function App() {
   ]);
 
   useEffect(() => {
-    const active = state?.activeTimer;
-    const title = active
-      ? `${formatTime(active.remaining)} · ${modeLabel[active.mode]} · TimeManage`
-      : "TimeManage";
-    void updateDesktopTimerPresence(Boolean(active), title);
+    void updateActiveTimerPresence(state?.activeTimer);
   }, [state?.activeTimer?.remaining, state?.activeTimer?.mode, state?.activeTimer?.sessionId]);
 
   useEffect(() => {
     if (!state?.settings.notificationsEnabled) return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
-      if (!current?.settings.notificationsEnabled) return;
-      const now = Date.now();
-      for (const task of current.tasks) {
-        if (!task.reminderAt || task.status === "completed" || reminderSentRef.current.has(task.id) || task.lastReminderSentAt) continue;
-        const reminderTime = new Date(task.reminderAt).getTime();
-        if (!Number.isNaN(reminderTime) && reminderTime <= now) {
-          reminderSentRef.current.add(task.id);
-          void sendTimerNotification(current.settings, "任务提醒", task.title);
-          setState((value) => {
-            if (!value) return value;
-            const timestamp = nowIso();
-            const next = {
-              ...value,
-              tasks: value.tasks.map((item) =>
-                item.id === task.id ? { ...item, lastReminderSentAt: timestamp, updatedAt: timestamp } : item,
-              ),
-              updatedAt: timestamp,
-            };
-            persistTeamChanges(value, next);
-            return next;
-          });
-        }
-      }
+      if (!current) return;
+      runDueTaskReminders(current, reminderSentRef.current, commitTeamState);
     }, 30_000);
     return () => window.clearInterval(handle);
   }, [state?.settings.notificationsEnabled]);
@@ -889,6 +814,7 @@ export function App() {
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current?.activeTimer || current.activeTimer.mode !== "focus") return;
+      if (current.sync.status === "syncing") return;
       const profile = current.blockProfiles.find((item) => item.id === current.settings.activeBlockProfileId);
       void checkStrictModeViolation(profile).then((result) => {
         if (!result.matched || !stateRef.current?.activeTimer) return;
@@ -910,16 +836,13 @@ export function App() {
           action: shouldAbort ? "aborted" : shouldPause ? "paused" : "recorded",
           createdAt: now,
         };
-        setState((value) => {
-          if (!value?.activeTimer) return value;
-          const next = {
-            ...value,
-            strictViolations: [violation, ...value.strictViolations],
-            activeTimer: shouldPause ? pauseTimer(value.activeTimer, now) : value.activeTimer,
-            updatedAt: now,
-          };
-          persistTeamChanges(value, next);
-          return next;
+        const latest = stateRef.current;
+        if (!latest?.activeTimer) return;
+        commitTeamState(latest, {
+          ...latest,
+          strictViolations: [violation, ...latest.strictViolations],
+          activeTimer: shouldPause ? pauseTimer(latest.activeTimer, now) : latest.activeTimer,
+          updatedAt: now,
         });
         setToast(shouldAbort ? "严格模式连续违规，当前番茄已作废" : `检测到分心源：${violation.matchedValue}`);
         if (shouldAbort) void finishTimer("aborted");
@@ -950,6 +873,17 @@ export function App() {
     return focusTasksForMember(state, committedTasks, currentMember);
   }, [state, committedTasks, currentMember]);
 
+  useEffect(() => {
+    if (!preferredFocusTaskId) return;
+    const preferredTask = focusCommittedTasks.find((task) => task.id === preferredFocusTaskId);
+    if (
+      !preferredTask ||
+      (preferredTask.status !== "committed" && preferredTask.status !== "in_progress" && preferredTask.status !== "pending_review")
+    ) {
+      setPreferredFocusTaskId(null);
+    }
+  }, [focusCommittedTasks, preferredFocusTaskId]);
+
   const poolTasks = useMemo(() => {
     if (!state || !todayPlan) return [];
     return poolTasksForFilters(state, todayPlan, taskFilters);
@@ -957,8 +891,8 @@ export function App() {
 
   const currentTask = useMemo(() => {
     if (!state) return undefined;
-    return currentTaskForFocus(state, focusCommittedTasks);
-  }, [state, focusCommittedTasks]);
+    return currentTaskForFocus(state, focusCommittedTasks, preferredFocusTaskId);
+  }, [state, focusCommittedTasks, preferredFocusTaskId]);
 
   const selectedTask = useMemo(() => {
     if (!state) return undefined;
@@ -1005,7 +939,7 @@ export function App() {
         .filter(Boolean),
       projectId: taskProjectId,
       project: projectId ? (targetProject?.name ?? draft.project.trim()) || "Inbox" : draft.project.trim() || "Inbox",
-      creatorMemberId: state.currentMemberId,
+      creatorMemberId: resolveMemberIdForProject(state, taskProjectId),
       priority: draft.priority,
       severity: draft.severity,
       stage: draft.stage,
@@ -1065,14 +999,15 @@ export function App() {
       return;
     }
     const timestamp = nowIso();
-    updateState((value) => submitTaskForReviewInState(value, taskId, value.currentMemberId, timestamp));
+    updateState((value) => submitTaskForReviewInState(value, taskId, actorMemberIdForTask(value, taskId), timestamp));
+    setPreferredFocusTaskId(taskId);
     setToast("已提交验收，等待项目负责人确认");
   };
 
   const acceptTask = (taskId: string) => {
     const timestamp = nowIso();
     updateState((value) => {
-      const acceptedState = acceptTaskInState(value, taskId, value.currentMemberId, timestamp);
+      const acceptedState = acceptTaskInState(value, taskId, actorMemberIdForTask(value, taskId), timestamp);
       const acceptedTask = acceptedState.tasks.find((task) => task.id === taskId && task.status === "completed");
       const recurringTask = acceptedTask ? generateRecurringTask(acceptedTask, timestamp) : null;
       const nextState = {
@@ -1085,12 +1020,13 @@ export function App() {
         rewardState: deriveRewardState(nextState, timestamp),
       };
     });
+    setSelectedTaskId((current) => (current === taskId ? null : current));
     setToast("验收通过，任务已完成");
   };
 
   const returnTaskForReview = (taskId: string, reason: string) => {
     const timestamp = nowIso();
-    updateState((value) => returnTaskForReviewInState(value, taskId, reason, value.currentMemberId, timestamp));
+    updateState((value) => returnTaskForReviewInState(value, taskId, reason, actorMemberIdForTask(value, taskId), timestamp));
     setToast("已退回任务并记录原因");
   };
 
@@ -1156,6 +1092,7 @@ export function App() {
   const beginTimer = async (mode: SessionMode, taskId?: string) => {
     const timestamp = nowIso();
     const sessionId = uid("session");
+    if (mode === "focus" && taskId) setPreferredFocusTaskId(taskId);
     updateState((value) => {
       return startTimerInState(value, mode, taskId, timestamp, activeProfile?.id, sessionId);
     });
@@ -1270,7 +1207,7 @@ export function App() {
       tags: [source.type === "internal" ? "内部中断" : "外部中断"],
       projectId: currentProjectId,
       project: "Inbox",
-      creatorMemberId: state.currentMemberId,
+      creatorMemberId: resolveMemberIdForProject(state, currentProjectId),
       priority: source.type === "external" ? "high" : "medium",
       severity: "medium",
       stage: "requirements",
@@ -1380,30 +1317,50 @@ export function App() {
     updateState((value) => updateProjectInState(value, project, timestamp));
   };
 
-  const createTeamMember = (name: string, email: string, password = "demo") => {
+  const reorderProjects = (projectIds: string[]) => {
+    const timestamp = nowIso();
+    updateState((value) => reorderProjectsInState(value, projectIds, timestamp));
+  };
+
+  const createTeamMember = (name: string, email: string, password = "1234") => {
+    const source = stateRef.current ?? state;
+    const canManage = source.auth.account?.id === "account_admin" || source.auth.account?.email?.trim().toLowerCase() === "admin";
+    if (!canManage) {
+      setToast("只有超级管理员可以创建成员账号");
+      return;
+    }
     const timestamp = nowIso();
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
       setToast("请输入登录邮箱或手机号");
       return;
     }
-    if (state.teamMembers.some((member) => member.status !== "disabled" && member.email?.trim().toLowerCase() === normalizedEmail)) {
-      setToast("该登录邮箱或手机号已存在于成员库，请勿重复创建");
+    const localDuplicateExists = source.teamMembers.some((member) => member.status !== "disabled" && member.email?.trim().toLowerCase() === normalizedEmail);
+    if (localDuplicateExists) {
+      setToast("该登录邮箱或手机号已存在于成员库，请直接编辑现有成员");
       return;
     }
-    const token = state.auth.token ?? state.sync.token;
+    const token = source.auth.token ?? source.sync.token;
     if (token) {
-      void createTeamMemberAccount(state.sync, token, { name, email: normalizedEmail, password })
-        .then((member) => {
-          updateState((value) => ({
-            ...value,
-            teamMembers: value.teamMembers.some((item) => item.id === member.id)
-              ? value.teamMembers.map((item) => (item.id === member.id ? member : item))
-              : [member, ...value.teamMembers],
-            updatedAt: nowIso(),
-          }));
-          setToast("成员账号已创建，可在项目中绑定");
-        })
+      const applyCreatedMember = (member: TeamMember) => {
+        const memberEmail = member.email?.trim().toLowerCase();
+        updateState((value) => ({
+          ...value,
+          teamMembers: [
+            member,
+            ...value.teamMembers.filter((item) => {
+              if (item.id === member.id) return false;
+              if (member.accountId && item.accountId === member.accountId) return false;
+              if (memberEmail && item.email?.trim().toLowerCase() === memberEmail) return false;
+              return true;
+            }),
+          ],
+          updatedAt: nowIso(),
+        }));
+        setToast("成员账号已创建，可在项目中绑定");
+      };
+      void createTeamMemberAccount(source.sync, token, { name, email: normalizedEmail, password, forceRecreate: true })
+        .then(applyCreatedMember)
         .catch((error) => {
           const message = error instanceof Error ? error.message : "成员账号创建失败";
           setToast(message);
@@ -1415,6 +1372,12 @@ export function App() {
   };
 
   const updateTeamMember = (member: TeamMember) => {
+    const source = stateRef.current ?? state;
+    const canManage = source.auth.account?.id === "account_admin" || source.auth.account?.email?.trim().toLowerCase() === "admin";
+    if (!canManage) {
+      setToast("只有超级管理员可以修改成员账号");
+      return;
+    }
     const timestamp = nowIso();
     const normalizedEmail = member.email?.trim().toLowerCase() ?? "";
     const normalizedName = member.name.trim();
@@ -1426,14 +1389,14 @@ export function App() {
       setToast("请输入登录邮箱或手机号");
       return;
     }
-    if (state.teamMembers.some((item) => item.id !== member.id && item.status !== "disabled" && item.email?.trim().toLowerCase() === normalizedEmail)) {
+    if (source.teamMembers.some((item) => item.id !== member.id && item.status !== "disabled" && item.email?.trim().toLowerCase() === normalizedEmail)) {
       setToast("该登录邮箱或手机号已存在于成员库，请勿重复使用");
       return;
     }
     const nextMember = { ...member, name: normalizedName, email: normalizedEmail };
-    const token = state.auth.token ?? state.sync.token;
+    const token = source.auth.token ?? source.sync.token;
     if (token && member.accountId) {
-      void updateTeamMemberAccount(state.sync, token, member.id, { name: normalizedName, email: normalizedEmail })
+      void updateTeamMemberAccount(source.sync, token, member.id, { name: normalizedName, email: normalizedEmail })
         .then((updatedMember) => {
           updateState((value) => updateTeamMemberInState(value, updatedMember, nowIso()));
           setToast("成员资料已保存");
@@ -1448,9 +1411,15 @@ export function App() {
   };
 
   const deleteTeamMember = (teamMemberId: string) => {
-    const member = state.teamMembers.find((item) => item.id === teamMemberId);
+    const source = stateRef.current ?? state;
+    const canManage = source.auth.account?.id === "account_admin" || source.auth.account?.email?.trim().toLowerCase() === "admin";
+    if (!canManage) {
+      setToast("只有超级管理员可以删除成员账号");
+      return;
+    }
+    const member = source.teamMembers.find((item) => item.id === teamMemberId);
     if (!member) return;
-    if (member.accountId && member.accountId === state.auth.account?.id) {
+    if (member.accountId && member.accountId === source.auth.account?.id) {
       setToast("不能删除当前登录账号");
       return;
     }
@@ -1475,6 +1444,22 @@ export function App() {
     }
     const confirmed = window.confirm(`确定删除成员「${member.name}」吗？将解除该成员的项目绑定，并清理任务分配。`);
     if (!confirmed) return;
+
+    const token = source.auth.token ?? source.sync.token;
+    if (token && member.accountId) {
+      void updateTeamMemberAccount(source.sync, token, member.id, { status: "disabled" })
+        .then(() => {
+          setToast("成员账号已在后台停用");
+        })
+        .catch((error) => {
+          setToast(
+            error instanceof Error
+              ? `成员已移除，但服务端停用失败：${error.message}`
+              : "成员已移除，但服务端停用失败，请稍后在成员管理页重试停用",
+          );
+        });
+    }
+
     const timestamp = nowIso();
     updateState((value) => deleteTeamMemberInState(value, teamMemberId, timestamp));
     setToast("成员已删除");
@@ -1492,9 +1477,15 @@ export function App() {
   };
 
   const updateTeamMemberPassword = (member: TeamMember, password: string) => {
+    const source = stateRef.current ?? state;
+    const canManage = source.auth.account?.id === "account_admin" || source.auth.account?.email?.trim().toLowerCase() === "admin";
+    if (!canManage) {
+      setToast("只有超级管理员可以修改成员密码");
+      return;
+    }
     const token = state.auth.token ?? state.sync.token;
     if (!token) {
-      setToast("请先登录团队服务后再修改成员密码");
+      setToast("请先登录团队后台后再修改成员密码");
       return;
     }
     if (!member.accountId) {
@@ -1648,7 +1639,7 @@ export function App() {
       tags: task.tags,
       projectId: task.projectId,
       project: task.project,
-      creatorMemberId: state.currentMemberId ?? task.creatorMemberId,
+      creatorMemberId: resolveMemberIdForProject(state, task.projectId) ?? task.creatorMemberId,
       primaryExecutorMemberId: task.primaryExecutorMemberId,
       collaboratorMemberIds: task.collaboratorMemberIds ?? [],
       expectedStartAt: task.expectedStartAt,
@@ -1738,7 +1729,7 @@ export function App() {
   };
 
   const checkAuthStatus = async () => {
-    setAuthPatch({ status: "checking", message: "正在检查团队服务" });
+    setAuthPatch({ status: "checking", message: "正在检查后台服务" });
     const source = stateRef.current;
     if (!source) return;
     try {
@@ -1746,7 +1737,7 @@ export function App() {
       setAuthPatch({
         status: source.auth.token ? "authenticated" : "signed_out",
         bootstrapped: status.bootstrapped,
-        message: status.bootstrapped ? "请登录团队工作区" : "当前服务还没有团队，请先初始化",
+        message: "请使用管理员分配的账号登录",
       });
     } catch (error) {
       setAuthPatch({
@@ -1756,54 +1747,83 @@ export function App() {
     }
   };
 
-  const applySession = async (session: { token: string; expiresAt: string; account: AuthState["account"]; workspace: AuthState["workspace"] }, message: string) => {
+  const applySession = async (session: AuthSession, message: string, options: { resetRuntime?: boolean } = {}) => {
     const source = stateRef.current ?? state;
-    if (!source) throw new Error("本地状态尚未加载");
-    const bound = bindAccountToMembers(source, {
+    if (!source) throw new Error("应用状态尚未加载");
+    const base = options.resetRuntime
+      ? {
+          ...source,
+          activeTimer: undefined,
+          currentMemberId: undefined,
+        }
+      : source;
+    const bound = bindAccountToMembers(base, {
       status: "authenticated",
       token: session.token,
       expiresAt: session.expiresAt,
       account: session.account,
       workspace: session.workspace,
+      membership: session.membership,
+      workspaces: session.workspaces,
       bootstrapped: true,
       message,
     });
     setState(ensureTodayPlan(await loadTeamState(bound)));
   };
 
-  const handleWorkspaceBootstrap = async (payload: { workspaceName: string; name: string; email: string; password: string }) => {
-    setAuthPatch({ status: "checking", message: "正在初始化团队" });
+  const handleWorkspaceSwitch = async (workspaceId: string) => {
+    const source = stateRef.current ?? state;
+    const token = source?.auth.token;
+    if (!source || !token || !workspaceId || workspaceId === source.auth.workspace?.id) return;
+    setAuthPatch({ status: "checking", message: "正在切换工作区" });
     try {
-      const source = stateRef.current ?? state;
-      if (!source) throw new Error("本地状态尚未加载");
-      const session = await bootstrapWorkspace(source.sync, payload);
-      const message = `已初始化 ${session.workspace.name}`;
-      const nextState = bindAccountToMembers(source, {
-        status: "authenticated",
-        token: session.token,
-        expiresAt: session.expiresAt,
-        account: session.account,
-        workspace: session.workspace,
-        bootstrapped: true,
-        message,
-      });
-      setState(ensureTodayPlan(await loadTeamState(nextState)));
-      setToast(message);
+      const session = await switchWorkspace(source.sync, token, workspaceId);
+      setSelectedTaskId(null);
+      setPreferredFocusTaskId(null);
+      setWorkspaceMode("board");
+      setTab("workspace");
+      await applySession(session, `已切换到 ${session.workspace.name}`, { resetRuntime: true });
+      setToast(`已切换到 ${session.workspace.name}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "初始化失败";
+      const message = error instanceof Error ? error.message : "切换工作区失败";
       setAuthPatch({ status: "error", message });
       setToast(message);
     }
   };
 
-  const handleWorkspaceLogin = async (email: string, password: string) => {
-    setAuthPatch({ status: "checking", message: "正在登录团队工作区" });
+  const handleCreateWorkspace = async () => {
+    const source = stateRef.current ?? state;
+    const token = source?.auth.token;
+    if (!source || !token) return;
+    const name = window.prompt("协作工作区名称");
+    if (!name?.trim()) return;
+    setAuthPatch({ status: "checking", message: "正在创建协作工作区" });
+    try {
+      const session = await createWorkspace(source.sync, token, name.trim());
+      setSelectedTaskId(null);
+      setPreferredFocusTaskId(null);
+      setWorkspaceMode("board");
+      setTab("workspace");
+      await applySession(session, `已创建 ${session.workspace.name}`, { resetRuntime: true });
+      setToast(`已创建 ${session.workspace.name}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "创建工作区失败";
+      setAuthPatch({ status: "error", message });
+      setToast(message);
+    }
+  };
+
+  const handleWorkspaceLogin = async (email: string, password: string, remember = true) => {
+    setAuthPatch({ status: "checking", message: "正在登录账号" });
     try {
       const source = stateRef.current ?? state;
-      if (!source) throw new Error("本地状态尚未加载");
+      if (!source) throw new Error("应用状态尚未加载");
       const session = await loginToWorkspace(source.sync, email, password);
+      if (remember) saveRememberedAuth(source.sync.serverUrl, session.account.email, password);
+      else clearRememberedAuth(source.sync.serverUrl);
+      setSuppressAutoLogin(false);
       await applySession(session, `已登录 ${session.workspace.name}`);
-      setToast("团队工作区已登录");
+      setToast("账号已登录");
     } catch (error) {
       const message = error instanceof Error ? error.message : "登录失败";
       setAuthPatch({ status: "error", message });
@@ -1819,7 +1839,7 @@ export function App() {
   };
 
   const handleSyncLogin = async () => {
-    setSyncStatus({ status: "authenticating", message: "正在登录同步服务" });
+    setSyncStatus({ status: "authenticating", message: "正在登录团队后台" });
     try {
       const nextSync = await loginToSyncServer(state.sync, syncPassword);
       updateState((current) => ({
@@ -1827,24 +1847,24 @@ export function App() {
         sync: { ...nextSync, retryCount: 0, nextRetryAt: undefined },
         updatedAt: nowIso(),
       }));
-      setToast("同步服务已连接");
+      setToast("团队后台已连接");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "登录同步服务失败";
+      const message = error instanceof Error ? error.message : "登录团队后台失败";
       setSyncStatus({ status: "error", message });
       setToast(message);
     }
   };
 
   const checkSyncHealth = async () => {
-    setSyncStatus({ status: "syncing", message: "正在检查同步服务健康状态" });
+    setSyncStatus({ status: "syncing", message: "正在检查团队后台健康状态" });
     try {
       const healthUrl = new URL("/health", state.sync.serverUrl.endsWith("/") ? state.sync.serverUrl : `${state.sync.serverUrl}/`).toString();
       const response = await fetch(healthUrl);
       if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
-      setSyncStatus({ status: state.sync.token ? "synced" : "idle", message: `同步服务可访问：${healthUrl}` });
-      setToast("同步服务健康检查通过");
+      setSyncStatus({ status: state.sync.token ? "synced" : "idle", message: `团队后台可访问：${healthUrl}` });
+      setToast("团队后台健康检查通过");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "同步服务健康检查失败";
+      const message = error instanceof Error ? error.message : "团队后台健康检查失败";
       setSyncStatus({ status: "error", message });
       setToast(message);
     }
@@ -1984,14 +2004,14 @@ export function App() {
   };
 
   const runSyncDiagnostics = async () => {
-    setSyncStatus({ status: "syncing", message: "正在运行同步诊断" });
+    setSyncStatus({ status: "syncing", message: "正在运行后台诊断" });
     try {
       const { result, state: diagnosedState } = await runSyncDiagnosticsApi(state, syncPassword);
       setSyncDiagnostic(result);
       setState(ensureTodayPlan(diagnosedState));
-      setToast(result.lastError ? `诊断完成：${result.lastError}` : "同步诊断通过");
+      setToast(result.lastError ? `诊断完成：${result.lastError}` : "后台诊断通过");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "同步诊断失败";
+      const message = error instanceof Error ? error.message : "后台诊断失败";
       setSyncDiagnostic({
         checkedAt: nowIso(),
         serverUrl: state.sync.serverUrl,
@@ -2125,7 +2145,7 @@ export function App() {
       tags: parsed.tags,
       projectId: currentProjectId,
       project: parsed.project ?? "Inbox",
-      creatorMemberId: state.currentMemberId,
+      creatorMemberId: resolveMemberIdForProject(state, currentProjectId),
       priority: parsed.priority ?? "medium",
       severity: "medium",
       stage: "requirements",
@@ -2176,13 +2196,37 @@ export function App() {
     updateSettings("reportFilter", filter);
   };
 
-  const loadDemoData = () => {
-    setState(ensureTodayPlan(createDemoState()));
-    setSelectedTaskId("demo_task_today_deep");
-    setTaskFilters(initialFilters);
-    setWorkspaceMode("board");
-    setTab("workspace");
-    setToast("已加载演示数据，可以从项目总览开始体验");
+  const loadDemoData = async () => {
+    const current = stateRef.current;
+    const targetProjectId =
+      current && selectedProjectId && current.projects.some((project) => project.id === selectedProjectId)
+        ? selectedProjectId
+        : current?.projects[0]?.id;
+    if (!current || !targetProjectId) {
+      setToast("没有可加载演示数据的项目");
+      return;
+    }
+    const token = current.auth.token ?? current.sync.token;
+    if (!token) {
+      setToast("请先登录团队后台后再加载演示数据");
+      return;
+    }
+    setToast("正在写入团队后台...");
+    try {
+      const next = ensureTodayPlan(mergeDemoDataIntoState(current, targetProjectId, nowIso()));
+      const saved = await persistTeamChanges(current, next, { refreshAfterSave: true });
+      if (!saved) return;
+      setSelectedProjectId(targetProjectId);
+      setProjectDetailTab("overview");
+      setSelectedTaskId(demoTaskIdForProject("demo_task_today_deep", targetProjectId));
+      setTaskFilters(initialFilters);
+      setTab("project");
+      setToast("已将演示数据写入团队后台");
+    } catch (error) {
+      const failed = applyTeamStateLoadFailure(current, error);
+      setState(failed);
+      setToast(failed.auth.message);
+    }
   };
 
   const totalCommittedEstimate = committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0);
@@ -2191,8 +2235,17 @@ export function App() {
   const activeProjectId = selectedProjectId && state.projects.some((project) => project.id === selectedProjectId)
     ? selectedProjectId
     : primaryProjectId;
+  const currentWorkspaceType = state.auth.workspace?.type ?? "shared";
+  const isPrivateWorkspace = currentWorkspaceType === "private";
+  const isSuperAdmin = state.auth.account?.id === "account_admin" || state.auth.account?.email?.trim().toLowerCase() === "admin";
+  const canManageMembers = isSuperAdmin;
+  const workspaceOptions = state.auth.workspaces?.length
+    ? state.auth.workspaces
+    : state.auth.workspace
+      ? [state.auth.workspace]
+      : [];
   const activeNavKey = tab === "workspace" ? workspaceMode : tab === "project" ? "board" : tab === "settings" ? "admin" : tab;
-  const openAdmin = (section: typeof settingsSection = "members") => {
+  const openAdmin = (section: typeof settingsSection = canManageMembers ? "members" : "projects") => {
     setSettingsSection(section);
     setTab("settings");
   };
@@ -2215,6 +2268,7 @@ export function App() {
   };
 
   const logout = () => {
+    setSuppressAutoLogin(true);
     updateState((value) => ({
       ...value,
       auth: {
@@ -2241,21 +2295,24 @@ export function App() {
     openDailyReview,
     openReports: () => setTab("reports"),
     openCalendar: () => setTab("calendar"),
-    openAdmin: () => openAdmin("members"),
+    openAdmin: () => openAdmin(),
     logout,
+    showMemberStatus: !isPrivateWorkspace,
   });
   const { title: mobileTitle, subtitle: mobileSubtitle } = mobileTitleForNavigation({ tab, activeNavKey, activeProject });
+  const rememberedAuth = readRememberedAuth(state.sync.serverUrl);
 
   if (state.auth.status !== "authenticated" || !state.auth.token) {
     return (
       <AuthGate
         status={state.auth.status}
-        bootstrapped={state.auth.bootstrapped}
         serverUrl={state.sync.serverUrl}
         message={state.auth.message}
+        initialEmail={rememberedAuth?.email}
+        initialPassword={rememberedAuth?.password}
+        autoLogin={Boolean(rememberedAuth?.email && rememberedAuth.password) && !suppressAutoLogin}
         updateServerUrl={(serverUrl) => updateSyncSetting("serverUrl", serverUrl)}
         checkStatus={checkAuthStatus}
-        bootstrap={handleWorkspaceBootstrap}
         login={handleWorkspaceLogin}
       />
     );
@@ -2273,6 +2330,22 @@ export function App() {
           mobileSubtitle={mobileSubtitle}
           actions={(
             <>
+              <div className="workspace-switcher">
+                <select
+                  aria-label="当前工作区"
+                  value={state.auth.workspace?.id ?? ""}
+                  onChange={(event) => void handleWorkspaceSwitch(event.target.value)}
+                >
+                  {workspaceOptions.map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {(workspace.type ?? "shared") === "private" ? "私人" : "协作"} · {workspace.name}
+                    </option>
+                  ))}
+                </select>
+                <button className="secondary-button" onClick={() => void handleCreateWorkspace()} type="button">
+                  新建协作区
+                </button>
+              </div>
               <button className="secondary-button" onClick={logout}>
                 账号：{state.auth.account?.name ?? "退出"}
               </button>
@@ -2286,6 +2359,18 @@ export function App() {
           )}
           mobileActions={(
             <>
+              <select
+                className="mobile-workspace-select"
+                aria-label="当前工作区"
+                value={state.auth.workspace?.id ?? ""}
+                onChange={(event) => void handleWorkspaceSwitch(event.target.value)}
+              >
+                {workspaceOptions.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>
+                    {(workspace.type ?? "shared") === "private" ? "私人" : "协作"} · {workspace.name}
+                  </option>
+                ))}
+              </select>
               <button className="secondary-button account-chip" onClick={logout}>
                 {state.auth.account?.name ?? "账号"}
               </button>
@@ -2332,6 +2417,7 @@ export function App() {
               setTab("focus");
               void beginTimer("focus", taskId);
             }}
+            reorderProjects={reorderProjects}
             openProjectSettings={() => openAdmin("projects")}
             openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
             resolveInterruption={resolveInterruption}
@@ -2339,7 +2425,7 @@ export function App() {
           />
         )}
 
-        {tab === "member_status" && (
+        {tab === "member_status" && !isPrivateWorkspace && (
           <MemberStatusView
             state={state}
             selectTask={setSelectedTaskId}
@@ -2368,6 +2454,7 @@ export function App() {
             }}
             bindTeamMemberToProject={bindTeamMemberToProject}
             updateProjectMember={updateProjectMember}
+            canManageMembers={canManageMembers}
             backToBoard={() => {
               setWorkspaceMode("board");
               setTab("workspace");
@@ -2456,6 +2543,7 @@ export function App() {
             updateTeamMember={updateTeamMember}
             updateTeamMemberPassword={updateTeamMemberPassword}
             deleteTeamMember={deleteTeamMember}
+            canManageMembers={canManageMembers}
             openProjectDetail={openProjectDetail}
             updateProfile={updateProfile}
             askPermissions={askPermissions}

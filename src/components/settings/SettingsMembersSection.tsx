@@ -15,16 +15,15 @@ export function SettingsMembersSection({
   updateTeamMemberPassword: (member: TeamMember, password: string) => void;
   deleteTeamMember: (teamMemberId: string) => void;
 }) {
-  const [memberDraft, setMemberDraft] = useState({ name: "", email: "", password: "demo" });
+  const [memberDraft, setMemberDraft] = useState({ name: "", email: "", password: "1234" });
   const [memberDraftWarning, setMemberDraftWarning] = useState("");
   const [memberPasswordDrafts, setMemberPasswordDrafts] = useState<Record<string, string>>({});
   const canManageWorkspaceProjects = true;
+  const activeTeamMembers = state.teamMembers.filter((member) => member.status !== "disabled");
   const normalizedMemberDraftEmail = memberDraft.email.trim().toLowerCase();
   const memberDraftEmailExists = Boolean(
     normalizedMemberDraftEmail &&
-      state.teamMembers.some(
-        (member) => member.status !== "disabled" && member.email?.trim().toLowerCase() === normalizedMemberDraftEmail,
-      ),
+      activeTeamMembers.some((member) => member.email?.trim().toLowerCase() === normalizedMemberDraftEmail),
   );
   const memberDraftValidationMessage = memberDraftEmailExists
     ? "该登录邮箱或手机号已存在于成员库，请直接编辑现有成员或绑定到项目。"
@@ -86,18 +85,18 @@ export function SettingsMembersSection({
         <div className="button-row">
           <button
             className="primary-button"
-            disabled={!canManageWorkspaceProjects || memberDraftEmailExists}
+            disabled={!canManageWorkspaceProjects}
             onClick={() => {
               if (!memberDraft.name.trim() || !memberDraft.email.trim() || !memberDraft.password.trim()) {
                 setMemberDraftWarning("请先填写成员姓名、登录邮箱或手机号和初始密码。");
                 return;
               }
-              if (memberDraftValidationMessage) {
+              if (memberDraftEmailExists) {
                 setMemberDraftWarning(memberDraftValidationMessage);
                 return;
               }
               createTeamMember(memberDraft.name, memberDraft.email, memberDraft.password);
-              setMemberDraft({ name: "", email: "", password: "demo" });
+              setMemberDraft({ name: "", email: "", password: "1234" });
               setMemberDraftWarning("");
             }}
           >
@@ -109,11 +108,11 @@ export function SettingsMembersSection({
         )}
       </section>
       <div className="member-directory">
-        {state.teamMembers.map((member) => (
+        {activeTeamMembers.map((member) => (
           <TeamMemberCard
             key={member.id}
             member={member}
-            teamMembers={state.teamMembers}
+            teamMembers={activeTeamMembers}
             projectCount={state.projectMembers.filter((binding) => binding.teamMemberId === member.id && binding.status !== "disabled").length}
             canManage={canManageWorkspaceProjects}
             passwordDraft={memberPasswordDrafts[member.id] ?? ""}
@@ -126,7 +125,7 @@ export function SettingsMembersSection({
             }}
           />
         ))}
-        {!state.teamMembers.length && <p className="empty">还没有团队成员，请先创建成员账号。</p>}
+        {!activeTeamMembers.length && <p className="empty">还没有团队成员，请先创建成员账号。</p>}
       </div>
     </section>
   );

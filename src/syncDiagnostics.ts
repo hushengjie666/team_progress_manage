@@ -23,8 +23,8 @@ export const deploymentCommands = (serverUrl: string) => {
       ".\\timemanage-sync.exe install --config C:\\TimeManage\\sync.json",
       ".\\timemanage-sync.exe start",
     ],
-    proxy: [`反向代理到 ${normalized}，建议开启 HTTPS，并把 MySQL 数据库和同步配置加入服务器备份。`],
-    storage: "同步服务使用 MySQL 存储；请在 sync.json 中配置 mysql_dsn，并定期备份 timemanage_sync 数据库。",
+    proxy: [`反向代理到 ${normalized}，建议开启 HTTPS，并把 MySQL 数据库和后台配置加入服务器备份。`],
+    storage: "团队后台使用 MySQL 存储；请在 sync.json 中配置 mysql_dsn，并定期备份 timemanage_sync 数据库。",
   };
 };
 
@@ -40,7 +40,7 @@ export async function runSyncDiagnostics(state: AppState, password?: string): Pr
       if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
       return response.text();
     });
-    steps.push({ id: "health", label: "健康检查", ok: true, latencyMs, detail: "同步服务 /health 可访问。" });
+    steps.push({ id: "health", label: "健康检查", ok: true, latencyMs, detail: "团队后台 /health 可访问。" });
   } catch (error) {
     lastError = error instanceof Error ? error.message : "健康检查失败";
     steps.push({ id: "health", label: "健康检查", ok: false, detail: lastError });

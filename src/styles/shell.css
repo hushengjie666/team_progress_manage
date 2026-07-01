@@ -63,6 +63,21 @@
   gap: 8px;
 }
 
+.auth-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #4d5a5f;
+  font-size: 13px;
+}
+
+.auth-remember input {
+  min-height: auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -155,6 +170,22 @@
 .topbar .secondary-button,
 .topbar .icon-button {
   min-height: 34px;
+}
+
+.workspace-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workspace-switcher select,
+.mobile-workspace-select {
+  min-height: 34px;
+  max-width: 220px;
+  border-radius: 8px;
+  font-weight: 700;
+  background: #fffdfa;
 }
 
 .mobile-topbar-title,

@@ -1,5 +1,217 @@
 import { createInitialState, todayKey } from "./seed";
-import type { AppState, DailyPlan, FocusSession, Interruption, StrictViolation, Task } from "./types";
+import { resolveMemberIdForProject, sameMemberIdentity } from "./memberIdentity";
+import type { AppState, DailyPlan, FocusSession, Interruption, ProjectMember, StrictViolation, Task } from "./types";
+
+const demoProjectIdSuffix = (projectId: string) => projectId.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+export const demoTaskIdForProject = (taskId: string, projectId: string) => `${taskId}_${demoProjectIdSuffix(projectId)}`;
+
+const demoEntityIdForProject = (id: string, projectId: string) => `${id}_${demoProjectIdSuffix(projectId)}`;
+
+const upsertById = <T extends { id: string }>(current: T[], incoming: T[]) => {
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  return [...incoming, ...current.filter((item) => !incomingIds.has(item.id))];
+};
+
+const appendUnique = (current: string[], incoming: string[]) => [...current, ...incoming.filter((id) => !current.includes(id))];
+
+const mapDemoTaskId = (taskId: string | undefined, projectId: string) => (taskId ? demoTaskIdForProject(taskId, projectId) : undefined);
+
+const mapDemoSessionId = (sessionId: string | undefined, projectId: string) =>
+  sessionId ? demoEntityIdForProject(sessionId, projectId) : undefined;
+
+const keepsTimeManageDemoLanguage = (projectName: string) => /timemanage/i.test(projectName) || projectName.includes("时间管理");
+
+const targetProjectDemoTaskPatch = (task: Task, projectName: string): Partial<Task> => {
+  if (keepsTimeManageDemoLanguage(projectName)) return {};
+
+  const projectLabel = projectName.replace(/系统|项目/g, "").trim() || projectName;
+  const patches: Record<string, Partial<Task>> = {
+    demo_task_today_deep: {
+      title: `完成${projectLabel}样例集核验`,
+      notes: `核对${projectName}的核心样例、异常样例和验收口径，确保今天能看到真实项目进展。`,
+      tags: ["验收", "样例"],
+      stage: "testing",
+    },
+    demo_task_today_sync: {
+      title: `验证${projectLabel}团队数据流转`,
+      notes: `确认${projectName}的任务分配、进度更新和成员协作记录能正常保存并刷新。`,
+      tags: ["协作", "验收"],
+      stage: "testing",
+    },
+    demo_task_today_report: {
+      title: `整理${projectLabel}验收报告`,
+      notes: `汇总今日测试结论、风险点和下一步处理项，方便团队对齐项目状态。`,
+      tags: ["报告", "复盘"],
+      stage: "acceptance",
+    },
+    demo_task_pool_ios: {
+      title: `拆分${projectLabel}部署任务`,
+      notes: `把部署准备拆成环境检查、数据准备、接口联调和验收回归四步。`,
+      tags: ["部署", "拆分"],
+      stage: "deployment",
+    },
+    demo_task_pool_calendar: {
+      title: `补齐${projectLabel}空状态检查`,
+      notes: `检查无数据、加载失败和部分结果缺失时的提示是否清晰。`,
+      tags: ["体验", "测试"],
+      stage: "testing",
+    },
+    demo_task_pool_import: {
+      title: `准备${projectLabel}导入前备份`,
+      notes: `导入新样例或配置前创建恢复点，并记录新增数据的影响范围。`,
+      tags: ["数据", "备份"],
+      stage: "requirements",
+    },
+    demo_task_pool_shortcuts: {
+      title: `整理${projectLabel}常用操作清单`,
+      notes: `把测试、验收、回退和问题记录的常用动作整理成可执行清单。`,
+      tags: ["效率", "流程"],
+      stage: "requirements",
+    },
+    demo_task_pool_mobile: {
+      title: `检查${projectLabel}小屏展示`,
+      notes: `确认移动端下任务卡片、结果摘要和风险提示不会遮挡或溢出。`,
+      tags: ["移动端", "UI"],
+      stage: "testing",
+    },
+    demo_task_pool_weekly: {
+      title: `准备${projectLabel}周复盘模板`,
+      notes: `固定回顾本周验收结论、遗留问题、风险变化和下周计划。`,
+      tags: ["周复盘", "模板"],
+      stage: "acceptance",
+    },
+    demo_task_done_prd: {
+      title: `整理${projectLabel}首版需求`,
+      tags: ["需求"],
+      stage: "requirements",
+    },
+    demo_task_done_nav: {
+      title: `完成${projectLabel}流程梳理`,
+      tags: ["流程", "协作"],
+      stage: "design",
+    },
+    demo_task_done_focus: {
+      title: `完成${projectLabel}核心用例验证`,
+      tags: ["验证", "核心流程"],
+      stage: "testing",
+    },
+    demo_task_done_review: {
+      title: `设计${projectLabel}回顾字段`,
+      tags: ["复盘", "验收"],
+      stage: "acceptance",
+    },
+  };
+
+  return patches[task.id] ?? {};
+};
+
+const preferredDemoExecutorForProject = (state: AppState, projectId: string, preferredMemberId?: string): ProjectMember | undefined => {
+  const projectExecutors = state.projectMembers.filter(
+    (member) => member.projectId === projectId && member.status !== "disabled" && member.roles.includes("executor"),
+  );
+  const preferredMember = preferredMemberId
+    ? state.projectMembers.find((member) => member.id === preferredMemberId && member.status !== "disabled")
+    : undefined;
+  const accountId = state.auth.account?.id;
+  return (
+    projectExecutors.find((member) => preferredMember && member.id === preferredMember.id) ??
+    projectExecutors.find((member) => preferredMember && sameMemberIdentity(member, preferredMember)) ??
+    projectExecutors.find((member) => accountId && member.accountId === accountId) ??
+    projectExecutors[0]
+  );
+};
+
+export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: string, timestamp = new Date().toISOString()): AppState => {
+  const targetProject = current.projects.find((project) => project.id === targetProjectId) ?? current.projects[0];
+  if (!targetProject) return current;
+
+  const demo = createDemoState();
+  const projectId = targetProject.id;
+  const mapTaskId = (taskId: string) => demoTaskIdForProject(taskId, projectId);
+  const mapEntityId = (id: string) => demoEntityIdForProject(id, projectId);
+  const actorMemberId = resolveMemberIdForProject(current, projectId);
+  const targetExecutor = preferredDemoExecutorForProject(current, projectId, actorMemberId);
+
+  const tasks = demo.tasks.map((task) => {
+    const taskPatch = targetProjectDemoTaskPatch(task, targetProject.name);
+    return {
+      ...task,
+      ...taskPatch,
+      id: mapTaskId(task.id),
+      projectId,
+      project: targetProject.name,
+      creatorMemberId: actorMemberId,
+      primaryExecutorMemberId:
+        task.status === "pool" || task.status === "completed"
+          ? task.primaryExecutorMemberId
+          : targetExecutor?.id ?? actorMemberId,
+      collaboratorMemberIds: [],
+      subtasks: task.subtasks.map((subtask) => ({ ...subtask, id: mapEntityId(subtask.id) })),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+  });
+
+  const focusSessions = demo.focusSessions.map((session) => ({
+    ...session,
+    id: mapEntityId(session.id),
+    taskId: mapDemoTaskId(session.taskId, projectId),
+  }));
+  const interruptions = demo.interruptions.map((interruption) => ({
+    ...interruption,
+    id: mapEntityId(interruption.id),
+    sessionId: mapDemoSessionId(interruption.sessionId, projectId),
+    taskId: mapDemoTaskId(interruption.taskId, projectId),
+    convertedTaskId: mapDemoTaskId(interruption.convertedTaskId, projectId),
+  }));
+  const strictViolations = demo.strictViolations.map((violation) => ({
+    ...violation,
+    id: mapEntityId(violation.id),
+    sessionId: mapDemoSessionId(violation.sessionId, projectId),
+    taskId: mapDemoTaskId(violation.taskId, projectId),
+  }));
+  const demoPlans = demo.dailyPlans.map((plan) => ({
+    ...plan,
+    id: mapEntityId(plan.id),
+    committedTaskIds: plan.committedTaskIds.map(mapTaskId),
+    suggestedTaskIds: plan.suggestedTaskIds.map(mapTaskId),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }));
+  const plansByDate = new Map(current.dailyPlans.map((plan) => [plan.date, plan]));
+  const dailyPlans = [
+    ...current.dailyPlans.map((plan) => {
+      const demoPlan = demoPlans.find((item) => item.date === plan.date);
+      if (!demoPlan) return plan;
+      return {
+        ...plan,
+        committedTaskIds: appendUnique(plan.committedTaskIds, demoPlan.committedTaskIds),
+        suggestedTaskIds: appendUnique(plan.suggestedTaskIds, demoPlan.suggestedTaskIds),
+        updatedAt: timestamp,
+      };
+    }),
+    ...demoPlans.filter((plan) => !plansByDate.has(plan.date)),
+  ].sort((left, right) => right.date.localeCompare(left.date));
+
+  return {
+    ...current,
+    onboarding: {
+      ...current.onboarding,
+      completed: true,
+    },
+    tasks: upsertById(current.tasks, tasks),
+    dailyPlans,
+    focusSessions: upsertById(current.focusSessions, focusSessions),
+    interruptions: upsertById(current.interruptions, interruptions),
+    strictViolations: upsertById(current.strictViolations, strictViolations),
+    rewardState: {
+      ...current.rewardState,
+      badges: appendUnique(current.rewardState.badges, demo.rewardState.badges),
+    },
+    updatedAt: timestamp,
+  };
+};
 
 const isoAt = (offsetDays: number, hour: number, minute = 0) => {
   const date = new Date();
@@ -81,7 +293,7 @@ export const createDemoState = (): AppState => {
     }),
     makeTask({
       id: "demo_task_today_sync",
-      title: "验证本地同步服务",
+      title: "验证本地团队后台",
       notes: "在设置页登录 demo/demo，确认推送、拉取和冲突提示是否能跑通。",
       tags: ["同步", "验收"],
       project: "TimeManage",

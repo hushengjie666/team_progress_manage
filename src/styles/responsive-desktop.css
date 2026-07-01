@@ -1,3 +1,20 @@
+@media (max-width: 1500px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar-nav {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .topbar-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 1180px) {
   .topbar {
     grid-template-columns: minmax(0, 1fr);
@@ -58,7 +75,7 @@
   }
 
   .project-card-board {
-    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .my-project-card-grid {

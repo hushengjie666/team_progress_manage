@@ -10,7 +10,7 @@
 - 自律激励：分心成本、连续目标、成就、热力图、年度番茄墙。
 - 严格模式配置：App/网站屏蔽清单、Apple 原生插件命令边界、非 Apple 软严格降级。
 - 本地优先持久化：Tauri 环境使用 SQLite，浏览器预览使用 `localStorage` fallback。
-- P0/P0.5 同步服务：轻量 Go 单二进制服务，支持登录、推送、拉取、冲突返回、删除 tombstone、自动同步与失败重试。
+- P0/P0.5 团队后台服务：轻量 Go 单二进制服务，支持登录、团队成员、推送、拉取、冲突返回、删除 tombstone、自动同步与失败重试。
 
 ## 开发命令
 
@@ -18,14 +18,14 @@
 npm install
 npm run dev
 npm run build
-npm run sync:build
-npm run sync:server
+npm run backend:build
+npm run backend:server
 npm run tauri dev
 ```
 
-## 本地同步验证
+## 本地后台验证
 
-默认同步服务地址是 `http://127.0.0.1:8787`，账号/密码是 `demo/demo`。低内存服务器部署时只需要上传 `sync-server/bin/timemanage-sync` 这个二进制，并通过环境变量配置：
+默认团队后台服务地址是 `http://127.0.0.1:8787`，账号/密码是 `demo/demo`。低内存服务器部署时只需要上传 `sync-server/bin/timemanage-sync` 这个二进制，并通过环境变量配置：
 
 ```bash
 TM_SYNC_USER=demo \
@@ -35,7 +35,7 @@ TM_SYNC_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/timemanage_sync?parseTime
 ./timemanage-sync
 ```
 
-前端在“设置 -> 本地同步验证”里登录后可以立即同步任务、今日计划、番茄记录、中断、严格模式配置和基础设置；也可以开启自动同步并查看冲突列表。
+前端在“设置 -> 团队后台”里登录后可以立即同步任务、今日计划、番茄记录、中断、严格模式配置和基础设置；也可以开启自动同步并查看冲突列表。
 
 ## 原生严格模式边界
 

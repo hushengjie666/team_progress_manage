@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Activity, Check, ChevronRight, PanelRight, Play, Sparkles, Split, Target, Trash2, X } from "lucide-react";
 import { labelPriority, labelTaskStage, type TaskDraft } from "../appModel";
 import { type MyProjectTaskCard, type ProjectOverviewCard } from "../projectOverview";
@@ -38,6 +38,7 @@ export function WorkspaceView(props: {
   dismissCoachStep: (stepId: CoachStepId) => void;
   splitTask: (taskId: string) => void;
   beginFocus: (taskId: string) => void;
+  reorderProjects: (projectIds: string[]) => void;
   openProjectSettings: () => void;
   openProjectDetail: (projectId: string) => void;
   resolveInterruption: (interruptionId: string) => void;
@@ -124,6 +125,7 @@ export function WorkspaceView(props: {
           cards={projectOverviewCards}
           openProjectDetail={props.openProjectDetail}
           openProjectSettings={props.openProjectSettings}
+          reorderProjects={props.reorderProjects}
         />
       </div>
     );
@@ -315,13 +317,196 @@ const projectStatusLabels: Record<TaskStatus, string> = {
 
 const projectStatusOrder: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
 
+const PROJECT_CARD_LONG_PRESS_MS = 150;
+const PROJECT_CARD_MOUSE_DRAG_START_PX = 8;
+const PROJECT_CARD_TOUCH_SCROLL_CANCEL_PX = 18;
+
+type ProjectCardPressState = {
+  projectId: string;
+  pointerId: number;
+  pointerType: string;
+  startX: number;
+  startY: number;
+  active: boolean;
+  changed: boolean;
+  order: string[];
+};
+
+const moveProjectIdNearTarget = (order: string[], draggingProjectId: string, targetProjectId: string) => {
+  const sourceIndex = order.indexOf(draggingProjectId);
+  const targetIndex = order.indexOf(targetProjectId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return order;
+  const withoutSource = order.filter((projectId) => projectId !== draggingProjectId);
+  const targetIndexAfterRemoval = withoutSource.indexOf(targetProjectId);
+  const insertIndex = sourceIndex < targetIndex ? targetIndexAfterRemoval + 1 : targetIndexAfterRemoval;
+  return [
+    ...withoutSource.slice(0, insertIndex),
+    draggingProjectId,
+    ...withoutSource.slice(insertIndex),
+  ];
+};
+
 function ProjectOverviewCardsPanel(props: {
   cards: ProjectOverviewCard[];
   openProjectDetail: (projectId: string) => void;
   openProjectSettings: () => void;
+  reorderProjects: (projectIds: string[]) => void;
 }) {
+  const [projectReorder, setProjectReorder] = useState<{
+    draggingProjectId: string;
+    order: string[];
+  } | null>(null);
+  const longPressTimerRef = useRef<number | undefined>(undefined);
+  const projectCardBoardRef = useRef<HTMLElement | null>(null);
+  const projectCardRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  const projectPressRef = useRef<ProjectCardPressState | null>(null);
+  const suppressProjectClickRef = useRef(false);
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== undefined) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = undefined;
+    }
+  };
+
+  const captureProjectCardRects = () => {
+    const board = projectCardBoardRef.current;
+    if (!board) return;
+    const rects = new Map<string, DOMRect>();
+    board.querySelectorAll<HTMLElement>("[data-project-card-id]").forEach((element) => {
+      const projectId = element.dataset.projectCardId;
+      if (projectId) rects.set(projectId, element.getBoundingClientRect());
+    });
+    projectCardRectsRef.current = rects;
+  };
+
+  const activateProjectReorder = (press: ProjectCardPressState) => {
+    if (press.active) return;
+    press.active = true;
+    suppressProjectClickRef.current = true;
+    clearLongPressTimer();
+    captureProjectCardRects();
+    setProjectReorder({ draggingProjectId: press.projectId, order: press.order });
+  };
+
+  useEffect(() => () => clearLongPressTimer(), []);
+
+  const projectReorderOrderKey = projectReorder?.order.join("|") ?? "";
+  useLayoutEffect(() => {
+    const previousRects = projectCardRectsRef.current;
+    if (!projectReorder || previousRects.size === 0) return;
+    const board = projectCardBoardRef.current;
+    if (!board) return;
+
+    board.querySelectorAll<HTMLElement>("[data-project-card-id]").forEach((element) => {
+      const projectId = element.dataset.projectCardId;
+      if (!projectId || projectId === projectReorder.draggingProjectId) return;
+      const previous = previousRects.get(projectId);
+      if (!previous) return;
+      const next = element.getBoundingClientRect();
+      const dx = previous.left - next.left;
+      const dy = previous.top - next.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      element.getAnimations().forEach((animation) => animation.cancel());
+      element.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: "translate(0, 0)" },
+        ],
+        {
+          duration: 190,
+          easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        },
+      );
+    });
+    projectCardRectsRef.current = new Map();
+  }, [projectReorder?.draggingProjectId, projectReorderOrderKey]);
+
+  const visibleCards = projectReorder
+    ? projectReorder.order.map((projectId) => props.cards.find((card) => card.projectId === projectId)).filter((card): card is ProjectOverviewCard => Boolean(card))
+    : props.cards;
+
+  const beginProjectPointerDown = (projectId: string, event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement | null)?.closest("button")) return;
+    const order = props.cards.map((card) => card.projectId);
+    projectPressRef.current = {
+      projectId,
+      pointerId: event.pointerId,
+      pointerType: event.pointerType,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+      changed: false,
+      order,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      const press = projectPressRef.current;
+      if (!press || press.pointerId !== event.pointerId) return;
+      activateProjectReorder(press);
+    }, PROJECT_CARD_LONG_PRESS_MS);
+  };
+
+  const movePressedProject = (event: React.PointerEvent<HTMLElement>) => {
+    const press = projectPressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    const distance = Math.hypot(event.clientX - press.startX, event.clientY - press.startY);
+    if (!press.active) {
+      if (press.pointerType === "mouse" && distance > PROJECT_CARD_MOUSE_DRAG_START_PX) {
+        activateProjectReorder(press);
+      } else if (press.pointerType !== "mouse" && distance > PROJECT_CARD_TOUCH_SCROLL_CANCEL_PX) {
+        clearLongPressTimer();
+        projectPressRef.current = null;
+        return;
+      } else {
+        return;
+      }
+    }
+    event.preventDefault();
+    const target = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-project-card-id]");
+    const targetProjectId = target?.dataset.projectCardId;
+    if (!targetProjectId || targetProjectId === press.projectId) return;
+    const nextOrder = moveProjectIdNearTarget(press.order, press.projectId, targetProjectId);
+    if (nextOrder === press.order) return;
+    captureProjectCardRects();
+    press.order = nextOrder;
+    press.changed = true;
+    setProjectReorder({ draggingProjectId: press.projectId, order: nextOrder });
+  };
+
+  const finishProjectPress = (event: React.PointerEvent<HTMLElement>) => {
+    const press = projectPressRef.current;
+    if (!press || press.pointerId !== event.pointerId) return;
+    clearLongPressTimer();
+    projectPressRef.current = null;
+    if (press.active) {
+      if (press.changed) props.reorderProjects(press.order);
+      setProjectReorder(null);
+      window.setTimeout(() => {
+        suppressProjectClickRef.current = false;
+      }, 0);
+      return;
+    }
+    suppressProjectClickRef.current = false;
+  };
+
+  const cancelProjectPress = () => {
+    clearLongPressTimer();
+    projectPressRef.current = null;
+    setProjectReorder(null);
+    suppressProjectClickRef.current = false;
+  };
+
+  const shouldSuppressProjectClick = () => suppressProjectClickRef.current || Boolean(projectReorder);
+
   return (
-    <section className="project-card-board" aria-label="项目卡片总览">
+    <section
+      className={projectReorder ? "project-card-board reordering" : "project-card-board"}
+      ref={projectCardBoardRef}
+      aria-label="项目卡片总览"
+    >
       {props.cards.length === 0 && (
         <div className="band project-overview-empty">
           <p className="eyebrow">项目总览</p>
@@ -330,12 +515,19 @@ function ProjectOverviewCardsPanel(props: {
           <button className="primary-button" onClick={props.openProjectSettings}>创建项目</button>
         </div>
       )}
-      {props.cards.map((card) => (
+      {visibleCards.map((card) => (
         <ProjectOverviewCardItem
           card={card}
+          dragging={projectReorder?.draggingProjectId === card.projectId}
+          reordering={Boolean(projectReorder)}
           key={card.projectId}
+          onPointerCancel={cancelProjectPress}
+          onPointerDown={beginProjectPointerDown}
+          onPointerMove={movePressedProject}
+          onPointerUp={finishProjectPress}
           openProjectDetail={props.openProjectDetail}
           openProjectSettings={props.openProjectSettings}
+          shouldSuppressClick={shouldSuppressProjectClick}
         />
       ))}
     </section>
@@ -344,26 +536,52 @@ function ProjectOverviewCardsPanel(props: {
 
 function ProjectOverviewCardItem(props: {
   card: ProjectOverviewCard;
+  dragging: boolean;
+  reordering: boolean;
+  onPointerCancel: () => void;
+  onPointerDown: (projectId: string, event: React.PointerEvent<HTMLElement>) => void;
+  onPointerMove: (event: React.PointerEvent<HTMLElement>) => void;
+  onPointerUp: (event: React.PointerEvent<HTMLElement>) => void;
   openProjectDetail: (projectId: string) => void;
   openProjectSettings: () => void;
+  shouldSuppressClick: () => boolean;
 }) {
   const { card } = props;
   const hasRisk = card.riskCount > 0;
   const hasPendingReview = card.pendingReviewCount > 0;
   const activeStatuses = projectStatusOrder.filter((status) => card.statusCounts[status] > 0);
   const openProject = () => props.openProjectDetail(card.projectId);
+  const cardClassName = [
+    "project-overview-card",
+    "clickable-card",
+    hasRisk || hasPendingReview ? "attention" : "",
+    props.reordering ? "reordering" : "",
+    props.dragging ? "dragging" : "",
+  ].filter(Boolean).join(" ");
 
   return (
     <article
       aria-label={`进入项目 ${card.name}`}
-      className={hasRisk || hasPendingReview ? "project-overview-card attention clickable-card" : "project-overview-card clickable-card"}
-      onClick={openProject}
+      className={cardClassName}
+      data-project-card-id={card.projectId}
+      onClick={(event) => {
+        if (props.shouldSuppressClick()) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        openProject();
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           openProject();
         }
       }}
+      onPointerCancel={props.onPointerCancel}
+      onPointerDown={(event) => props.onPointerDown(card.projectId, event)}
+      onPointerMove={props.onPointerMove}
+      onPointerUp={props.onPointerUp}
       tabIndex={0}
     >
       <div className="project-overview-card-header">
@@ -546,6 +764,7 @@ function TaskColumn(props: {
           const isRunningTask = isTimerTask && props.activeTimer?.mode === "focus" && props.activeTimer.isRunning;
           const isPausedTask = isTimerTask && props.activeTimer?.mode === "focus" && !props.activeTimer.isRunning;
           const hasTimerState = isRunningTask || isPausedTask;
+          const isCompletedTask = task.status === "completed";
           const canSubmitReview = task.status === "committed" || task.status === "in_progress";
           const visibleTags = task.tags.filter((tag) => tag !== task.project && tag !== labelTaskStage[task.stage]);
           const visibleNotes = task.notes.startsWith("由「") && task.notes.endsWith("」拆分而来。") ? "" : task.notes;
@@ -609,69 +828,79 @@ function TaskColumn(props: {
                   {isPausedTask && <span className="status-pill">已暂停</span>}
                 </div>
               </div>
-              <div className="task-progress-meta-row">
-                <div className="task-meta-strip">
-                  <span className="task-inline-chip">{task.project}</span>
-                  <span className="task-inline-chip">{labelTaskStage[task.stage]}</span>
-                  {visibleTags.slice(0, 2).map((tag) => (
-                    <span className="task-inline-chip muted-chip" key={tag}>
-                      {tag}
-                    </span>
-                  ))}
-                  {visibleTags.length > 2 && <span className="task-inline-chip muted-chip">+{visibleTags.length - 2}</span>}
-                  {task.dueAt && <span className="task-inline-chip muted-chip">到期 {new Date(task.dueAt).toLocaleDateString()}</span>}
-                  {task.severity === "very_high" && <span className="task-inline-chip danger-chip">高严重度</span>}
-                </div>
-                <div className="task-inline-progress">
-                  <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
-                  <TaskProgressBar percent={task.progressPercent ?? 0} compact />
-                  <span className="task-pomodoro-summary">{task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
-                </div>
+              <div className="task-meta-strip">
+                <span className="task-inline-chip">{task.project}</span>
+                <span className="task-inline-chip">{labelTaskStage[task.stage]}</span>
+                {visibleTags.slice(0, 2).map((tag) => (
+                  <span className="task-inline-chip muted-chip" key={tag}>
+                    {tag}
+                  </span>
+                ))}
+                {visibleTags.length > 2 && <span className="task-inline-chip muted-chip">+{visibleTags.length - 2}</span>}
+                {task.dueAt && <span className="task-inline-chip muted-chip">到期 {new Date(task.dueAt).toLocaleDateString()}</span>}
+                {task.severity === "very_high" && <span className="task-inline-chip danger-chip">高严重度</span>}
               </div>
               {visibleNotes && <div className="task-summary-line">
                 <p>{visibleNotes}</p>
               </div>}
             </div>
-            <div className="task-actions">
-              <div className="task-primary-actions">
-                {props.onSelect && (
-                  <button className="icon-button small" title="任务详情" onClick={() => props.onSelect?.(task.id)}>
-                    <PanelRight size={16} />
-                  </button>
-                )}
-                {hasTimerState ? (
-                  <span className="small-button active-action" aria-label="当前正在执行的任务">
-                    <Activity className="active-action-icon" size={15} />
-                    {isPausedTask ? "已暂停" : "执行中"}
+            <div className="task-card-side">
+              <div className="task-progress-panel">
+                <div className="task-progress-heading">
+                  <span className={`priority priority-${task.priority}`}>{labelPriority[task.priority]}</span>
+                  <span className="task-progress-numbers">
+                    <strong>{task.progressPercent ?? 0}%</strong>
+                    <span>{task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
                   </span>
-                ) : (
-                  <button className="small-button task-primary-action" onClick={() => props.onAction(task.id)}>
-                    {props.actionIcon}
-                    {props.actionLabel}
-                  </button>
-                )}
+                </div>
+                <TaskProgressBar percent={task.progressPercent ?? 0} compact showValue={false} />
               </div>
-              <div className="task-secondary-actions">
-                {props.onSplit && task.status !== "completed" && task.status !== "split" && task.status !== "archived" && (
-                  <button className="icon-button small" title="拆分任务" onClick={() => props.onSplit?.(task.id)}>
-                    <Split size={16} />
-                  </button>
-                )}
-                {props.onComplete && canSubmitReview && (
-                  <button className="icon-button small" title="提交验收" onClick={() => props.onComplete?.(task.id)}>
-                    <Check size={16} />
-                  </button>
-                )}
-                {props.onRemove && (
-                  <button className="icon-button small" title="移回活动清单" onClick={() => props.onRemove?.(task.id)}>
-                    <X size={16} />
-                  </button>
-                )}
-                {props.onDelete && (
-                  <button className="icon-button small danger" title="删除任务" onClick={() => props.onDelete?.(task.id)}>
-                    <Trash2 size={16} />
-                  </button>
-                )}
+              <div className="task-actions">
+                <div className="task-secondary-actions">
+                  {props.onSelect && (
+                    <button className="icon-button small" title="任务详情" onClick={() => props.onSelect?.(task.id)}>
+                      <PanelRight size={16} />
+                    </button>
+                  )}
+                  {props.onSplit && task.status !== "completed" && task.status !== "split" && task.status !== "archived" && (
+                    <button className="icon-button small" title="拆分任务" onClick={() => props.onSplit?.(task.id)}>
+                      <Split size={16} />
+                    </button>
+                  )}
+                  {props.onComplete && canSubmitReview && (
+                    <button className="icon-button small" title="提交验收" onClick={() => props.onComplete?.(task.id)}>
+                      <Check size={16} />
+                    </button>
+                  )}
+                  {props.onRemove && (
+                    <button className="icon-button small" title="移回活动清单" onClick={() => props.onRemove?.(task.id)}>
+                      <X size={16} />
+                    </button>
+                  )}
+                  {props.onDelete && (
+                    <button className="icon-button small danger" title="删除任务" onClick={() => props.onDelete?.(task.id)}>
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+                <div className="task-primary-actions">
+                  {isCompletedTask ? (
+                    <span className="small-button active-action completed-action" aria-label="今日已完成的任务">
+                      <Check size={15} />
+                      已完成
+                    </span>
+                  ) : hasTimerState ? (
+                    <span className="small-button active-action" aria-label="当前正在执行的任务">
+                      <Activity className="active-action-icon" size={15} />
+                      {isPausedTask ? "已暂停" : "执行中"}
+                    </span>
+                  ) : (
+                    <button className="small-button task-primary-action" onClick={() => props.onAction(task.id)}>
+                      {props.actionIcon}
+                      {props.actionLabel}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </article>
@@ -682,13 +911,13 @@ function TaskColumn(props: {
   );
 }
 
-function TaskProgressBar({ percent, compact = false }: { percent: number; compact?: boolean }) {
+function TaskProgressBar({ percent, compact = false, showValue = true }: { percent: number; compact?: boolean; showValue?: boolean }) {
   const safe = Math.max(0, Math.min(100, Math.round(percent)));
   return (
     <div className="task-progress-bar" aria-label={`任务进度 ${safe}%`}>
       <span style={{ width: `${safe}%` }} />
-      {!compact && <strong>{safe}%</strong>}
-      {compact && <em>{safe}%</em>}
+      {showValue && !compact && <strong>{safe}%</strong>}
+      {showValue && compact && <em>{safe}%</em>}
     </div>
   );
 }

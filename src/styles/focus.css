@@ -339,3 +339,30 @@
   font-size: 12px;
   font-weight: 800;
 }
+
+.focus-todo-item .review-pill {
+  color: #245d86;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid #b9d5ea;
+  background: #e9f2fb;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.focus-todo-item .completed-pill {
+  color: #16796d;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border-radius: 999px;
+  border: 1px solid #b7e3da;
+  background: #e8f7f3;
+  font-size: 12px;
+  font-weight: 800;
+}

@@ -12,12 +12,23 @@ export const uid = (prefix: string) => {
 
 const now = () => new Date().toISOString();
 
+const mountedApiBaseFromBuiltAssets = (origin: string) => {
+  const script = document.querySelector<HTMLScriptElement>('script[type="module"][src*="/assets/"]');
+  const src = script?.getAttribute("src");
+  if (!src) return "";
+  const scriptPath = new URL(src, origin).pathname;
+  const assetsIndex = scriptPath.indexOf("/assets/");
+  if (assetsIndex <= 0) return "";
+  const basePath = scriptPath.slice(0, assetsIndex).replace(/\/+$/, "");
+  return basePath ? `${origin}${basePath}/api` : "";
+};
+
 export const defaultSyncServerUrl = () => {
   if (typeof window === "undefined") return "http://127.0.0.1:8787";
   const { protocol, hostname, origin } = window.location;
   if (protocol === "http:" || protocol === "https:") {
     const isLocalHost = hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
-    if (!isLocalHost) return origin;
+    if (!isLocalHost) return mountedApiBaseFromBuiltAssets(origin) || origin;
   }
   return "http://127.0.0.1:8787";
 };
@@ -27,6 +38,7 @@ export const starterProject: Project = {
   name: "TimeManage 团队进度",
   description: "从个人时间管理迁移而来的团队进度管控起始项目。",
   defaultExpectedStartHours: 24,
+  sortOrder: 0,
   createdAt: now(),
   updatedAt: now(),
 };
@@ -121,7 +133,7 @@ export const defaultNativeCapabilities: NativeCapabilityState[] = [
     label: "浏览器预览",
     available: true,
     permissionState: "unavailable",
-    capabilities: ["本地数据", "Web 通知 fallback", "软严格模式说明", "命令面板"],
+    capabilities: ["应用缓存", "Web 通知 fallback", "软严格模式说明", "命令面板"],
     fallback: "无法读取前台 App/URL，也不会进行系统级拦截。",
   },
   {
@@ -185,7 +197,7 @@ export const createInitialState = (): AppState => ({
   auth: {
     status: "signed_out",
     bootstrapped: undefined,
-    message: "请登录团队工作区",
+    message: "请使用管理员分配的账号登录",
   },
   currentMemberId: starterProjectMember.id,
   projects: [starterProject],
@@ -216,7 +228,7 @@ export const createInitialState = (): AppState => ({
     retryCount: 0,
     lastPulledRevision: 0,
     status: "idle",
-    message: "本地同步服务未连接",
+    message: "本地团队后台未连接",
     conflictCount: 0,
     tombstones: [],
     conflicts: [],

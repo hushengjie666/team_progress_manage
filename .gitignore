@@ -9,3 +9,8 @@ sync-server/config.local.json
 *.log
 test-results
 playwright-report
+deploy/
+deploy/**/*.zip
+deploy/timemanageTeam-v*/
+deploy/**/sync.json
+deploy/**/timemanage-sync.exe

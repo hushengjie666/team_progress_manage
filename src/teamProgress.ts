@@ -1,4 +1,6 @@
 import { uid } from "./seed";
+import { endActiveWorkSessionsForTaskInState } from "./workSessionTransitions";
+import { compareProjectsForOverview } from "./projectOverview";
 import type { AppState, Project, ProjectMember, ProjectMemberRole, Task, TeamMember } from "./types";
 
 type IdFactory = (prefix: string) => string;
@@ -9,6 +11,12 @@ const cleanRoles = (roles: ProjectMemberRole[]): ProjectMemberRole[] =>
 export const clampProgressPercent = (value?: number) => {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+};
+
+const nextProjectSortOrder = (projects: Project[]) => {
+  const orders = projects.map((project) => project.sortOrder).filter((value): value is number => Number.isFinite(value));
+  if (orders.length) return Math.max(...orders) + 1000;
+  return projects.length * 1000;
 };
 
 export function createProjectInState(
@@ -45,6 +53,7 @@ export function createProjectInState(
         name: name.trim() || "新项目",
         description: description.trim(),
         defaultExpectedStartHours: 24,
+        sortOrder: nextProjectSortOrder(state.projects),
         createdAt: timestamp,
         updatedAt: timestamp,
       },
@@ -133,12 +142,55 @@ export function updateTeamMemberInState(state: AppState, teamMember: TeamMember,
 }
 
 export function deleteTeamMemberInState(state: AppState, teamMemberId: string, timestamp = new Date().toISOString()): AppState {
-  const deletedProjectMembers = state.projectMembers.filter((member) => member.teamMemberId === teamMemberId);
+  const targetMember = state.teamMembers.find((member) => member.id === teamMemberId);
+  const normalizedEmail = targetMember?.email?.trim().toLowerCase();
+  const deletedTeamMemberIds = new Set<string>([teamMemberId]);
+  const teamMemberAliases = state.sync.entityAliases?.filter((alias) => alias.entity === "team_member") ?? [];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    teamMemberAliases.forEach((alias) => {
+      if (deletedTeamMemberIds.has(alias.id) && !deletedTeamMemberIds.has(alias.canonicalId)) {
+        deletedTeamMemberIds.add(alias.canonicalId);
+        changed = true;
+      }
+      if (deletedTeamMemberIds.has(alias.canonicalId) && !deletedTeamMemberIds.has(alias.id)) {
+        deletedTeamMemberIds.add(alias.id);
+        changed = true;
+      }
+    });
+  }
+  state.teamMembers.forEach((member) => {
+    if (targetMember?.accountId && member.accountId === targetMember.accountId) deletedTeamMemberIds.add(member.id);
+    if (normalizedEmail && member.email?.trim().toLowerCase() === normalizedEmail) deletedTeamMemberIds.add(member.id);
+  });
+  const matchesDeletedIdentity = (member: { teamMemberId?: string; accountId?: string; email?: string }) =>
+    Boolean(
+      (member.teamMemberId && deletedTeamMemberIds.has(member.teamMemberId)) ||
+      (targetMember?.accountId && member.accountId === targetMember.accountId) ||
+      (normalizedEmail && member.email?.trim().toLowerCase() === normalizedEmail),
+    );
+  const deletedProjectMembers = state.projectMembers.filter(matchesDeletedIdentity);
   const deletedProjectMemberIds = new Set(deletedProjectMembers.map((member) => member.id));
-  const projectMembers = state.projectMembers.filter((member) => !deletedProjectMemberIds.has(member.id));
+  const projectMemberAliases = state.sync.entityAliases?.filter((alias) => alias.entity === "project_member") ?? [];
+  changed = true;
+  while (changed) {
+    changed = false;
+    projectMemberAliases.forEach((alias) => {
+      if (deletedProjectMemberIds.has(alias.id) && !deletedProjectMemberIds.has(alias.canonicalId)) {
+        deletedProjectMemberIds.add(alias.canonicalId);
+        changed = true;
+      }
+      if (deletedProjectMemberIds.has(alias.canonicalId) && !deletedProjectMemberIds.has(alias.id)) {
+        deletedProjectMemberIds.add(alias.id);
+        changed = true;
+      }
+    });
+  }
+  const projectMembers = state.projectMembers.filter((member) => !deletedProjectMemberIds.has(member.id) && !matchesDeletedIdentity(member));
   return {
     ...state,
-    teamMembers: state.teamMembers.filter((member) => member.id !== teamMemberId),
+    teamMembers: state.teamMembers.filter((member) => !deletedTeamMemberIds.has(member.id)),
     projectMembers,
     currentMemberId: state.currentMemberId && deletedProjectMemberIds.has(state.currentMemberId) ? projectMembers[0]?.id : state.currentMemberId,
     tasks: state.tasks.map((task) => ({
@@ -160,12 +212,16 @@ export function deleteTeamMemberInState(state: AppState, teamMemberId: string, t
       tombstones: [
         ...(state.sync.tombstones ?? []).filter(
           (item) =>
-            !(item.entity === "team_member" && item.id === teamMemberId) &&
+            !(item.entity === "team_member" && deletedTeamMemberIds.has(item.id)) &&
             !(item.entity === "project_member" && deletedProjectMemberIds.has(item.id)),
         ),
-        { entity: "team_member", id: teamMemberId, deletedAt: timestamp },
-        ...deletedProjectMembers.map((member) => ({ entity: "project_member" as const, id: member.id, deletedAt: timestamp })),
+        ...Array.from(deletedTeamMemberIds).map((id) => ({ entity: "team_member" as const, id, deletedAt: timestamp })),
+        ...Array.from(deletedProjectMemberIds).map((id) => ({ entity: "project_member" as const, id, deletedAt: timestamp })),
       ],
+      entityAliases: state.sync.entityAliases?.filter((alias) => {
+        if (alias.entity === "team_member") return !deletedTeamMemberIds.has(alias.id) && !deletedTeamMemberIds.has(alias.canonicalId);
+        return !deletedProjectMemberIds.has(alias.id) && !deletedProjectMemberIds.has(alias.canonicalId);
+      }),
     },
     updatedAt: timestamp,
   };
@@ -177,6 +233,30 @@ export function updateProjectInState(state: AppState, project: Project, timestam
     projects: state.projects.map((item) => (item.id === project.id ? { ...project, updatedAt: timestamp } : item)),
     updatedAt: timestamp,
   };
+}
+
+export function reorderProjectsInState(state: AppState, orderedProjectIds: string[], timestamp = new Date().toISOString()): AppState {
+  const knownProjectIds = new Set(state.projects.map((project) => project.id));
+  const explicitOrder = orderedProjectIds.filter((projectId, index) =>
+    knownProjectIds.has(projectId) && orderedProjectIds.indexOf(projectId) === index,
+  );
+  const orderedSet = new Set(explicitOrder);
+  const completeOrder = [
+    ...explicitOrder,
+    ...[...state.projects]
+      .sort(compareProjectsForOverview)
+      .map((project) => project.id)
+      .filter((projectId) => !orderedSet.has(projectId)),
+  ];
+  const sortOrderByProjectId = new Map(completeOrder.map((projectId, index) => [projectId, index * 1000]));
+  let changed = false;
+  const projects = state.projects.map((project) => {
+    const sortOrder = sortOrderByProjectId.get(project.id);
+    if (sortOrder === undefined || project.sortOrder === sortOrder) return project;
+    changed = true;
+    return { ...project, sortOrder, updatedAt: timestamp };
+  });
+  return changed ? { ...state, projects, updatedAt: timestamp } : state;
 }
 
 export function bindTeamMemberToProjectInState(
@@ -344,7 +424,8 @@ export function submitTaskForReviewInState(
   timestamp = new Date().toISOString(),
 ): AppState {
   const canSubmitForReview = (task: Task) => task.status === "committed" || task.status === "in_progress";
-  return {
+  const shouldEndActiveWork = state.tasks.some((task) => task.id === taskId && canSubmitForReview(task));
+  const submitted = {
     ...state,
     tasks: state.tasks.map((task) =>
       task.id === taskId && canSubmitForReview(task)
@@ -366,6 +447,13 @@ export function submitTaskForReviewInState(
     ),
     updatedAt: timestamp,
   };
+  if (!shouldEndActiveWork) return submitted;
+  return endActiveWorkSessionsForTaskInState(submitted, taskId, timestamp, {
+    reason: "submitted_for_review",
+    activeTimerWorkSessionId: state.activeTimer?.workSessionId,
+    activeTimerTotalPausedSeconds: state.activeTimer?.totalPausedSeconds,
+    clearActiveTimer: true,
+  });
 }
 
 export function acceptTaskInState(

@@ -1,40 +1,54 @@
-import { LogIn, Server, Users } from "lucide-react";
-import { useState } from "react";
+import { LogIn, Server } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { normalizeAuthMessage } from "../appBoot";
 import type { AuthStatus } from "../types";
 
 export function AuthGate(props: {
   status: AuthStatus;
-  bootstrapped?: boolean;
   serverUrl: string;
   message: string;
+  initialEmail?: string;
+  initialPassword?: string;
+  autoLogin?: boolean;
   updateServerUrl: (serverUrl: string) => void;
   checkStatus: () => Promise<void>;
-  bootstrap: (payload: { workspaceName: string; name: string; email: string; password: string }) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, remember: boolean) => Promise<void>;
 }) {
-  const [workspaceName, setWorkspaceName] = useState("默认团队");
-  const [name, setName] = useState("项目负责人");
-  const [email, setEmail] = useState("owner@example.com");
-  const [password, setPassword] = useState("demo");
+  const [email, setEmail] = useState(props.initialEmail ?? "");
+  const [password, setPassword] = useState(props.initialPassword ?? "");
+  const [remember, setRemember] = useState(true);
+  const autoLoginKeyRef = useRef("");
   const busy = props.status === "checking";
-  const needsBootstrap = props.bootstrapped === false;
-  const submitAuth = () =>
-    needsBootstrap
-      ? props.bootstrap({ workspaceName, name, email, password })
-      : props.login(email, password);
+  const submitAuth = () => props.login(email, password, remember);
+
+  useEffect(() => {
+    setEmail(props.initialEmail ?? "");
+    setPassword(props.initialPassword ?? "");
+    setRemember(true);
+  }, [props.serverUrl, props.initialEmail, props.initialPassword]);
+
+  useEffect(() => {
+    if (!props.autoLogin || busy || props.status !== "signed_out") return;
+    if (!email.trim() || !password) return;
+    const autoLoginKey = `${props.serverUrl}|${email}`;
+    if (autoLoginKeyRef.current === autoLoginKey) return;
+    autoLoginKeyRef.current = autoLoginKey;
+    void props.login(email, password, true);
+  }, [busy, email, password, props.autoLogin, props.serverUrl, props.status]);
 
   return (
     <main className="auth-shell">
       <section className="auth-panel">
         <div className="auth-mark">
-          {needsBootstrap ? <Users size={28} /> : <LogIn size={28} />}
+          <LogIn size={28} />
         </div>
         <p className="eyebrow">团队进度管控</p>
-        <h1>{needsBootstrap ? "初始化团队工作区" : "登录团队工作区"}</h1>
-        <p className="muted">{props.message}</p>
+        <h1>登录账号</h1>
+        <p className="muted">{normalizeAuthMessage(props.message)}</p>
 
         <form
           className="auth-form"
+          autoComplete="off"
           onSubmit={(event) => {
             event.preventDefault();
             if (!busy) void submitAuth();
@@ -50,30 +64,21 @@ export function AuthGate(props: {
             </div>
           </label>
 
-          {needsBootstrap && (
-            <label>
-              团队名称
-              <input value={workspaceName} onChange={(event) => setWorkspaceName(event.target.value)} />
-            </label>
-          )}
-
-          {needsBootstrap && (
-            <label>
-              姓名
-              <input value={name} onChange={(event) => setName(event.target.value)} />
-            </label>
-          )}
           <label>
-            {needsBootstrap ? "负责人登录邮箱或手机号" : "登录邮箱或手机号"}
-            <input value={email} onChange={(event) => setEmail(event.target.value)} />
+            登录邮箱或手机号
+            <input autoComplete="off" value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
           <label>
             密码
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <input autoComplete="off" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </label>
+          <label className="auth-remember">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+            记住账号密码
           </label>
 
           <button type="submit" className="primary-button large" disabled={busy}>
-            {needsBootstrap ? "创建团队并登录" : "登录"}
+            登录
           </button>
         </form>
       </section>

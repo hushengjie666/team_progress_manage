@@ -78,8 +78,8 @@ func installWindowsService(configPath string) error {
 		args = append(args, "--config", configPath)
 	}
 	service, err := m.CreateService(serviceName, exe, mgr.Config{
-		DisplayName: "TimeManage Sync Server",
-		Description: "Small-footprint self-hosted sync service for TimeManage.",
+		DisplayName: "TimeManage Backend Service",
+		Description: "Small-footprint self-hosted team backend service for TimeManage.",
 		StartType:   mgr.StartAutomatic,
 	}, args...)
 	if err != nil {

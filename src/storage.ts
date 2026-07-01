@@ -1,8 +1,9 @@
 import { createInitialState, defaultNativeCapabilities, defaultTaskTemplates } from "./seed";
 import { isTauri } from "./env";
+import { currentProjectMemberForAccount } from "./memberIdentity";
 import {
   attachTeamMembersToProjectMembers,
-  dedupeProjectMemberBindings,
+  dedupeProjectMemberBindingsWithAliases,
   dedupeTeamMembers,
   migrateTeamMembers,
   normalizeProjectMember,
@@ -42,11 +43,13 @@ type NormalizableAppState = Omit<Partial<AppState>, "projects" | "teamMembers" |
 
 const normalizeProject = (project: Partial<Project>, fallback: Project, index: number): Project => {
   const timestamp = project.updatedAt ?? project.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
+  const sortOrder = Number.isFinite(project.sortOrder) ? project.sortOrder : project.id === fallback.id ? fallback.sortOrder : undefined;
   return {
     id: project.id ?? (index === 0 ? fallback.id : `project_migrated_${index}`),
     name: project.name?.trim() || fallback.name,
     description: project.description ?? "",
     defaultExpectedStartHours: Math.max(1, project.defaultExpectedStartHours ?? fallback.defaultExpectedStartHours ?? 24),
+    sortOrder,
     createdAt: project.createdAt ?? timestamp,
     updatedAt: timestamp,
     archivedAt: project.archivedAt,
@@ -223,15 +226,16 @@ const normalizeActiveTimer = (timer?: Partial<ActiveTimer>): ActiveTimer | undef
 
 export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState => {
   const initial = createInitialState();
-  const projects = (parsed.projects?.length ? parsed.projects : initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
+  const projects = (parsed.projects ?? initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
   const starterProjectId = projects[0]?.id ?? initial.projects[0].id;
-  const rawProjectMembers = (parsed.projectMembers?.length ? parsed.projectMembers : initial.projectMembers).map((member, index) =>
+  const rawProjectMembers = (parsed.projectMembers ?? initial.projectMembers).map((member, index) =>
     normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index),
   );
   const migratedTeamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
   const deduped = dedupeTeamMembers(migratedTeamMembers, rawProjectMembers, parsed.auth?.account?.id);
   const teamMembers = deduped.teamMembers;
-  const projectMembers = dedupeProjectMemberBindings(attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers));
+  const dedupedProjectMembers = dedupeProjectMemberBindingsWithAliases(attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers));
+  const projectMembers = dedupedProjectMembers.projectMembers;
   const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
     ? parsed.currentMemberId
     : projectMembers[0]?.id;
@@ -248,8 +252,12 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     token: syncToken ?? parsed.sync?.token,
     tombstones: parsed.sync?.tombstones ?? [],
     conflicts: parsed.sync?.conflicts ?? [],
+    entityAliases: [
+      ...deduped.teamMemberAliases.map((alias) => ({ entity: "team_member" as const, ...alias })),
+      ...dedupedProjectMembers.projectMemberAliases.map((alias) => ({ entity: "project_member" as const, ...alias })),
+    ],
   };
-  return {
+  const normalized = {
     ...initial,
     ...parsed,
     onboarding: { ...initial.onboarding, ...parsed.onboarding, completed: true },
@@ -272,6 +280,8 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     activeTimer: normalizeActiveTimer(parsed.activeTimer),
     sync: normalizedSync,
   } as AppState;
+  const authenticatedMember = normalized.auth.account ? currentProjectMemberForAccount(normalized) : undefined;
+  return authenticatedMember ? { ...normalized, currentMemberId: authenticatedMember.id } : normalized;
 };
 
 const mergeStoredState = (payload: string): AppState => normalizeAppStatePayload(JSON.parse(payload) as Partial<AppState>);

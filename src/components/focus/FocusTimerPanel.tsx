@@ -22,6 +22,8 @@ export function FocusTimerPanel(props: {
   const [, setDisplayTick] = useState(0);
   const displayRemaining = active ? displayRemainingForTimer(active) : 0;
   const displayProgress = active ? 100 - (displayRemaining / active.duration) * 100 : props.progress;
+  const isCurrentTaskPendingReview = currentTask?.status === "pending_review";
+  const startableTasks = props.committedTasks.filter((task) => task.status === "committed" || task.status === "in_progress");
 
   useEffect(() => {
     if (!active?.isRunning) return;
@@ -41,11 +43,16 @@ export function FocusTimerPanel(props: {
       </div>
 
       <div className="timer-controls">
-        {!active ? (
+        {!active && isCurrentTaskPendingReview ? (
+          <button className="secondary-button large" disabled>
+            <Check size={18} />
+            已提交验收
+          </button>
+        ) : !active ? (
           <button
             className="primary-button large"
-            onClick={() => void props.beginTimer("focus", currentTask?.id ?? props.committedTasks[0]?.id)}
-            disabled={!currentTask && props.committedTasks.length === 0}
+            onClick={() => void props.beginTimer("focus", currentTask?.id ?? startableTasks[0]?.id)}
+            disabled={!currentTask && startableTasks.length === 0}
           >
             <CirclePlay size={18} />
             开始工作

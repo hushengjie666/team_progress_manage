@@ -1,6 +1,8 @@
 import { createInitialState } from "./seed";
+import { ensureTodayPlan } from "./appModel";
+import { currentProjectMemberForAccount } from "./authModel";
 import { flattenStateToChanges, mergeRowsIntoState, type SyncRow } from "./sync";
-import type { AppState, ProjectMember, SyncState } from "./types";
+import type { AppState, ExecutionSignal, FocusSession, SyncState, Task, WorkSession } from "./types";
 
 type TeamStateResponse = {
   changes: SyncRow[];
@@ -36,15 +38,83 @@ const readResponse = async <T>(response: Response): Promise<T> => {
   throw new Error(message);
 };
 
-const currentMemberForAccount = (state: AppState): ProjectMember | undefined => {
-  const account = state.auth.account;
-  if (!account) return state.projectMembers[0];
-  return (
-    state.projectMembers.find((member) => member.accountId === account.id) ??
-    state.projectMembers.find((member) => member.email?.toLowerCase() === account.email.toLowerCase()) ??
-    state.projectMembers[0]
+const upsertById = <T extends { id: string }>(items: T[], incoming: T) =>
+  items.some((item) => item.id === incoming.id)
+    ? items.map((item) => (item.id === incoming.id ? incoming : item))
+    : [incoming, ...items];
+
+const localIsNewerOrMissing = <T extends { updatedAt?: string; startedAt?: string }>(local: T, remote?: T) =>
+  !remote || (local.updatedAt ?? local.startedAt ?? "") >= (remote.updatedAt ?? remote.startedAt ?? "");
+
+const preserveLocalActiveRuntime = (remote: AppState, local: AppState): AppState => {
+  const active = local.activeTimer;
+  if (!active) return remote;
+
+  let next = { ...remote, activeTimer: active };
+  const localTask = active.taskId ? local.tasks.find((task) => task.id === active.taskId) : undefined;
+  if (localTask && localIsNewerOrMissing<Task>(localTask, next.tasks.find((task) => task.id === localTask.id))) {
+    next = { ...next, tasks: upsertById(next.tasks, localTask) };
+  }
+
+  const localFocusSession = local.focusSessions.find((session) => session.id === active.sessionId);
+  if (
+    localFocusSession &&
+    localIsNewerOrMissing<FocusSession>(localFocusSession, next.focusSessions.find((session) => session.id === localFocusSession.id))
+  ) {
+    next = { ...next, focusSessions: upsertById(next.focusSessions, localFocusSession) };
+  }
+
+  const localWorkSession = local.workSessions.find((session) =>
+    active.workSessionId ? session.id === active.workSessionId : session.focusSessionId === active.sessionId,
   );
+  if (
+    localWorkSession &&
+    (localWorkSession.status === "active" || localWorkSession.status === "paused") &&
+    localIsNewerOrMissing<WorkSession>(localWorkSession, next.workSessions.find((session) => session.id === localWorkSession.id))
+  ) {
+    next = { ...next, workSessions: upsertById(next.workSessions, localWorkSession) };
+  }
+
+  const localSignals = localWorkSession
+    ? local.executionSignals.filter((signal) => signal.workSessionId === localWorkSession.id)
+    : [];
+  if (localSignals.length) {
+    const existingSignalIds = new Set(next.executionSignals.map((signal) => signal.id));
+    const missingSignals = localSignals.filter((signal) => !existingSignalIds.has(signal.id));
+    if (missingSignals.length) {
+      next = { ...next, executionSignals: [...missingSignals, ...next.executionSignals] as ExecutionSignal[] };
+    }
+  }
+
+  return ensureTodayPlan(next);
 };
+
+const createEmptyTeamStateBase = (local: AppState, token: string): AppState => ({
+  ...createInitialState(),
+  auth: local.auth,
+  currentMemberId: undefined,
+  projects: [],
+  teamMembers: [],
+  projectMembers: [],
+  tasks: [],
+  dailyPlans: [],
+  focusSessions: [],
+  workSessions: [],
+  executionSignals: [],
+  interruptions: [],
+  strictViolations: [],
+  sync: {
+    ...local.sync,
+    enabled: false,
+    autoSync: false,
+    token,
+    lastPulledRevision: 0,
+    status: "idle",
+    message: "团队在线模式",
+    tombstones: [],
+    conflicts: [],
+  },
+});
 
 export async function loadTeamState(local: AppState): Promise<AppState> {
   const token = local.auth.token ?? local.sync.token;
@@ -52,27 +122,16 @@ export async function loadTeamState(local: AppState): Promise<AppState> {
   const payload = await readResponse<TeamStateResponse>(await fetch(apiUrl(local.sync.serverUrl, "/team/state"), {
     headers: authHeaders(token),
   }));
-  const base = {
-    ...createInitialState(),
-    auth: local.auth,
-    sync: {
-      ...local.sync,
-      enabled: false,
-      autoSync: false,
-      token,
-      lastPulledRevision: 0,
-      status: "idle" as const,
-      message: "团队在线模式",
-    },
-  };
+  const base = createEmptyTeamStateBase(local, token);
   const merged = mergeRowsIntoState(base, payload.changes, payload.current_revision, { forceRemote: true });
-  const currentMember = currentMemberForAccount(merged);
+  const restored = preserveLocalActiveRuntime(merged, local);
+  const currentMember = currentProjectMemberForAccount(restored);
   return {
-    ...merged,
-    currentMemberId: currentMember?.id ?? merged.currentMemberId,
+    ...restored,
+    currentMemberId: currentMember?.id,
     auth: local.auth,
     sync: {
-      ...merged.sync,
+      ...restored.sync,
       enabled: false,
       autoSync: false,
       token,

@@ -20,7 +20,7 @@ const baseCommands: CommandItem[] = [
   { action: "toggle_timer", label: "暂停/继续计时", hint: "控制当前计时器" },
   { action: "record_internal_interruption", label: "记录内部中断", hint: "把突然想做的事先记下来" },
   { action: "record_external_interruption", label: "记录外部中断", hint: "把消息/请求放进中断收件箱" },
-  { action: "open_sync_settings", label: "打开团队同步", hint: "检查服务器、登录、诊断和立即同步" },
+  { action: "open_sync_settings", label: "打开团队后台", hint: "检查服务器、登录、诊断和立即同步" },
   { action: "open_shortcut_help", label: "快捷键说明", hint: "查看高频场景下的键盘命令" },
 ];
 

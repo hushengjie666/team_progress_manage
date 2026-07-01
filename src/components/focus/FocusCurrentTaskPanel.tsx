@@ -7,6 +7,7 @@ export function FocusCurrentTaskPanel(props: {
   completeTask: (taskId: string) => void;
 }) {
   const { currentTask } = props;
+  const isPendingReview = currentTask?.status === "pending_review";
 
   return (
     <div className="focus-current-panel">
@@ -27,10 +28,17 @@ export function FocusCurrentTaskPanel(props: {
           <div className="task-meta">
             <span>{currentTask.project}</span>
           </div>
-          <button className="small-button" onClick={() => props.completeTask(currentTask.id)}>
-            <Check size={15} />
-            提交验收
-          </button>
+          {isPendingReview ? (
+            <button className="small-button" disabled>
+              <Check size={15} />
+              已提交验收
+            </button>
+          ) : (
+            <button className="small-button" onClick={() => props.completeTask(currentTask.id)}>
+              <Check size={15} />
+              提交验收
+            </button>
+          )}
         </div>
       ) : (
         <p className="empty">工作队列为空，先从左侧清单选择任务。</p>

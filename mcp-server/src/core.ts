@@ -1,5 +1,6 @@
 import { buildInsights, buildProgressBoard, defaultReview } from "../../src/domain.js";
 import { createProjectTaskInState, type ProjectTaskInput } from "../../src/projectDetail.js";
+import { resolveMemberIdForProject } from "../../src/memberIdentity.js";
 import { createInitialState, todayKey, uid } from "../../src/seed.js";
 import { loginToWorkspace, mergeRowsIntoState, syncAppState, type AuthSession } from "../../src/sync.js";
 import {
@@ -182,7 +183,7 @@ const createEmptySyncState = (config: TimeManageMcpConfig, session: AuthSession)
       autoSync: true,
       lastPulledRevision: 0,
       status: "idle",
-      message: "MCP 已连接同步服务",
+      message: "MCP 已连接团队后台",
       tombstones: [],
       conflicts: [],
     },
@@ -226,6 +227,11 @@ const compactTask = (state: AppState, task: Task) => {
     dueAt: task.dueAt,
     updatedAt: task.updatedAt,
   };
+};
+
+const actorMemberIdForTask = (state: AppState, taskId: string) => {
+  const task = state.tasks.find((item) => item.id === taskId);
+  return task ? resolveMemberIdForProject(state, task.projectId) : undefined;
 };
 
 const taskMatchesFilter = (task: Task, filter: TaskListFilter) => {
@@ -953,7 +959,7 @@ export class TimeManageMcpClient {
 
   async submitTaskReview(taskId: string) {
     return this.mutate(undefined, (state, timestamp) => {
-      const next = submitTaskForReviewInState(state, taskId, state.currentMemberId, timestamp);
+      const next = submitTaskForReviewInState(state, taskId, actorMemberIdForTask(state, taskId), timestamp);
       const task = next.tasks.find((item) => item.id === taskId);
       if (!task) throw new Error(`Task not found: ${taskId}`);
       return { state: next, result: compactTask(next, task) };
@@ -962,7 +968,7 @@ export class TimeManageMcpClient {
 
   async acceptTaskReview(taskId: string) {
     return this.mutate(undefined, (state, timestamp) => {
-      const next = acceptTaskInState(state, taskId, state.currentMemberId, timestamp);
+      const next = acceptTaskInState(state, taskId, actorMemberIdForTask(state, taskId), timestamp);
       const task = next.tasks.find((item) => item.id === taskId);
       if (!task) throw new Error(`Task not found: ${taskId}`);
       return { state: next, result: compactTask(next, task) };
@@ -971,7 +977,7 @@ export class TimeManageMcpClient {
 
   async returnTaskReview(taskId: string, reason: string) {
     return this.mutate(undefined, (state, timestamp) => {
-      const next = returnTaskForReviewInState(state, taskId, reason, state.currentMemberId, timestamp);
+      const next = returnTaskForReviewInState(state, taskId, reason, actorMemberIdForTask(state, taskId), timestamp);
       const task = next.tasks.find((item) => item.id === taskId);
       if (!task) throw new Error(`Task not found: ${taskId}`);
       return { state: next, result: compactTask(next, task) };

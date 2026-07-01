@@ -1,5 +1,6 @@
 import { emptyTaskDefaults, nowIso, priorityWeight } from "./appModel";
 import { buildProgressBoard } from "./domain";
+import { resolveMemberForProject, resolveMemberIdForProject } from "./memberIdentity";
 import { uid } from "./seed";
 import type { AppState, Priority, ProjectMember, RepeatRule, Severity, Task, TaskStage, TaskStatus } from "./types";
 
@@ -118,16 +119,17 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
   const addableTeamMembers = activeTeamMembers.filter((member) => !projectTeamMemberIds.has(member.id));
   const executors = projectMembers.filter((member) => member.roles.includes("executor"));
   const allProjectTasks = projectTasksForProject(state, project.id);
-  const overviewTasks = allProjectTasks.filter((task) => task.status !== "split" && task.status !== "archived");
+  const overviewTasks = allProjectTasks.filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived");
   const acceptedTasks = allProjectTasks
     .filter((task) => task.status === "completed" && Boolean(task.reviewAcceptedAt))
     .sort((left, right) => (right.reviewAcceptedAt ?? "").localeCompare(left.reviewAcceptedAt ?? ""));
   const todayPlan = state.dailyPlans.find((plan) => plan.date === date);
   const allProjectTaskIds = new Set(allProjectTasks.map((task) => task.id));
+  const runnableProjectTaskIds = new Set(allProjectTasks.filter((task) => task.status === "in_progress").map((task) => task.id));
   const activeProjectTaskIds = state.workSessions
-    .filter((session) => session.status === "active" && allProjectTaskIds.has(session.taskId))
+    .filter((session) => session.status === "active" && runnableProjectTaskIds.has(session.taskId))
     .map((session) => session.taskId);
-  if (state.activeTimer?.mode === "focus" && state.activeTimer.taskId && allProjectTaskIds.has(state.activeTimer.taskId)) {
+  if (state.activeTimer?.mode === "focus" && state.activeTimer.taskId && runnableProjectTaskIds.has(state.activeTimer.taskId)) {
     activeProjectTaskIds.push(state.activeTimer.taskId);
   }
   const filteredTasks = filterProjectTasks(allProjectTasks, filters);
@@ -172,7 +174,7 @@ export const buildProjectOverviewTaskBoard = (
   activeTaskIds?: string | Iterable<string>,
   todayTaskIds: Iterable<string> = [],
 ): ProjectOverviewTaskBoard => {
-  const visibleTasks = tasks.filter((task) => task.status !== "split" && task.status !== "archived");
+  const visibleTasks = tasks.filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived");
   const poolTasks = visibleTasks.filter((task) => task.status === "pool" || task.status === "committed");
   const pendingReviewTasks = visibleTasks.filter((task) => task.status === "pending_review");
   const inProgressTasks = visibleTasks.filter((task) => task.status === "in_progress");
@@ -242,18 +244,7 @@ export const projectAccessForCurrentMember = (state: AppState, projectId: string
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return { canView: false, canEditTasks: false, canReviewTasks: false };
 
-  const currentMember = state.currentMemberId ? state.projectMembers.find((item) => item.id === state.currentMemberId) : undefined;
-  const accountId = state.auth.account?.id ?? currentMember?.accountId;
-  const teamMemberId = currentMember?.teamMemberId;
-  const email = (state.auth.account?.email ?? currentMember?.email)?.toLowerCase();
-  const member = state.projectMembers.find((item) => {
-    if (item.projectId !== projectId || item.status === "disabled") return false;
-    if (item.id === state.currentMemberId) return true;
-    if (accountId && item.accountId === accountId) return true;
-    if (teamMemberId && item.teamMemberId === teamMemberId) return true;
-    if (email && item.email?.toLowerCase() === email) return true;
-    return false;
-  });
+  const member = resolveMemberForProject(state, projectId);
   return {
     canView: true,
     canEditTasks: true,
@@ -280,7 +271,7 @@ export const createProjectTaskInState = (
     tags: input.tags ?? [],
     projectId: project.id,
     project: project.name,
-    creatorMemberId: state.currentMemberId,
+    creatorMemberId: resolveMemberIdForProject(state, project.id),
     primaryExecutorMemberId: input.primaryExecutorMemberId || undefined,
     collaboratorMemberIds: input.collaboratorMemberIds?.filter((id) => id !== input.primaryExecutorMemberId) ?? [],
     expectedStartAt: input.expectedStartAt,

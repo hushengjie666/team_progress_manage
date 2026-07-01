@@ -1,6 +1,6 @@
-# TimeManage Sync Server
+# TimeManage Backend Service
 
-P0 personal sync service. It is a small Go HTTP server with MySQL persistence, designed to be built as a single binary for low-memory servers that already have MySQL available.
+P0 team backend service. It is a small Go HTTP server with MySQL persistence, designed to be built as a single binary for low-memory servers that already have MySQL available. The binary and package paths still use `timemanage-sync` / `sync-server` for compatibility, but the service now owns authentication, members, project state, and sync APIs.
 
 ## Build
 
@@ -31,6 +31,12 @@ Configuration priority is `flags > env > config file > defaults`.
 
 ```bash
 ./timemanage-sync serve                    # 启动 HTTP 服务
+./timemanage-sync migrate status           # 查看数据库版本状态
+./timemanage-sync migrate up               # 执行待升级数据库迁移
+./timemanage-sync migrate verify           # 校验数据库版本和关键表结构
+./timemanage-sync migrate backup           # 使用 mysqldump 备份数据库
+./timemanage-sync migrate restore --input <file.sql> # 使用 mysql 命令恢复备份
+./timemanage-sync migrate down --to <ver>  # 回退到指定数据库版本（仅限可逆迁移）
 ./timemanage-sync service                  # Windows 下以服务进程模式运行
 ./timemanage-sync install --config <path>   # 安装 Windows Service（Windows 平台）
 ./timemanage-sync uninstall                # 卸载 Windows Service（Windows 平台）
@@ -39,6 +45,45 @@ Configuration priority is `flags > env > config file > defaults`.
 ```
 
 > 说明：`service` 用于 Windows 服务进程入口；普通用户也可直接用 `serve`，两者参数同源、都支持 `--config` 与配置文件/环境变量。
+
+## 数据库版本管理
+
+MySQL schema 和数据修复必须走版本化迁移，不再手动登录数据库执行临时 SQL。迁移文件放在 `sync-server/migrations/`，发布后只允许追加新版本，不允许修改已经执行过的迁移文件。
+
+推荐升级流程是直接双击 Windows 部署包里的脚本：
+
+```text
+upgrade.bat
+```
+
+部署包目录带版本号，例如 `timemanageTeam-v0.1.0-20260701-153000`。默认把同级 `timemanageTeam` 作为正式运行目录，自动完成：停止后端、创建回退点、备份数据库、安装新后端、安装新网页、升级数据库、校验数据库、启动后端、健康检查。
+
+需要回退时直接双击：
+
+```text
+rollback.bat
+```
+
+它会默认使用最近一次 `upgrade.bat` 创建的回退点，自动恢复数据库、恢复旧后端、恢复旧网页并启动检查。正常情况下不需要手动打开 MySQL 工具导入 SQL。
+
+手动命令仅用于排查问题：
+
+```bash
+./timemanage-sync migrate status --config sync.json
+./timemanage-sync migrate backup --config sync.json
+./timemanage-sync migrate up --config sync.json
+./timemanage-sync migrate verify --config sync.json
+./timemanage-sync serve --config sync.json
+```
+
+服务启动时也会自动执行待升级迁移；如果发现迁移失败、dirty 状态或已执行迁移的 checksum 被改动，服务会拒绝启动。正式部署仍应优先用 `upgrade.bat`，因为它会先创建完整回退点。
+
+Windows 部署包包含：
+
+- `upgrade.bat`：版本包根目录入口，一键升级同级 `timemanageTeam` 正式目录。
+- `rollback.bat`：版本包根目录入口，一键回退同级 `timemanageTeam` 正式目录。
+- `sync\release\timemanage-sync.exe`：待安装的新后端程序。
+- `sync\sync.example.json`：首次部署时用于生成正式目录 `sync.json` 的配置模板。
 
 ## API
 
@@ -50,7 +95,7 @@ Configuration priority is `flags > env > config file > defaults`.
 
 The React app defaults to `http://127.0.0.1:8787`, username `demo`, password `demo`.
 
-## Small Server Deployment
+## Small Backend Deployment
 
 Build on a machine with Go, then upload only the binary:
 
@@ -86,9 +131,9 @@ sync.example.com {
 }
 ```
 
-The app can then use `https://sync.example.com` as the sync server URL.
+The app can then use `https://sync.example.com` as the backend service URL.
 
-For a long-running Linux service, copy the binary plus the two helper files and run:
+For a long-running Linux backend service, copy the binary plus the two helper files and run:
 
 ```bash
 sudo ./install-linux-service.sh
@@ -100,14 +145,14 @@ The script installs:
 - config: `/etc/timemanage-sync/sync.json`
 - unit: `/etc/systemd/system/timemanage-sync.service`
 
-After editing `/etc/timemanage-sync/sync.json` and setting `mysql_dsn`, restart with:
+After editing `/etc/timemanage-sync/sync.json` and setting `mysql_dsn`, restart the backend service with:
 
 ```bash
 sudo systemctl restart timemanage-sync
 curl http://127.0.0.1:8787/health
 ```
 
-## Windows Service Deployment
+## Windows Backend Service Deployment
 
 Build a small Windows binary:
 

@@ -41,6 +41,9 @@ export type CommandAction =
 export type NativePlatform = "browser" | "tauri_macos" | "ios";
 export type ProjectMemberRole = "project_owner" | "executor";
 export type AuthStatus = "checking" | "signed_out" | "authenticated" | "error";
+export type WorkspaceType = "private" | "shared";
+export type WorkspaceMemberRole = "owner" | "admin" | "member";
+export type WorkspaceMemberStatus = "active" | "disabled";
 
 export interface Subtask {
   id: string;
@@ -107,6 +110,7 @@ export interface Project {
   name: string;
   description: string;
   defaultExpectedStartHours: number;
+  sortOrder?: number;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string;
@@ -138,6 +142,20 @@ export interface ProjectMember {
 export interface Workspace {
   id: string;
   name: string;
+  type?: WorkspaceType;
+  ownerAccountId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMembership {
+  id: string;
+  workspaceId: string;
+  accountId: string;
+  name: string;
+  email: string;
+  role: WorkspaceMemberRole;
+  status: WorkspaceMemberStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -514,6 +532,12 @@ export interface SyncTombstone {
   deletedAt: string;
 }
 
+export interface SyncEntityAlias {
+  entity: "team_member" | "project_member";
+  id: string;
+  canonicalId: string;
+}
+
 export interface SyncConflict {
   entity: string;
   id: string;
@@ -542,6 +566,7 @@ export interface SyncState {
   conflictCount: number;
   tombstones: SyncTombstone[];
   conflicts: SyncConflict[];
+  entityAliases?: SyncEntityAlias[];
   sseStatus?: "idle" | "connecting" | "open" | "error";
   lastReceivedRevision?: number;
   pendingLocalSync?: boolean;
@@ -555,6 +580,8 @@ export interface AuthState {
   expiresAt?: string;
   account?: Account;
   workspace?: Workspace;
+  membership?: WorkspaceMembership;
+  workspaces?: Workspace[];
   bootstrapped?: boolean;
   message: string;
 }

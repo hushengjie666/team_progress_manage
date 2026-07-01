@@ -36,11 +36,13 @@ type userData struct {
 }
 
 type workspaceData struct {
-	ID        string             `json:"id"`
-	Name      string             `json:"name"`
-	Rows      map[string]syncRow `json:"rows"`
-	CreatedAt string             `json:"created_at"`
-	UpdatedAt string             `json:"updated_at"`
+	ID             string             `json:"id"`
+	Name           string             `json:"name"`
+	Type           string             `json:"type"`
+	OwnerAccountID string             `json:"owner_account_id,omitempty"`
+	Rows           map[string]syncRow `json:"rows"`
+	CreatedAt      string             `json:"created_at"`
+	UpdatedAt      string             `json:"updated_at"`
 }
 
 type accountRecord struct {
@@ -52,6 +54,16 @@ type accountRecord struct {
 	DisabledAt   string `json:"disabled_at,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
+}
+
+type workspaceMembershipRecord struct {
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+	AccountID   string `json:"account_id"`
+	Role        string `json:"role"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 type syncRow struct {
@@ -84,11 +96,13 @@ type bootstrapRequest struct {
 }
 
 type loginResponse struct {
-	Token     string           `json:"token"`
-	UserID    string           `json:"user_id"`
-	ExpiresAt string           `json:"expires_at"`
-	Account   accountRecord    `json:"account"`
-	Workspace workspaceSummary `json:"workspace"`
+	Token      string                     `json:"token"`
+	UserID     string                     `json:"user_id"`
+	ExpiresAt  string                     `json:"expires_at"`
+	Account    accountRecord              `json:"account"`
+	Workspace  workspaceSummary           `json:"workspace"`
+	Membership workspaceMembershipSummary `json:"membership"`
+	Workspaces []workspaceSummary         `json:"workspaces"`
 }
 
 type authStatusResponse struct {
@@ -98,10 +112,35 @@ type authStatusResponse struct {
 }
 
 type workspaceSummary struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	OwnerAccountID string `json:"owner_account_id,omitempty"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
+}
+
+type workspaceMembershipSummary struct {
+	ID          string `json:"id"`
+	WorkspaceID string `json:"workspace_id"`
+	AccountID   string `json:"account_id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Role        string `json:"role"`
+	Status      string `json:"status"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+type workspaceCreateRequest struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`
+	DeviceID string `json:"device_id,omitempty"`
+}
+
+type workspaceSwitchRequest struct {
+	WorkspaceID string `json:"workspace_id"`
+	DeviceID    string `json:"device_id,omitempty"`
 }
 
 type memberRequest struct {
@@ -186,6 +225,10 @@ func main() {
 		if err := runMigrateFile(context.Background(), cfg); err != nil {
 			log.Fatal(err)
 		}
+	case "migrate":
+		if err := runMigrateCommand(context.Background(), cfg); err != nil {
+			log.Fatal(err)
+		}
 	case "service":
 		if err := runWindowsService(cfg); err != nil {
 			log.Fatal(err)
@@ -207,7 +250,7 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		log.Fatalf("unknown command %q; use serve, migrate-file, service, install, uninstall, start or stop", command)
+		log.Fatalf("unknown command %q; use serve, migrate, migrate-file, service, install, uninstall, start or stop", command)
 	}
 }
 
@@ -223,8 +266,11 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	mux.HandleFunc("/auth/status", api.handleAuthStatus)
 	mux.HandleFunc("/auth/bootstrap", api.handleBootstrap)
 	mux.HandleFunc("/auth/login", api.handleLogin)
+	mux.HandleFunc("/auth/switch-workspace", api.withAuth(api.handleSwitchWorkspace))
 	mux.HandleFunc("/auth/me", api.withAuth(api.handleMe))
 	mux.HandleFunc("/auth/change-password", api.withAuth(api.handleChangePassword))
+	mux.HandleFunc("/workspaces", api.withAuth(api.handleWorkspaces))
+	mux.HandleFunc("/workspaces/", api.withAuth(api.handleWorkspaceByID))
 	mux.HandleFunc("/members", api.withAuth(api.handleMembers))
 	mux.HandleFunc("/members/", api.withAuth(api.handleMemberByID))
 	mux.HandleFunc("/sync/status", api.withAuth(api.handleStatus))
@@ -236,7 +282,7 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	mux.HandleFunc("/team/revision", api.withAuth(api.handleTeamRevision))
 	mux.HandleFunc("/team/changes", api.withAuth(api.handleTeamChanges))
 
-	log.Printf("TimeManage sync server listening on http://%s", cfg.addr)
+	log.Printf("TimeManage backend service listening on http://%s", cfg.addr)
 	log.Printf("Storage: MySQL")
 	server := &http.Server{Addr: cfg.addr, Handler: withCORS(mux), ReadHeaderTimeout: 10 * time.Second}
 	go func() {
@@ -265,11 +311,16 @@ func runMigrateFile(ctx context.Context, cfg config) error {
 	}
 	normalizeLegacyStore(&legacy)
 
-	db, _, err := openMySQLStore(cfg.mysqlDSN)
+	db, err := openMySQLDB(cfg.mysqlDSN)
 	if err != nil {
 		return fmt.Errorf("open mysql store: %w", err)
 	}
 	defer db.Close()
+	schemaCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	if err := ensureMySQLSchema(schemaCtx, db); err != nil {
+		return fmt.Errorf("ensure mysql schema: %w", err)
+	}
 
 	if !cfg.replace {
 		current, err := loadStoreFromMySQL(ctx, db)
@@ -327,6 +378,7 @@ func migrateLegacyUsers(s *store) {
 		s.Workspaces[workspaceID] = workspaceData{
 			ID:        workspaceID,
 			Name:      username,
+			Type:      "shared",
 			Rows:      rows,
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -357,6 +409,9 @@ func normalizeLegacyStore(s *store) {
 		}
 		if workspace.Name == "" {
 			workspace.Name = "默认团队"
+		}
+		if workspace.Type == "" {
+			workspace.Type = "shared"
 		}
 		if workspace.CreatedAt == "" {
 			workspace.CreatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -398,7 +453,11 @@ func (a *app) workspaceLocked(workspaceID string) workspaceData {
 	if current.ID == "" {
 		current.ID = workspaceID
 		current.Name = "默认团队"
+		current.Type = "shared"
 		current.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	if current.Type == "" {
+		current.Type = "shared"
 	}
 	if current.Rows == nil {
 		current.Rows = map[string]syncRow{}
@@ -509,24 +568,27 @@ func (a *app) handleBootstrap(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	workspaceID := newID("workspace")
 	accountID := newID("account")
+	accountName := fallback(strings.TrimSpace(req.Name), "用户")
+	workspaceID := privateWorkspaceID(accountID)
 	hash, err := hashPassword(req.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "password hashing failed")
 		return
 	}
 	workspace := workspaceData{
-		ID:        workspaceID,
-		Name:      fallback(strings.TrimSpace(req.WorkspaceName), "默认团队"),
-		Rows:      map[string]syncRow{},
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:             workspaceID,
+		Name:           firstNonEmpty(strings.TrimSpace(req.WorkspaceName), accountName+"的私人工作区"),
+		Type:           "private",
+		OwnerAccountID: accountID,
+		Rows:           map[string]syncRow{},
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}
 	account := accountRecord{
 		ID:           accountID,
 		WorkspaceID:  workspaceID,
-		Name:         fallback(strings.TrimSpace(req.Name), "项目负责人"),
+		Name:         accountName,
 		Email:        email,
 		PasswordHash: hash,
 		CreatedAt:    now,
@@ -576,6 +638,95 @@ func (a *app) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	workspace := a.workspaceLocked(account.WorkspaceID)
 	a.writeLoginResponse(w, req.DeviceID, account, workspace)
+}
+
+func (a *app) handleSwitchWorkspace(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if a.db != nil {
+		a.handleSwitchWorkspaceMySQL(w, r, auth)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req workspaceSwitchRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	workspaceID := strings.TrimSpace(req.WorkspaceID)
+	if workspaceID == "" {
+		writeError(w, http.StatusBadRequest, "workspace_id is required")
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	account, ok := a.store.Accounts[auth.AccountID]
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "account not found")
+		return
+	}
+	if account.WorkspaceID != workspaceID {
+		writeError(w, http.StatusForbidden, "workspace access denied")
+		return
+	}
+	workspace := a.workspaceLocked(workspaceID)
+	a.writeLoginResponse(w, "", account, workspace)
+}
+
+func (a *app) handleWorkspaces(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if a.db != nil {
+		a.handleWorkspacesMySQL(w, r, auth)
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	account, ok := a.store.Accounts[auth.AccountID]
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "account not found")
+		return
+	}
+	if r.Method == http.MethodGet {
+		workspace := a.workspaceLocked(account.WorkspaceID)
+		writeJSON(w, http.StatusOK, map[string]any{"workspaces": []workspaceSummary{publicWorkspace(workspace)}})
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req workspaceCreateRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	workspace := workspaceData{
+		ID:             newID("workspace"),
+		Name:           fallback(req.Name, "协作工作区"),
+		Type:           "shared",
+		OwnerAccountID: account.ID,
+		Rows:           map[string]syncRow{},
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	a.store.Workspaces[workspace.ID] = workspace
+	account.WorkspaceID = workspace.ID
+	account.UpdatedAt = now
+	a.store.Accounts[account.ID] = account
+	if err := a.saveLocked(); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	a.writeLoginResponse(w, "", account, workspace)
+}
+
+func (a *app) handleWorkspaceByID(w http.ResponseWriter, r *http.Request, auth authContext) {
+	if a.db != nil {
+		a.handleWorkspaceByIDMySQL(w, r, auth)
+		return
+	}
+	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 }
 
 func (a *app) handleMe(w http.ResponseWriter, r *http.Request, auth authContext) {
@@ -712,6 +863,10 @@ func (a *app) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	auth, err := a.verifyEventRequest(r)
 	if err != nil {
+		writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	if err := a.ensureAuthAccess(r.Context(), auth); err != nil {
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -931,10 +1086,6 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 		writeError(w, http.StatusConflict, "email belongs to another workspace")
 		return
 	}
-	if found && projectID == "" {
-		writeError(w, http.StatusConflict, "email already exists")
-		return
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	if !found {
 		hash, err := hashPassword(req.Password)
@@ -952,13 +1103,36 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 			UpdatedAt:    now,
 		}
 		a.store.Accounts[account.ID] = account
-	}
-	teamMemberID := "team_member_" + account.ID
-	if projectID == "" {
-		if _, exists := workspace.Rows[key("team_member", teamMemberID)]; exists {
-			writeError(w, http.StatusConflict, "member account already exists")
+	} else {
+		hash, err := hashPassword(req.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "password hashing failed")
 			return
 		}
+		account.Name = fallback(strings.TrimSpace(req.Name), account.Name)
+		account.Email = email
+		account.PasswordHash = hash
+		account.DisabledAt = ""
+		account.UpdatedAt = now
+		a.store.Accounts[account.ID] = account
+	}
+	teamMemberID := "team_member_" + account.ID
+	teamMemberRowKey := key("team_member", teamMemberID)
+	existingTeamMemberRow, teamMemberExists := workspace.Rows[teamMemberRowKey]
+	teamMemberCanRecreate := true
+	if teamMemberExists {
+		teamMemberCanRecreate = existingTeamMemberRow.DeletedAt != ""
+		if !teamMemberCanRecreate {
+			var existingPayload map[string]any
+			if err := json.Unmarshal(existingTeamMemberRow.Payload, &existingPayload); err == nil {
+				if status, ok := existingPayload["status"].(string); ok {
+					teamMemberCanRecreate = strings.TrimSpace(strings.ToLower(status)) == "disabled"
+				}
+			}
+		}
+	}
+
+	makeTeamMemberRow := func() syncRow {
 		teamMemberPayload := map[string]any{
 			"id":        teamMemberID,
 			"accountId": account.ID,
@@ -969,7 +1143,7 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 			"updatedAt": now,
 		}
 		payload, _ := json.Marshal(teamMemberPayload)
-		row := syncRow{
+		return syncRow{
 			UserID:      auth.AccountID,
 			AccountID:   auth.AccountID,
 			WorkspaceID: auth.WorkspaceID,
@@ -981,8 +1155,12 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 			Revision:    a.store.NextRevision,
 			Payload:     payload,
 		}
+	}
+
+	if projectID == "" {
+		row := makeTeamMemberRow()
 		a.store.NextRevision++
-		workspace.Rows[key(row.Entity, row.ID)] = row
+		workspace.Rows[teamMemberRowKey] = row
 		workspace.UpdatedAt = now
 		a.store.Workspaces[auth.WorkspaceID] = workspace
 		if err := a.saveLocked(); err != nil {
@@ -993,29 +1171,8 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 		writeJSON(w, http.StatusOK, memberResponse{Account: account, Member: row})
 		return
 	}
-	if _, exists := workspace.Rows[key("team_member", teamMemberID)]; !exists {
-		teamMemberPayload := map[string]any{
-			"id":        teamMemberID,
-			"accountId": account.ID,
-			"name":      fallback(strings.TrimSpace(req.Name), account.Name),
-			"email":     account.Email,
-			"status":    fallback(strings.TrimSpace(req.Status), "active"),
-			"createdAt": now,
-			"updatedAt": now,
-		}
-		payload, _ := json.Marshal(teamMemberPayload)
-		workspace.Rows[key("team_member", teamMemberID)] = syncRow{
-			UserID:      auth.AccountID,
-			AccountID:   auth.AccountID,
-			WorkspaceID: auth.WorkspaceID,
-			Entity:      "team_member",
-			ID:          teamMemberID,
-			DeviceID:    "server",
-			UpdatedAt:   now,
-			Version:     1,
-			Revision:    a.store.NextRevision,
-			Payload:     payload,
-		}
+	if teamMemberCanRecreate {
+		workspace.Rows[teamMemberRowKey] = makeTeamMemberRow()
 		a.store.NextRevision++
 	}
 	memberID := "member_" + projectID + "_" + account.ID
@@ -1208,11 +1365,17 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 		if accountID != "" {
 			account, ok := a.store.Accounts[accountID]
 			if ok && account.WorkspaceID == auth.WorkspaceID {
+				status, _ := payload["status"].(string)
 				if name, ok := payload["name"].(string); ok && strings.TrimSpace(name) != "" {
 					account.Name = strings.TrimSpace(name)
 				}
 				if email, ok := payload["email"].(string); ok && strings.TrimSpace(email) != "" {
 					account.Email = normalizeEmail(email)
+				}
+				if strings.EqualFold(strings.TrimSpace(status), "disabled") {
+					account.DisabledAt = now
+				} else if strings.EqualFold(strings.TrimSpace(status), "active") {
+					account.DisabledAt = ""
 				}
 				account.UpdatedAt = now
 				a.store.Accounts[account.ID] = account
@@ -1247,8 +1410,26 @@ func (a *app) withAuth(next func(http.ResponseWriter, *http.Request, authContext
 			writeError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
+		if err := a.ensureAuthAccess(r.Context(), auth); err != nil {
+			writeError(w, http.StatusUnauthorized, err.Error())
+			return
+		}
 		next(w, r, auth)
 	}
+}
+
+func (a *app) ensureAuthAccess(ctx context.Context, auth authContext) error {
+	if a.db == nil {
+		return nil
+	}
+	_, ok, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, a.db, auth.AccountID, auth.WorkspaceID)
+	if err != nil {
+		return errors.New("validate workspace access failed")
+	}
+	if !ok {
+		return errors.New("workspace access denied")
+	}
+	return nil
 }
 
 func (a *app) verifyRequest(r *http.Request) (authContext, error) {
@@ -1322,7 +1503,7 @@ func (a *app) writeLoginResponse(w http.ResponseWriter, deviceID string, account
 	token, err := a.signToken(tokenClaims{
 		UserID:      account.ID,
 		AccountID:   account.ID,
-		WorkspaceID: account.WorkspaceID,
+		WorkspaceID: workspace.ID,
 		Exp:         expires.Unix(),
 	})
 	if err != nil {
@@ -1331,21 +1512,56 @@ func (a *app) writeLoginResponse(w http.ResponseWriter, deviceID string, account
 	}
 	publicAccount := account
 	publicAccount.PasswordHash = ""
+	membership := workspaceMembershipSummary{
+		ID:          "membership_" + workspace.ID + "_" + account.ID,
+		WorkspaceID: workspace.ID,
+		AccountID:   account.ID,
+		Name:        account.Name,
+		Email:       account.Email,
+		Role:        "owner",
+		Status:      "active",
+		CreatedAt:   account.CreatedAt,
+		UpdatedAt:   account.UpdatedAt,
+	}
+	workspaces := []workspaceSummary{publicWorkspace(workspace)}
+	if a.db != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var ok bool
+		membership, ok, err = mysqlMembershipSummaryByAccountAndWorkspace(ctx, a.db, account.ID, workspace.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load workspace membership failed")
+			return
+		}
+		if !ok {
+			writeError(w, http.StatusForbidden, "workspace access denied")
+			return
+		}
+		workspaces, err = mysqlWorkspaceSummariesForAccount(ctx, a.db, account.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load workspaces failed")
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, loginResponse{
-		Token:     token,
-		UserID:    account.ID,
-		ExpiresAt: expires.Format(time.RFC3339),
-		Account:   publicAccount,
-		Workspace: publicWorkspace(workspace),
+		Token:      token,
+		UserID:     account.ID,
+		ExpiresAt:  expires.Format(time.RFC3339),
+		Account:    publicAccount,
+		Workspace:  publicWorkspace(workspace),
+		Membership: membership,
+		Workspaces: workspaces,
 	})
 }
 
 func publicWorkspace(workspace workspaceData) workspaceSummary {
 	return workspaceSummary{
-		ID:        workspace.ID,
-		Name:      workspace.Name,
-		CreatedAt: workspace.CreatedAt,
-		UpdatedAt: workspace.UpdatedAt,
+		ID:             workspace.ID,
+		Name:           workspace.Name,
+		Type:           fallback(workspace.Type, "shared"),
+		OwnerAccountID: workspace.OwnerAccountID,
+		CreatedAt:      workspace.CreatedAt,
+		UpdatedAt:      workspace.UpdatedAt,
 	}
 }
 
@@ -1509,6 +1725,13 @@ func normalizeRoles(roles []string) []string {
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func requestForceRecreate(r *http.Request) bool {
+	return strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("force_recreate")), "1") ||
+		strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("force_recreate")), "true") ||
+		strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("force")), "1") ||
+		strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("force")), "true")
 }
 
 func firstNonEmpty(values ...string) string {

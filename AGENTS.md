@@ -2,15 +2,24 @@
 
 ## Project Structure & Module Organization
 
-TimeManage is a Vite + React + TypeScript app with a Tauri desktop shell and Go sync service.
+TimeManage is a Vite + React + TypeScript app with a Tauri desktop shell and Go team backend service.
 
 - `src/`: React UI, domain logic, storage, sync, notifications, and styles.
 - `src/components/`: feature views and shared UI components.
 - `src-tauri/`: Rust/Tauri desktop application, permissions, icons, and build output.
-- `sync-server/`: Go HTTP sync service, service installers, and example config.
+- `sync-server/`: Go HTTP team backend service, service installers, and example config.
 - `tests/e2e/`: Playwright end-to-end tests.
 - `dist/`: generated frontend output.
 - `参考资料/`: product research and reference materials.
+
+## Codex Context Hygiene
+
+Keep routine changes scoped so Codex does not exhaust context on generated output or broad entrypoints.
+
+- Use CodeGraph first when locating code or planning edits in this indexed repo.
+- Do not read all of `src/App.tsx` unless the task is explicitly changing the app shell or migrating logic out of it; ask CodeGraph for the relevant symbol or line range first.
+- Do not use `src-tauri/target`, `sync-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
+- When a test fails, summarize the failing test name, assertion, and relevant stack line instead of pasting full traces or large logs.
 
 ## Build, Test, and Development Commands
 
@@ -18,10 +27,16 @@ TimeManage is a Vite + React + TypeScript app with a Tauri desktop shell and Go 
 - `npm run dev`: start Vite at `http://127.0.0.1:1420/`.
 - `npm run build`: type-check and build the frontend.
 - `npm run preview`: serve the built frontend at `http://127.0.0.1:1421/`.
+- `npm run verify:fast`: run unit tests and the frontend build for common frontend changes.
+- `npm run verify:e2e`: run the Playwright end-to-end suite.
+- `npm run verify:backend`: run the Go backend tests.
 - `npm test`: run Vitest unit tests.
 - `npm run test:e2e`: run Playwright tests.
-- `npm run sync:build`: build the Go sync binary into `sync-server/bin/`.
-- `npm run sync:server`: start the local sync server.
+- `npm run backend:build`: build the Go backend binary into `sync-server/bin/`.
+- `npm run backend:server`: start the local backend service.
+- `npm run sync:build`: legacy alias for building the Go backend binary.
+- `npm run sync:server`: legacy alias for starting the local backend service.
+- `npm run deploy:team`: build the `/timemanage-team/` frontend, build a Windows Server 2008 compatible backend, and create `deploy/timemanageTeam-no-root.zip`.
 - `npm run tauri dev`: run the desktop app in development mode.
 
 ## Coding Style & Naming Conventions
@@ -56,7 +71,9 @@ Pull requests should include a short summary, test results, and screenshots for 
 
 ## Security & Configuration Tips
 
-The default local sync endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production sync data, or machine-specific paths. Use environment variables such as `TM_SYNC_USER`, `TM_SYNC_PASSWORD`, `TM_SYNC_ADDR`, and `TM_SYNC_MYSQL_DSN` for sync-server configuration.
+The default local backend endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production sync data, or machine-specific paths. Use environment variables such as `TM_SYNC_USER`, `TM_SYNC_PASSWORD`, `TM_SYNC_ADDR`, and `TM_SYNC_MYSQL_DSN` for backend service configuration.
+
+Production TimeManage Team deployment details are recorded in `docs/deployment-timemanage-team.md`. Use that file before changing deployment packaging, Nginx rules, server paths, or Windows backend build settings.
 
 ## Agent skills
 
