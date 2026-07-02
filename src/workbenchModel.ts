@@ -11,6 +11,7 @@ import {
   filterTodayCompletedTasksForMember,
   filterTodayCommittedTasksForMember,
 } from "./projectOverview";
+import { accessibleProjectIdsForCurrentUser } from "./accessControl";
 import type { AppState, DailyPlan, ProjectMember, Task } from "./types";
 
 export const committedTasksForPlan = (state: AppState, todayPlan: DailyPlan): Task[] =>
@@ -104,11 +105,28 @@ export const deriveWorkspaceModel = (
   const nextGuideStep = guideSteps.find((step) => !step.completed);
   const currentMember = currentMemberForState(state);
   const myProjectTaskCards = buildMyProjectTaskCards(state, currentMember);
+  const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state, currentMember);
   const todayCommittedTasks = filterTodayCommittedTasksForMember(state, committedTasks, currentMember, { includeUnassigned: true });
   const todayCompletedTasks = filterTodayCompletedTasksForMember(state, todayPlan.date, currentMember, { includeUnassigned: true });
+  const todayAccessibleCommittedTasks = committedTasks.filter((task) => accessibleProjectIds.has(task.projectId));
+  const todayAccessibleCompletedTasks = state.tasks.filter(
+    (task) =>
+      accessibleProjectIds.has(task.projectId) &&
+      task.status === "completed" &&
+      task.completedAt?.slice(0, 10) === todayPlan.date,
+  );
   const todayWorkbenchTasks = [
     ...todayCommittedTasks,
     ...todayCompletedTasks.filter((task) => !todayCommittedTasks.some((item) => item.id === task.id)),
+    ...todayAccessibleCommittedTasks.filter(
+      (task) => !todayCommittedTasks.some((item) => item.id === task.id) && !todayCompletedTasks.some((item) => item.id === task.id),
+    ),
+    ...todayAccessibleCompletedTasks.filter(
+      (task) =>
+        !todayCommittedTasks.some((item) => item.id === task.id) &&
+        !todayCompletedTasks.some((item) => item.id === task.id) &&
+        !todayAccessibleCommittedTasks.some((item) => item.id === task.id),
+    ),
   ];
   const todayWorkbenchTaskIds = new Set(todayWorkbenchTasks.map((task) => task.id));
   const availableWorkbenchProjectIds = Array.from(new Set([
@@ -124,13 +142,14 @@ export const deriveWorkspaceModel = (
     selectedProjectIdSet.has(task.projectId) &&
     task.status !== "split" &&
     task.status !== "archived" &&
+    accessibleProjectIds.has(task.projectId) &&
     (taskAssignedToMemberIdentity(task, memberIdentityIds) || todayWorkbenchTaskIds.has(task.id));
   const isVisiblePoolWorkbenchTask = (task: Task) =>
     selectedProjectIdSet.has(task.projectId) &&
     task.status !== "completed" &&
     task.status !== "split" &&
     task.status !== "archived" &&
-    taskAssignedToMemberIdentity(task, memberIdentityIds, { includeUnassigned: true });
+    accessibleProjectIds.has(task.projectId);
   const committedWorkbenchTasks = todayWorkbenchTasks.filter(isVisibleWorkbenchTask);
   const poolWorkbenchTasks = poolTasks.filter(isVisiblePoolWorkbenchTask);
   const projectOverviewCards = buildProjectOverviewCards(state);

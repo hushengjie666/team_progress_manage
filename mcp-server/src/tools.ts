@@ -85,6 +85,7 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
         name: z.string(),
         description: z.string().optional(),
         defaultExpectedStartHours: z.number().optional(),
+        taskStageMode: z.enum(["regular", "software"]).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -101,6 +102,7 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
         name: z.string().optional(),
         description: z.string().optional(),
         defaultExpectedStartHours: z.number().optional(),
+        taskStageMode: z.enum(["regular", "software"]).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -139,9 +141,9 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
     "list_members",
     {
       title: "List Members",
-      description: "列出成员库或某个项目内成员。",
+      description: "列出当前可见项目成员；传项目 ID 时只列出该项目成员。",
       inputSchema: {
-        projectId: z.string().optional().describe("项目 ID；为空时列出成员库。"),
+        projectId: z.string().optional().describe("项目 ID；为空时按账号/邮箱去重列出所有可见项目成员。"),
         includeDisabled: z.boolean().optional().describe("是否包含停用成员。"),
       },
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -152,12 +154,14 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
   server.registerTool(
     "create_member",
     {
-      title: "Create Member",
-      description: "在成员库中新建成员，或按登录邮箱/手机号复用并激活已有成员。",
+      title: "Create Project Member",
+      description: "在指定项目中新建项目成员。",
       inputSchema: {
+        projectId: z.string(),
         name: z.string(),
         email: z.string().optional().describe("登录邮箱或手机号。"),
         accountId: z.string().optional(),
+        roles: z.array(projectMemberRoleSchema).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
@@ -167,34 +171,33 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
   server.registerTool(
     "update_member",
     {
-      title: "Update Member",
-      description: "更新成员库成员资料、登录标识或启停状态。",
+      title: "Update Project Member",
+      description: "更新项目成员资料或启停状态。",
       inputSchema: {
-        teamMemberId: z.string(),
+        projectMemberId: z.string(),
         name: z.string().optional(),
         email: z.string().optional().describe("登录邮箱或手机号。"),
-        accountId: z.string().optional(),
         status: z.enum(["active", "disabled"]).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    async ({ teamMemberId, ...input }) => handle(() => client.updateMember(teamMemberId, input)),
+    async ({ projectMemberId, ...input }) => handle(() => client.updateMember(projectMemberId, input)),
   );
 
   server.registerTool(
     "delete_member",
     {
-      title: "Delete Member",
-      description: "删除成员库成员，并解除项目绑定、任务引用。高风险，必须确认。",
+      title: "Delete Project Member",
+      description: "解除项目成员绑定，并清理任务引用。高风险，必须确认。",
       inputSchema: {
-        teamMemberId: z.string(),
-        confirmed: z.boolean().optional().describe("仅在用户明确确认删除成员后传 true。"),
+        projectMemberId: z.string(),
+        confirmed: z.boolean().optional().describe("仅在用户明确确认解除项目成员绑定后传 true。"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
     },
-    async ({ teamMemberId, confirmed }) => handle(async () => {
+    async ({ projectMemberId, confirmed }) => handle(async () => {
       requireConfirmation(confirmed, "delete_member");
-      return client.deleteMember(teamMemberId);
+      return client.deleteMember(projectMemberId);
     }),
   );
 
@@ -202,15 +205,15 @@ export function registerTimeManageTools(server: McpServer, client: TimeManageMcp
     "bind_member_to_project",
     {
       title: "Bind Member To Project",
-      description: "把成员库成员绑定到项目，并设置项目角色。",
+      description: "按现有项目成员 ID、账号 ID 或邮箱，把成员绑定到另一个项目并设置项目角色。",
       inputSchema: {
         projectId: z.string(),
-        teamMemberId: z.string(),
+        memberRef: z.string(),
         roles: z.array(projectMemberRoleSchema).optional(),
       },
       annotations: { readOnlyHint: false, openWorldHint: false },
     },
-    async ({ projectId, teamMemberId, roles }) => handle(() => client.bindMemberToProject(projectId, teamMemberId, roles)),
+    async ({ projectId, memberRef, roles }) => handle(() => client.bindMemberToProject(projectId, memberRef, roles)),
   );
 
   server.registerTool(

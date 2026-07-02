@@ -7,7 +7,7 @@ export type KeyboardRuntimeOptions = {
   getSelectedTaskId: () => string | null;
   setCommandPaletteOpen: (open: boolean) => void;
   setShowShortcutHelp: (open: boolean) => void;
-  setSettingsSection: (section: "projects") => void;
+  setSettingsSection: (section: "members") => void;
   setWorkspaceMode: (mode: "board" | "workbench") => void;
   setTab: (tab: Tab) => void;
   setPendingReset: (pending: boolean) => void;
@@ -38,7 +38,7 @@ export const createKeyboardRuntime = (options: KeyboardRuntimeOptions) => {
     if ((event.metaKey || event.ctrlKey) && !event.shiftKey) {
       if (event.key === "1") {
         event.preventDefault();
-        options.setSettingsSection("projects");
+        options.setSettingsSection("members");
         options.setTab("settings");
         return;
       }

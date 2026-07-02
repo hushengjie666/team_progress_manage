@@ -13,6 +13,8 @@ export type PersistTeamChangesOptions = {
   showFailureToast?: boolean;
   refreshAfterSave?: boolean;
   applySuccessState?: boolean;
+  applyFailureState?: boolean;
+  canApplyState?: () => boolean;
 };
 
 export type TeamStateRuntime = {
@@ -25,6 +27,8 @@ export type TeamStateRuntime = {
 };
 
 export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeOptions): TeamStateRuntime => {
+  let commitSequence = 0;
+
   const persistTeamChanges = async (
     before: AppState,
     after: AppState,
@@ -37,6 +41,8 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
     }
     const showFailureToast = options.showFailureToast ?? true;
     const applySuccessState = options.applySuccessState ?? true;
+    const applyFailureState = options.applyFailureState ?? true;
+    const canApplyState = options.canApplyState ?? (() => true);
     try {
       const revision = await pushTeamChanges(before.sync, token, before, after);
       const saved = {
@@ -49,12 +55,12 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
         },
       };
       const finalState = options.refreshAfterSave ? ensureTodayPlan(await loadTeamState(saved)) : saved;
-      if (applySuccessState) setState(finalState);
+      if (applySuccessState && canApplyState()) setState(finalState);
       return finalState;
     } catch (error) {
-      const failed = applyTeamStateLoadFailure(before, error);
-      setState(failed);
-      if (showFailureToast) setToast(failed.auth.message);
+      const failed = applyTeamStateLoadFailure(after, error);
+      if (applyFailureState && canApplyState()) setState(failed);
+      if (showFailureToast && canApplyState()) setToast(failed.auth.message);
       return undefined;
     }
   };
@@ -65,15 +71,19 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
       setState(after);
       return;
     }
+    const sequence = ++commitSequence;
     setState({
-      ...before,
+      ...after,
       sync: {
-        ...before.sync,
+        ...after.sync,
         status: "syncing",
         message: "正在写入团队后台",
       },
     });
-    void persistTeamChanges(before, after, { refreshAfterSave: true });
+    void persistTeamChanges(before, after, {
+      refreshAfterSave: true,
+      canApplyState: () => sequence === commitSequence,
+    });
   };
 
   return { persistTeamChanges, commitTeamState };

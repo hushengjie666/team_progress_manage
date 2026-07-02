@@ -200,7 +200,7 @@ describe("progress board", () => {
   it("keeps split parent tasks out of progress board sections", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
-    const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId);
+    const currentMember = state.projectMembers[0];
     const next: AppState = {
       ...state,
       tasks: [

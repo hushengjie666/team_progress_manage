@@ -12,6 +12,16 @@
   border-radius: 8px;
   background: rgba(255, 253, 250, 0.96);
   box-shadow: 0 16px 40px rgba(41, 46, 48, 0.18);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition: box-shadow 160ms ease, transform 160ms ease;
+}
+
+.mini-timer-panel.dragging {
+  cursor: grabbing;
+  box-shadow: 0 22px 48px rgba(41, 46, 48, 0.24);
+  transform: scale(1.01);
 }
 
 .mini-timer-panel p,
@@ -47,4 +57,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.mini-timer-actions button {
+  cursor: pointer;
 }

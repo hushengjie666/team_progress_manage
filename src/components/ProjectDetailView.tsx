@@ -1,22 +1,21 @@
-import { useState } from "react";
-import { Check, CheckCircle2, ChevronRight, Eye, Plus, Search, Settings, SlidersHorizontal, UserPlus, UserRoundPen, Users, X } from "lucide-react";
-import { labelPriority, labelTaskStage, nowIso, taskStageOptions } from "../appModel";
-import {
-  projectTaskStatusColumns,
-  stageTaskCardClassName,
-  stageTaskSortRank,
-  stageTaskStatePills,
-  stageTaskStatusLabel,
-} from "../projectTaskDisplay";
+import { useEffect, useState } from "react";
+import { Plus, Save, SlidersHorizontal, UserPlus } from "lucide-react";
+import { defaultTaskStageForMode, nowIso, taskStageModeOptions } from "../appModel";
+import { projectTaskStatusColumns } from "../projectTaskDisplay";
 import {
   type ProjectTaskInput,
   type ProjectTaskFilters,
   type ProjectDetailModel,
 } from "../projectDetail";
-import type { Project, ProjectMember, ProjectMemberRole, Task, TaskStatus, TeamMember } from "../types";
+import type { Project, ProjectMember, ProjectMemberRole, Task, TaskStageMode, TaskStatus, Workspace } from "../types";
 import { TaskDetailModal } from "./WorkspaceView";
 import { ScheduleCalendarView } from "./ScheduleCalendarView";
+import { AddProjectMemberModal } from "./projectDetail/AddProjectMemberModal";
+import { ProjectAcceptedTasksPanel } from "./projectDetail/ProjectAcceptedTasksPanel";
+import { ProjectMemberBindingPanel } from "./projectDetail/ProjectMemberBindingPanel";
+import { ProjectOverviewTaskBoard } from "./projectDetail/ProjectOverviewTaskBoard";
 import { ProjectTaskCreateDialog } from "./projectDetail/ProjectTaskCreateDialog";
+import { ProjectTaskRow } from "./projectDetail/ProjectTaskRow";
 export { MemberStatusView } from "./MemberStatusView";
 export {
   stageTaskCardClassName,
@@ -29,13 +28,13 @@ export type ProjectDetailTab = "overview" | "schedule" | "tasks" | "members" | "
 
 const statusColumns = projectTaskStatusColumns;
 
-const createEmptyProjectTaskDraft = (): ProjectTaskInput => ({
+const createEmptyProjectTaskDraft = (taskStageMode: TaskStageMode = "software"): ProjectTaskInput => ({
   title: "",
   notes: "",
   tags: [],
   priority: "medium",
   severity: "medium",
-  stage: "requirements",
+  stage: defaultTaskStageForMode(taskStageMode),
   estimateHours: 1,
   collaboratorMemberIds: [],
   repeatRule: "none",
@@ -43,12 +42,21 @@ const createEmptyProjectTaskDraft = (): ProjectTaskInput => ({
   subtasks: [],
 });
 
+type ProjectSettingsDraft = {
+  projectId: string;
+  name: string;
+  description: string;
+  taskStageMode: TaskStageMode;
+  workspaceId: string;
+};
+
 export function ProjectDetailView(props: {
   model?: ProjectDetailModel;
   filters: ProjectTaskFilters;
   setFilters: (filters: ProjectTaskFilters) => void;
   allProjects: Project[];
   allProjectMembers: ProjectMember[];
+  availableWorkspaces: Workspace[];
   currentProjectMemberId?: string;
   activeTab: ProjectDetailTab;
   setActiveTab: (tab: ProjectDetailTab) => void;
@@ -63,9 +71,16 @@ export function ProjectDetailView(props: {
   returnTaskForReview: (taskId: string, reason: string) => void;
   splitTask: (taskId: string) => void;
   beginFocus: (taskId: string) => void;
-  bindTeamMemberToProject: (projectId: string, teamMemberId: string, roles: ProjectMemberRole[]) => void;
+  bindAccessibleMemberToProject: (projectId: string, input: {
+    accountId?: string;
+    name: string;
+    email?: string;
+    workspaceId?: string;
+    roles: ProjectMemberRole[];
+  }) => void;
+  inviteProjectMember: (input: { workspaceId?: string; projectId: string; email: string; roles: ProjectMemberRole[] }) => void;
   updateProjectMember: (member: ProjectMember) => void;
-  canManageMembers?: boolean;
+  canManageProjectMembers?: boolean;
   backToBoard: () => void;
   backToAdmin: () => void;
   openMemberSettings: () => void;
@@ -73,12 +88,21 @@ export function ProjectDetailView(props: {
   const [showFilters, setShowFilters] = useState(false);
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [showAddMemberDialog, setShowAddMemberDialog] = useState(false);
-  const [addMemberRolesById, setAddMemberRolesById] = useState<Record<string, ProjectMemberRole[]>>({});
   const [draft, setDraft] = useState<ProjectTaskInput>(createEmptyProjectTaskDraft);
+  const [settingsDraft, setSettingsDraft] = useState<ProjectSettingsDraft | null>(null);
   const { filters, setFilters } = props;
   const model = props.model;
-  const canManageMembers = props.canManageMembers ?? true;
-  const activeTab = !canManageMembers && props.activeTab === "members" ? "overview" : props.activeTab;
+
+  useEffect(() => {
+    if (!model) return;
+    setSettingsDraft({
+      projectId: model.project.id,
+      name: model.project.name,
+      description: model.project.description,
+      taskStageMode: model.project.taskStageMode ?? "software",
+      workspaceId: model.project.workspaceId ?? model.workspace?.id ?? "",
+    });
+  }, [model?.project.id, model?.project.updatedAt, model?.workspace?.id]);
 
   if (!model) {
     return (
@@ -91,10 +115,10 @@ export function ProjectDetailView(props: {
 
   const {
     project,
+    workspace,
     access,
     projectMembers,
-    activeTeamMembers,
-    addableTeamMembers,
+    accessibleProjectMembers,
     executors,
     allProjectTasks,
     overviewTasks,
@@ -106,8 +130,32 @@ export function ProjectDetailView(props: {
     riskSections,
     riskTaskCount,
     taskCounts,
+    accessibleMemberCount,
     memberOverviewStats,
   } = model;
+  const projectStageMode = project.taskStageMode ?? "software";
+  const isPrivateProject = (workspace?.type ?? "shared") === "private";
+  const workspaceTagLabel = workspace
+    ? `${isPrivateProject ? "私人工作区" : "协作工作区"} · ${workspace.name}`
+    : "未归属工作区";
+  const currentProjectWorkspaceId = project.workspaceId ?? workspace?.id;
+  const editableProjectSettings = settingsDraft?.projectId === project.id ? settingsDraft : {
+    projectId: project.id,
+    name: project.name,
+    description: project.description,
+    taskStageMode: projectStageMode,
+    workspaceId: currentProjectWorkspaceId ?? "",
+  };
+  const workspaceOptions = [
+    ...props.availableWorkspaces,
+    ...(workspace && !props.availableWorkspaces.some((item) => item.id === workspace.id) ? [workspace] : []),
+  ].filter((item, index, items) =>
+    items.findIndex((candidate) => candidate.id === item.id) === index &&
+    ((item.type ?? "shared") !== "private" || item.id === currentProjectWorkspaceId),
+  );
+  const canManageProjectMembers = props.canManageProjectMembers ?? access.canReviewTasks;
+  const canShowProjectMemberManagement = canManageProjectMembers && !isPrivateProject;
+  const activeTab = !canShowProjectMemberManagement && props.activeTab === "members" ? "overview" : props.activeTab;
   const signalSectionMeta = {
     assigned_not_started: { label: "未启动", description: "已分配但还没有开始记录。" },
     stalled: { label: "停滞", description: "任务超过预期但没有新的执行信号。" },
@@ -120,8 +168,13 @@ export function ProjectDetailView(props: {
   const createTask = () => {
     if (!access.canEditTasks || !draft.title.trim()) return;
     props.createProjectTask(project.id, draft);
-    setDraft(createEmptyProjectTaskDraft());
+    setDraft(createEmptyProjectTaskDraft(projectStageMode));
     setShowCreateTaskDialog(false);
+  };
+
+  const openCreateTaskDialog = () => {
+    setDraft(createEmptyProjectTaskDraft(projectStageMode));
+    setShowCreateTaskDialog(true);
   };
 
   const updateStatus = (taskId: string, status: TaskStatus) => {
@@ -133,24 +186,44 @@ export function ProjectDetailView(props: {
       reviewSubmittedByMemberId: status === "pending_review" && task ? props.currentProjectMemberId : undefined,
     });
   };
-  const updateMemberRole = (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => {
-    const roles = checked ? Array.from(new Set([...member.roles, role])) : member.roles.filter((item) => item !== role);
-    props.updateProjectMember({ ...member, roles });
-  };
-  const addMemberRoles = (teamMemberId: string) => addMemberRolesById[teamMemberId] ?? ["executor"];
-  const updateAddMemberRole = (teamMemberId: string, role: ProjectMemberRole, checked: boolean) => {
-    setAddMemberRolesById((value) => {
-      const current = value[teamMemberId] ?? ["executor"];
-      const roles = checked ? Array.from(new Set([...current, role])) : current.filter((item) => item !== role);
-      return { ...value, [teamMemberId]: roles.length ? roles : ["executor"] };
+  const updateMemberRole = (member: typeof accessibleProjectMembers[number], role: ProjectMemberRole, checked: boolean) => {
+    const currentRoles = member.projectMember?.roles ?? member.roles;
+    const roles = checked ? Array.from(new Set([...currentRoles, role])) : currentRoles.filter((item) => item !== role);
+    const nextRoles = roles.length ? roles : ["executor" as ProjectMemberRole];
+    if (member.projectMember) {
+      props.updateProjectMember({ ...member.projectMember, roles: nextRoles });
+      return;
+    }
+    props.bindAccessibleMemberToProject(project.id, {
+      accountId: member.workspaceMembership?.accountId,
+      name: member.name,
+      email: member.email,
+      workspaceId: project.workspaceId ?? workspace?.id,
+      roles: nextRoles,
     });
   };
-  const addTeamMemberToProject = (teamMemberId: string) => {
-    props.bindTeamMemberToProject(project.id, teamMemberId, addMemberRoles(teamMemberId));
-    setAddMemberRolesById((value) => {
-      const next = { ...value };
-      delete next[teamMemberId];
-      return next;
+  const updateSettingsDraft = (patch: Partial<Omit<ProjectSettingsDraft, "projectId">>) => {
+    setSettingsDraft((value) => ({
+      ...(value?.projectId === project.id ? value : editableProjectSettings),
+      ...patch,
+    }));
+  };
+  const saveProjectSettings = () => {
+    if (!access.canReviewTasks) return;
+    const nextName = editableProjectSettings.name.trim();
+    if (!nextName) return;
+    const nextWorkspaceId = editableProjectSettings.workspaceId || currentProjectWorkspaceId;
+    if (nextWorkspaceId && nextWorkspaceId !== currentProjectWorkspaceId) {
+      const targetWorkspace = workspaceOptions.find((item) => item.id === nextWorkspaceId);
+      const confirmed = window.confirm(`确定将项目「${project.name}」移动到「${targetWorkspace?.name ?? "目标工作区"}」吗？项目下的任务和项目成员归属会一起更新。`);
+      if (!confirmed) return;
+    }
+    props.updateProject({
+      ...project,
+      name: nextName,
+      description: editableProjectSettings.description,
+      taskStageMode: editableProjectSettings.taskStageMode,
+      workspaceId: nextWorkspaceId,
     });
   };
 
@@ -162,18 +235,22 @@ export function ProjectDetailView(props: {
             ["overview", "概览"],
             ["schedule", "排期日历"],
             ["tasks", "任务"],
-            ["members", "成员"],
             ["settings", "设置"],
-          ] as const).filter(([tab]) => canManageMembers || tab !== "members").map(([tab, label]) => (
+            ["members", "项目成员管理"],
+          ] as const).filter(([tab]) => canShowProjectMemberManagement || tab !== "members").map(([tab, label]) => (
             <button className={activeTab === tab ? "active" : ""} key={tab} onClick={() => props.setActiveTab(tab)}>
               {label}
             </button>
           ))}
         </div>
+        <div className="project-detail-identity" aria-label={`当前项目 ${project.name}，所属${workspaceTagLabel}`}>
+          <strong title={project.name}>{project.name}</strong>
+          <span title={workspaceTagLabel}>{workspaceTagLabel}</span>
+        </div>
         <div className="project-detail-stats">
           <Metric label="进度" value={`${board.projectProgress}%`} />
           <Metric label="任务" value={`${allProjectTasks.length}`} />
-          <Metric label="成员" value={`${projectMembers.length}`} />
+          <Metric label="成员" value={`${accessibleMemberCount}`} />
           <Metric label="待验收" value={`${taskCounts.pending_review}`} />
         </div>
       </section>
@@ -186,7 +263,7 @@ export function ProjectDetailView(props: {
                 <span className="count-pill">{overviewTasks.length}</span>
                 <h2>任务阶段总览</h2>
               </div>
-              <button className="primary-button compact-button" disabled={!access.canEditTasks} onClick={() => setShowCreateTaskDialog(true)}>
+              <button className="primary-button compact-button" disabled={!access.canEditTasks} onClick={openCreateTaskDialog}>
                 <Plus size={16} />
                 添加任务
               </button>
@@ -197,6 +274,7 @@ export function ProjectDetailView(props: {
               todayTaskIds={todayPlan?.committedTaskIds ?? []}
               selectTask={props.selectTask}
               activeTaskIds={activeProjectTaskIds}
+              taskStageMode={projectStageMode}
             />
           </section>
           <section className="band progress-board">
@@ -261,7 +339,7 @@ export function ProjectDetailView(props: {
               <h2>创建与任务列表</h2>
             </div>
             <div className="button-row">
-              <button className="primary-button compact-button" disabled={!access.canEditTasks} onClick={() => setShowCreateTaskDialog(true)}>
+              <button className="primary-button compact-button" disabled={!access.canEditTasks} onClick={openCreateTaskDialog}>
                 <Plus size={16} />
                 添加任务
               </button>
@@ -353,6 +431,7 @@ export function ProjectDetailView(props: {
             members={projectMembers}
             activeTaskIds={activeProjectTaskIds}
             todayTaskIds={todayPlan?.committedTaskIds ?? []}
+            taskStageMode={projectStageMode}
             embedded
             title={`${project.name}排期`}
             subtitle="按阶段查看当前项目任务的排期、负责人、今日任务和运行状态。"
@@ -361,14 +440,14 @@ export function ProjectDetailView(props: {
         </section>
       )}
 
-      {activeTab === "members" && (
+      {canShowProjectMemberManagement && activeTab === "members" && (
         <section className="band project-members-panel">
           <div className="section-title">
             <div>
               <p className="eyebrow">项目成员</p>
-              <h2>成员数量总览</h2>
+              <h2>项目成员管理</h2>
             </div>
-            <button className="secondary-button" disabled={!access.canReviewTasks} onClick={() => setShowAddMemberDialog(true)}>
+            <button className="secondary-button" disabled={!canManageProjectMembers} onClick={() => setShowAddMemberDialog(true)}>
               <UserPlus size={16} />
               添加成员
             </button>
@@ -383,25 +462,24 @@ export function ProjectDetailView(props: {
             ))}
           </div>
           <ProjectMemberBindingPanel
-            project={project}
-            teamMembers={activeTeamMembers}
-            projectMembers={props.allProjectMembers}
-            canManage={access.canReviewTasks}
+            accessibleMembers={accessibleProjectMembers}
+            canManage={canManageProjectMembers}
             updateMemberRole={updateMemberRole}
             updateProjectMember={props.updateProjectMember}
           />
-          {showAddMemberDialog && (
-            <AddProjectMemberModal
-              project={project}
-              addableTeamMembers={addableTeamMembers}
-              canManage={access.canReviewTasks}
-              rolesForMember={addMemberRoles}
-              updateRole={updateAddMemberRole}
-              addMember={addTeamMemberToProject}
-              openMemberSettings={props.openMemberSettings}
-              onClose={() => setShowAddMemberDialog(false)}
-            />
-          )}
+      {showAddMemberDialog && (
+        <AddProjectMemberModal
+          project={project}
+          canManage={canManageProjectMembers}
+          inviteMember={(input) => props.inviteProjectMember({
+            workspaceId: project.workspaceId,
+            projectId: project.id,
+            email: input.email,
+            roles: input.roles,
+          })}
+          onClose={() => setShowAddMemberDialog(false)}
+        />
+      )}
         </section>
       )}
 
@@ -412,32 +490,49 @@ export function ProjectDetailView(props: {
               <p className="eyebrow">项目设置</p>
               <h2>项目资料</h2>
             </div>
-            <Settings size={20} />
           </div>
-          <div className="settings-grid">
+          <div className="settings-grid project-settings-form">
             <label>
               项目名称
-              <input value={project.name} disabled={!access.canReviewTasks} onChange={(event) => props.updateProject({ ...project, name: event.target.value })} />
+              <input value={editableProjectSettings.name} disabled={!access.canReviewTasks} onChange={(event) => updateSettingsDraft({ name: event.target.value })} />
             </label>
             <label>
-              默认预计开始（小时）
-              <input
-                type="number"
-                min="1"
-                max="720"
-                value={project.defaultExpectedStartHours}
+              项目类型
+              <select
+                value={editableProjectSettings.taskStageMode}
                 disabled={!access.canReviewTasks}
-                onChange={(event) => props.updateProject({ ...project, defaultExpectedStartHours: Number(event.target.value) })}
-              />
+                onChange={(event) => updateSettingsDraft({ taskStageMode: event.target.value as TaskStageMode })}
+              >
+                {taskStageModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </label>
-            <label className="span-2">
+            <label>
+              所属工作区
+              <select
+                value={editableProjectSettings.workspaceId}
+                disabled={!access.canReviewTasks || workspaceOptions.length <= 1}
+                onChange={(event) => updateSettingsDraft({ workspaceId: event.target.value })}
+              >
+                {workspaceOptions.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {(item.type ?? "shared") === "private" ? "私人" : "协作"} · {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="project-settings-description">
               项目说明
-              <textarea value={project.description} disabled={!access.canReviewTasks} onChange={(event) => props.updateProject({ ...project, description: event.target.value })} />
+              <textarea value={editableProjectSettings.description} disabled={!access.canReviewTasks} onChange={(event) => updateSettingsDraft({ description: event.target.value })} />
             </label>
           </div>
-          <button className="secondary-button" onClick={() => props.setActiveTab("members")}>
-            前往成员管理
-          </button>
+          <div className="project-settings-actions">
+            <button className="primary-button" disabled={!access.canReviewTasks || !editableProjectSettings.name.trim()} onClick={saveProjectSettings}>
+              <Save size={16} />
+              保存项目资料
+            </button>
+          </div>
         </section>
       )}
 
@@ -461,6 +556,7 @@ export function ProjectDetailView(props: {
         draft={draft}
         members={projectMembers}
         executors={executors}
+        taskStageMode={projectStageMode}
         canEdit={access.canEditTasks}
         setDraft={setDraft}
         onCancel={() => setShowCreateTaskDialog(false)}
@@ -470,392 +566,11 @@ export function ProjectDetailView(props: {
   );
 }
 
-function formatAcceptedAt(iso?: string) {
-  if (!iso) return "未记录验收时间";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "验收时间异常";
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
-function ProjectAcceptedTasksPanel(props: {
-  tasks: Task[];
-  members: ProjectMember[];
-  selectTask: (taskId: string) => void;
-}) {
-  const membersById = new Map(props.members.map((member) => [member.id, member]));
-
-  return (
-    <section className="band project-accepted-panel">
-      <div className="section-title">
-        <div>
-          <p className="eyebrow">验收归档</p>
-          <h2>验收通过</h2>
-        </div>
-        <span className="count-pill">{props.tasks.length}</span>
-      </div>
-      {props.tasks.length === 0 && <p className="empty">当前项目还没有验收通过的任务。</p>}
-      {props.tasks.length > 0 && (
-        <div className="project-accepted-list">
-          {props.tasks.map((task) => {
-            const executorName = task.primaryExecutorMemberId ? membersById.get(task.primaryExecutorMemberId)?.name ?? "已分配" : "未分配";
-            return (
-              <button className="project-accepted-card" key={task.id} onClick={() => props.selectTask(task.id)} type="button">
-                <span className="accepted-icon">
-                  <CheckCircle2 size={18} />
-                </span>
-                <div className="project-accepted-main">
-                  <strong>{task.title}</strong>
-                  <span>{executorName} · {labelTaskStage[task.stage]} · {labelPriority[task.priority]} · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
-                </div>
-                <div className="project-accepted-time">
-                  <span>验收时间</span>
-                  <strong>{formatAcceptedAt(task.reviewAcceptedAt)}</strong>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function ProjectOverviewTaskBoard(props: {
-  tasks: Task[];
-  members: ProjectMember[];
-  todayTaskIds: string[];
-  selectTask: (taskId: string) => void;
-  activeTaskIds: string[];
-}) {
-  const activeTaskIdSet = new Set(props.activeTaskIds);
-  const todayTaskIdSet = new Set(props.todayTaskIds);
-  const membersById = new Map(props.members.map((member) => [member.id, member]));
-  const statusOrder: Record<TaskStatus, number> = {
-    in_progress: 0,
-    pending_review: 1,
-    committed: 2,
-    pool: 3,
-    completed: 4,
-    split: 5,
-    archived: 6,
-  };
-  const sortedTasks = (tasks: Task[]) => [...tasks].sort((left, right) => {
-    const leftRank = stageTaskSortRank(left.status, activeTaskIdSet.has(left.id), todayTaskIdSet.has(left.id));
-    const rightRank = stageTaskSortRank(right.status, activeTaskIdSet.has(right.id), todayTaskIdSet.has(right.id));
-    if (leftRank !== rightRank) return leftRank - rightRank;
-    const statusDelta = statusOrder[left.status] - statusOrder[right.status];
-    if (statusDelta !== 0) return statusDelta;
-    return left.sortOrder - right.sortOrder;
-  });
-
-  const renderStageTask = (task: Task) => {
-    const isActive = activeTaskIdSet.has(task.id);
-    const showsActiveState = isActive && task.status === "in_progress";
-    const isTodayTask = todayTaskIdSet.has(task.id);
-    const statusLabel = stageTaskStatusLabel(task.status);
-    const statePills = stageTaskStatePills(task.status, showsActiveState);
-    const executorName = task.primaryExecutorMemberId ? membersById.get(task.primaryExecutorMemberId)?.name ?? "已分配" : undefined;
-    return (
-      <button
-        className={stageTaskCardClassName(task.status, showsActiveState, isTodayTask)}
-        key={task.id}
-        onClick={() => props.selectTask(task.id)}
-        type="button"
-      >
-        <div className="project-stage-task-main">
-          <strong>{task.title}</strong>
-          <span>{statusLabel} · {labelPriority[task.priority]} · {task.progressPercent ?? 0}% · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
-        </div>
-        {showsActiveState && (
-          <span className="working-indicator" aria-label="当前任务执行中">
-            <UserRoundPen size={32} />
-          </span>
-        )}
-        <div className="project-stage-task-tags">
-          {executorName ? <span className="task-info-pill assignee">{executorName}</span> : <span className="task-info-pill muted">未分配</span>}
-          {isTodayTask && <span className="task-info-pill today">今日</span>}
-          {statePills.map((pill) => (
-            <span className={`task-info-pill ${pill.className}`} key={pill.className}>{pill.label}</span>
-          ))}
-          <Eye size={14} />
-        </div>
-      </button>
-    );
-  };
-
-  return (
-    <section className="project-stage-overview">
-      {taskStageOptions.map((stage) => {
-        const stageTasks = sortedTasks(props.tasks.filter((task) => task.stage === stage.value));
-        return (
-          <div className="project-stage-row" key={stage.value}>
-            <div className="project-stage-label">
-              <strong>{stage.label}</strong>
-              <span>{stageTasks.length}</span>
-            </div>
-            <div className="project-stage-task-list">
-              {stageTasks.length === 0 && <p className="project-stage-empty">暂无任务</p>}
-              {stageTasks.map(renderStageTask)}
-            </div>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-function ProjectMemberBindingPanel({
-  project,
-  teamMembers,
-  projectMembers,
-  canManage,
-  updateMemberRole,
-  updateProjectMember,
-}: {
-  project: Project;
-  teamMembers: TeamMember[];
-  projectMembers: ProjectMember[];
-  canManage: boolean;
-  updateMemberRole: (member: ProjectMember, role: ProjectMemberRole, checked: boolean) => void;
-  updateProjectMember: (member: ProjectMember) => void;
-}) {
-  const bindings = projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
-  const teamMemberById = new Map(teamMembers.map((member) => [member.id, member]));
-
-  return (
-    <section className="project-binding-panel inline-project-binding">
-      <div className="member-section-title">
-        <strong>项目成员管理</strong>
-        <span>这里只显示已加入当前项目的成员，角色在这里维护。</span>
-      </div>
-      <div className="project-binding-list">
-        {bindings.map((binding) => {
-          const teamMember = binding.teamMemberId ? teamMemberById.get(binding.teamMemberId) : undefined;
-          return (
-            <article className="project-binding-row bound" key={binding.id}>
-              <div>
-                <strong>{teamMember?.name ?? binding.name}</strong>
-                <span>{teamMember?.email ?? binding.email ?? "未填写登录信息"}</span>
-              </div>
-              <label className="inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={binding.roles.includes("project_owner")}
-                  disabled={!canManage}
-                  onChange={(event) => updateMemberRole(binding, "project_owner", event.target.checked)}
-                />
-                项目负责人
-              </label>
-              <label className="inline-toggle">
-                <input
-                  type="checkbox"
-                  checked={binding.roles.includes("executor")}
-                  disabled={!canManage}
-                  onChange={(event) => updateMemberRole(binding, "executor", event.target.checked)}
-                />
-                执行者
-              </label>
-              <button className="secondary-button" disabled={!canManage} onClick={() => updateProjectMember({ ...binding, status: "disabled" })}>
-                解除绑定
-              </button>
-            </article>
-          );
-        })}
-        {!bindings.length && <p className="empty">当前项目还没有成员，请点击“添加成员”从成员库加入。</p>}
-      </div>
-    </section>
-  );
-}
-
-function AddProjectMemberModal(props: {
-  project: Project;
-  addableTeamMembers: TeamMember[];
-  canManage: boolean;
-  rolesForMember: (teamMemberId: string) => ProjectMemberRole[];
-  updateRole: (teamMemberId: string, role: ProjectMemberRole, checked: boolean) => void;
-  addMember: (teamMemberId: string) => void;
-  openMemberSettings: () => void;
-  onClose: () => void;
-}) {
-  const [memberQuery, setMemberQuery] = useState("");
-  const normalizedQuery = memberQuery.trim().toLowerCase();
-  const filteredTeamMembers = normalizedQuery
-    ? props.addableTeamMembers.filter((teamMember) =>
-        [teamMember.name, teamMember.email, teamMember.accountId].filter(Boolean).join(" ").toLowerCase().includes(normalizedQuery),
-      )
-    : props.addableTeamMembers;
-
-  return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
-      <section
-        className={`modal-panel add-project-member-modal${props.addableTeamMembers.length ? "" : " no-search"}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="添加项目成员"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="modal-heading">
-          <div>
-            <p className="eyebrow">PROJECT MEMBER</p>
-            <h2>添加成员</h2>
-            <span>从成员库选择成员加入「{props.project.name}」，并设置项目内角色。</span>
-          </div>
-          <button className="icon-button" onClick={props.onClose} aria-label="关闭">
-            <X size={18} />
-          </button>
-        </div>
-        {props.addableTeamMembers.length > 0 && (
-          <div className="add-project-member-tools">
-            <label className="add-project-member-search">
-              <Search size={17} />
-              <input
-                autoFocus
-                value={memberQuery}
-                onChange={(event) => setMemberQuery(event.target.value)}
-                placeholder="搜索姓名、邮箱或账号"
-                aria-label="搜索成员"
-              />
-              {memberQuery && (
-                <button className="icon-button small" type="button" onClick={() => setMemberQuery("")} aria-label="清空搜索">
-                  <X size={15} />
-                </button>
-              )}
-            </label>
-            <span>{filteredTeamMembers.length} / {props.addableTeamMembers.length} 可加入</span>
-          </div>
-        )}
-        <div className="add-project-member-list">
-          {filteredTeamMembers.map((teamMember) => {
-            const roles = props.rolesForMember(teamMember.id);
-            return (
-              <article className="add-project-member-row" key={teamMember.id}>
-                <div className="add-project-member-profile">
-                  <strong>{teamMember.name}</strong>
-                  <span>{teamMember.email ?? "未填写登录信息"}</span>
-                </div>
-                <label className="inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={roles.includes("project_owner")}
-                    disabled={!props.canManage}
-                    onChange={(event) => props.updateRole(teamMember.id, "project_owner", event.target.checked)}
-                  />
-                  项目负责人
-                </label>
-                <label className="inline-toggle">
-                  <input
-                    type="checkbox"
-                    checked={roles.includes("executor")}
-                    disabled={!props.canManage}
-                    onChange={(event) => props.updateRole(teamMember.id, "executor", event.target.checked)}
-                  />
-                  执行者
-                </label>
-                <button className="primary-button" disabled={!props.canManage} onClick={() => props.addMember(teamMember.id)}>
-                  加入项目
-                </button>
-              </article>
-            );
-          })}
-          {props.addableTeamMembers.length > 0 && !filteredTeamMembers.length && (
-            <div className="empty add-project-member-empty">
-              <strong>没有匹配成员</strong>
-              <span>换个姓名、邮箱或账号关键词再试。</span>
-              <button className="secondary-button" onClick={() => setMemberQuery("")}>
-                清空搜索
-              </button>
-            </div>
-          )}
-          {!props.addableTeamMembers.length && (
-            <div className="empty add-project-member-empty">
-              <strong>没有可加入的成员</strong>
-              <span>成员库里的成员都已经加入当前项目，或者成员库暂时为空。</span>
-              <button className="secondary-button" onClick={props.openMemberSettings}>
-                <Users size={15} />
-                打开成员库
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ProjectTaskRow(props: {
-  task: Task;
-  members: ProjectMember[];
-  canEdit: boolean;
-  canReview: boolean;
-  selectTask: (taskId: string) => void;
-  beginFocus: (taskId: string) => void;
-  updateStatus: (taskId: string, status: TaskStatus) => void;
-  updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
-}) {
-  const executors = props.members.filter((member) => member.roles.includes("executor"));
-  const selectedExecutor = props.task.primaryExecutorMemberId
-    ? props.members.find((member) => member.id === props.task.primaryExecutorMemberId)
-    : undefined;
-  const executorOptions = selectedExecutor && !executors.some((member) => member.id === selectedExecutor.id)
-    ? [...executors, selectedExecutor]
-    : executors;
-
-  return (
-    <article className="project-task-row">
-      <div>
-        <strong>{props.task.title}</strong>
-        <span>{labelTaskStage[props.task.stage]} · {props.task.tags.slice(0, 3).join("、") || "无标签"}</span>
-      </div>
-      <select
-        value={props.task.primaryExecutorMemberId ?? ""}
-        disabled={!props.canEdit}
-        onChange={(event) => props.updateTaskAssignment(props.task.id, { primaryExecutorMemberId: event.target.value || undefined })}
-      >
-        <option value="">未分配</option>
-        {executorOptions.map((member) => (
-          <option key={member.id} value={member.id}>{member.name}</option>
-        ))}
-      </select>
-      <select
-        value={props.task.status}
-        disabled={!props.canEdit || (props.task.status === "pending_review" && !props.canReview)}
-        onChange={(event) => props.updateStatus(props.task.id, event.target.value as TaskStatus)}
-      >
-        {statusColumns.map((column) => (
-          <option key={column.status} value={column.status}>{column.title}</option>
-        ))}
-      </select>
-      <span className={`priority priority-${props.task.priority}`}>{labelPriority[props.task.priority]}</span>
-      <span>{props.task.progressPercent ?? 0}%</span>
-      <div className="button-row">
-        <button className="small-button" onClick={() => props.selectTask(props.task.id)}>详情</button>
-        {props.task.status !== "completed" && props.task.status !== "split" && props.task.status !== "archived" && (
-          <button className="small-button" onClick={() => props.beginFocus(props.task.id)}>
-            <ChevronRight size={14} />
-            开始
-          </button>
-        )}
-        {props.task.status === "pending_review" && props.canReview && (
-          <span className="status-pill">
-            <Check size={13} />
-            可验收
-          </span>
-        )}
-      </div>
-    </article>
   );
 }

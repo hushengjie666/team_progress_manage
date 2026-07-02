@@ -25,6 +25,7 @@ import {
   removeTaskFromTodayInState,
   shouldFinishExpiredTimerInState,
   startTimerInState,
+  taskStageOptionsForMode,
   toggleTimerInState,
 } from "./appModel";
 import { addTaskToTodayInState } from "./workSessionTransitions";
@@ -37,12 +38,11 @@ import {
   addProjectMemberToState,
   assignTaskInState,
   createProjectInState,
-  deleteTeamMemberInState,
   reorderProjectsInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
+  updateProjectInState,
   updateProjectMemberInState,
-  updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
 import { buildProjectOverviewTaskBoard, createProjectTaskInState, deriveProjectDetailModel, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
@@ -58,6 +58,19 @@ import { bindAccountToMembers } from "./authModel";
 import type { ActiveTimer, AppState, FocusSession, ProjectMember, Task, TaskTemplate } from "./types";
 
 describe("planning and rewards", () => {
+  it("returns project-specific task stage options", () => {
+    expect(taskStageOptionsForMode("regular").map((stage) => stage.value)).toEqual(["planning", "execution", "check"]);
+    expect(taskStageOptionsForMode("software").map((stage) => stage.value)).toEqual([
+      "sales",
+      "requirements",
+      "design",
+      "development",
+      "testing",
+      "deployment",
+      "acceptance",
+    ]);
+  });
+
   it("reduces suggested capacity after a high interruption day", () => {
     const state = createInitialState();
     const today = todayKey();
@@ -247,6 +260,24 @@ describe("data portability and long planning", () => {
     });
   });
 
+  it("creates project detail tasks with regular task stages", () => {
+    const state = createInitialState();
+    const project = state.projects[0];
+    const next = createProjectTaskInState(
+      state,
+      project.id,
+      { title: "常规规划任务", stage: "planning" },
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_regular`,
+    );
+
+    expect(next.tasks[0]).toMatchObject({
+      id: "task_regular",
+      title: "常规规划任务",
+      stage: "planning",
+    });
+  });
+
   it("converts project detail estimate hours to pomodoros when creating tasks", () => {
     const baseState = createInitialState();
     const state = { ...baseState, settings: { ...baseState.settings, focusMinutes: 25 } };
@@ -315,7 +346,7 @@ describe("data portability and long planning", () => {
     expect(next.tasks[0].subtasks.map((subtask) => subtask.title)).toEqual(["拆第一步", "拆第二步"]);
   });
 
-  it("allows every account to view and manage project workspaces", () => {
+  it("lets visible project members edit tasks while only owners review work", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
     const ownerAccess = projectAccessForCurrentMember(state, projectId);
@@ -328,8 +359,42 @@ describe("data portability and long planning", () => {
       "2026-05-10T10:00:00.000Z",
       (prefix) => `${prefix}_member`,
     );
-    const memberAccess = projectAccessForCurrentMember({ ...withMember, currentMemberId: "member_member" }, projectId);
-    const nonMemberAccess = projectAccessForCurrentMember({ ...withMember, currentMemberId: "missing_member" }, projectId);
+    const memberAccess = projectAccessForCurrentMember(
+      {
+        ...withMember,
+        auth: {
+          ...withMember.auth,
+          status: "authenticated",
+          account: {
+            id: "account_member",
+            workspaceId: "workspace_test",
+            name: "普通成员",
+            email: "member@example.com",
+            createdAt: "2026-05-10T10:00:00.000Z",
+            updatedAt: "2026-05-10T10:00:00.000Z",
+          },
+        },
+      },
+      projectId,
+    );
+    const nonMemberAccess = projectAccessForCurrentMember(
+      {
+        ...withMember,
+        auth: {
+          ...withMember.auth,
+          status: "authenticated",
+          account: {
+            id: "account_missing",
+            workspaceId: "workspace_other",
+            name: "非项目成员",
+            email: "missing@example.com",
+            createdAt: "2026-05-10T10:00:00.000Z",
+            updatedAt: "2026-05-10T10:00:00.000Z",
+          },
+        },
+      },
+      projectId,
+    );
     const withSecondProject = createProjectInState(
       state,
       "同账号项目",
@@ -337,6 +402,7 @@ describe("data portability and long planning", () => {
       "2026-05-10T11:00:00.000Z",
       (prefix) => `${prefix}_account`,
     );
+    const accountProjectId = withSecondProject.projects[0].id;
     const accountScopedState: AppState = {
       ...withSecondProject,
       auth: {
@@ -351,21 +417,21 @@ describe("data portability and long planning", () => {
         },
       },
       projectMembers: withSecondProject.projectMembers.map((member) =>
-        member.projectId === "project_account" ? { ...member, accountId: "account_owner" } : member,
+        member.projectId === accountProjectId ? { ...member, accountId: "account_owner" } : member,
       ),
     };
-    const accountAccess = projectAccessForCurrentMember(accountScopedState, "project_account");
+    const accountAccess = projectAccessForCurrentMember(accountScopedState, accountProjectId);
     const emailScopedState: AppState = {
       ...accountScopedState,
       projectMembers: accountScopedState.projectMembers.map((member) =>
-        member.projectId === "project_account" ? { ...member, accountId: undefined, teamMemberId: undefined, email: "owner@example.com" } : member,
+        member.projectId === accountProjectId ? { ...member, accountId: undefined, email: "owner@example.com" } : member,
       ),
     };
-    const emailAccess = projectAccessForCurrentMember(emailScopedState, "project_account");
+    const emailAccess = projectAccessForCurrentMember(emailScopedState, accountProjectId);
 
     expect(ownerAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
-    expect(memberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
-    expect(nonMemberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
+    expect(memberAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: false });
+    expect(nonMemberAccess).toMatchObject({ canView: false, canEditTasks: false, canReviewTasks: false });
     expect(accountAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
     expect(emailAccess).toMatchObject({ canView: true, canEditTasks: true, canReviewTasks: true });
   });
@@ -389,6 +455,112 @@ describe("data portability and long planning", () => {
       projectId: "project_test",
       roles: ["project_owner", "executor"],
     });
+  });
+
+  it("creates cross-workspace project owners as project-scoped bindings", () => {
+    const state = createInitialState();
+    const next = createProjectInState(
+      {
+        ...state,
+        projects: [],
+        projectMembers: [],
+      },
+      "跨工作区项目",
+      "",
+      "2026-05-10T10:00:00.000Z",
+      (prefix) => `${prefix}_workspace_b`,
+      {
+        workspaceId: "workspace_b",
+        accountId: "account_owner",
+        name: "负责人",
+        email: "owner@example.com",
+      },
+    );
+
+    expect(next.projectMembers[0]).toMatchObject({
+      projectId: "project_workspace_b",
+      workspaceId: "workspace_b",
+      accountId: "account_owner",
+      name: "负责人",
+      email: "owner@example.com",
+    });
+  });
+
+  it("moves project-scoped data to another workspace", () => {
+    const state = createInitialState();
+    const timestamp = "2026-05-10T10:00:00.000Z";
+    const project = { ...state.projects[0], id: "project_move", workspaceId: "workspace_a", name: "迁移前项目" };
+    const sourceProjectMember = {
+      ...state.projectMembers[0],
+      id: "member_move_owner",
+      workspaceId: "workspace_a",
+      projectId: "project_move",
+      accountId: "account_owner",
+      email: "owner@example.com",
+    };
+    const movingTask: Task = {
+      ...state.tasks[0],
+      id: "task_move",
+      workspaceId: "workspace_a",
+      projectId: "project_move",
+      project: "迁移前项目",
+      title: "迁移任务",
+      updatedAt: "2026-05-10T09:00:00.000Z",
+    };
+    const next = updateProjectInState(
+      {
+        ...state,
+        projects: [project],
+        projectMembers: [sourceProjectMember],
+        tasks: [movingTask],
+        workSessions: [
+          {
+            id: "work_session_move",
+            workspaceId: "workspace_a",
+            taskId: "task_move",
+            focusSessionId: "focus_session_move",
+            status: "active",
+            totalPausedSeconds: 0,
+            startedAt: "2026-05-10T09:10:00.000Z",
+            createdAt: "2026-05-10T09:10:00.000Z",
+            updatedAt: "2026-05-10T09:10:00.000Z",
+          },
+        ],
+        executionSignals: [
+          {
+            id: "signal_move",
+            workspaceId: "workspace_a",
+            workSessionId: "work_session_move",
+            taskId: "task_move",
+            type: "work_started",
+            createdAt: "2026-05-10T09:20:00.000Z",
+          },
+        ],
+      },
+      { ...project, workspaceId: "workspace_b", name: "迁移后项目" },
+      timestamp,
+      (prefix) => `${prefix}_workspace_b_owner`,
+    );
+
+    expect(next.projects[0]).toMatchObject({ workspaceId: "workspace_b", name: "迁移后项目" });
+    expect(next.projectMembers[0]).toMatchObject({
+      workspaceId: "workspace_b",
+      accountId: "account_owner",
+      email: "owner@example.com",
+      updatedAt: timestamp,
+    });
+    expect(next.tasks[0]).toMatchObject({ workspaceId: "workspace_b", project: "迁移后项目", updatedAt: timestamp });
+    expect(next.workSessions[0]).toMatchObject({ workspaceId: "workspace_b", updatedAt: timestamp });
+    expect(next.executionSignals[0]).toMatchObject({ workspaceId: "workspace_b" });
+    expect(next.sync.tombstones).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ entity: "project", id: "project_move", workspaceId: "workspace_a" }),
+        expect.objectContaining({ entity: "project_member", id: "member_move_owner", workspaceId: "workspace_a" }),
+        expect.objectContaining({ entity: "task", id: "task_move", workspaceId: "workspace_a" }),
+        expect.objectContaining({ entity: "work_session", id: "work_session_move", workspaceId: "workspace_a" }),
+        expect.objectContaining({ entity: "execution_signal", id: "signal_move", workspaceId: "workspace_a" }),
+      ]),
+    );
   });
 
   it("adds and updates project members with project-scoped roles", () => {
@@ -417,50 +589,35 @@ describe("data portability and long planning", () => {
     expect(updated.projectMembers[0].roles).toEqual(["executor"]);
   });
 
-  it("updates team member profile data across project bindings", () => {
+  it("updates project member profile data in place", () => {
     const state = createInitialState();
-    const teamMember = state.teamMembers[0];
-    const updated = updateTeamMemberInState(
+    const projectMember = state.projectMembers[0];
+    const updated = updateProjectMemberInState(
       state,
-      { ...teamMember, name: "负责人 A", email: "owner-a@example.com" },
+      { ...projectMember, name: "负责人 A", email: "owner-a@example.com" },
       "2026-05-10T11:00:00.000Z",
     );
 
-    expect(updated.teamMembers.find((member) => member.id === teamMember.id)).toMatchObject({
+    expect(updated.projectMembers.find((member) => member.id === projectMember.id)).toMatchObject({
       name: "负责人 A",
       email: "owner-a@example.com",
       updatedAt: "2026-05-10T11:00:00.000Z",
     });
-    expect(updated.projectMembers.filter((member) => member.teamMemberId === teamMember.id)).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "负责人 A",
-          email: "owner-a@example.com",
-          updatedAt: "2026-05-10T11:00:00.000Z",
-        }),
-      ]),
-    );
     expect(updated.updatedAt).toBe("2026-05-10T11:00:00.000Z");
   });
 
-  it("deletes a team member and clears project task assignments", () => {
+  it("disables a project member and keeps task assignment cleanup project scoped", () => {
     const state = createInitialState();
-    const deleted = deleteTeamMemberInState(state, "team_member_owner", "2026-05-10T11:00:00.000Z");
+    const disabled = updateProjectMemberInState(
+      state,
+      { ...state.projectMembers[0], status: "disabled" },
+      "2026-05-10T11:00:00.000Z",
+    );
 
-    expect(deleted.teamMembers.some((member) => member.id === "team_member_owner")).toBe(false);
-    expect(deleted.projectMembers.some((member) => member.teamMemberId === "team_member_owner")).toBe(false);
-    expect(deleted.tasks[0]).toMatchObject({
-      creatorMemberId: undefined,
-      primaryExecutorMemberId: undefined,
-      collaboratorMemberIds: [],
+    expect(disabled.projectMembers.find((member) => member.id === "member_owner")).toMatchObject({
+      status: "disabled",
       updatedAt: "2026-05-10T11:00:00.000Z",
     });
-    expect(deleted.sync.tombstones).toEqual(
-      expect.arrayContaining([
-        { entity: "team_member", id: "team_member_owner", deletedAt: "2026-05-10T11:00:00.000Z" },
-        { entity: "project_member", id: "member_owner", deletedAt: "2026-05-10T11:00:00.000Z" },
-      ]),
-    );
   });
 
   it("assigns a task to one primary executor and keeps collaborators separate", () => {
@@ -575,7 +732,6 @@ describe("data portability and long planning", () => {
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "王硕",
       email: "wangshuo@example.com",
@@ -583,7 +739,6 @@ describe("data portability and long planning", () => {
     };
     const loggedInState: AppState = {
       ...state,
-      currentMemberId: teammate.id,
       auth: {
         ...state.auth,
         status: "authenticated",
@@ -617,6 +772,35 @@ describe("data portability and long planning", () => {
     expect(created.tasks[0].creatorMemberId).toBe(owner.id);
     expect(submitted.tasks[0].reviewSubmittedByMemberId).toBe(owner.id);
     expect(accepted.tasks[0].reviewAcceptedByMemberId).toBe(owner.id);
+  });
+
+  it("defaults new task stages from the project type", () => {
+    const state = createInitialState();
+    const withRegularProject = createProjectInState(
+      state,
+      "常规项目",
+      "",
+      "2026-05-10T09:00:00.000Z",
+      (prefix) => `${prefix}_regular_stage`,
+      { taskStageMode: "regular" },
+    );
+    const regularTask = createProjectTaskInState(
+      withRegularProject,
+      "project_regular_stage",
+      { title: "常规任务" },
+      "2026-05-10T09:05:00.000Z",
+      (prefix) => `${prefix}_regular_stage`,
+    ).tasks[0];
+    const softwareTask = createProjectTaskInState(
+      state,
+      state.projects[0].id,
+      { title: "软件任务" },
+      "2026-05-10T09:10:00.000Z",
+      (prefix) => `${prefix}_software_stage`,
+    ).tasks[0];
+
+    expect(regularTask.stage).toBe("planning");
+    expect(softwareTask.stage).toBe("requirements");
   });
 
   it("does not resubmit tasks already waiting for review", () => {
@@ -670,7 +854,6 @@ describe("data portability and long planning", () => {
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "王硕",
       email: "wangshuo@example.com",
@@ -679,7 +862,6 @@ describe("data portability and long planning", () => {
     const taskId = state.tasks[0].id;
     const loggedInState: AppState = {
       ...state,
-      currentMemberId: teammate.id,
       auth: {
         ...state.auth,
         status: "authenticated",
@@ -807,7 +989,6 @@ describe("data portability and long planning", () => {
     const migrated = normalizeAppStatePayload(legacy);
     expect(migrated.projects[0]).toMatchObject({ id: "project_starter" });
     expect(migrated.projectMembers[0].roles).toEqual(["project_owner", "executor"]);
-    expect(migrated.currentMemberId).toBe(migrated.projectMembers[0].id);
     expect(migrated.tasks[0]).toMatchObject({
       id: "legacy_task",
       project: "旧项目标签",
@@ -844,19 +1025,88 @@ describe("data portability and long planning", () => {
     expect(imported.backupSnapshots[0]).toMatchObject({ reason: "before_import" });
   });
 
-  it("deduplicates team members by login identity during normalization", () => {
+  it("hydrates project members from legacy team member data during normalization", () => {
     const state = createInitialState();
     const normalized = normalizeAppStatePayload({
       ...state,
       teamMembers: [
-        { ...state.teamMembers[0], id: "team_member_bound", email: "owner@example.com", updatedAt: "2026-05-10T10:00:00.000Z" },
-        { ...state.teamMembers[0], id: "team_member_duplicate", email: "owner@example.com", updatedAt: "2026-05-10T11:00:00.000Z" },
+        {
+          id: "team_member_bound",
+          accountId: "account_owner",
+          name: "负责人",
+          email: "owner@example.com",
+          status: "active",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
       ],
-      projectMembers: state.projectMembers.map((member) => ({ ...member, teamMemberId: "team_member_bound" })),
+      projectMembers: state.projectMembers.map((member) => ({
+        ...member,
+        accountId: undefined,
+        name: "",
+        teamMemberId: "team_member_bound",
+      })),
     });
 
-    expect(normalized.teamMembers.filter((member) => member.email === "owner@example.com")).toHaveLength(1);
-    expect(normalized.projectMembers[0].teamMemberId).toBe("team_member_bound");
+    expect(normalized.projectMembers[0]).toMatchObject({
+      accountId: "account_owner",
+      name: "负责人",
+      email: "owner@example.com",
+    });
+  });
+
+  it("keeps the same account as separate project bindings across workspaces", () => {
+    const state = createInitialState();
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      projects: [
+        {
+          ...state.projects[0],
+          id: "project_workspace_a",
+          workspaceId: "workspace_a",
+        },
+        {
+          ...state.projects[0],
+          id: "project_workspace_b",
+          workspaceId: "workspace_b",
+        },
+      ],
+      projectMembers: [
+        { ...state.projectMembers[0], id: "member_workspace_a", projectId: "project_workspace_a", workspaceId: "workspace_a" },
+        { ...state.projectMembers[0], id: "member_workspace_b", projectId: "project_workspace_b", workspaceId: "workspace_b" },
+      ],
+    });
+
+    expect(normalized.projectMembers.filter((member) => member.accountId === "account_owner")).toHaveLength(2);
+  });
+
+  it("keeps project member workspace aligned with its project", () => {
+    const state = createInitialState();
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      projects: [
+        {
+          ...state.projects[0],
+          id: "project_workspace_b",
+          workspaceId: "workspace_b",
+        },
+      ],
+      projectMembers: [
+        {
+          ...state.projectMembers[0],
+          id: "member_workspace_b_owner",
+          workspaceId: "workspace_b",
+          projectId: "project_workspace_b",
+          accountId: "account_owner",
+          email: "owner@example.com",
+        },
+      ],
+    });
+
+    expect(normalized.projectMembers[0]).toMatchObject({
+      workspaceId: "workspace_b",
+      accountId: "account_owner",
+    });
   });
 
   it("reenables automatic sync when normalizing an authenticated team state", () => {
@@ -895,22 +1145,11 @@ describe("data portability and long planning", () => {
     const projectId = state.projects[0].id;
     const normalized = normalizeAppStatePayload({
       ...state,
-      teamMembers: [
-        {
-          ...state.teamMembers[0],
-          id: "team_member_wangshuo",
-          accountId: "account_wangshuo",
-          name: "王硕",
-          email: "wangshuo",
-          updatedAt: "2026-05-10T10:00:00.000Z",
-        },
-      ],
       projectMembers: [
         {
           ...state.projectMembers[0],
           id: "member_wangshuo_old",
           projectId,
-          teamMemberId: "team_member_wangshuo",
           accountId: "account_wangshuo",
           name: "王硕",
           email: "wangshuo",
@@ -921,7 +1160,6 @@ describe("data portability and long planning", () => {
           ...state.projectMembers[0],
           id: "member_wangshuo_latest",
           projectId,
-          teamMemberId: "team_member_wangshuo",
           accountId: "account_wangshuo",
           name: "王硕",
           email: "wangshuo",
@@ -931,7 +1169,7 @@ describe("data portability and long planning", () => {
       ],
     });
 
-    expect(normalized.projectMembers.filter((member) => member.teamMemberId === "team_member_wangshuo")).toHaveLength(1);
+    expect(normalized.projectMembers.filter((member) => member.accountId === "account_wangshuo")).toHaveLength(1);
     expect(normalized.projectMembers[0]).toMatchObject({ id: "member_wangshuo_latest", roles: ["executor"] });
   });
 
@@ -944,7 +1182,17 @@ describe("data portability and long planning", () => {
     expect(normalized.tasks[0].stage).toBe("requirements");
   });
 
-  it("does not transfer project owner role when repairing duplicated login identities", () => {
+  it("preserves regular task stages when normalizing tasks", () => {
+    const state = createInitialState();
+    const normalized = normalizeAppStatePayload({
+      ...state,
+      tasks: [{ ...state.tasks[0], stage: "execution" }],
+    });
+
+    expect(normalized.tasks[0].stage).toBe("execution");
+  });
+
+  it("does not transfer project owner role when repairing duplicated project member identities", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
     const normalized = normalizeAppStatePayload({
@@ -960,31 +1208,10 @@ describe("data portability and long planning", () => {
           updatedAt: "2026-05-10T10:00:00.000Z",
         },
       },
-      teamMembers: [
-        {
-          id: "team_member_account_owner",
-          accountId: "account_owner",
-          name: "王硕",
-          email: "wangshuo",
-          status: "active",
-          createdAt: "2026-05-10T09:00:00.000Z",
-          updatedAt: "2026-05-10T09:00:00.000Z",
-        },
-        {
-          id: "team_member_wangshuo",
-          accountId: "account_wangshuo",
-          name: "王硕",
-          email: "wangshuo",
-          status: "active",
-          createdAt: "2026-05-10T10:00:00.000Z",
-          updatedAt: "2026-05-10T10:00:00.000Z",
-        },
-      ],
       projectMembers: [
         {
           id: "member_stale_owner",
           projectId,
-          teamMemberId: "team_member_account_owner",
           accountId: "account_owner",
           name: "王硕",
           email: "wangshuo",
@@ -993,13 +1220,22 @@ describe("data portability and long planning", () => {
           createdAt: "2026-05-10T09:00:00.000Z",
           updatedAt: "2026-05-10T09:00:00.000Z",
         },
+        {
+          id: "member_wangshuo",
+          projectId,
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          roles: ["executor"],
+          status: "active",
+          createdAt: "2026-05-10T10:00:00.000Z",
+          updatedAt: "2026-05-10T10:00:00.000Z",
+        },
       ],
     });
 
-    expect(normalized.teamMembers.filter((member) => member.email === "wangshuo")).toHaveLength(1);
-    expect(normalized.teamMembers[0]).toMatchObject({ id: "team_member_wangshuo", accountId: "account_wangshuo" });
+    expect(normalized.projectMembers.filter((member) => member.email === "wangshuo")).toHaveLength(1);
     expect(normalized.projectMembers[0]).toMatchObject({
-      teamMemberId: "team_member_wangshuo",
       accountId: "account_wangshuo",
       roles: ["executor"],
     });

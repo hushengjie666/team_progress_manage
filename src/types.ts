@@ -1,6 +1,17 @@
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type Severity = "low" | "medium" | "high" | "very_high";
-export type TaskStage = "sales" | "requirements" | "design" | "development" | "testing" | "deployment" | "acceptance";
+export type TaskStage =
+  | "planning"
+  | "execution"
+  | "check"
+  | "sales"
+  | "requirements"
+  | "design"
+  | "development"
+  | "testing"
+  | "deployment"
+  | "acceptance";
+export type TaskStageMode = "regular" | "software";
 export type TaskStatus = "pool" | "committed" | "in_progress" | "pending_review" | "completed" | "split" | "archived";
 export type SessionMode = "focus" | "short_break" | "long_break";
 export type SessionOutcome = "completed" | "aborted" | "skipped";
@@ -44,6 +55,14 @@ export type AuthStatus = "checking" | "signed_out" | "authenticated" | "error";
 export type WorkspaceType = "private" | "shared";
 export type WorkspaceMemberRole = "owner" | "admin" | "member";
 export type WorkspaceMemberStatus = "active" | "disabled";
+export type WorkspaceUpdateInput = {
+  name: string;
+  type: WorkspaceType;
+  ownerAccountId?: string;
+};
+export type WorkspaceMembershipUpdateInput = {
+  status: WorkspaceMemberStatus;
+};
 
 export interface Subtask {
   id: string;
@@ -63,6 +82,7 @@ export interface EstimateEntry {
 
 export interface Task {
   id: string;
+  workspaceId?: string;
   title: string;
   notes: string;
   tags: string[];
@@ -107,29 +127,21 @@ export interface Task {
 
 export interface Project {
   id: string;
+  workspaceId?: string;
   name: string;
   description: string;
   defaultExpectedStartHours: number;
+  taskStageMode?: TaskStageMode;
   sortOrder?: number;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string;
 }
 
-export interface TeamMember {
-  id: string;
-  accountId?: string;
-  name: string;
-  email?: string;
-  status?: "active" | "disabled";
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ProjectMember {
   id: string;
+  workspaceId?: string;
   projectId: string;
-  teamMemberId?: string;
   accountId?: string;
   name: string;
   email?: string;
@@ -160,6 +172,40 @@ export interface WorkspaceMembership {
   updatedAt: string;
 }
 
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  workspaceType: WorkspaceType;
+  inviterAccountId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviteeAccountId: string;
+  inviteeEmail: string;
+  status: "pending" | "accepted" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+  acceptedAt?: string;
+}
+
+export interface ProjectInvitation {
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  projectId: string;
+  projectName: string;
+  inviterAccountId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviteeAccountId: string;
+  inviteeEmail: string;
+  roles: ProjectMemberRole[];
+  status: "pending" | "accepted" | "cancelled";
+  createdAt: string;
+  updatedAt: string;
+  acceptedAt?: string;
+}
+
 export interface Account {
   id: string;
   workspaceId: string;
@@ -172,6 +218,7 @@ export interface Account {
 
 export interface DailyPlan {
   id: string;
+  workspaceId?: string;
   date: string;
   capacityPomodoros: number;
   committedTaskIds: string[];
@@ -197,6 +244,7 @@ export interface DailyReview {
 
 export interface FocusSession {
   id: string;
+  workspaceId?: string;
   taskId?: string;
   mode: SessionMode;
   duration: number;
@@ -212,6 +260,7 @@ export interface FocusSession {
 
 export interface WorkSession {
   id: string;
+  workspaceId?: string;
   taskId: string;
   executorMemberId?: string;
   focusSessionId: string;
@@ -226,6 +275,7 @@ export interface WorkSession {
 
 export interface ExecutionSignal {
   id: string;
+  workspaceId?: string;
   workSessionId: string;
   taskId: string;
   executorMemberId?: string;
@@ -236,6 +286,7 @@ export interface ExecutionSignal {
 
 export interface Interruption {
   id: string;
+  workspaceId?: string;
   sessionId?: string;
   taskId?: string;
   type: InterruptionType;
@@ -248,6 +299,7 @@ export interface Interruption {
 
 export interface BlockProfile {
   id: string;
+  workspaceId?: string;
   name: string;
   apps: string[];
   websites: string[];
@@ -380,6 +432,7 @@ export interface StrictCheckResult {
 
 export interface StrictViolation {
   id: string;
+  workspaceId?: string;
   sessionId?: string;
   taskId?: string;
   profileId?: string;
@@ -529,11 +582,12 @@ export interface NativeCapabilityState {
 export interface SyncTombstone {
   entity: string;
   id: string;
+  workspaceId?: string;
   deletedAt: string;
 }
 
 export interface SyncEntityAlias {
-  entity: "team_member" | "project_member";
+  entity: "project_member";
   id: string;
   canonicalId: string;
 }
@@ -582,6 +636,7 @@ export interface AuthState {
   workspace?: Workspace;
   membership?: WorkspaceMembership;
   workspaces?: Workspace[];
+  workspaceMemberships?: WorkspaceMembership[];
   bootstrapped?: boolean;
   message: string;
 }
@@ -591,9 +646,7 @@ export interface AppState {
   onboarding: Onboarding;
   settings: Settings;
   auth: AuthState;
-  currentMemberId?: string;
   projects: Project[];
-  teamMembers: TeamMember[];
   projectMembers: ProjectMember[];
   tasks: Task[];
   dailyPlans: DailyPlan[];

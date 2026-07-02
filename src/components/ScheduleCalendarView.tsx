@@ -1,8 +1,8 @@
 import { CalendarDays, ChevronLeft, ChevronRight, Eye } from "lucide-react";
 import { useMemo, useState } from "react";
-import { labelPriority, labelTaskStage, taskStageOptions } from "../appModel";
+import { labelPriority, labelTaskStage, taskStageOptionsForMode } from "../appModel";
 import { todayKey } from "../seed";
-import type { ProjectMember, Task } from "../types";
+import type { ProjectMember, Task, TaskStageMode } from "../types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS = 42;
@@ -102,6 +102,7 @@ export function ScheduleCalendarView(props: {
   todayTaskIds?: string[];
   title?: string;
   subtitle?: string;
+  taskStageMode?: TaskStageMode;
   embedded?: boolean;
   openTask: (taskId: string) => void;
 }) {
@@ -174,7 +175,7 @@ export function ScheduleCalendarView(props: {
           ))}
         </div>
 
-        {taskStageOptions.map((stage) => {
+        {taskStageOptionsForMode(props.taskStageMode ?? "software").map((stage) => {
           const stageTasks = scheduledTasks.filter((task) => task.stage === stage.value);
           const scheduleItems = buildScheduleItems(stageTasks, windowStart, WINDOW_DAYS);
           const laneCount = Math.max(1, scheduleItems.reduce((max, item) => Math.max(max, item.lane + 1), 0));

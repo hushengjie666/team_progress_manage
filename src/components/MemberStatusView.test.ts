@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { today } from "../appModel";
 import { createInitialState } from "../seed";
-import type { DailyPlan, Project, ProjectMember, Task } from "../types";
+import type { DailyPlan, Project, ProjectMember, Task, WorkspaceMembership } from "../types";
 import {
   buildMemberStatusColumns,
   buildMemberStatusPeople,
@@ -9,19 +9,19 @@ import {
 
 const timestamp = "2026-06-30T08:00:00.000Z";
 
-const project = (id: string, name: string): Project => ({
+const project = (id: string, name: string, overrides: Partial<Project> = {}): Project => ({
   id,
   name,
   description: "",
   defaultExpectedStartHours: 24,
   createdAt: timestamp,
   updatedAt: timestamp,
+  ...overrides,
 });
 
 const member = (overrides: Partial<ProjectMember> & Pick<ProjectMember, "id" | "projectId">): ProjectMember => ({
   id: overrides.id,
   projectId: overrides.projectId,
-  teamMemberId: overrides.teamMemberId,
   accountId: overrides.accountId ?? "account_hushengjie",
   name: overrides.name ?? "胡圣杰",
   email: overrides.email ?? "hushengjie@example.com",
@@ -73,17 +73,27 @@ const dailyPlan = (committedTaskIds: string[]): DailyPlan => ({
   updatedAt: timestamp,
 });
 
+const workspaceMembership = (overrides: Pick<WorkspaceMembership, "id" | "workspaceId" | "accountId" | "name" | "email"> & Partial<WorkspaceMembership>): WorkspaceMembership => ({
+  id: overrides.id,
+  workspaceId: overrides.workspaceId,
+  accountId: overrides.accountId,
+  name: overrides.name,
+  email: overrides.email,
+  role: overrides.role ?? "member",
+  status: overrides.status ?? "active",
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
 describe("member status view model", () => {
   it("merges the same account across projects even when team member ids differ", () => {
     const timeManageMember = member({
       id: "member_time_manage_owner",
       projectId: "project_time_manage",
-      teamMemberId: "team_member_time_manage",
     });
     const imageMember = member({
       id: "member_image_owner",
       projectId: "project_image",
-      teamMemberId: "team_member_image",
     });
 
     const people = buildMemberStatusPeople([timeManageMember, imageMember]);
@@ -100,12 +110,10 @@ describe("member status view model", () => {
     const timeManageMember = member({
       id: "member_time_manage_owner",
       projectId: timeManage.id,
-      teamMemberId: "team_member_time_manage",
     });
     const imageMember = member({
       id: "member_image_owner",
       projectId: imageRecognition.id,
-      teamMemberId: "team_member_image",
     });
     const timeManageTask = task({
       id: "task_time_manage",
@@ -145,13 +153,11 @@ describe("member status view model", () => {
     const timeManageMember = member({
       id: "member_time_manage_executor",
       projectId: timeManage.id,
-      teamMemberId: "team_member_time_manage",
       roles: ["executor"],
     });
     const imageMember = member({
       id: "member_image_owner",
       projectId: imageRecognition.id,
-      teamMemberId: "team_member_image",
       roles: ["project_owner", "executor"],
     });
     const timeManageTask = task({
@@ -191,7 +197,6 @@ describe("member status view model", () => {
     const imageMember = member({
       id: "member_image_owner",
       projectId: imageRecognition.id,
-      teamMemberId: "team_member_image",
     });
     const runningTask = task({
       id: "task_running",
@@ -223,5 +228,175 @@ describe("member status view model", () => {
     expect(columns).toHaveLength(1);
     expect(columns[0].displayedTasks.map((item) => item.id)).toEqual(["task_running", "task_completed"]);
     expect(columns[0].projectTaskGroups[0].tasks.map((item) => item.id)).toEqual(["task_running", "task_completed"]);
+  });
+
+  it("only shows other members' today tasks from projects the current account can access", () => {
+    const state = createInitialState();
+    const visibleWorkspace = {
+      id: "workspace_visible",
+      name: "消毒工作区",
+      type: "shared" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const hiddenWorkspace = {
+      id: "workspace_hidden",
+      name: "隐藏工作区",
+      type: "shared" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const visibleProject = project("project_visible", "消毒中心", { workspaceId: visibleWorkspace.id });
+    const hiddenProject = project("project_hidden", "隐藏项目", { workspaceId: hiddenWorkspace.id });
+    const currentMembership = workspaceMembership({
+      id: "workspace_member_current",
+      workspaceId: visibleWorkspace.id,
+      accountId: "account_current",
+      name: "胡圣杰",
+      email: "hushengjie@example.com",
+      role: "owner",
+    });
+    const otherVisibleMembership = workspaceMembership({
+      id: "workspace_member_other",
+      workspaceId: visibleWorkspace.id,
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo@example.com",
+    });
+    const visibleMember = member({
+      id: "member_wangshuo_visible",
+      projectId: visibleProject.id,
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      roles: ["executor"],
+    });
+    const hiddenMember = member({
+      id: "member_wangshuo_hidden",
+      projectId: hiddenProject.id,
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      roles: ["executor"],
+    });
+    const visibleTask = task({
+      id: "task_visible",
+      title: "处理消毒中心任务",
+      projectId: visibleProject.id,
+      project: visibleProject.name,
+      primaryExecutorMemberId: visibleMember.id,
+    });
+    const hiddenTask = task({
+      id: "task_hidden",
+      title: "处理隐藏项目任务",
+      projectId: hiddenProject.id,
+      project: hiddenProject.name,
+      primaryExecutorMemberId: hiddenMember.id,
+    });
+
+    const columns = buildMemberStatusColumns({
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        token: "token",
+        account: {
+          id: "account_current",
+          workspaceId: visibleWorkspace.id,
+          name: "胡圣杰",
+          email: "hushengjie@example.com",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        workspace: visibleWorkspace,
+        membership: currentMembership,
+        workspaces: [visibleWorkspace],
+        workspaceMemberships: [currentMembership, otherVisibleMembership],
+      },
+      projects: [visibleProject, hiddenProject],
+      projectMembers: [visibleMember, hiddenMember],
+      tasks: [visibleTask, hiddenTask],
+      dailyPlans: [dailyPlan([visibleTask.id, hiddenTask.id])],
+    });
+
+    const wangshuo = columns.find((column) => column.name === "王硕");
+
+    expect(wangshuo?.displayedTasks.map((item) => item.id)).toEqual(["task_visible"]);
+    expect(wangshuo?.projectTaskGroups.map((group) => group.projectName)).toEqual(["消毒中心"]);
+    expect(wangshuo?.projectTaskGroups.map((group) => group.workspaceName)).toEqual(["消毒工作区"]);
+  });
+
+  it("uses visible workspace team members when ordinary members cannot load workspace membership details", () => {
+    const state = createInitialState();
+    const privateWorkspace = {
+      id: "workspace_private_wangshuo",
+      name: "王硕的私人工作区",
+      type: "private" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const sharedWorkspace = {
+      id: "workspace_shared_disinfection",
+      name: "宁波团队出击",
+      type: "shared" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const hiddenWorkspace = {
+      id: "workspace_hidden",
+      name: "隐藏工作区",
+      type: "shared" as const,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const visibleProject = project("project_disinfection", "消毒中心", { workspaceId: sharedWorkspace.id });
+
+    const columns = buildMemberStatusColumns({
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        token: "token",
+        account: {
+          id: "account_wangshuo",
+          workspaceId: privateWorkspace.id,
+          name: "王硕",
+          email: "wangshuo@example.com",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        workspace: privateWorkspace,
+        workspaces: [privateWorkspace, sharedWorkspace],
+        workspaceMemberships: [
+          workspaceMembership({
+            id: "membership_hushengjie",
+            workspaceId: sharedWorkspace.id,
+            accountId: "account_hushengjie",
+            name: "胡圣杰",
+            email: "hushengjie@example.com",
+          }),
+          workspaceMembership({
+            id: "membership_wangshuo",
+            workspaceId: sharedWorkspace.id,
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo@example.com",
+          }),
+          workspaceMembership({
+            id: "membership_hidden",
+            workspaceId: hiddenWorkspace.id,
+            accountId: "account_hidden",
+            name: "隐藏成员",
+            email: "hidden@example.com",
+          }),
+        ],
+      },
+      projects: [visibleProject],
+      projectMembers: [],
+      tasks: [],
+      dailyPlans: [dailyPlan([])],
+    });
+
+    expect(columns.map((column) => column.name)).toEqual(["胡圣杰", "王硕"]);
   });
 });

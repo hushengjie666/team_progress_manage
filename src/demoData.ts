@@ -1,6 +1,6 @@
 import { createInitialState, todayKey } from "./seed";
 import { resolveMemberIdForProject, sameMemberIdentity } from "./memberIdentity";
-import type { AppState, DailyPlan, FocusSession, Interruption, ProjectMember, StrictViolation, Task } from "./types";
+import type { AppState, DailyPlan, FocusSession, Interruption, ProjectMember, StrictViolation, Task, TaskStage, TaskStageMode } from "./types";
 
 const demoProjectIdSuffix = (projectId: string) => projectId.replace(/[^a-zA-Z0-9_-]/g, "_");
 
@@ -21,6 +21,46 @@ const mapDemoSessionId = (sessionId: string | undefined, projectId: string) =>
   sessionId ? demoEntityIdForProject(sessionId, projectId) : undefined;
 
 const keepsTimeManageDemoLanguage = (projectName: string) => /timemanage/i.test(projectName) || projectName.includes("时间管理");
+
+const softwareToRegularStage: Record<TaskStage, TaskStage> = {
+  planning: "planning",
+  execution: "execution",
+  check: "check",
+  sales: "planning",
+  requirements: "planning",
+  design: "planning",
+  development: "execution",
+  testing: "check",
+  deployment: "execution",
+  acceptance: "check",
+};
+
+const regularToSoftwareStage: Record<TaskStage, TaskStage> = {
+  planning: "requirements",
+  execution: "development",
+  check: "testing",
+  sales: "sales",
+  requirements: "requirements",
+  design: "design",
+  development: "development",
+  testing: "testing",
+  deployment: "deployment",
+  acceptance: "acceptance",
+};
+
+const normalizeDemoTaskStage = (stage: TaskStage, mode: TaskStageMode): TaskStage =>
+  mode === "regular" ? softwareToRegularStage[stage] : regularToSoftwareStage[stage];
+
+const fallbackDemoTaskNotes = (task: Task, projectName: string) =>
+  `围绕${projectName}推进「${task.title}」，补齐背景、执行口径和验收要点，确保演示数据可以直接用于功能体验。`;
+
+const fallbackDemoTaskProgressNote = (task: Task) => {
+  if (task.status === "completed") return "演示任务已完成，用于展示历史完成记录和复盘效果。";
+  if (task.status === "in_progress") return "演示任务正在推进中，用于展示当前工作状态和进度变化。";
+  if (task.status === "committed") return "演示任务已进入今日队列，用于展示待执行任务。";
+  if (task.status === "pending_review") return "演示任务等待负责人验收。";
+  return "演示任务已进入任务池，可用于安排和分配。";
+};
 
 const targetProjectDemoTaskPatch = (task: Task, projectName: string): Partial<Task> => {
   if (keepsTimeManageDemoLanguage(projectName)) return {};
@@ -128,25 +168,30 @@ export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: stri
 
   const demo = createDemoState();
   const projectId = targetProject.id;
+  const workspaceId = targetProject.workspaceId ?? current.auth.workspace?.id;
+  const taskStageMode = targetProject.taskStageMode ?? "software";
   const mapTaskId = (taskId: string) => demoTaskIdForProject(taskId, projectId);
   const mapEntityId = (id: string) => demoEntityIdForProject(id, projectId);
   const actorMemberId = resolveMemberIdForProject(current, projectId);
   const targetExecutor = preferredDemoExecutorForProject(current, projectId, actorMemberId);
+  const targetExecutorMemberId = targetExecutor?.id ?? actorMemberId;
 
   const tasks = demo.tasks.map((task) => {
     const taskPatch = targetProjectDemoTaskPatch(task, targetProject.name);
+    const patchedTask = { ...task, ...taskPatch };
     return {
-      ...task,
-      ...taskPatch,
+      ...patchedTask,
       id: mapTaskId(task.id),
+      workspaceId,
       projectId,
       project: targetProject.name,
-      creatorMemberId: actorMemberId,
-      primaryExecutorMemberId:
-        task.status === "pool" || task.status === "completed"
-          ? task.primaryExecutorMemberId
-          : targetExecutor?.id ?? actorMemberId,
+      creatorMemberId: actorMemberId ?? targetExecutorMemberId,
+      primaryExecutorMemberId: targetExecutorMemberId,
       collaboratorMemberIds: [],
+      notes: patchedTask.notes.trim() || fallbackDemoTaskNotes(patchedTask, targetProject.name),
+      tags: patchedTask.tags.length ? patchedTask.tags : ["演示", "任务"],
+      stage: normalizeDemoTaskStage(patchedTask.stage, taskStageMode),
+      progressNote: (patchedTask.progressNote ?? "").trim() || fallbackDemoTaskProgressNote(patchedTask),
       subtasks: task.subtasks.map((subtask) => ({ ...subtask, id: mapEntityId(subtask.id) })),
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -156,11 +201,13 @@ export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: stri
   const focusSessions = demo.focusSessions.map((session) => ({
     ...session,
     id: mapEntityId(session.id),
+    workspaceId,
     taskId: mapDemoTaskId(session.taskId, projectId),
   }));
   const interruptions = demo.interruptions.map((interruption) => ({
     ...interruption,
     id: mapEntityId(interruption.id),
+    workspaceId,
     sessionId: mapDemoSessionId(interruption.sessionId, projectId),
     taskId: mapDemoTaskId(interruption.taskId, projectId),
     convertedTaskId: mapDemoTaskId(interruption.convertedTaskId, projectId),
@@ -168,12 +215,14 @@ export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: stri
   const strictViolations = demo.strictViolations.map((violation) => ({
     ...violation,
     id: mapEntityId(violation.id),
+    workspaceId,
     sessionId: mapDemoSessionId(violation.sessionId, projectId),
     taskId: mapDemoTaskId(violation.taskId, projectId),
   }));
   const demoPlans = demo.dailyPlans.map((plan) => ({
     ...plan,
     id: mapEntityId(plan.id),
+    workspaceId,
     committedTaskIds: plan.committedTaskIds.map(mapTaskId),
     suggestedTaskIds: plan.suggestedTaskIds.map(mapTaskId),
     createdAt: timestamp,
@@ -294,7 +343,7 @@ export const createDemoState = (): AppState => {
     makeTask({
       id: "demo_task_today_sync",
       title: "验证本地团队后台",
-      notes: "在设置页登录 demo/demo，确认推送、拉取和冲突提示是否能跑通。",
+      notes: "在设置页输入团队后台账号密码，确认推送、拉取和冲突提示是否能跑通。",
       tags: ["同步", "验收"],
       project: "TimeManage",
       priority: "high",

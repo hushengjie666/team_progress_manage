@@ -1,12 +1,14 @@
 import { uid } from "./seed";
 import { endActiveWorkSessionsForTaskInState } from "./workSessionTransitions";
 import { compareProjectsForOverview } from "./projectOverview";
-import type { AppState, Project, ProjectMember, ProjectMemberRole, Task, TeamMember } from "./types";
+import type { AppState, Project, ProjectMember, ProjectMemberRole, Task, TaskStageMode } from "./types";
 
 type IdFactory = (prefix: string) => string;
 
 const cleanRoles = (roles: ProjectMemberRole[]): ProjectMemberRole[] =>
   roles.filter((role, index) => roles.indexOf(role) === index);
+
+const normalizedEmail = (email?: string) => email?.trim().toLowerCase();
 
 export const clampProgressPercent = (value?: number) => {
   if (!Number.isFinite(value)) return 0;
@@ -25,49 +27,37 @@ export function createProjectInState(
   description: string,
   timestamp = new Date().toISOString(),
   idFactory: IdFactory = uid,
-  owner?: { accountId?: string; name?: string; email?: string },
+  owner?: { accountId?: string; name?: string; email?: string; workspaceId?: string; taskStageMode?: TaskStageMode },
 ): AppState {
   const projectId = idFactory("project");
   const memberId = idFactory("member");
-  const existingTeamMember = owner?.accountId
-    ? state.teamMembers.find((member) => member.accountId === owner.accountId)
-    : owner?.email
-      ? state.teamMembers.find((member) => member.email?.toLowerCase() === owner.email?.toLowerCase())
-      : undefined;
-  const teamMemberId = existingTeamMember?.id ?? idFactory("team_member");
-  const teamMember: TeamMember = existingTeamMember ?? {
-    id: teamMemberId,
-    accountId: owner?.accountId,
-    name: owner?.name?.trim() || "项目负责人",
-    email: owner?.email?.trim() || undefined,
-    status: "active",
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
+  const workspaceId = owner?.workspaceId ?? state.auth.workspace?.id ?? state.projects[0]?.workspaceId;
+  const ownerName = owner?.name?.trim() || state.auth.account?.name || "项目负责人";
+  const ownerEmail = owner?.email?.trim() || state.auth.account?.email;
   return {
     ...state,
-    currentMemberId: memberId,
     projects: [
       {
         id: projectId,
+        workspaceId,
         name: name.trim() || "新项目",
         description: description.trim(),
         defaultExpectedStartHours: 24,
+        taskStageMode: owner?.taskStageMode ?? "regular",
         sortOrder: nextProjectSortOrder(state.projects),
         createdAt: timestamp,
         updatedAt: timestamp,
       },
       ...state.projects,
     ],
-    teamMembers: existingTeamMember ? state.teamMembers : [teamMember, ...state.teamMembers],
     projectMembers: [
       {
         id: memberId,
+        workspaceId,
         projectId,
-        teamMemberId,
-        accountId: teamMember.accountId,
-        name: teamMember.name,
-        email: teamMember.email,
+        accountId: owner?.accountId ?? state.auth.account?.id,
+        name: ownerName,
+        email: ownerEmail,
         roles: ["project_owner", "executor"],
         status: "active",
         createdAt: timestamp,
@@ -79,158 +69,91 @@ export function createProjectInState(
   };
 }
 
-export function createTeamMemberInState(
-  state: AppState,
-  name: string,
-  email: string,
-  timestamp = new Date().toISOString(),
-  idFactory: IdFactory = uid,
-  accountId?: string,
-): AppState {
-  const normalizedEmail = email.trim();
-  const existing = state.teamMembers.find(
-    (member) =>
-      (accountId && member.accountId === accountId) ||
-      (normalizedEmail && member.email?.toLowerCase() === normalizedEmail.toLowerCase()),
-  );
-  if (existing) {
-    return updateTeamMemberInState(state, {
-      ...existing,
-      accountId: existing.accountId ?? accountId,
-      name: name.trim() || existing.name,
-      email: normalizedEmail || existing.email,
-      status: "active",
-    }, timestamp);
-  }
+export function updateProjectInState(state: AppState, project: Project, timestamp = new Date().toISOString(), _idFactory: IdFactory = uid): AppState {
+  const existingProject = state.projects.find((item) => item.id === project.id);
+  const previousWorkspaceId = existingProject?.workspaceId ?? state.auth.workspace?.id;
+  const nextWorkspaceId = project.workspaceId;
+  const workspaceChanged = Boolean(existingProject && previousWorkspaceId !== nextWorkspaceId);
+  const projectTaskIds = new Set(state.tasks.filter((task) => task.projectId === project.id).map((task) => task.id));
+  const movedProjectMemberIds = state.projectMembers.filter((member) => member.projectId === project.id).map((member) => member.id);
+  const movedWorkSessionIds = state.workSessions.filter((session) => projectTaskIds.has(session.taskId)).map((session) => session.id);
+  const movedExecutionSignalIds = state.executionSignals.filter((signal) => projectTaskIds.has(signal.taskId)).map((signal) => signal.id);
+  const movedFocusSessionIds = state.focusSessions.filter((session) => session.taskId && projectTaskIds.has(session.taskId)).map((session) => session.id);
+  const movedInterruptionIds = state.interruptions.filter((interruption) => interruption.taskId && projectTaskIds.has(interruption.taskId)).map((interruption) => interruption.id);
+  const movedStrictViolationIds = state.strictViolations.filter((violation) => violation.taskId && projectTaskIds.has(violation.taskId)).map((violation) => violation.id);
+  const movedEntityTombstones = workspaceChanged && previousWorkspaceId
+    ? [
+        { entity: "project" as const, id: project.id, workspaceId: previousWorkspaceId, deletedAt: timestamp },
+        ...Array.from(projectTaskIds).map((id) => ({ entity: "task" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedProjectMemberIds.map((id) => ({ entity: "project_member" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedWorkSessionIds.map((id) => ({ entity: "work_session" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedExecutionSignalIds.map((id) => ({ entity: "execution_signal" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedFocusSessionIds.map((id) => ({ entity: "focus_session" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedInterruptionIds.map((id) => ({ entity: "interruption" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+        ...movedStrictViolationIds.map((id) => ({ entity: "strict_violation" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
+      ]
+    : [];
   return {
     ...state,
-    teamMembers: [
-      {
-        id: idFactory("team_member"),
-        accountId,
-        name: name.trim() || "新成员",
-        email: normalizedEmail || undefined,
-        status: "active",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      },
-      ...state.teamMembers,
-    ],
-    updatedAt: timestamp,
-  };
-}
-
-export function updateTeamMemberInState(state: AppState, teamMember: TeamMember, timestamp = new Date().toISOString()): AppState {
-  const updatedTeamMember = { ...teamMember, status: teamMember.status ?? "active", updatedAt: timestamp };
-  return {
-    ...state,
-    teamMembers: state.teamMembers.map((item) => (item.id === teamMember.id ? updatedTeamMember : item)),
+    projects: state.projects.map((item) => (item.id === project.id ? { ...project, updatedAt: timestamp } : item)),
     projectMembers: state.projectMembers.map((member) =>
-      member.teamMemberId === teamMember.id
+      workspaceChanged && member.projectId === project.id
         ? {
             ...member,
-            accountId: updatedTeamMember.accountId ?? member.accountId,
-            name: updatedTeamMember.name,
-            email: updatedTeamMember.email,
-            status: updatedTeamMember.status,
+            workspaceId: nextWorkspaceId,
+            accountId: member.accountId,
+            name: member.name,
+            email: member.email,
+            status: member.status ?? "active",
             updatedAt: timestamp,
           }
         : member,
     ),
-    updatedAt: timestamp,
-  };
-}
-
-export function deleteTeamMemberInState(state: AppState, teamMemberId: string, timestamp = new Date().toISOString()): AppState {
-  const targetMember = state.teamMembers.find((member) => member.id === teamMemberId);
-  const normalizedEmail = targetMember?.email?.trim().toLowerCase();
-  const deletedTeamMemberIds = new Set<string>([teamMemberId]);
-  const teamMemberAliases = state.sync.entityAliases?.filter((alias) => alias.entity === "team_member") ?? [];
-  let changed = true;
-  while (changed) {
-    changed = false;
-    teamMemberAliases.forEach((alias) => {
-      if (deletedTeamMemberIds.has(alias.id) && !deletedTeamMemberIds.has(alias.canonicalId)) {
-        deletedTeamMemberIds.add(alias.canonicalId);
-        changed = true;
-      }
-      if (deletedTeamMemberIds.has(alias.canonicalId) && !deletedTeamMemberIds.has(alias.id)) {
-        deletedTeamMemberIds.add(alias.id);
-        changed = true;
-      }
-    });
-  }
-  state.teamMembers.forEach((member) => {
-    if (targetMember?.accountId && member.accountId === targetMember.accountId) deletedTeamMemberIds.add(member.id);
-    if (normalizedEmail && member.email?.trim().toLowerCase() === normalizedEmail) deletedTeamMemberIds.add(member.id);
-  });
-  const matchesDeletedIdentity = (member: { teamMemberId?: string; accountId?: string; email?: string }) =>
-    Boolean(
-      (member.teamMemberId && deletedTeamMemberIds.has(member.teamMemberId)) ||
-      (targetMember?.accountId && member.accountId === targetMember.accountId) ||
-      (normalizedEmail && member.email?.trim().toLowerCase() === normalizedEmail),
-    );
-  const deletedProjectMembers = state.projectMembers.filter(matchesDeletedIdentity);
-  const deletedProjectMemberIds = new Set(deletedProjectMembers.map((member) => member.id));
-  const projectMemberAliases = state.sync.entityAliases?.filter((alias) => alias.entity === "project_member") ?? [];
-  changed = true;
-  while (changed) {
-    changed = false;
-    projectMemberAliases.forEach((alias) => {
-      if (deletedProjectMemberIds.has(alias.id) && !deletedProjectMemberIds.has(alias.canonicalId)) {
-        deletedProjectMemberIds.add(alias.canonicalId);
-        changed = true;
-      }
-      if (deletedProjectMemberIds.has(alias.canonicalId) && !deletedProjectMemberIds.has(alias.id)) {
-        deletedProjectMemberIds.add(alias.id);
-        changed = true;
-      }
-    });
-  }
-  const projectMembers = state.projectMembers.filter((member) => !deletedProjectMemberIds.has(member.id) && !matchesDeletedIdentity(member));
-  return {
-    ...state,
-    teamMembers: state.teamMembers.filter((member) => !deletedTeamMemberIds.has(member.id)),
-    projectMembers,
-    currentMemberId: state.currentMemberId && deletedProjectMemberIds.has(state.currentMemberId) ? projectMembers[0]?.id : state.currentMemberId,
-    tasks: state.tasks.map((task) => ({
-      ...task,
-      creatorMemberId: task.creatorMemberId && deletedProjectMemberIds.has(task.creatorMemberId) ? undefined : task.creatorMemberId,
-      primaryExecutorMemberId: task.primaryExecutorMemberId && deletedProjectMemberIds.has(task.primaryExecutorMemberId)
-        ? undefined
-        : task.primaryExecutorMemberId,
-      collaboratorMemberIds: task.collaboratorMemberIds?.filter((id) => !deletedProjectMemberIds.has(id)) ?? [],
-      updatedAt:
-        (task.creatorMemberId && deletedProjectMemberIds.has(task.creatorMemberId)) ||
-        (task.primaryExecutorMemberId && deletedProjectMemberIds.has(task.primaryExecutorMemberId)) ||
-        task.collaboratorMemberIds?.some((id) => deletedProjectMemberIds.has(id))
-          ? timestamp
-          : task.updatedAt,
-    })),
+    tasks: state.tasks.map((task) =>
+      task.projectId === project.id
+        ? {
+            ...task,
+            workspaceId: nextWorkspaceId,
+            project: project.name,
+            updatedAt:
+              workspaceChanged || task.project !== project.name
+                ? timestamp
+                : task.updatedAt,
+        }
+        : task,
+    ),
+    workSessions: state.workSessions.map((session) =>
+      workspaceChanged && projectTaskIds.has(session.taskId)
+        ? { ...session, workspaceId: nextWorkspaceId, updatedAt: timestamp }
+        : session,
+    ),
+    executionSignals: state.executionSignals.map((signal) =>
+      workspaceChanged && projectTaskIds.has(signal.taskId)
+        ? { ...signal, workspaceId: nextWorkspaceId }
+        : signal,
+    ),
+    focusSessions: state.focusSessions.map((session) =>
+      workspaceChanged && session.taskId && projectTaskIds.has(session.taskId)
+        ? { ...session, workspaceId: nextWorkspaceId }
+        : session,
+    ),
+    interruptions: state.interruptions.map((interruption) =>
+      workspaceChanged && interruption.taskId && projectTaskIds.has(interruption.taskId)
+        ? { ...interruption, workspaceId: nextWorkspaceId }
+        : interruption,
+    ),
+    strictViolations: state.strictViolations.map((violation) =>
+      workspaceChanged && violation.taskId && projectTaskIds.has(violation.taskId)
+        ? { ...violation, workspaceId: nextWorkspaceId }
+        : violation,
+    ),
     sync: {
       ...state.sync,
       tombstones: [
-        ...(state.sync.tombstones ?? []).filter(
-          (item) =>
-            !(item.entity === "team_member" && deletedTeamMemberIds.has(item.id)) &&
-            !(item.entity === "project_member" && deletedProjectMemberIds.has(item.id)),
-        ),
-        ...Array.from(deletedTeamMemberIds).map((id) => ({ entity: "team_member" as const, id, deletedAt: timestamp })),
-        ...Array.from(deletedProjectMemberIds).map((id) => ({ entity: "project_member" as const, id, deletedAt: timestamp })),
+        ...(state.sync.tombstones ?? []),
+        ...movedEntityTombstones,
       ],
-      entityAliases: state.sync.entityAliases?.filter((alias) => {
-        if (alias.entity === "team_member") return !deletedTeamMemberIds.has(alias.id) && !deletedTeamMemberIds.has(alias.canonicalId);
-        return !deletedProjectMemberIds.has(alias.id) && !deletedProjectMemberIds.has(alias.canonicalId);
-      }),
     },
-    updatedAt: timestamp,
-  };
-}
-
-export function updateProjectInState(state: AppState, project: Project, timestamp = new Date().toISOString()): AppState {
-  return {
-    ...state,
-    projects: state.projects.map((item) => (item.id === project.id ? { ...project, updatedAt: timestamp } : item)),
     updatedAt: timestamp,
   };
 }
@@ -259,30 +182,49 @@ export function reorderProjectsInState(state: AppState, orderedProjectIds: strin
   return changed ? { ...state, projects, updatedAt: timestamp } : state;
 }
 
-export function bindTeamMemberToProjectInState(
+export function addProjectMemberToState(
   state: AppState,
   projectId: string,
-  teamMemberId: string,
+  name: string,
+  email: string,
   roles: ProjectMemberRole[],
   timestamp = new Date().toISOString(),
   idFactory: IdFactory = uid,
+  identity: { accountId?: string; workspaceId?: string } = {},
 ): AppState {
-  const teamMember = state.teamMembers.find((member) => member.id === teamMemberId);
-  if (!teamMember) return state;
-  const existing = state.projectMembers.find((member) => member.projectId === projectId && member.teamMemberId === teamMemberId);
+  const project = state.projects.find((item) => item.id === projectId);
+  const workspaceId = project?.workspaceId ?? identity.workspaceId ?? state.auth.workspace?.id;
+  const normalizedName = name.trim() || "新成员";
+  const normalizedMemberEmail = email.trim() || undefined;
+  const existing = state.projectMembers.find(
+    (member) =>
+      member.projectId === projectId &&
+      member.status !== "disabled" &&
+      (
+        (identity.accountId && member.accountId === identity.accountId) ||
+        (normalizedMemberEmail && normalizedEmail(member.email) === normalizedEmail(normalizedMemberEmail)) ||
+        member.name === normalizedName
+      ),
+  );
   if (existing) {
-    return updateProjectMemberInState(state, { ...existing, roles, status: "active" }, timestamp);
+    return updateProjectMemberInState(state, {
+      ...existing,
+      name: normalizedName,
+      email: normalizedMemberEmail ?? existing.email,
+      roles,
+      status: "active",
+    }, timestamp);
   }
   return {
     ...state,
     projectMembers: [
       {
         id: idFactory("member"),
+        workspaceId,
         projectId,
-        teamMemberId,
-        accountId: teamMember.accountId,
-        name: teamMember.name,
-        email: teamMember.email,
+        accountId: identity.accountId,
+        name: normalizedName,
+        email: normalizedMemberEmail,
         roles: cleanRoles(roles).length ? cleanRoles(roles) : ["executor"],
         status: "active",
         createdAt: timestamp,
@@ -294,33 +236,16 @@ export function bindTeamMemberToProjectInState(
   };
 }
 
-export function addProjectMemberToState(
-  state: AppState,
-  projectId: string,
-  name: string,
-  email: string,
-  roles: ProjectMemberRole[],
-  timestamp = new Date().toISOString(),
-  idFactory: IdFactory = uid,
-): AppState {
-  const withTeamMember = createTeamMemberInState(state, name, email, timestamp, idFactory);
-  const created = withTeamMember.teamMembers.find(
-    (member) => (email.trim() && member.email?.toLowerCase() === email.trim().toLowerCase()) || member.name === (name.trim() || "新成员"),
-  ) ?? withTeamMember.teamMembers[0];
-  return bindTeamMemberToProjectInState(withTeamMember, projectId, created.id, roles, timestamp, idFactory);
-}
-
 export function updateProjectMemberInState(state: AppState, member: ProjectMember, timestamp = new Date().toISOString()): AppState {
-  const teamMember = member.teamMemberId ? state.teamMembers.find((item) => item.id === member.teamMemberId) : undefined;
   return {
     ...state,
     projectMembers: state.projectMembers.map((item) =>
       item.id === member.id
         ? {
             ...member,
-            accountId: teamMember?.accountId ?? member.accountId,
-            name: teamMember?.name ?? member.name,
-            email: teamMember?.email ?? member.email,
+            accountId: member.accountId,
+            name: member.name,
+            email: member.email,
             roles: cleanRoles(member.roles).length ? cleanRoles(member.roles) : ["executor"],
             status: member.status ?? "active",
             updatedAt: timestamp,
@@ -377,6 +302,7 @@ export function assignTaskInState(
       task.id === taskId
         ? {
             ...task,
+            workspaceId: project.workspaceId ?? task.workspaceId,
             projectId: project.id,
             project: project.name,
             primaryExecutorMemberId,

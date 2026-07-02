@@ -1,12 +1,32 @@
-import { emptyTaskDefaults, nowIso, priorityWeight } from "./appModel";
+import { defaultTaskStageForMode, emptyTaskDefaults, nowIso, priorityWeight } from "./appModel";
+import {
+  accessibleProjectIdsForCurrentUser,
+  buildAccessibleProjectMembers,
+  canReviewProjectTasks,
+  resolveProjectMemberForAccount,
+  type ProjectAccessibleMember,
+} from "./accessControl";
 import { resolveMemberForProject, resolveMemberIdForProject } from "./memberIdentity";
 import { buildProgressBoard } from "./progressBoard";
 import { uid } from "./seed";
-import type { AppState, Priority, ProjectMember, RepeatRule, Severity, Task, TaskStage, TaskStatus } from "./types";
+import type {
+  AppState,
+  Priority,
+  ProjectMember,
+  ProjectMemberRole,
+  RepeatRule,
+  Severity,
+  Task,
+  TaskStage,
+  TaskStatus,
+} from "./types";
 
 type IdFactory = (prefix: string) => string;
 
 const projectTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
+
+export type { ProjectAccessibleMember };
+export { buildAccessibleProjectMembers };
 
 export type ProjectAccess = {
   canView: boolean;
@@ -122,9 +142,13 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
 
   const access = projectAccessForCurrentMember(state, project.id);
   const projectMembers = state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled");
-  const projectTeamMemberIds = new Set(projectMembers.map((member) => member.teamMemberId).filter((id): id is string => Boolean(id)));
-  const activeTeamMembers = state.teamMembers.filter((member) => member.status !== "disabled");
-  const addableTeamMembers = activeTeamMembers.filter((member) => !projectTeamMemberIds.has(member.id));
+  const projectWorkspaceId = project.workspaceId ?? state.auth.workspace?.id;
+  const workspace = projectWorkspaceId
+    ? state.auth.workspaces?.find((item) => item.id === projectWorkspaceId) ?? (state.auth.workspace?.id === projectWorkspaceId ? state.auth.workspace : undefined)
+    : undefined;
+  const accessibleProjectMembers = buildAccessibleProjectMembers(state, projectMembers, projectWorkspaceId);
+  const accessibleMemberCount = accessibleProjectMembers.length;
+  const accessibleExecutorCount = accessibleProjectMembers.filter((member) => member.roles.includes("executor")).length;
   const executors = projectMembers.filter((member) => member.roles.includes("executor"));
   const allProjectTasks = projectTasksForProject(state, project.id);
   const overviewTasks = allProjectTasks.filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived");
@@ -149,18 +173,18 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
     return acc;
   }, { pool: 0, committed: 0, in_progress: 0, pending_review: 0, completed: 0, split: 0, archived: 0 });
   const memberOverviewStats = [
-    { label: "项目成员", value: projectMembers.length, helper: "已绑定成员" },
+    { label: "项目成员", value: accessibleMemberCount, helper: "有权访问项目" },
     { label: "项目负责人", value: projectMembers.filter((member) => member.roles.includes("project_owner")).length, helper: "负责验收与成员维护" },
-    { label: "执行者", value: executors.length, helper: "可承接任务" },
+    { label: "执行者", value: accessibleExecutorCount, helper: "可承接任务" },
     { label: "待验收", value: taskCounts.pending_review, helper: "等待负责人确认" },
   ];
 
   return {
     project,
+    workspace,
     access,
     projectMembers,
-    activeTeamMembers,
-    addableTeamMembers,
+    accessibleProjectMembers,
     executors,
     allProjectTasks,
     overviewTasks,
@@ -172,6 +196,7 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
     riskSections,
     riskTaskCount,
     taskCounts,
+    accessibleMemberCount,
     memberOverviewStats,
   };
 };
@@ -254,11 +279,12 @@ export const projectAccessForCurrentMember = (state: AppState, projectId: string
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return { canView: false, canEditTasks: false, canReviewTasks: false };
 
-  const member = resolveMemberForProject(state, projectId);
+  const canView = accessibleProjectIdsForCurrentUser(state).has(projectId);
+  const member = resolveProjectMemberForAccount(state, projectId) ?? resolveMemberForProject(state, projectId);
   return {
-    canView: true,
-    canEditTasks: true,
-    canReviewTasks: true,
+    canView,
+    canEditTasks: canView,
+    canReviewTasks: canReviewProjectTasks(state, projectId),
     memberName: member?.name,
   };
 };
@@ -276,6 +302,7 @@ export const createProjectTaskInState = (
 
   const task: Task = {
     id: idFactory("task"),
+    workspaceId: project.workspaceId ?? state.auth.workspace?.id,
     title,
     notes: input.notes?.trim() ?? "",
     tags: input.tags ?? [],
@@ -288,7 +315,7 @@ export const createProjectTaskInState = (
     expectedFinishAt: input.expectedFinishAt,
     priority: input.priority ?? "medium",
     severity: input.severity ?? "medium",
-    stage: input.stage ?? "requirements",
+    stage: input.stage ?? defaultTaskStageForMode(project.taskStageMode ?? "software"),
     estimatePomodoros: input.estimateHours !== undefined
       ? estimateHoursToPomodoros(input.estimateHours, state.settings.focusMinutes)
       : Math.max(1, Math.round(input.estimatePomodoros ?? 1)),

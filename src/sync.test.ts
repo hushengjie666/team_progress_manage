@@ -10,9 +10,10 @@ import {
   switchWorkspace,
   syncableStateFingerprint,
   syncAppState,
+  updateWorkspace,
   type SyncRow,
 } from "./sync";
-import type { AppState, ExecutionSignal, Project, ProjectMember, Task, TeamMember, WorkSession } from "./types";
+import type { AppState, ExecutionSignal, Project, ProjectMember, Task, WorkSession } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
@@ -79,7 +80,6 @@ const teamState = (): AppState => {
     sync: { ...state.sync, deviceId: "device_local", token: "token" },
     projects: [project],
     projectMembers: [member],
-    currentMemberId: member.id,
     tasks: [task],
     workSessions: [workSession],
     executionSignals: [signal],
@@ -203,30 +203,47 @@ describe("team progress sync", () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({ name: "新协作区", type: "shared", device_id: "device_test" });
   });
 
-  it("deduplicates pulled team members by login identity", () => {
+  it("patches workspace name, type, and owner", async () => {
+    const sync = { ...createInitialState().sync, serverUrl: "http://127.0.0.1:8787", deviceId: "device_test" };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        workspace: {
+          id: "workspace_shared",
+          name: "私人事项",
+          type: "private",
+          owner_account_id: "account_owner",
+          created_at: "2026-07-01T08:00:00Z",
+          updated_at: "2026-07-01T09:00:00Z",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const workspace = await updateWorkspace(sync, "token_current", "workspace_shared", {
+      name: "私人事项",
+      type: "private",
+      ownerAccountId: "account_owner",
+    });
+
+    expect(workspace).toMatchObject({ id: "workspace_shared", name: "私人事项", type: "private" });
+    expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:8787/workspaces/workspace_shared");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("PATCH");
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toMatchObject({
+      name: "私人事项",
+      type: "private",
+      owner_account_id: "account_owner",
+    });
+  });
+
+  it("ignores legacy pulled team member rows", () => {
     const base = createInitialState();
-    const existingMember: TeamMember = {
-      id: "team_member_wangshuo",
-      accountId: "account_wangshuo",
-      name: "王硕",
-      email: "wangshuo",
-      status: "active",
-      createdAt: iso("2026-06-18T09:00:00Z"),
-      updatedAt: iso("2026-06-18T09:00:00Z"),
-    };
-    const duplicateMember: TeamMember = {
-      ...existingMember,
-      id: "team_member_duplicate",
-      accountId: undefined,
-      updatedAt: iso("2026-06-18T10:00:00Z"),
-    };
     const projectMember: ProjectMember = {
       ...base.projectMembers[0],
       id: "project_member_wangshuo",
-      teamMemberId: existingMember.id,
-      accountId: existingMember.accountId,
-      name: existingMember.name,
-      email: existingMember.email,
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo",
       roles: ["executor"],
       updatedAt: iso("2026-06-18T09:05:00Z"),
     };
@@ -234,64 +251,136 @@ describe("team progress sync", () => {
     const merged = mergeRowsIntoState(
       {
         ...base,
-        teamMembers: [existingMember],
         projectMembers: [projectMember],
-        currentMemberId: projectMember.id,
         updatedAt: iso("2026-06-18T09:10:00Z"),
       },
       [
         row({
-          entity: "team_member",
-          id: duplicateMember.id,
-          updated_at: duplicateMember.updatedAt,
-          payload: duplicateMember,
+          entity: "team_member" as SyncRow["entity"],
+          id: "team_member_legacy_wangshuo",
+          updated_at: iso("2026-06-18T10:00:00Z"),
+          payload: {
+            id: "team_member_legacy_wangshuo",
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo",
+            status: "active",
+            createdAt: iso("2026-06-18T09:00:00Z"),
+            updatedAt: iso("2026-06-18T10:00:00Z"),
+          } as unknown as SyncRow["payload"],
           revision: 50,
         }),
       ],
       50,
     );
 
-    expect(merged.teamMembers.filter((member) => member.email?.toLowerCase() === "wangshuo")).toHaveLength(1);
-    expect(merged.teamMembers[0]).toMatchObject({ id: existingMember.id, accountId: existingMember.accountId });
-    expect(merged.projectMembers[0].teamMemberId).toBe(existingMember.id);
+    expect(merged.projectMembers).toHaveLength(1);
+    expect(merged.projectMembers[0]).toMatchObject({
+      id: "project_member_wangshuo",
+      accountId: "account_wangshuo",
+      email: "wangshuo",
+    });
+    expect(merged.projectMembers[0]).not.toHaveProperty("teamMemberId");
   });
 
-  it("deduplicates team members when a full synced snapshot is merged back into the latest state", () => {
+  it("injects workspace ids from pulled team rows", () => {
+    const base = createInitialState();
+    const merged = mergeRowsIntoState(
+      base,
+      [
+        row({
+          workspace_id: "workspace_shared",
+          entity: "project",
+          id: "project_remote",
+          updated_at: iso("2026-07-01T08:00:00Z"),
+          payload: {
+            id: "project_remote",
+            name: "远端项目",
+            description: "",
+            defaultExpectedStartHours: 24,
+            createdAt: iso("2026-07-01T08:00:00Z"),
+            updatedAt: iso("2026-07-01T08:00:00Z"),
+          },
+        }),
+      ],
+      1,
+      { forceRemote: true },
+    );
+
+    expect(merged.projects.find((project) => project.id === "project_remote")?.workspaceId).toBe("workspace_shared");
+  });
+
+  it("emits workspace ids for project-scoped changes", () => {
+    const state = teamState();
+    const workspaceId = "workspace_shared";
+    const withWorkspace: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        workspace: {
+          id: "workspace_private_account_sync",
+          name: "私人工作区",
+          type: "private",
+          ownerAccountId: "account_sync",
+          createdAt: state.updatedAt,
+          updatedAt: state.updatedAt,
+        },
+        workspaces: [
+          {
+            id: "workspace_private_account_sync",
+            name: "私人工作区",
+            type: "private",
+            ownerAccountId: "account_sync",
+            createdAt: state.updatedAt,
+            updatedAt: state.updatedAt,
+          },
+          {
+            id: workspaceId,
+            name: "协作区",
+            type: "shared",
+            ownerAccountId: "account_sync",
+            createdAt: state.updatedAt,
+            updatedAt: state.updatedAt,
+          },
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+    };
+
+    const changes = flattenStateToChanges(withWorkspace);
+
+    expect(changes.find((change) => change.entity === "project" && change.id === "project_sync")?.workspace_id).toBe(workspaceId);
+    expect(changes.find((change) => change.entity === "task" && change.id === "task_sync")?.workspace_id).toBe(workspaceId);
+    expect(changes.find((change) => change.entity === "work_session" && change.id === "work_session_sync")?.workspace_id).toBe(workspaceId);
+    expect(changes.find((change) => change.entity === "execution_signal" && change.id === "signal_sync")?.workspace_id).toBe(workspaceId);
+  });
+
+  it("deduplicates project members when a full synced snapshot is merged back into the latest state", () => {
     const source = teamState();
-    const existingMember: TeamMember = {
-      id: "team_member_owner_a",
-      accountId: "account_owner_a",
-      name: "项目负责人",
-      email: "owner@example.com",
-      status: "active",
-      createdAt: iso("2026-06-18T09:00:00Z"),
-      updatedAt: iso("2026-06-18T09:00:00Z"),
-    };
-    const duplicateMember: TeamMember = {
-      ...existingMember,
-      id: "team_member_owner_b",
-      accountId: undefined,
-      updatedAt: iso("2026-06-18T09:30:00Z"),
-    };
     const projectMember: ProjectMember = {
       ...source.projectMembers[0],
-      teamMemberId: existingMember.id,
-      accountId: existingMember.accountId,
-      email: existingMember.email,
-      name: existingMember.name,
+      id: "project_member_owner_a",
+      accountId: "account_owner_a",
+      email: "owner@example.com",
+      name: "项目负责人",
       roles: ["executor"],
+      updatedAt: iso("2026-06-18T09:00:00Z"),
+    };
+    const duplicateProjectMember: ProjectMember = {
+      ...projectMember,
+      id: "project_member_owner_b",
+      updatedAt: iso("2026-06-18T09:30:00Z"),
     };
     const synced = {
       ...source,
-      teamMembers: [existingMember, duplicateMember],
-      projectMembers: [projectMember],
+      projectMembers: [projectMember, duplicateProjectMember],
       updatedAt: iso("2026-06-18T09:35:00Z"),
     };
 
     const merged = mergeSyncedStateIntoLatest(source, source, synced);
 
-    expect(merged.teamMembers.filter((member) => member.email?.toLowerCase() === "owner@example.com")).toHaveLength(1);
-    expect(merged.projectMembers[0].teamMemberId).toBe(existingMember.id);
+    expect(merged.projectMembers.filter((member) => member.email?.toLowerCase() === "owner@example.com")).toHaveLength(1);
+    expect(merged.projectMembers[0]).toMatchObject({ id: "project_member_owner_b", accountId: "account_owner_a" });
   });
 
   it("represents team progress entities in push payloads", () => {
@@ -812,6 +901,53 @@ describe("team progress sync", () => {
     );
 
     expect(merged.onboarding.completed).toBe(true);
+  });
+
+  it("keeps moved workspace rows when old workspace tombstones are pulled later", () => {
+    const base = teamState();
+    const sourceWorkspaceId = "workspace_source";
+    const targetWorkspaceId = "workspace_target";
+    const movedProject: Project = {
+      ...base.projects[0],
+      workspaceId: targetWorkspaceId,
+      updatedAt: iso("2026-07-02T09:10:00Z"),
+    };
+    const movedMember: ProjectMember = {
+      ...base.projectMembers[0],
+      workspaceId: targetWorkspaceId,
+      projectId: movedProject.id,
+      updatedAt: iso("2026-07-02T09:11:00Z"),
+    };
+    const movedTask: Task = {
+      ...base.tasks[0],
+      workspaceId: targetWorkspaceId,
+      projectId: movedProject.id,
+      project: movedProject.name,
+      primaryExecutorMemberId: movedMember.id,
+      updatedAt: iso("2026-07-02T09:12:00Z"),
+    };
+    const state: AppState = {
+      ...base,
+      projects: [],
+      projectMembers: [],
+      tasks: [],
+      workSessions: [],
+      executionSignals: [],
+    };
+    const rows: SyncRow[] = [
+      row({ workspace_id: targetWorkspaceId, entity: "project", id: movedProject.id, updated_at: movedProject.updatedAt, payload: movedProject, revision: 40 }),
+      row({ workspace_id: targetWorkspaceId, entity: "project_member", id: movedMember.id, updated_at: movedMember.updatedAt, payload: movedMember, revision: 41 }),
+      row({ workspace_id: targetWorkspaceId, entity: "task", id: movedTask.id, updated_at: movedTask.updatedAt, payload: movedTask, revision: 42 }),
+      row({ workspace_id: sourceWorkspaceId, entity: "project", id: movedProject.id, updated_at: iso("2026-07-02T09:13:00Z"), deleted_at: iso("2026-07-02T09:13:00Z"), payload: {}, revision: 43 }),
+      row({ workspace_id: sourceWorkspaceId, entity: "project_member", id: movedMember.id, updated_at: iso("2026-07-02T09:14:00Z"), deleted_at: iso("2026-07-02T09:14:00Z"), payload: {}, revision: 44 }),
+      row({ workspace_id: sourceWorkspaceId, entity: "task", id: movedTask.id, updated_at: iso("2026-07-02T09:15:00Z"), deleted_at: iso("2026-07-02T09:15:00Z"), payload: {}, revision: 45 }),
+    ];
+
+    const merged = mergeRowsIntoState(state, rows, 45, { forceRemote: true });
+
+    expect(merged.projects.find((project) => project.id === movedProject.id)).toMatchObject({ workspaceId: targetWorkspaceId });
+    expect(merged.projectMembers.find((member) => member.id === movedMember.id)).toMatchObject({ workspaceId: targetWorkspaceId });
+    expect(merged.tasks.find((task) => task.id === movedTask.id)).toMatchObject({ workspaceId: targetWorkspaceId });
   });
 
   it("applies tombstones for team progress entities", () => {

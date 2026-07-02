@@ -1,7 +1,7 @@
 import { calculateRemaining, completedFocusSessions, defaultReview, deriveRewardState, nextBreakMode, pauseTimer, restoreTimer, resumeTimer, suggestedTasks } from "./domain";
 import { resolveCurrentMember, resolveMemberIdForProject } from "./memberIdentity";
 import { todayKey, uid } from "./seed";
-import type { AppState, DailyPlan, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, TaskStage, WorkSession } from "./types";
+import type { AppState, DailyPlan, FocusSession, Priority, RepeatRule, SessionMode, SessionOutcome, Severity, Subtask, Task, TaskStage, TaskStageMode, WorkSession } from "./types";
 import {
   activeWorkSessionForExecutor,
   claimTaskForCurrentMemberIfUnassigned,
@@ -10,7 +10,7 @@ import {
   endWorkSessionForSwitchInState,
 } from "./workSessionTransitions";
 
-export type Tab = "workspace" | "project" | "member_status" | "focus" | "calendar" | "daily" | "reports" | "settings";
+export type Tab = "workspace" | "workspaces" | "project" | "member_status" | "focus" | "calendar" | "daily" | "reports" | "settings";
 
 export type TaskDraft = {
   title: string;
@@ -66,7 +66,16 @@ export type SplitDraft = {
 export const nowIso = () => new Date().toISOString();
 export const today = () => todayKey();
 export const priorityWeight: Record<Priority, number> = { urgent: 4, high: 3, medium: 2, low: 1 };
-export const taskStageOptions: { value: TaskStage; label: string }[] = [
+export const taskStageModeOptions: { value: TaskStageMode; label: string }[] = [
+  { value: "regular", label: "常规" },
+  { value: "software", label: "软件开发" },
+];
+export const regularTaskStageOptions: { value: TaskStage; label: string }[] = [
+  { value: "planning", label: "规划" },
+  { value: "execution", label: "执行" },
+  { value: "check", label: "检查" },
+];
+export const softwareTaskStageOptions: { value: TaskStage; label: string }[] = [
   { value: "sales", label: "销售" },
   { value: "requirements", label: "需求" },
   { value: "design", label: "设计" },
@@ -75,6 +84,19 @@ export const taskStageOptions: { value: TaskStage; label: string }[] = [
   { value: "deployment", label: "部署" },
   { value: "acceptance", label: "验收" },
 ];
+export const taskStageOptions: { value: TaskStage; label: string }[] = [
+  ...regularTaskStageOptions,
+  ...softwareTaskStageOptions,
+];
+export const taskStageOptionsForMode = (mode: TaskStageMode = "software") =>
+  mode === "regular" ? regularTaskStageOptions : softwareTaskStageOptions;
+const regularTaskStageValues = new Set<TaskStage>(regularTaskStageOptions.map((option) => option.value));
+export const taskStageModeForStage = (stage?: TaskStage): TaskStageMode => (
+  stage && regularTaskStageValues.has(stage) ? "regular" : "software"
+);
+export const defaultTaskStageForMode = (mode: TaskStageMode): TaskStage => (
+  mode === "regular" ? "planning" : "requirements"
+);
 export const labelTaskStage: Record<TaskStage, string> = Object.fromEntries(taskStageOptions.map((option) => [option.value, option.label])) as Record<TaskStage, string>;
 export const initialFilters: TaskFilters = { query: "", project: "all", tag: "all", priority: "all", sort: "manual" };
 

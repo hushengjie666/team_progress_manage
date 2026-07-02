@@ -1,16 +1,33 @@
 import {
+  accessibleProjectIdsForCurrentUser,
+  countProjectAccessibleMembers,
   projectMemberIdentityIds,
   sameMemberIdentity,
   taskAssignedToMemberIdentity,
   taskBelongsToMemberIdentity,
-} from "./memberIdentity";
+  visibleProjectsForAccount,
+  workspaceForProject,
+  workspaceIdForProject,
+} from "./accessControl";
 import { buildProgressBoard } from "./progressBoard";
 import type { AppState, Project, ProjectMember, Task, TaskStatus } from "./types";
 
-export { projectMemberIdentityIds, sameMemberIdentity, taskAssignedToMemberIdentity } from "./memberIdentity";
+export {
+  accessibleProjectIdsForCurrentUser,
+  activeWorkspaceIdsForCurrentAccount,
+  projectMemberIdentityIds,
+  sameMemberIdentity,
+  taskAssignedToMemberIdentity,
+  workspaceForProject,
+  workspaceIdForProject,
+  workspaceMembershipsForState,
+} from "./accessControl";
 
 export type ProjectOverviewCard = {
   projectId: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  workspaceType?: "private" | "shared";
   name: string;
   description: string;
   progressPercent: number;
@@ -26,6 +43,9 @@ export type ProjectOverviewCard = {
 
 export type MyProjectTaskCard = {
   projectId: string;
+  workspaceId?: string;
+  workspaceName?: string;
+  workspaceType?: "private" | "shared";
   name: string;
   description: string;
   progressPercent: number;
@@ -59,8 +79,14 @@ export const compareProjectsForOverview = (left: Project, right: Project) =>
   projectCreatedAtRank(left) - projectCreatedAtRank(right) ||
   left.id.localeCompare(right.id);
 
+const visibleProjectsForOverview = (state: AppState) => {
+  return visibleProjectsForAccount(state);
+};
+
 export const buildProjectOverviewCards = (state: AppState): ProjectOverviewCard[] =>
-  [...state.projects].sort(compareProjectsForOverview).map((project) => {
+  [...visibleProjectsForOverview(state)].sort(compareProjectsForOverview).map((project) => {
+    const workspace = workspaceForProject(state, project);
+    const workspaceId = workspaceIdForProject(state, project);
     const tasks = state.tasks.filter((task) => task.projectId === project.id);
     const statusCounts = tasks.reduce<Record<TaskStatus, number>>((counts, task) => {
       counts[task.status] += 1;
@@ -74,10 +100,13 @@ export const buildProjectOverviewCards = (state: AppState): ProjectOverviewCard[
 
     return {
       projectId: project.id,
+      workspaceId,
+      workspaceName: workspace?.name,
+      workspaceType: workspace?.type,
       name: project.name,
       description: project.description,
       progressPercent: board.projectProgress,
-      memberCount: state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").length,
+      memberCount: countProjectAccessibleMembers(state, project, workspaceId),
       taskCount: tasks.length,
       activeSessionCount: board.activeSessions.length,
       inProgressCount: statusCounts.in_progress,
@@ -93,22 +122,17 @@ export const filterMyTasksByProjectSelection = (
   currentMember: ProjectMember | undefined,
   selectedProjectIds: string[],
 ) => {
-  const memberIds = projectMemberIdentityIds(state, currentMember);
-  if (memberIds.size === 0) return [];
+  const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state, currentMember);
+  if (accessibleProjectIds.size === 0) return [];
   const selectedProjects = selectedProjectIds.length > 0
-    ? new Set(selectedProjectIds)
-    : new Set(
-        state.projectMembers
-          .filter((member) => member.status !== "disabled" && currentMember && sameMemberIdentity(member, currentMember))
-          .map((member) => member.projectId),
-      );
+    ? new Set(selectedProjectIds.filter((projectId) => accessibleProjectIds.has(projectId)))
+    : accessibleProjectIds;
   return state.tasks.filter(
     (task) =>
       selectedProjects.has(task.projectId) &&
       task.status !== "completed" &&
       task.status !== "split" &&
-      task.status !== "archived" &&
-      taskBelongsToMemberIdentity(state, task, memberIds),
+      task.status !== "archived",
   );
 };
 
@@ -143,29 +167,28 @@ export const quickAddProjectIdForSelection = (selectedProjectIds: string[]) =>
   selectedProjectIds.length === 1 ? selectedProjectIds[0] : undefined;
 
 export const buildMyProjectTaskCards = (state: AppState, currentMember?: ProjectMember): MyProjectTaskCard[] => {
-  const memberIds = projectMemberIdentityIds(state, currentMember);
-  if (memberIds.size === 0) return [];
-  const participatingProjectIds = new Set(
-    state.projectMembers
-      .filter((member) => member.status !== "disabled" && memberIds.has(member.id))
-      .map((member) => member.projectId),
-  );
+  const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state, currentMember);
+  if (accessibleProjectIds.size === 0) return [];
 
   return state.projects
-    .filter((project) => participatingProjectIds.has(project.id))
+    .filter((project) => accessibleProjectIds.has(project.id))
     .map((project) => {
+      const workspace = workspaceForProject(state, project);
+      const workspaceId = workspaceIdForProject(state, project);
       const myTasks = state.tasks.filter(
         (task) =>
           task.projectId === project.id &&
           task.status !== "completed" &&
           task.status !== "split" &&
-          task.status !== "archived" &&
-          taskBelongsToMemberIdentity(state, task, memberIds),
+          task.status !== "archived",
       );
       const board = buildProgressBoard(state, project.id);
 
       return {
         projectId: project.id,
+        workspaceId,
+        workspaceName: workspace?.name,
+        workspaceType: workspace?.type,
         name: project.name,
         description: project.description,
         progressPercent: board.projectProgress,

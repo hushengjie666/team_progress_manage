@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, X } from "lucide-react";
-import { formatDateTimeLocal, labelPriority, labelSeverity, parseDateTimeLocal, taskStageOptions } from "../../appModel";
-import type { ProjectMember, RepeatRule, Priority, Severity } from "../../types";
+import {
+  formatDateTimeLocal,
+  labelPriority,
+  labelSeverity,
+  parseDateTimeLocal,
+  taskStageOptionsForMode,
+} from "../../appModel";
+import type { ProjectMember, RepeatRule, Priority, Severity, TaskStageMode } from "../../types";
 import type { ProjectTaskInput } from "../../projectDetail";
 
 export function ProjectTaskCreateDialog(props: {
@@ -9,6 +15,7 @@ export function ProjectTaskCreateDialog(props: {
   draft: ProjectTaskInput;
   members: ProjectMember[];
   executors: ProjectMember[];
+  taskStageMode: TaskStageMode;
   canEdit: boolean;
   setDraft: (draft: ProjectTaskInput) => void;
   onCancel: () => void;
@@ -24,6 +31,9 @@ export function ProjectTaskCreateDialog(props: {
   }, [props.open]);
 
   if (!props.open) return null;
+
+  const stageOptions = taskStageOptionsForMode(props.taskStageMode);
+
   return (
     <div className="modal-backdrop" role="presentation">
       <section className="modal-panel project-task-create-modal" role="dialog" aria-modal="true" aria-label="添加项目任务">
@@ -51,7 +61,7 @@ export function ProjectTaskCreateDialog(props: {
             <div className="task-create-stage-field">
               <span>阶段</span>
               <div className="stage-switch-group" role="radiogroup" aria-label="任务阶段">
-                {taskStageOptions.map((option) => {
+                {stageOptions.map((option) => {
                   const selected = (props.draft.stage ?? "requirements") === option.value;
                   return (
                     <button

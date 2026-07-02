@@ -37,12 +37,10 @@ import {
   addProjectMemberToState,
   assignTaskInState,
   createProjectInState,
-  deleteTeamMemberInState,
   reorderProjectsInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectMemberInState,
-  updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
 import { buildProjectOverviewTaskBoard, createProjectTaskInState, deriveProjectDetailModel, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
@@ -50,12 +48,13 @@ import { resolveMemberIdForProject } from "./memberIdentity";
 import {
   buildMyProjectTaskCards,
   buildProjectOverviewCards,
+  accessibleProjectIdsForCurrentUser,
   filterTodayCommittedTasksForMember,
   filterMyTasksByProjectSelection,
   quickAddProjectIdForSelection,
 } from "./projectOverview";
 import { bindAccountToMembers } from "./authModel";
-import type { ActiveTimer, AppState, FocusSession, ProjectMember, Task, TaskTemplate } from "./types";
+import type { ActiveTimer, AppState, FocusSession, ProjectMember, Task, TaskTemplate, WorkspaceMembership } from "./types";
 
 describe("project overview", () => {
   it("builds project overview cards with project-scoped counts and archived tasks", () => {
@@ -104,6 +103,565 @@ describe("project overview", () => {
       inProgressCount: 1,
       statusCounts: expect.objectContaining({ in_progress: 1, archived: 0 }),
     });
+  });
+
+  it("counts everyone with project access in project overview cards", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_shared_access_count";
+    const workspaceMemberships: WorkspaceMembership[] = [
+      {
+        id: "membership_owner_access_count",
+        workspaceId,
+        accountId: "account_owner",
+        name: "项目负责人",
+        email: "owner@example.com",
+        role: "owner",
+        status: "active",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+      {
+        id: "membership_teammate_access_count",
+        workspaceId,
+        accountId: "account_teammate",
+        name: "协作成员",
+        email: "teammate@example.com",
+        role: "member",
+        status: "active",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+      {
+        id: "membership_disabled_access_count",
+        workspaceId,
+        accountId: "account_disabled",
+        name: "停用成员",
+        email: "disabled@example.com",
+        role: "member",
+        status: "disabled",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+    ];
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        workspace: {
+          id: workspaceId,
+          name: "协作区",
+          type: "shared",
+          ownerAccountId: "account_owner",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspaces: [{
+          id: workspaceId,
+          name: "协作区",
+          type: "shared",
+          ownerAccountId: "account_owner",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        }],
+        workspaceMemberships,
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: [
+        ...state.projectMembers,
+        {
+          id: "member_project_only_access_count",
+          workspaceId,
+          projectId: state.projects[0].id,
+          name: "项目单独成员",
+          email: "contractor@example.com",
+          roles: ["executor"],
+          status: "active",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        {
+          id: "member_duplicate_workspace_access_count",
+          workspaceId,
+          projectId: state.projects[0].id,
+          accountId: "account_teammate",
+          name: "协作成员",
+          email: "teammate@example.com",
+          roles: ["executor"],
+          status: "active",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        {
+          id: "member_disabled_project_access_count",
+          workspaceId,
+          projectId: state.projects[0].id,
+          name: "停用项目成员",
+          email: "project-disabled@example.com",
+          roles: ["executor"],
+          status: "disabled",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+      ],
+    };
+
+    expect(buildProjectOverviewCards(next)[0]).toMatchObject({
+      memberCount: 3,
+      workspaceName: "协作区",
+    });
+  });
+
+  it("does not treat workspace summaries as workspace-level access for project invitees", () => {
+    const state = createInitialState();
+    const now = iso("2026-05-10T08:00:00Z");
+    const sharedWorkspace = {
+      id: "workspace_summary_only",
+      name: "摘要协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const privateWorkspace = {
+      id: "workspace_private_invitee",
+      name: "受邀者私人区",
+      type: "private" as const,
+      ownerAccountId: "account_invitee",
+      createdAt: now,
+      updatedAt: now,
+    };
+    const invitedProject = { ...state.projects[0], id: "project_invited_only", name: "受邀项目", workspaceId: sharedWorkspace.id };
+    const hiddenProject = { ...state.projects[0], id: "project_workspace_hidden", name: "工作区隐藏项目", workspaceId: sharedWorkspace.id };
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        account: {
+          id: "account_invitee",
+          workspaceId: privateWorkspace.id,
+          name: "受邀者",
+          email: "invitee@example.com",
+          createdAt: now,
+          updatedAt: now,
+        },
+        workspace: privateWorkspace,
+        workspaces: [privateWorkspace, sharedWorkspace],
+        membership: {
+          id: "membership_private_invitee",
+          workspaceId: privateWorkspace.id,
+          accountId: "account_invitee",
+          name: "受邀者",
+          email: "invitee@example.com",
+          role: "owner",
+          status: "active",
+          createdAt: now,
+          updatedAt: now,
+        },
+        workspaceMemberships: [
+          {
+            id: "membership_private_invitee",
+            workspaceId: privateWorkspace.id,
+            accountId: "account_invitee",
+            name: "受邀者",
+            email: "invitee@example.com",
+            role: "owner",
+            status: "active",
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+      },
+      projects: [invitedProject, hiddenProject],
+      projectMembers: [
+        {
+          id: "member_invited_only",
+          workspaceId: sharedWorkspace.id,
+          projectId: invitedProject.id,
+          accountId: "account_invitee",
+          name: "受邀者",
+          email: "invitee@example.com",
+          roles: ["executor"],
+          status: "active",
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      tasks: [],
+    };
+
+    expect([...accessibleProjectIdsForCurrentUser(next)].sort()).toEqual([invitedProject.id]);
+    expect(buildProjectOverviewCards(next).map((card) => card.projectId)).toEqual([invitedProject.id]);
+    expect(buildProjectOverviewCards(next)[0]).toMatchObject({
+      memberCount: 2,
+      workspaceName: "摘要协作区",
+    });
+  });
+
+  it("uses workspace memberships for project access counts", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_shared_team_member_count";
+    const workspace = {
+      id: workspaceId,
+      name: "协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: iso("2026-05-10T08:00:00Z"),
+      updatedAt: iso("2026-05-10T08:00:00Z"),
+    };
+    const workspaceMemberships: WorkspaceMembership[] = [
+      {
+        id: "membership_owner_count",
+        workspaceId,
+        accountId: "account_owner",
+        name: "负责人",
+        email: "owner@example.com",
+        role: "owner",
+        status: "active",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+      {
+        id: "membership_teammate_count",
+        workspaceId,
+        accountId: "account_teammate",
+        name: "协作成员",
+        email: "teammate@example.com",
+        role: "member",
+        status: "active",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+      {
+        id: "membership_disabled_count",
+        workspaceId,
+        accountId: "account_disabled",
+        name: "停用成员",
+        email: "disabled@example.com",
+        role: "member",
+        status: "disabled",
+        createdAt: iso("2026-05-10T08:00:00Z"),
+        updatedAt: iso("2026-05-10T08:00:00Z"),
+      },
+    ];
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        workspace,
+        workspaces: [workspace],
+        workspaceMemberships,
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: state.projectMembers.map((member) => ({
+        ...member,
+        workspaceId,
+        accountId: "account_owner",
+        email: "owner@example.com",
+      })),
+    };
+
+    expect(buildProjectOverviewCards(next)[0]).toMatchObject({
+      memberCount: 2,
+      workspaceName: "协作区",
+    });
+  });
+
+  it("counts the workspace owner and active workspace members on project cards", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_owner_fallback";
+    const workspace = {
+      id: workspaceId,
+      name: "旧数据协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: iso("2026-05-10T08:00:00Z"),
+      updatedAt: iso("2026-05-10T08:00:00Z"),
+    };
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        account: {
+          id: "account_wangshuo",
+          workspaceId,
+          name: "王硕",
+          email: "wangshuo",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspace,
+        workspaces: [workspace],
+        membership: {
+          id: "membership_wangshuo_owner_fallback",
+          workspaceId,
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          role: "member",
+          status: "active",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspaceMemberships: [
+          {
+            id: "membership_wangshuo_owner_fallback",
+            workspaceId,
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo",
+            role: "member",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: [],
+    };
+
+    expect(buildProjectOverviewCards(next)[0]).toMatchObject({
+      memberCount: 2,
+      workspaceName: "旧数据协作区",
+    });
+  });
+
+  it("uses inherited workspace access for project detail member totals", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_project_detail_members";
+    const workspace = {
+      id: workspaceId,
+      name: "详情协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: iso("2026-05-10T08:00:00Z"),
+      updatedAt: iso("2026-05-10T08:00:00Z"),
+    };
+    const projectId = state.projects[0].id;
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        account: {
+          id: "account_wangshuo",
+          workspaceId,
+          name: "王硕",
+          email: "wangshuo",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspace,
+        workspaces: [workspace],
+        membership: {
+          id: "membership_wangshuo_detail",
+          workspaceId,
+          accountId: "account_wangshuo",
+          name: "王硕",
+          email: "wangshuo",
+          role: "member",
+          status: "active",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspaceMemberships: [
+          {
+            id: "membership_owner_detail",
+            workspaceId,
+            accountId: "account_owner",
+            name: "负责人",
+            email: "owner@example.com",
+            role: "owner",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+          {
+            id: "membership_wangshuo_detail",
+            workspaceId,
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo",
+            role: "member",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: state.projectMembers.map((member) => ({
+        ...member,
+        workspaceId,
+        projectId,
+        accountId: "account_owner",
+        email: "owner@example.com",
+      })),
+    };
+
+    const model = deriveProjectDetailModel(next, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(model?.accessibleMemberCount).toBe(2);
+    expect(model?.memberOverviewStats.find((item) => item.label === "项目成员")?.value).toBe(2);
+    expect(model?.memberOverviewStats.find((item) => item.label === "执行者")?.value).toBe(2);
+    expect(model?.accessibleProjectMembers.map((member) => ({ name: member.name, source: member.source }))).toEqual([
+      { name: "项目负责人", source: "project" },
+      { name: "王硕", source: "workspace" },
+    ]);
+  });
+
+  it("shows inherited workspace memberships in project detail when team member rows are unavailable", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_detail_membership_only";
+    const projectId = state.projects[0].id;
+    const workspace = {
+      id: workspaceId,
+      name: "后端成员协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: iso("2026-05-10T08:00:00Z"),
+      updatedAt: iso("2026-05-10T08:00:00Z"),
+    };
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        account: {
+          id: "account_owner",
+          workspaceId,
+          name: "负责人",
+          email: "owner@example.com",
+          createdAt: iso("2026-05-10T08:00:00Z"),
+          updatedAt: iso("2026-05-10T08:00:00Z"),
+        },
+        workspace,
+        workspaces: [workspace],
+        membership: undefined,
+        workspaceMemberships: [
+          {
+            id: "membership_owner_detail_only",
+            workspaceId,
+            accountId: "account_owner",
+            name: "负责人",
+            email: "owner@example.com",
+            role: "owner",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+          {
+            id: "membership_wangshuo_detail_only",
+            workspaceId,
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo",
+            role: "member",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: state.projectMembers.map((member) => ({
+        ...member,
+        workspaceId,
+        projectId,
+        accountId: "account_owner",
+        name: "负责人",
+        email: "owner@example.com",
+      })),
+    };
+
+    const model = deriveProjectDetailModel(next, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(model?.accessibleMemberCount).toBe(2);
+    expect(model?.memberOverviewStats.find((item) => item.label === "项目成员")?.value).toBe(2);
+    expect(model?.memberOverviewStats.find((item) => item.label === "执行者")?.value).toBe(2);
+    expect(model?.accessibleProjectMembers.map((member) => ({ name: member.name, source: member.source, label: member.sourceLabel }))).toEqual([
+      { name: "负责人", source: "project", label: "项目成员" },
+      { name: "王硕", source: "workspace", label: "工作区成员" },
+    ]);
+  });
+
+  it("deduplicates project and workspace member identities across account and email fields", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_detail_member_identity";
+    const projectId = state.projects[0].id;
+    const workspace = {
+      id: workspaceId,
+      name: "身份去重协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: iso("2026-05-10T08:00:00Z"),
+      updatedAt: iso("2026-05-10T08:00:00Z"),
+    };
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        workspace,
+        workspaces: [workspace],
+        membership: undefined,
+        workspaceMemberships: [
+          {
+            id: "membership_owner_identity",
+            workspaceId,
+            accountId: "account_owner",
+            name: "负责人",
+            email: "owner@example.com",
+            role: "owner",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+          {
+            id: "membership_wangshuo_identity",
+            workspaceId,
+            accountId: "account_wangshuo",
+            name: "王硕",
+            email: "wangshuo",
+            role: "member",
+            status: "active",
+            createdAt: iso("2026-05-10T08:00:00Z"),
+            updatedAt: iso("2026-05-10T08:00:00Z"),
+          },
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: state.projectMembers.map((member) => ({
+        ...member,
+        workspaceId,
+        projectId,
+        accountId: undefined,
+        name: "负责人",
+        email: "owner@example.com",
+      })),
+    };
+
+    const model = deriveProjectDetailModel(next, projectId, {
+      query: "",
+      status: "all",
+      executor: "all",
+      priority: "all",
+      sort: "status",
+    });
+
+    expect(buildProjectOverviewCards(next)[0]).toMatchObject({ memberCount: 2 });
+    expect(model?.accessibleMemberCount).toBe(2);
+    expect(model?.accessibleProjectMembers.map((member) => member.name)).toEqual(["负责人", "王硕"]);
   });
 
   it("keeps project overview cards in persisted sort order", () => {
@@ -270,7 +828,7 @@ describe("project overview", () => {
     expect(model?.acceptedTasks.map((task) => task.id)).toEqual(["accepted_new", "accepted_old"]);
   });
 
-  it("builds my project task cards from active participations only", () => {
+  it("builds my project task cards from accessible project tasks", () => {
     const state = createInitialState();
     const firstProjectId = state.projects[0].id;
     const withSecondProject = createProjectInState(
@@ -285,7 +843,6 @@ describe("project overview", () => {
     const currentMember = withSecondProject.projectMembers.find((member) => member.id === "member_owner");
     const next: AppState = {
       ...withSecondProject,
-      currentMemberId: "member_owner",
       tasks: [
         { ...state.tasks[0], id: "my_first_committed", projectId: firstProjectId, status: "committed", primaryExecutorMemberId: "member_owner" },
         { ...state.tasks[1], id: "my_first_done", projectId: firstProjectId, status: "completed", primaryExecutorMemberId: "member_owner" },
@@ -297,7 +854,6 @@ describe("project overview", () => {
         {
           id: "member_disabled_participation",
           projectId: "project_disabled",
-          teamMemberId: "team_member_owner",
           accountId: "account_owner",
           name: "停用成员",
           roles: ["executor"],
@@ -316,8 +872,9 @@ describe("project overview", () => {
       committedCount: 1,
     });
     expect(cards.find((card) => card.projectId === "project_my_card")).toMatchObject({
-      myTaskCount: 1,
+      myTaskCount: 2,
       inProgressCount: 1,
+      poolCount: 1,
     });
     expect(cards.some((card) => card.projectId === "project_disabled")).toBe(false);
   });
@@ -328,7 +885,6 @@ describe("project overview", () => {
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "胡圣杰",
       email: "husj",
@@ -357,7 +913,6 @@ describe("project overview", () => {
     };
     const next: AppState = {
       ...state,
-      currentMemberId: owner.id,
       projectMembers: [...state.projectMembers, teammate],
       tasks: [ownerTask, teammateTask, unassignedTask],
       dailyPlans: [
@@ -381,7 +936,6 @@ describe("project overview", () => {
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "王硕",
       email: "wangshuo@example.com",
@@ -460,13 +1014,11 @@ describe("project overview", () => {
     const loggedIn = bindAccountToMembers(
       {
         ...withSecondProject,
-        currentMemberId: "member_owner",
         projectMembers: withSecondProject.projectMembers.map((member) =>
           member.projectId === "project_login_bind"
             ? {
                 ...member,
                 accountId: undefined,
-                teamMemberId: undefined,
                 email: "owner@example.com",
                 roles: ["executor"],
               }
@@ -491,14 +1043,15 @@ describe("project overview", () => {
       },
       "2026-05-10T09:10:00.000Z",
     );
-    const currentMember = loggedIn.projectMembers.find((member) => member.id === loggedIn.currentMemberId);
+    const currentMember = loggedIn.projectMembers.find(
+      (member) => member.projectId === "project_login_bind" && member.accountId === "account_owner",
+    );
     const committedTasks = loggedIn.dailyPlans[0].committedTaskIds
       .map((id) => loggedIn.tasks.find((task) => task.id === id))
       .filter((task): task is Task => Boolean(task));
 
     expect(loggedIn.projectMembers.find((member) => member.id === secondMember.id)).toMatchObject({
       accountId: "account_owner",
-      teamMemberId: "team_member_owner",
     });
     expect(filterTodayCommittedTasksForMember(loggedIn, committedTasks, currentMember).map((task) => task.id)).toEqual([secondTask.id]);
   });
@@ -508,7 +1061,6 @@ describe("project overview", () => {
     const staleMember: ProjectMember = {
       ...state.projectMembers[0],
       id: "member_stale_selected",
-      teamMemberId: undefined,
       accountId: undefined,
       name: "王硕",
       email: undefined,
@@ -517,7 +1069,6 @@ describe("project overview", () => {
     const loggedIn = bindAccountToMembers(
       {
         ...state,
-        currentMemberId: staleMember.id,
         projectMembers: [staleMember, ...state.projectMembers],
       },
       {
@@ -538,16 +1089,14 @@ describe("project overview", () => {
     );
 
     expect(loggedIn.projectMembers.find((member) => member.id === staleMember.id)?.accountId).toBeUndefined();
-    expect(loggedIn.currentMemberId).toBeUndefined();
+    expect(loggedIn.projectMembers.some((member) => member.accountId === "account_hushengjie")).toBe(false);
   });
 
-  it("does not create a team member just because an account logged in", () => {
+  it("does not create a project member just because an account logged in", () => {
     const state = createInitialState();
     const loggedIn = bindAccountToMembers(
       {
         ...state,
-        currentMemberId: undefined,
-        teamMembers: [],
         projectMembers: [],
       },
       {
@@ -567,8 +1116,7 @@ describe("project overview", () => {
       "2026-05-10T09:10:00.000Z",
     );
 
-    expect(loggedIn.teamMembers).toEqual([]);
-    expect(loggedIn.currentMemberId).toBeUndefined();
+    expect(loggedIn.projectMembers).toEqual([]);
   });
 
   it("clears sync retry backoff when binding an authenticated account", () => {
@@ -626,7 +1174,6 @@ describe("project overview", () => {
     const currentMember = withSecondProject.projectMembers.find((member) => member.id === "member_owner");
     const next: AppState = {
       ...withSecondProject,
-      currentMemberId: "member_owner",
       tasks: [
         { ...state.tasks[0], id: "selected_first", projectId: firstProjectId, status: "committed", primaryExecutorMemberId: "member_owner" },
         { ...state.tasks[1], id: "selected_second", projectId: "project_filter_card", project: "第二项目", status: "pool", primaryExecutorMemberId: secondMember?.id },
@@ -638,8 +1185,17 @@ describe("project overview", () => {
     };
 
     expect(filterMyTasksByProjectSelection(next, currentMember, [firstProjectId]).map((task) => task.id)).toEqual(["selected_first"]);
-    expect(filterMyTasksByProjectSelection(next, currentMember, ["project_filter_card"]).map((task) => task.id)).toEqual(["selected_second"]);
-    expect(filterMyTasksByProjectSelection(next, currentMember, []).map((task) => task.id)).toEqual(["selected_first", "selected_second"]);
+    expect(filterMyTasksByProjectSelection(next, currentMember, ["project_filter_card"]).map((task) => task.id)).toEqual([
+      "selected_second",
+      "selected_unassigned",
+      "selected_other_member",
+    ]);
+    expect(filterMyTasksByProjectSelection(next, currentMember, []).map((task) => task.id)).toEqual([
+      "selected_first",
+      "selected_second",
+      "selected_unassigned",
+      "selected_other_member",
+    ]);
     expect(quickAddProjectIdForSelection([firstProjectId])).toBe(firstProjectId);
     expect(quickAddProjectIdForSelection([firstProjectId, "project_filter_card"])).toBeUndefined();
   });
@@ -647,7 +1203,7 @@ describe("project overview", () => {
   it("keeps split parent tasks out of execution lists while preserving project traceability", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
-    const currentMember = state.projectMembers.find((member) => member.id === state.currentMemberId);
+    const currentMember = state.projectMembers[0];
     const next: AppState = {
       ...state,
       tasks: [

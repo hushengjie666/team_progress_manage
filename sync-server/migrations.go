@@ -196,6 +196,9 @@ func verifyMySQLMigrations(ctx context.Context, db *sql.DB) error {
 		{"workspaces", "type"},
 		{"workspaces", "owner_account_id"},
 		{"workspace_memberships", "account_id"},
+		{"workspace_invitations", "invitee_account_id"},
+		{"project_invitations", "project_id"},
+		{"project_invitations", "roles_json"},
 		{"sync_rows", "revision"},
 		{"team_tasks", "payload"},
 	} {

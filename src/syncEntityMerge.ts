@@ -12,7 +12,6 @@ import type {
   Settings,
   StrictViolation,
   Task,
-  TeamMember,
   WorkSession,
 } from "./types";
 
@@ -34,7 +33,6 @@ type SyncEntity =
 
 type SyncPayload =
   | Project
-  | TeamMember
   | ProjectMember
   | Task
   | DailyPlan
@@ -49,6 +47,7 @@ type SyncPayload =
   | RewardState;
 
 export interface SyncMergeRow {
+  workspace_id?: string;
   entity: SyncEntity;
   id: string;
   updated_at: string;
@@ -117,7 +116,18 @@ const mergeDailyPlan = (local: DailyPlan, remote: DailyPlan, remoteUpdatedAt: st
   };
 };
 
-const removeById = <T extends { id: string }>(items: T[], id: string) => items.filter((item) => item.id !== id);
+const matchesDeletedRow = <T extends { id: string; workspaceId?: string }>(item: T, row: SyncMergeRow) =>
+  item.id === row.id && (!row.workspace_id || !item.workspaceId || item.workspaceId === row.workspace_id);
+
+const removeByScopedId = <T extends { id: string; workspaceId?: string }>(items: T[], row: SyncMergeRow) => {
+  let removed = false;
+  const next = items.filter((item) => {
+    const shouldRemove = matchesDeletedRow(item, row);
+    if (shouldRemove) removed = true;
+    return !shouldRemove;
+  });
+  return { items: next, removed };
+};
 
 const removeMemberReferences = (tasks: Task[], memberId: string) =>
   tasks.map((task) => ({
@@ -128,40 +138,51 @@ const removeMemberReferences = (tasks: Task[], memberId: string) =>
   }));
 
 const applyDeletedRow = (state: AppState, row: SyncMergeRow): AppState => {
-  if (row.entity === "project") return { ...state, projects: removeById(state.projects, row.id) };
-  if (row.entity === "team_member") return { ...state, teamMembers: removeById(state.teamMembers, row.id) };
+  if (row.entity === "project") {
+    const { items } = removeByScopedId(state.projects, row);
+    return { ...state, projects: items };
+  }
+  if (row.entity === "team_member") {
+    return state;
+  }
   if (row.entity === "project_member") {
-    const projectMembers = removeById(state.projectMembers, row.id);
+    const { items: projectMembers, removed } = removeByScopedId(state.projectMembers, row);
+    if (!removed) return state;
     return {
       ...state,
       projectMembers,
-      currentMemberId: state.currentMemberId === row.id ? projectMembers[0]?.id : state.currentMemberId,
       tasks: removeMemberReferences(state.tasks, row.id),
     };
   }
   if (row.entity === "task") {
+    const { items: tasks, removed } = removeByScopedId(state.tasks, row);
+    if (!removed) return state;
     return {
       ...state,
-      tasks: removeById(state.tasks, row.id),
+      tasks,
       dailyPlans: state.dailyPlans.map((plan) => ({
         ...plan,
         committedTaskIds: plan.committedTaskIds.filter((taskId) => taskId !== row.id),
       })),
     };
   }
-  if (row.entity === "work_session") return { ...state, workSessions: removeById(state.workSessions, row.id) };
-  if (row.entity === "execution_signal") return { ...state, executionSignals: removeById(state.executionSignals, row.id) };
-  if (row.entity === "daily_plan") return { ...state, dailyPlans: removeById(state.dailyPlans, row.id) };
-  if (row.entity === "focus_session") return { ...state, focusSessions: removeById(state.focusSessions, row.id) };
-  if (row.entity === "interruption") return { ...state, interruptions: removeById(state.interruptions, row.id) };
-  if (row.entity === "strict_violation") return { ...state, strictViolations: removeById(state.strictViolations, row.id) };
-  if (row.entity === "block_profile") return { ...state, blockProfiles: removeById(state.blockProfiles, row.id) };
+  if (row.entity === "work_session") return { ...state, workSessions: removeByScopedId(state.workSessions, row).items };
+  if (row.entity === "execution_signal") return { ...state, executionSignals: removeByScopedId(state.executionSignals, row).items };
+  if (row.entity === "daily_plan") return { ...state, dailyPlans: removeByScopedId(state.dailyPlans, row).items };
+  if (row.entity === "focus_session") return { ...state, focusSessions: removeByScopedId(state.focusSessions, row).items };
+  if (row.entity === "interruption") return { ...state, interruptions: removeByScopedId(state.interruptions, row).items };
+  if (row.entity === "strict_violation") return { ...state, strictViolations: removeByScopedId(state.strictViolations, row).items };
+  if (row.entity === "block_profile") return { ...state, blockProfiles: removeByScopedId(state.blockProfiles, row).items };
   return state;
 };
 
 const applyUpsertRow = (state: AppState, row: SyncMergeRow, options: SyncMergeOptions = {}): AppState => {
-  const payload = row.payload;
-  if (!isObject(payload)) return state;
+  const rawPayload = row.payload;
+  if (!isObject(rawPayload)) return state;
+  const payload =
+    row.workspace_id && !singletonEntities.includes(row.entity)
+      ? { ...rawPayload, workspaceId: row.workspace_id }
+      : rawPayload;
   const forceRemote = options.forceRemote ?? false;
 
   if (row.entity === "settings" && shouldAcceptRemote(row, state.settings, state.updatedAt, forceRemote)) {
@@ -181,18 +202,7 @@ const applyUpsertRow = (state: AppState, row: SyncMergeRow, options: SyncMergeOp
       : state;
   }
   if (row.entity === "team_member") {
-    const incoming = payload as unknown as TeamMember;
-    const existing = state.teamMembers.find((member) => member.id === row.id);
-    if (!shouldAcceptRemote(row, existing, state.updatedAt, forceRemote)) return state;
-    return {
-      ...state,
-      teamMembers: upsert(row.entity, state.teamMembers, incoming, row.updated_at, state.updatedAt, forceRemote),
-      projectMembers: state.projectMembers.map((member) =>
-        member.teamMemberId === incoming.id
-          ? { ...member, accountId: incoming.accountId ?? member.accountId, name: incoming.name, email: incoming.email, status: incoming.status ?? member.status }
-          : member,
-      ),
-    };
+    return state;
   }
   if (row.entity === "project_member") {
     const incoming = payload as unknown as ProjectMember;

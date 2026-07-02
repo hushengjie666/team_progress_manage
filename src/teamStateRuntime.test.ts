@@ -46,6 +46,37 @@ const createRuntimeHarness = (initial: AppState) => {
   };
 };
 
+const deferredResponse = () => {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
+
+const teamStateResponse = (state: AppState, revision: number) =>
+  new Response(JSON.stringify({
+    changes: [
+      {
+        workspace_id: state.auth.workspace?.id,
+        entity: "settings",
+        id: "default",
+        device_id: "server",
+        updated_at: state.updatedAt,
+        revision,
+        version: 1,
+        payload: state.settings,
+      },
+    ],
+    current_revision: revision,
+  }), { status: 200, headers: { "content-type": "application/json" } });
+
+const flushPromises = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -108,6 +139,51 @@ describe("team state runtime", () => {
     expect(saved?.sync.message).toBe("团队在线数据已加载");
     expect(saved?.sync.lastPulledRevision).toBe(9);
     expect(getCurrent()).toEqual(saved);
+  });
+
+  it("keeps the latest optimistic commit when an older remote refresh finishes later", async () => {
+    const before = withToken(createInitialState());
+    const first = changedState(before);
+    const second = {
+      ...first,
+      settings: {
+        ...first.settings,
+        focusMinutes: first.settings.focusMinutes + 5,
+      },
+      updatedAt: "2026-07-01T08:01:00.000Z",
+    };
+    const stateResponses = [deferredResponse(), deferredResponse()];
+    let stateResponseIndex = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/team/changes")) {
+        return new Response(JSON.stringify({
+          accepted: [],
+          conflicts: [],
+          current_revision: stateResponseIndex + 1,
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return stateResponses[stateResponseIndex++].promise;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent } = createRuntimeHarness(before);
+
+    runtime.commitTeamState(before, first);
+    expect(getCurrent()?.settings.focusMinutes).toBe(first.settings.focusMinutes);
+
+    runtime.commitTeamState(first, second);
+    expect(getCurrent()?.settings.focusMinutes).toBe(second.settings.focusMinutes);
+
+    await flushPromises();
+    stateResponses[1].resolve(teamStateResponse(second, 2));
+    await flushPromises();
+    expect(getCurrent()?.settings.focusMinutes).toBe(second.settings.focusMinutes);
+    expect(getCurrent()?.sync.lastPulledRevision).toBe(2);
+
+    stateResponses[0].resolve(teamStateResponse(first, 1));
+    await flushPromises();
+    expect(getCurrent()?.settings.focusMinutes).toBe(second.settings.focusMinutes);
+    expect(getCurrent()?.sync.lastPulledRevision).toBe(2);
   });
 
   it("applies failure state and toast when remote save fails", async () => {

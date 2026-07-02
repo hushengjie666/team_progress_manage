@@ -37,12 +37,10 @@ import {
   addProjectMemberToState,
   assignTaskInState,
   createProjectInState,
-  deleteTeamMemberInState,
   reorderProjectsInState,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectMemberInState,
-  updateTeamMemberInState,
   updateTaskProgressInState,
 } from "./teamProgress";
 import { buildProjectOverviewTaskBoard, createProjectTaskInState, deriveProjectDetailModel, filterProjectTasks, projectAccessForCurrentMember, projectTasksForProject } from "./projectDetail";
@@ -257,7 +255,7 @@ describe("timer domain", () => {
     };
 
     const queued = addTaskToTodayInState(
-      { ...withSecondProject, currentMemberId: "member_owner", tasks: [task] },
+      { ...withSecondProject, tasks: [task] },
       task.id,
       "2026-05-10T09:10:00.000Z",
     );

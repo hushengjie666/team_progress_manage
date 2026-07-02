@@ -1,4 +1,4 @@
-import type { AppState, BlockProfile, NativeCapabilityState, Project, ProjectMember, TaskTemplate, TeamMember } from "./types";
+import type { AppState, BlockProfile, NativeCapabilityState, Project, ProjectMember, TaskTemplate } from "./types";
 
 export const todayKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
@@ -38,6 +38,7 @@ export const starterProject: Project = {
   name: "TimeManage 团队进度",
   description: "从个人时间管理迁移而来的团队进度管控起始项目。",
   defaultExpectedStartHours: 24,
+  taskStageMode: "software",
   sortOrder: 0,
   createdAt: now(),
   updatedAt: now(),
@@ -46,21 +47,10 @@ export const starterProject: Project = {
 export const starterProjectMember: ProjectMember = {
   id: "member_owner",
   projectId: starterProject.id,
-  teamMemberId: "team_member_owner",
   accountId: "account_owner",
   name: "项目负责人",
   email: "owner@example.com",
   roles: ["project_owner", "executor"],
-  status: "active",
-  createdAt: now(),
-  updatedAt: now(),
-};
-
-export const starterTeamMember: TeamMember = {
-  id: "team_member_owner",
-  accountId: "account_owner",
-  name: "项目负责人",
-  email: "owner@example.com",
   status: "active",
   createdAt: now(),
   updatedAt: now(),
@@ -199,9 +189,7 @@ export const createInitialState = (): AppState => ({
     bootstrapped: undefined,
     message: "请使用管理员分配的账号登录",
   },
-  currentMemberId: starterProjectMember.id,
   projects: [starterProject],
-  teamMembers: [starterTeamMember],
   projectMembers: [starterProjectMember],
   tasks: [],
   dailyPlans: [],
@@ -221,7 +209,7 @@ export const createInitialState = (): AppState => ({
   sync: {
     enabled: false,
     serverUrl: defaultSyncServerUrl(),
-    username: "demo",
+    username: "admin",
     deviceId: uid("device"),
     autoSync: true,
     intervalSeconds: 60,

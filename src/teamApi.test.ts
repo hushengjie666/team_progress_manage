@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { deleteTeamMemberInState } from "./teamProgress";
 import { loadTeamState, teamChangesBetween } from "./teamApi";
 import type { SyncRow } from "./sync";
 import type { ActiveTimer, FocusSession, SyncState, Task, WorkSession } from "./types";
@@ -59,9 +58,7 @@ describe("team backend state loading", () => {
     const loaded = await loadTeamState(local);
 
     expect(loaded.projects).toEqual([]);
-    expect(loaded.teamMembers).toEqual([]);
     expect(loaded.projectMembers).toEqual([]);
-    expect(loaded.currentMemberId).toBeUndefined();
   });
 
   it("preserves the local active timer when refreshing team state", async () => {
@@ -189,21 +186,26 @@ describe("team backend state loading", () => {
     expect(loaded.dailyPlans.some((plan) => plan.committedTaskIds.includes(task.id))).toBe(true);
   });
 
-  it("sends member and project-member tombstones when deleting a team member", () => {
+  it("sends a project-member tombstone when a project member is removed", () => {
     const base = createInitialState();
     const timestamp = iso("2026-06-30T07:00:00Z");
-    const deleted = deleteTeamMemberInState(base, base.teamMembers[0].id, timestamp);
+    const deleted = {
+      ...base,
+      projectMembers: [],
+      sync: {
+        ...base.sync,
+        tombstones: [
+          ...base.sync.tombstones,
+          { entity: "project_member", id: base.projectMembers[0].id, deletedAt: timestamp },
+        ],
+      },
+      updatedAt: timestamp,
+    };
 
     const changes = teamChangesBetween(base, deleted);
 
     expect(changes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          entity: "team_member",
-          id: base.teamMembers[0].id,
-          deleted_at: timestamp,
-          payload: {},
-        }),
         expect.objectContaining({
           entity: "project_member",
           id: base.projectMembers[0].id,
@@ -214,7 +216,7 @@ describe("team backend state loading", () => {
     );
   });
 
-  it("sends tombstones for hidden duplicate member identities when deleting the visible member", async () => {
+  it("records hidden duplicate project member identities as aliases when loading team state", async () => {
     const base = createInitialState();
     const local = {
       ...base,
@@ -244,34 +246,17 @@ describe("team backend state loading", () => {
         token: "token",
       } satisfies SyncState,
     };
-    const canonicalMember = {
-      ...base.teamMembers[0],
-      id: "team_member_account_owner",
-      accountId: "account_owner",
-      name: "项目负责人",
-      email: "owner@example.com",
-      updatedAt: iso("2026-06-30T06:20:00Z"),
-    };
-    const duplicateMember = {
-      ...canonicalMember,
-      id: "team_member_owner_duplicate",
-      accountId: undefined,
-      updatedAt: iso("2026-06-30T06:10:00Z"),
-    };
     const canonicalProjectMember = {
       ...base.projectMembers[0],
       id: "member_account_owner",
-      teamMemberId: canonicalMember.id,
-      accountId: canonicalMember.accountId,
-      email: canonicalMember.email,
-      updatedAt: canonicalMember.updatedAt,
+      accountId: "account_owner",
+      email: "owner@example.com",
+      updatedAt: iso("2026-06-30T06:20:00Z"),
     };
     const duplicateProjectMember = {
       ...canonicalProjectMember,
       id: "member_owner_duplicate",
-      teamMemberId: duplicateMember.id,
-      accountId: undefined,
-      updatedAt: duplicateMember.updatedAt,
+      updatedAt: iso("2026-06-30T06:10:00Z"),
     };
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
@@ -282,18 +267,6 @@ describe("team backend state loading", () => {
           id: base.projects[0].id,
           updated_at: base.projects[0].updatedAt,
           payload: base.projects[0],
-        }),
-        syncRow({
-          entity: "team_member",
-          id: canonicalMember.id,
-          updated_at: canonicalMember.updatedAt,
-          payload: canonicalMember,
-        }),
-        syncRow({
-          entity: "team_member",
-          id: duplicateMember.id,
-          updated_at: duplicateMember.updatedAt,
-          payload: duplicateMember,
         }),
         syncRow({
           entity: "project_member",
@@ -311,23 +284,11 @@ describe("team backend state loading", () => {
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
     const loaded = await loadTeamState(local);
-    const timestamp = iso("2026-06-30T07:10:00Z");
-    const deleted = deleteTeamMemberInState(loaded, canonicalMember.id, timestamp);
-    const changes = teamChangesBetween(loaded, deleted);
 
-    expect(loaded.teamMembers.map((member) => member.id)).toEqual([canonicalMember.id]);
+    expect(loaded.projectMembers.map((member) => member.id)).toEqual([canonicalProjectMember.id]);
     expect(loaded.sync.entityAliases).toEqual(
       expect.arrayContaining([
-        { entity: "team_member", id: duplicateMember.id, canonicalId: canonicalMember.id },
         { entity: "project_member", id: duplicateProjectMember.id, canonicalId: canonicalProjectMember.id },
-      ]),
-    );
-    expect(changes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ entity: "team_member", id: canonicalMember.id, deleted_at: timestamp, payload: {} }),
-        expect.objectContaining({ entity: "team_member", id: duplicateMember.id, deleted_at: timestamp, payload: {} }),
-        expect.objectContaining({ entity: "project_member", id: canonicalProjectMember.id, deleted_at: timestamp, payload: {} }),
-        expect.objectContaining({ entity: "project_member", id: duplicateProjectMember.id, deleted_at: timestamp, payload: {} }),
       ]),
     );
   });

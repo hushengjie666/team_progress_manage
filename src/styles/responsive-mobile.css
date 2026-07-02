@@ -152,8 +152,20 @@
     white-space: nowrap;
   }
 
-  .mobile-workspace-select {
-    max-width: 150px;
+  .mobile-topbar-actions .invitation-trigger span {
+    display: none;
+  }
+
+  .mobile-topbar-actions .invitation-popover {
+    position: fixed;
+    top: calc(var(--mobile-topbar-height) + 10px);
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .invitation-item {
+    grid-template-columns: 1fr;
   }
 
   .mobile-bottom-nav {
@@ -364,6 +376,10 @@
 
   .project-overview-card {
     padding: 13px;
+  }
+
+  .project-overview-create-card {
+    min-height: 180px;
   }
 
   .project-overview-card-header {

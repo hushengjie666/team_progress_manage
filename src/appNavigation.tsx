@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Building2,
   CalendarDays,
   Focus,
   FolderKanban,
@@ -15,6 +16,7 @@ import type { Tab } from "./appModel";
 
 export type AppNavigationHandlers = {
   openBoard: () => void;
+  openWorkspaces: () => void;
   openMemberStatus: () => void;
   openWorkbench: () => void;
   openFocus: () => void;
@@ -28,6 +30,7 @@ export type AppNavigationHandlers = {
 
 export const createAppNavigation = ({
   openBoard,
+  openWorkspaces,
   openMemberStatus,
   openWorkbench,
   openFocus,
@@ -45,10 +48,16 @@ export const createAppNavigation = ({
     onClick: openAdmin,
   };
 
+  const boardNavItem: AppTopbarNavItem = { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard };
+  const workspacesNavItem: AppTopbarNavItem = { key: "workspaces", label: "工作区", icon: <Building2 size={18} />, onClick: openWorkspaces };
+  const memberStatusNavItem: AppTopbarNavItem = { key: "member_status", label: "成员状况", icon: <Users size={18} />, onClick: openMemberStatus };
+  const workbenchNavItem: AppTopbarNavItem = { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench };
+
   const primaryNavItems: AppTopbarNavItem[] = [
-    { key: "board", label: "项目总览", icon: <LayoutDashboard size={18} />, onClick: openBoard },
-    ...(showMemberStatus ? [{ key: "member_status", label: "成员状况", icon: <Users size={18} />, onClick: openMemberStatus }] : []),
-    { key: "workbench", label: "我的任务", icon: <UserCheck size={18} />, onClick: openWorkbench },
+    boardNavItem,
+    workspacesNavItem,
+    ...(showMemberStatus ? [memberStatusNavItem] : []),
+    workbenchNavItem,
   ];
 
   const secondaryNavItems: AppTopbarNavItem[] = [
@@ -60,7 +69,7 @@ export const createAppNavigation = ({
   ];
 
   const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
-  const mobileNavItems = [...primaryNavItems.slice(0, 3), secondaryNavItems[0]].slice(0, 4);
+  const mobileNavItems = [boardNavItem, ...(showMemberStatus ? [memberStatusNavItem] : []), workbenchNavItem, secondaryNavItems[0]].slice(0, 4);
   const mobileMoreItems: AppTopbarNavItem[] = [
     secondaryNavItems[1],
     secondaryNavItems[2],
@@ -90,6 +99,7 @@ export const mobileTitleForNavigation = ({
 
   const titleByNav: Record<string, string> = {
     board: "项目总览",
+    workspaces: "工作区",
     member_status: "成员状况",
     workbench: "我的任务",
     admin: "管理中心",

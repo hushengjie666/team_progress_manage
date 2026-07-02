@@ -138,18 +138,79 @@ type workspaceCreateRequest struct {
 	DeviceID string `json:"device_id,omitempty"`
 }
 
+type workspaceUpdateRequest struct {
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	OwnerAccountID string `json:"owner_account_id,omitempty"`
+}
+
+type workspaceMembershipUpdateRequest struct {
+	Status string `json:"status"`
+}
+
+type workspaceMembershipResponse struct {
+	Membership workspaceMembershipSummary `json:"membership"`
+}
+
 type workspaceSwitchRequest struct {
 	WorkspaceID string `json:"workspace_id"`
 	DeviceID    string `json:"device_id,omitempty"`
 }
 
+type workspaceInvitationRequest struct {
+	WorkspaceID string `json:"workspace_id"`
+	Email       string `json:"email"`
+}
+
+type projectInvitationRequest struct {
+	WorkspaceID string   `json:"workspace_id,omitempty"`
+	ProjectID   string   `json:"project_id"`
+	Email       string   `json:"email"`
+	Roles       []string `json:"roles"`
+}
+
+type workspaceInvitationSummary struct {
+	ID               string `json:"id"`
+	WorkspaceID      string `json:"workspace_id"`
+	WorkspaceName    string `json:"workspace_name"`
+	WorkspaceType    string `json:"workspace_type"`
+	InviterAccountID string `json:"inviter_account_id"`
+	InviterName      string `json:"inviter_name"`
+	InviterEmail     string `json:"inviter_email"`
+	InviteeAccountID string `json:"invitee_account_id"`
+	InviteeEmail     string `json:"invitee_email"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"created_at"`
+	UpdatedAt        string `json:"updated_at"`
+	AcceptedAt       string `json:"accepted_at,omitempty"`
+}
+
+type projectInvitationSummary struct {
+	ID               string   `json:"id"`
+	WorkspaceID      string   `json:"workspace_id"`
+	WorkspaceName    string   `json:"workspace_name"`
+	ProjectID        string   `json:"project_id"`
+	ProjectName      string   `json:"project_name"`
+	InviterAccountID string   `json:"inviter_account_id"`
+	InviterName      string   `json:"inviter_name"`
+	InviterEmail     string   `json:"inviter_email"`
+	InviteeAccountID string   `json:"invitee_account_id"`
+	InviteeEmail     string   `json:"invitee_email"`
+	Roles            []string `json:"roles"`
+	Status           string   `json:"status"`
+	CreatedAt        string   `json:"created_at"`
+	UpdatedAt        string   `json:"updated_at"`
+	AcceptedAt       string   `json:"accepted_at,omitempty"`
+}
+
 type memberRequest struct {
-	ProjectID string   `json:"project_id"`
-	Name      string   `json:"name"`
-	Email     string   `json:"email"`
-	Password  string   `json:"password"`
-	Roles     []string `json:"roles"`
-	Status    string   `json:"status,omitempty"`
+	WorkspaceID string   `json:"workspace_id,omitempty"`
+	ProjectID   string   `json:"project_id"`
+	Name        string   `json:"name"`
+	Email       string   `json:"email"`
+	Password    string   `json:"password"`
+	Roles       []string `json:"roles"`
+	Status      string   `json:"status,omitempty"`
 }
 
 type memberResponse struct {
@@ -269,8 +330,14 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	mux.HandleFunc("/auth/switch-workspace", api.withAuth(api.handleSwitchWorkspace))
 	mux.HandleFunc("/auth/me", api.withAuth(api.handleMe))
 	mux.HandleFunc("/auth/change-password", api.withAuth(api.handleChangePassword))
+	mux.HandleFunc("/admin/accounts", api.withAuth(api.handleAdminAccounts))
+	mux.HandleFunc("/admin/accounts/", api.withAuth(api.handleAdminAccountByID))
 	mux.HandleFunc("/workspaces", api.withAuth(api.handleWorkspaces))
 	mux.HandleFunc("/workspaces/", api.withAuth(api.handleWorkspaceByID))
+	mux.HandleFunc("/workspace-invitations", api.withAuth(api.handleWorkspaceInvitations))
+	mux.HandleFunc("/workspace-invitations/", api.withAuth(api.handleWorkspaceInvitationByID))
+	mux.HandleFunc("/project-invitations", api.withAuth(api.handleProjectInvitations))
+	mux.HandleFunc("/project-invitations/", api.withAuth(api.handleProjectInvitationByID))
 	mux.HandleFunc("/members", api.withAuth(api.handleMembers))
 	mux.HandleFunc("/members/", api.withAuth(api.handleMemberByID))
 	mux.HandleFunc("/sync/status", api.withAuth(api.handleStatus))
@@ -278,6 +345,7 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 	mux.HandleFunc("/sync/pull", api.withAuth(api.handlePull))
 	mux.HandleFunc("/sync/push", api.withAuth(api.handlePush))
 	mux.HandleFunc("/sync/events", api.handleEvents)
+	mux.HandleFunc("/team/state/all", api.withAuth(api.handleTeamStateAll))
 	mux.HandleFunc("/team/state", api.withAuth(api.handleTeamState))
 	mux.HandleFunc("/team/revision", api.withAuth(api.handleTeamRevision))
 	mux.HandleFunc("/team/changes", api.withAuth(api.handleTeamChanges))
@@ -1104,93 +1172,58 @@ func (a *app) handleMembers(w http.ResponseWriter, r *http.Request, auth authCon
 		}
 		a.store.Accounts[account.ID] = account
 	} else {
-		hash, err := hashPassword(req.Password)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "password hashing failed")
-			return
+		if projectID == "" {
+			hash, err := hashPassword(req.Password)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "password hashing failed")
+				return
+			}
+			account.PasswordHash = hash
 		}
 		account.Name = fallback(strings.TrimSpace(req.Name), account.Name)
 		account.Email = email
-		account.PasswordHash = hash
 		account.DisabledAt = ""
 		account.UpdatedAt = now
 		a.store.Accounts[account.ID] = account
 	}
-	teamMemberID := "team_member_" + account.ID
-	teamMemberRowKey := key("team_member", teamMemberID)
-	existingTeamMemberRow, teamMemberExists := workspace.Rows[teamMemberRowKey]
-	teamMemberCanRecreate := true
-	if teamMemberExists {
-		teamMemberCanRecreate = existingTeamMemberRow.DeletedAt != ""
-		if !teamMemberCanRecreate {
-			var existingPayload map[string]any
-			if err := json.Unmarshal(existingTeamMemberRow.Payload, &existingPayload); err == nil {
-				if status, ok := existingPayload["status"].(string); ok {
-					teamMemberCanRecreate = strings.TrimSpace(strings.ToLower(status)) == "disabled"
-				}
-			}
-		}
-	}
-
-	makeTeamMemberRow := func() syncRow {
-		teamMemberPayload := map[string]any{
-			"id":        teamMemberID,
-			"accountId": account.ID,
-			"name":      fallback(strings.TrimSpace(req.Name), account.Name),
-			"email":     account.Email,
-			"status":    fallback(strings.TrimSpace(req.Status), "active"),
-			"createdAt": now,
-			"updatedAt": now,
-		}
-		payload, _ := json.Marshal(teamMemberPayload)
-		return syncRow{
-			UserID:      auth.AccountID,
-			AccountID:   auth.AccountID,
-			WorkspaceID: auth.WorkspaceID,
-			Entity:      "team_member",
-			ID:          teamMemberID,
-			DeviceID:    "server",
-			UpdatedAt:   now,
-			Version:     1,
-			Revision:    a.store.NextRevision,
-			Payload:     payload,
-		}
-	}
-
 	if projectID == "" {
-		row := makeTeamMemberRow()
-		a.store.NextRevision++
-		workspace.Rows[teamMemberRowKey] = row
 		workspace.UpdatedAt = now
 		a.store.Workspaces[auth.WorkspaceID] = workspace
 		if err := a.saveLocked(); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
-		a.notifyWorkspaceChanged(auth.WorkspaceID, a.store.NextRevision-1, "server")
-		writeJSON(w, http.StatusOK, memberResponse{Account: account, Member: row})
+		writeJSON(w, http.StatusOK, memberResponse{Account: account})
 		return
 	}
-	if teamMemberCanRecreate {
-		workspace.Rows[teamMemberRowKey] = makeTeamMemberRow()
-		a.store.NextRevision++
-	}
 	memberID := "member_" + projectID + "_" + account.ID
-	if _, exists := workspace.Rows[key("project_member", memberID)]; exists {
+	existingProjectMemberRow, projectMemberExists := workspace.Rows[key("project_member", memberID)]
+	projectMemberCanRecreate := true
+	if projectMemberExists {
+		projectMemberCanRecreate = existingProjectMemberRow.DeletedAt != ""
+		if !projectMemberCanRecreate {
+			var existingProjectMemberPayload map[string]any
+			if err := json.Unmarshal(existingProjectMemberRow.Payload, &existingProjectMemberPayload); err == nil {
+				if status, ok := existingProjectMemberPayload["status"].(string); ok {
+					projectMemberCanRecreate = strings.TrimSpace(strings.ToLower(status)) == "disabled"
+				}
+			}
+		}
+	}
+	if projectMemberExists && !projectMemberCanRecreate {
 		writeError(w, http.StatusConflict, "account already belongs to this project")
 		return
 	}
 	memberPayload := map[string]any{
-		"id":           memberID,
-		"projectId":    projectID,
-		"teamMemberId": teamMemberID,
-		"accountId":    account.ID,
-		"name":         fallback(strings.TrimSpace(req.Name), account.Name),
-		"email":        account.Email,
-		"roles":        normalizeRoles(req.Roles),
-		"status":       fallback(strings.TrimSpace(req.Status), "active"),
-		"createdAt":    now,
-		"updatedAt":    now,
+		"id":        memberID,
+		"projectId": projectID,
+		"accountId": account.ID,
+		"name":      fallback(strings.TrimSpace(req.Name), account.Name),
+		"email":     account.Email,
+		"roles":     normalizeRoles(req.Roles),
+		"status":    fallback(strings.TrimSpace(req.Status), "active"),
+		"createdAt": now,
+		"updatedAt": now,
 	}
 	payload, _ := json.Marshal(memberPayload)
 	row := syncRow{
@@ -1242,41 +1275,6 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 	workspace := a.workspaceLocked(auth.WorkspaceID)
 	existing, found := workspace.Rows[key("project_member", memberID)]
 	if !found {
-		existing, found = workspace.Rows[key("team_member", memberID)]
-	}
-	if !found && strings.HasPrefix(memberID, "team_member_") {
-		accountID := strings.TrimPrefix(memberID, "team_member_")
-		account, ok := a.store.Accounts[accountID]
-		if ok && account.WorkspaceID == auth.WorkspaceID {
-			timestamp := time.Now().UTC().Format(time.RFC3339)
-			status := "active"
-			if account.DisabledAt != "" {
-				status = "disabled"
-			}
-			payload, _ := json.Marshal(map[string]any{
-				"id":        memberID,
-				"accountId": account.ID,
-				"name":      account.Name,
-				"email":     account.Email,
-				"status":    status,
-				"createdAt": fallback(account.CreatedAt, timestamp),
-				"updatedAt": fallback(account.UpdatedAt, timestamp),
-			})
-			existing = syncRow{
-				UserID:      auth.AccountID,
-				AccountID:   auth.AccountID,
-				WorkspaceID: auth.WorkspaceID,
-				Entity:      "team_member",
-				ID:          memberID,
-				DeviceID:    "server",
-				UpdatedAt:   timestamp,
-				Version:     1,
-				Payload:     payload,
-			}
-			found = true
-		}
-	}
-	if !found {
 		writeError(w, http.StatusNotFound, "member not found")
 		return
 	}
@@ -1285,26 +1283,12 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 		writeError(w, http.StatusBadRequest, "invalid member payload")
 		return
 	}
-	projectID, _ := payload["projectId"].(string)
-	_ = projectID
 	now := time.Now().UTC().Format(time.RFC3339)
 	if strings.TrimSpace(req.Name) != "" {
 		payload["name"] = strings.TrimSpace(req.Name)
 	}
 	if strings.TrimSpace(req.Email) != "" {
-		email := normalizeEmail(req.Email)
-		if existing.Entity == "team_member" {
-			accountID, _ := payload["accountId"].(string)
-			if accountID != "" {
-				for _, account := range a.store.Accounts {
-					if normalizeEmail(account.Email) == email && account.ID != accountID {
-						writeError(w, http.StatusConflict, "email belongs to another account")
-						return
-					}
-				}
-			}
-		}
-		payload["email"] = email
+		payload["email"] = normalizeEmail(req.Email)
 	}
 	if len(req.Roles) > 0 {
 		payload["roles"] = normalizeRoles(req.Roles)
@@ -1314,36 +1298,14 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 	}
 	if strings.TrimSpace(req.Password) != "" {
 		accountID, _ := payload["accountId"].(string)
-		email, _ := payload["email"].(string)
-		if accountID == "" && existing.Entity == "team_member" {
-			accountID = newID("account")
-			payload["accountId"] = accountID
-		}
 		if accountID == "" {
 			writeError(w, http.StatusBadRequest, "member account is required to update password")
 			return
 		}
 		account, ok := a.store.Accounts[accountID]
 		if !ok || account.WorkspaceID != auth.WorkspaceID {
-			if existing.Entity != "team_member" || normalizeEmail(email) == "" {
-				writeError(w, http.StatusNotFound, "member account not found")
-				return
-			}
-			for _, item := range a.store.Accounts {
-				if item.ID != accountID && item.WorkspaceID == auth.WorkspaceID && normalizeEmail(item.Email) == normalizeEmail(email) {
-					writeError(w, http.StatusConflict, "email belongs to another account")
-					return
-				}
-			}
-			name, _ := payload["name"].(string)
-			account = accountRecord{
-				ID:          accountID,
-				WorkspaceID: auth.WorkspaceID,
-				Name:        fallback(strings.TrimSpace(name), normalizeEmail(email)),
-				Email:       normalizeEmail(email),
-				CreatedAt:   now,
-				UpdatedAt:   now,
-			}
+			writeError(w, http.StatusNotFound, "member account not found")
+			return
 		}
 		hash, err := hashPassword(req.Password)
 		if err != nil {
@@ -1359,28 +1321,6 @@ func (a *app) handleMemberByID(w http.ResponseWriter, r *http.Request, auth auth
 		}
 		account.UpdatedAt = now
 		a.store.Accounts[account.ID] = account
-	}
-	if existing.Entity == "team_member" {
-		accountID, _ := payload["accountId"].(string)
-		if accountID != "" {
-			account, ok := a.store.Accounts[accountID]
-			if ok && account.WorkspaceID == auth.WorkspaceID {
-				status, _ := payload["status"].(string)
-				if name, ok := payload["name"].(string); ok && strings.TrimSpace(name) != "" {
-					account.Name = strings.TrimSpace(name)
-				}
-				if email, ok := payload["email"].(string); ok && strings.TrimSpace(email) != "" {
-					account.Email = normalizeEmail(email)
-				}
-				if strings.EqualFold(strings.TrimSpace(status), "disabled") {
-					account.DisabledAt = now
-				} else if strings.EqualFold(strings.TrimSpace(status), "active") {
-					account.DisabledAt = ""
-				}
-				account.UpdatedAt = now
-				a.store.Accounts[account.ID] = account
-			}
-		}
 	}
 	payload["updatedAt"] = now
 	bytes, _ := json.Marshal(payload)
@@ -1422,7 +1362,7 @@ func (a *app) ensureAuthAccess(ctx context.Context, auth authContext) error {
 	if a.db == nil {
 		return nil
 	}
-	_, ok, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, a.db, auth.AccountID, auth.WorkspaceID)
+	_, ok, err := mysqlWorkspaceVisibleToAccount(ctx, a.db, auth.AccountID, auth.WorkspaceID)
 	if err != nil {
 		return errors.New("validate workspace access failed")
 	}
@@ -1575,15 +1515,12 @@ func (a *app) accountByEmailLocked(email string) (accountRecord, bool) {
 }
 
 func (a *app) authorizeChangeLocked(auth authContext, workspace workspaceData, row syncRow) error {
-	if row.DeletedAt != "" && (row.Entity == "project" || row.Entity == "project_member" || row.Entity == "team_member") {
+	if row.DeletedAt != "" && (row.Entity == "project" || row.Entity == "project_member") {
 		return errors.New("projects and members cannot be deleted through sync")
 	}
 	projectID := projectIDFromRow(workspace, row)
 	if projectID == "" {
 		if row.Entity == "settings" || row.Entity == "onboarding" || row.Entity == "reward_state" || row.Entity == "block_profile" || row.Entity == "daily_plan" || row.Entity == "focus_session" || row.Entity == "interruption" || row.Entity == "strict_violation" {
-			return nil
-		}
-		if row.Entity == "team_member" {
 			return nil
 		}
 		return errors.New("project scoped entity is missing project id")

@@ -414,7 +414,7 @@ func TestMySQLIncrementalHandlersDoNotDependOnMemoryStore(t *testing.T) {
 	}
 }
 
-func TestMemoryTeamMemberCanRecreateAfterDisable(t *testing.T) {
+func TestMemoryWorkspaceMemberCreationDoesNotWriteTeamRows(t *testing.T) {
 	api := testApp(t)
 
 	createBody := []byte(`{"name":"成员","email":"member@example.com","password":"member-secret"}`)
@@ -423,66 +423,19 @@ func TestMemoryTeamMemberCanRecreateAfterDisable(t *testing.T) {
 	if createRecorder.Code != http.StatusOK {
 		t.Fatalf("create member status = %d, body = %s", createRecorder.Code, createRecorder.Body.String())
 	}
-	var first memberResponse
-	if err := json.Unmarshal(createRecorder.Body.Bytes(), &first); err != nil {
+	var response memberResponse
+	if err := json.Unmarshal(createRecorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-
-	recreateBody := []byte(`{"name":"成员重复","email":"member@example.com","password":"member-secret-2"}`)
-	recreateRecorder := httptest.NewRecorder()
-	api.handleMembers(recreateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(recreateBody)), ownerAuth())
-	if recreateRecorder.Code != http.StatusOK {
-		t.Fatalf("recreate active member status = %d, body = %s", recreateRecorder.Code, recreateRecorder.Body.String())
+	if response.Account.Email != "member@example.com" || response.Member.Entity != "" {
+		t.Fatalf("workspace member response should only return account: %#v", response)
 	}
-	var updated memberResponse
-	if err := json.Unmarshal(recreateRecorder.Body.Bytes(), &updated); err != nil {
-		t.Fatal(err)
-	}
-	if updated.Member.ID != first.Member.ID || updated.Member.DeletedAt != "" {
-		t.Fatalf("updated member unexpected: %#v", updated.Member)
-	}
-
-	disableBody := bytes.NewReader([]byte(`{"status":"disabled"}`))
-	disableRecorder := httptest.NewRecorder()
-	api.handleMemberByID(disableRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+first.Member.ID, disableBody), ownerAuth())
-	if disableRecorder.Code != http.StatusOK {
-		t.Fatalf("disable member status = %d, body = %s", disableRecorder.Code, disableRecorder.Body.String())
-	}
-	disabledLoginBody := bytes.NewReader([]byte(`{"email":"member@example.com","password":"member-secret-2","device_id":"device_disabled"}`))
-	disabledLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(disabledLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", disabledLoginBody))
-	if disabledLoginRecorder.Code != http.StatusUnauthorized {
-		t.Fatalf("disabled member login status = %d, body = %s", disabledLoginRecorder.Code, disabledLoginRecorder.Body.String())
-	}
-
-	recreateRecorder = httptest.NewRecorder()
-	api.handleMembers(recreateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(recreateBody)), ownerAuth())
-	if recreateRecorder.Code != http.StatusOK {
-		t.Fatalf("recreate member status = %d, body = %s", recreateRecorder.Code, recreateRecorder.Body.String())
-	}
-	var recreated memberResponse
-	if err := json.Unmarshal(recreateRecorder.Body.Bytes(), &recreated); err != nil {
-		t.Fatal(err)
-	}
-	if recreated.Member.ID != first.Member.ID || recreated.Member.DeletedAt != "" {
-		t.Fatalf("recreated member unexpected: %#v", recreated.Member)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(recreated.Member.Payload, &payload); err != nil {
-		t.Fatal(err)
-	}
-	if status, _ := payload["status"].(string); status != "active" {
-		t.Fatalf("recreated member status = %v", status)
-	}
-	memberLoginBody := bytes.NewReader([]byte(`{"email":"member@example.com","password":"member-secret-2","device_id":"device_member"}`))
-	memberLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(memberLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", memberLoginBody))
-	if memberLoginRecorder.Code != http.StatusOK {
-		t.Fatalf("recreated member login status = %d, body = %s", memberLoginRecorder.Code, memberLoginRecorder.Body.String())
+	if len(api.store.Workspaces["workspace_test"].Rows) != 0 || api.store.NextRevision != 1 {
+		t.Fatalf("workspace member creation should not create sync rows: %#v", api.store.Workspaces["workspace_test"].Rows)
 	}
 }
 
-func TestMySQLAuthAndMemberHandlersDoNotDependOnMemoryStore(t *testing.T) {
+func TestMySQLWorkspaceMemberCreationDoesNotWriteTeamRows(t *testing.T) {
 	dsn, cleanup := mysqlTestDSN(t)
 	defer cleanup()
 	db, _, err := openMySQLStore(dsn)
@@ -502,206 +455,45 @@ func TestMySQLAuthAndMemberHandlersDoNotDependOnMemoryStore(t *testing.T) {
 	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
 		t.Fatal(err)
 	}
-	if login.Account.Email != "admin" || login.Workspace.Type != "private" {
-		t.Fatalf("login response = %#v", login)
+
+	workspaceBody := []byte(`{"name":"协作区"}`)
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader(workspaceBody)), authContext{AccountID: login.Account.ID, WorkspaceID: login.Workspace.ID})
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
 	}
-	auth := authContext{AccountID: login.Account.ID, WorkspaceID: login.Workspace.ID}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: login.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 
 	memberBody := []byte(`{"name":"成员","email":"member@example.com","password":"member-secret"}`)
 	memberRecorder := httptest.NewRecorder()
-	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(memberBody)), auth)
+	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(memberBody)), sharedAuth)
 	if memberRecorder.Code != http.StatusOK {
 		t.Fatalf("member status = %d, body = %s", memberRecorder.Code, memberRecorder.Body.String())
 	}
-	var member memberResponse
-	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &member); err != nil {
+	var response memberResponse
+	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if member.Member.Entity != "team_member" || member.Member.Revision != 1 {
-		t.Fatalf("member response = %#v", member)
+	if response.Account.Email != "member@example.com" || response.Member.Entity != "" {
+		t.Fatalf("workspace member response should only return account: %#v", response)
 	}
-
-	pulled := pullRows(t, api, auth, 0)
-	if len(pulled.Changes) != 1 || pulled.Changes[0].Entity != "team_member" || pulled.CurrentRevision != 1 {
-		t.Fatalf("pull after member create = %#v", pulled)
-	}
-
-	if _, err := db.ExecContext(
-		context.Background(),
-		`UPDATE sync_rows SET deleted_at = ? WHERE workspace_id = ? AND entity = 'team_member' AND entity_id = ?`,
-		"2026-07-01T09:00:00Z",
-		auth.WorkspaceID,
-		member.Member.ID,
-	); err != nil {
+	var teamRows int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM sync_rows WHERE workspace_id = ? AND entity = 'team_member'`, sharedLogin.Workspace.ID).Scan(&teamRows); err != nil {
 		t.Fatal(err)
 	}
-	recreateBody := []byte(`{"name":"成员恢复","email":"member@example.com","password":"restored-secret"}`)
-	recreateRecorder := httptest.NewRecorder()
-	api.handleMembers(recreateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(recreateBody)), auth)
-	if recreateRecorder.Code != http.StatusOK {
-		t.Fatalf("recreate member status = %d, body = %s", recreateRecorder.Code, recreateRecorder.Body.String())
+	if teamRows != 0 {
+		t.Fatalf("team_member sync rows = %d", teamRows)
 	}
-	var recreated memberResponse
-	if err := json.Unmarshal(recreateRecorder.Body.Bytes(), &recreated); err != nil {
+	var membershipRows int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM workspace_memberships WHERE workspace_id = ? AND account_id = ? AND status = 'active'`, sharedLogin.Workspace.ID, response.Account.ID).Scan(&membershipRows); err != nil {
 		t.Fatal(err)
 	}
-	if recreated.Member.ID != member.Member.ID || recreated.Member.DeletedAt != "" {
-		t.Fatalf("recreated member was not restored: %#v", recreated.Member)
-	}
-
-	memberLoginBody := []byte(`{"email":"member@example.com","password":"restored-secret","device_id":"device_member"}`)
-	memberLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(memberLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(memberLoginBody)))
-	if memberLoginRecorder.Code != http.StatusOK {
-		t.Fatalf("member login status = %d, body = %s", memberLoginRecorder.Code, memberLoginRecorder.Body.String())
-	}
-	var memberLogin loginResponse
-	if err := json.Unmarshal(memberLoginRecorder.Body.Bytes(), &memberLogin); err != nil {
-		t.Fatal(err)
-	}
-	regularAuth := authContext{AccountID: memberLogin.Account.ID, WorkspaceID: memberLogin.Workspace.ID}
-	deniedBody := bytes.NewReader([]byte(`{"name":"其他成员","email":"other@example.com","password":"other-secret"}`))
-	deniedRecorder := httptest.NewRecorder()
-	api.handleMembers(deniedRecorder, httptest.NewRequest(http.MethodPost, "/members", deniedBody), regularAuth)
-	if deniedRecorder.Code != http.StatusForbidden || !strings.Contains(deniedRecorder.Body.String(), "admin account required") {
-		t.Fatalf("expected regular member to be denied, status = %d, body = %s", deniedRecorder.Code, deniedRecorder.Body.String())
-	}
-}
-
-func TestMySQLTeamMemberCanRecreateAfterDisable(t *testing.T) {
-	dsn, cleanup := mysqlTestDSN(t)
-	defer cleanup()
-	db, _, err := openMySQLStore(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	api := newApp(defaultConfig(), emptyStore(), db)
-
-	loginBody := []byte(`{"email":"admin","password":"hu626699","device_id":"device_mysql"}`)
-	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody)))
-	if loginRecorder.Code != http.StatusOK {
-		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
-	}
-	var owner loginResponse
-	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &owner); err != nil {
-		t.Fatal(err)
-	}
-	auth := authContext{AccountID: owner.Account.ID, WorkspaceID: owner.Workspace.ID}
-
-	memberBody := bytes.NewReader([]byte(`{"name":"成员","email":"member@example.com","password":"member-secret"}`))
-	memberRecorder := httptest.NewRecorder()
-	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", memberBody), auth)
-	if memberRecorder.Code != http.StatusOK {
-		t.Fatalf("create member status = %d, body = %s", memberRecorder.Code, memberRecorder.Body.String())
-	}
-	var member memberResponse
-	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &member); err != nil {
-		t.Fatal(err)
-	}
-
-	disableBody := bytes.NewReader([]byte(`{"status":"disabled"}`))
-	disableRecorder := httptest.NewRecorder()
-	api.handleMemberByID(disableRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+member.Member.ID, disableBody), auth)
-	if disableRecorder.Code != http.StatusOK {
-		t.Fatalf("disable member status = %d, body = %s", disableRecorder.Code, disableRecorder.Body.String())
-	}
-	disabledLoginBody := bytes.NewReader([]byte(`{"email":"member@example.com","password":"member-secret","device_id":"device_disabled"}`))
-	disabledLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(disabledLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", disabledLoginBody))
-	if disabledLoginRecorder.Code != http.StatusUnauthorized {
-		t.Fatalf("disabled member login status = %d, body = %s", disabledLoginRecorder.Code, disabledLoginRecorder.Body.String())
-	}
-
-	recreateBody := bytes.NewReader([]byte(`{"name":"成员恢复","email":"member@example.com","password":"restored-secret"}`))
-	recreateRecorder := httptest.NewRecorder()
-	api.handleMembers(recreateRecorder, httptest.NewRequest(http.MethodPost, "/members", recreateBody), auth)
-	if recreateRecorder.Code != http.StatusOK {
-		t.Fatalf("recreate member status = %d, body = %s", recreateRecorder.Code, recreateRecorder.Body.String())
-	}
-	var recreated memberResponse
-	if err := json.Unmarshal(recreateRecorder.Body.Bytes(), &recreated); err != nil {
-		t.Fatal(err)
-	}
-	if recreated.Member.ID != member.Member.ID || recreated.Member.DeletedAt != "" {
-		t.Fatalf("recreated member unexpected: %#v", recreated.Member)
-	}
-	var recreatedPayload map[string]any
-	if err := json.Unmarshal(recreated.Member.Payload, &recreatedPayload); err != nil {
-		t.Fatal(err)
-	}
-	if status, _ := recreatedPayload["status"].(string); status != "active" {
-		t.Fatalf("recreated member status = %v", status)
-	}
-
-	memberLoginBody := bytes.NewReader([]byte(`{"email":"member@example.com","password":"restored-secret","device_id":"device_member"}`))
-	memberLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(memberLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", memberLoginBody))
-	if memberLoginRecorder.Code != http.StatusOK {
-		t.Fatalf("member login status = %d, body = %s", memberLoginRecorder.Code, memberLoginRecorder.Body.String())
-	}
-}
-
-func TestMySQLTeamMemberRecreateUpdatesActiveWorkspaceMember(t *testing.T) {
-	dsn, cleanup := mysqlTestDSN(t)
-	defer cleanup()
-	db, _, err := openMySQLStore(dsn)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	api := newApp(defaultConfig(), emptyStore(), db)
-
-	loginBody := bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_mysql"}`))
-	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
-	if loginRecorder.Code != http.StatusOK {
-		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
-	}
-	var owner loginResponse
-	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &owner); err != nil {
-		t.Fatal(err)
-	}
-	auth := authContext{AccountID: owner.Account.ID, WorkspaceID: owner.Workspace.ID}
-
-	memberBody := []byte(`{"name":"成员","email":"restore@example.com","password":"member-secret"}`)
-	memberRecorder := httptest.NewRecorder()
-	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(memberBody)), auth)
-	if memberRecorder.Code != http.StatusOK {
-		t.Fatalf("create member status = %d, body = %s", memberRecorder.Code, memberRecorder.Body.String())
-	}
-	var member memberResponse
-	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &member); err != nil {
-		t.Fatal(err)
-	}
-
-	recreateBody := []byte(`{"name":"成员","email":"restore@example.com","password":"restored-secret"}`)
-	recreateRecorder := httptest.NewRecorder()
-	api.handleMembers(recreateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(recreateBody)), auth)
-	if recreateRecorder.Code != http.StatusOK {
-		t.Fatalf("recreate active member status = %d, body = %s", recreateRecorder.Code, recreateRecorder.Body.String())
-	}
-	var recreated memberResponse
-	if err := json.Unmarshal(recreateRecorder.Body.Bytes(), &recreated); err != nil {
-		t.Fatal(err)
-	}
-	if recreated.Member.ID != member.Member.ID || recreated.Member.DeletedAt != "" {
-		t.Fatalf("recreated member unexpected: %#v", recreated.Member)
-	}
-	var payload map[string]any
-	if err := json.Unmarshal(recreated.Member.Payload, &payload); err != nil {
-		t.Fatal(err)
-	}
-	if status, _ := payload["status"].(string); status != "active" {
-		t.Fatalf("recreated member status = %v", status)
-	}
-
-	memberLoginBody := bytes.NewReader([]byte(`{"email":"restore@example.com","password":"restored-secret","device_id":"device_member"}`))
-	memberLoginRecorder := httptest.NewRecorder()
-	api.handleLogin(memberLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", memberLoginBody))
-	if memberLoginRecorder.Code != http.StatusOK {
-		t.Fatalf("member login status = %d, body = %s", memberLoginRecorder.Code, memberLoginRecorder.Body.String())
+	if membershipRows != 1 {
+		t.Fatalf("workspace membership rows = %d", membershipRows)
 	}
 }
 
@@ -740,6 +532,611 @@ func TestMySQLStoreSeedsDefaultAdminAccount(t *testing.T) {
 	}
 	if login.Account.Email != "admin" || login.Account.Name != "超级管理员" || login.Workspace.Type != "private" {
 		t.Fatalf("login = %#v", login)
+	}
+}
+
+func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	accountRecorder := httptest.NewRecorder()
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"被邀请人","email":"invitee@example.com","password":"secret"}`))), adminAuth)
+	if accountRecorder.Code != http.StatusOK {
+		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
+	}
+	var accountPayload platformAccountResponse
+	if err := json.Unmarshal(accountRecorder.Body.Bytes(), &accountPayload); err != nil {
+		t.Fatal(err)
+	}
+
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"邀请协作区"}`))), adminAuth)
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+	ownerStateRecorder := httptest.NewRecorder()
+	api.handleTeamStateAll(ownerStateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), sharedAuth)
+	if ownerStateRecorder.Code != http.StatusOK {
+		t.Fatalf("owner team state status = %d, body = %s", ownerStateRecorder.Code, ownerStateRecorder.Body.String())
+	}
+	var ownerState pullResponse
+	if err := json.Unmarshal(ownerStateRecorder.Body.Bytes(), &ownerState); err != nil {
+		t.Fatal(err)
+	}
+	if len(ownerState.Changes) != 0 {
+		t.Fatalf("owner team state should not include workspace member sync rows: %#v", ownerState.Changes)
+	}
+
+	inviteBody := bytes.NewReader([]byte(`{"workspace_id":"` + sharedLogin.Workspace.ID + `","email":"invitee@example.com"}`))
+	inviteRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitations(inviteRecorder, httptest.NewRequest(http.MethodPost, "/workspace-invitations", inviteBody), sharedAuth)
+	if inviteRecorder.Code != http.StatusOK {
+		t.Fatalf("invite status = %d, body = %s", inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var invitePayload struct {
+		Invitation workspaceInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(inviteRecorder.Body.Bytes(), &invitePayload); err != nil {
+		t.Fatal(err)
+	}
+	if invitePayload.Invitation.Status != "pending" || invitePayload.Invitation.InviteeAccountID != accountPayload.Account.ID {
+		t.Fatalf("invitation = %#v", invitePayload.Invitation)
+	}
+
+	inviteeLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(inviteeLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"invitee@example.com","password":"secret","device_id":"device_invitee"}`))))
+	if inviteeLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("invitee login status = %d, body = %s", inviteeLoginRecorder.Code, inviteeLoginRecorder.Body.String())
+	}
+	var inviteeLogin loginResponse
+	if err := json.Unmarshal(inviteeLoginRecorder.Body.Bytes(), &inviteeLogin); err != nil {
+		t.Fatal(err)
+	}
+	inviteeAuth := authContext{AccountID: inviteeLogin.Account.ID, WorkspaceID: inviteeLogin.Workspace.ID}
+
+	listRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitations(listRecorder, httptest.NewRequest(http.MethodGet, "/workspace-invitations", nil), inviteeAuth)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("list invitations status = %d, body = %s", listRecorder.Code, listRecorder.Body.String())
+	}
+	var listPayload struct {
+		Invitations []workspaceInvitationSummary `json:"invitations"`
+	}
+	if err := json.Unmarshal(listRecorder.Body.Bytes(), &listPayload); err != nil {
+		t.Fatal(err)
+	}
+	if len(listPayload.Invitations) != 1 || listPayload.Invitations[0].ID != invitePayload.Invitation.ID {
+		t.Fatalf("invitations = %#v", listPayload.Invitations)
+	}
+
+	acceptRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+invitePayload.Invitation.ID+"/accept", nil), inviteeAuth)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("accept invitation status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptedPayload struct {
+		Invitation workspaceInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(acceptRecorder.Body.Bytes(), &acceptedPayload); err != nil {
+		t.Fatal(err)
+	}
+	if acceptedPayload.Invitation.Status != "accepted" || acceptedPayload.Invitation.AcceptedAt == "" {
+		t.Fatalf("accepted invitation = %#v", acceptedPayload.Invitation)
+	}
+
+	var membershipCount int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM workspace_memberships WHERE workspace_id = ? AND account_id = ? AND status = 'active'`, sharedLogin.Workspace.ID, inviteeLogin.Account.ID).Scan(&membershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if membershipCount != 1 {
+		t.Fatalf("membership count = %d", membershipCount)
+	}
+
+	workspacesRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspacesRecorder, httptest.NewRequest(http.MethodGet, "/workspaces", nil), inviteeAuth)
+	if workspacesRecorder.Code != http.StatusOK {
+		t.Fatalf("invitee workspaces status = %d, body = %s", workspacesRecorder.Code, workspacesRecorder.Body.String())
+	}
+	var workspacesPayload struct {
+		Workspaces  []workspaceSummary           `json:"workspaces"`
+		Memberships []workspaceMembershipSummary `json:"memberships"`
+	}
+	if err := json.Unmarshal(workspacesRecorder.Body.Bytes(), &workspacesPayload); err != nil {
+		t.Fatal(err)
+	}
+	hasSharedWorkspace := false
+	sharedMemberships := []workspaceMembershipSummary{}
+	for _, workspace := range workspacesPayload.Workspaces {
+		if workspace.ID == sharedLogin.Workspace.ID {
+			hasSharedWorkspace = true
+		}
+	}
+	for _, membership := range workspacesPayload.Memberships {
+		if membership.WorkspaceID == sharedLogin.Workspace.ID {
+			sharedMemberships = append(sharedMemberships, membership)
+		}
+	}
+	if !hasSharedWorkspace {
+		t.Fatalf("invitee workspaces missing shared workspace: %#v", workspacesPayload.Workspaces)
+	}
+	if len(sharedMemberships) != 1 || sharedMemberships[0].AccountID != inviteeLogin.Account.ID {
+		t.Fatalf("invitee shared memberships should only include self: %#v", sharedMemberships)
+	}
+
+	inviteeStateRecorder := httptest.NewRecorder()
+	api.handleTeamStateAll(inviteeStateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), inviteeAuth)
+	if inviteeStateRecorder.Code != http.StatusOK {
+		t.Fatalf("invitee team state status = %d, body = %s", inviteeStateRecorder.Code, inviteeStateRecorder.Body.String())
+	}
+	var inviteeState pullResponse
+	if err := json.Unmarshal(inviteeStateRecorder.Body.Bytes(), &inviteeState); err != nil {
+		t.Fatal(err)
+	}
+	if len(inviteeState.Changes) != 0 {
+		t.Fatalf("invitee team state should not include workspace member sync rows: %#v", inviteeState.Changes)
+	}
+}
+
+func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	accountRecorder := httptest.NewRecorder()
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"项目受邀人","email":"project-invitee@example.com","password":"secret"}`))), adminAuth)
+	if accountRecorder.Code != http.StatusOK {
+		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
+	}
+	var accountPayload platformAccountResponse
+	if err := json.Unmarshal(accountRecorder.Body.Bytes(), &accountPayload); err != nil {
+		t.Fatal(err)
+	}
+
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"项目邀请协作区"}`))), adminAuth)
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+	workspaceID := sharedLogin.Workspace.ID
+	seedRows := []syncRow{
+		{WorkspaceID: workspaceID, Entity: "project", ID: "project_invited", UpdatedAt: "2026-07-01T08:00:00Z", Payload: json.RawMessage(`{"id":"project_invited","workspaceId":"` + workspaceID + `","name":"受邀项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:00:00Z","updatedAt":"2026-07-01T08:00:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "project", ID: "project_other", UpdatedAt: "2026-07-01T08:01:00Z", Payload: json.RawMessage(`{"id":"project_other","workspaceId":"` + workspaceID + `","name":"其他项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:01:00Z","updatedAt":"2026-07-01T08:01:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "task", ID: "task_invited", UpdatedAt: "2026-07-01T08:02:00Z", Payload: json.RawMessage(`{"id":"task_invited","workspaceId":"` + workspaceID + `","projectId":"project_invited","project":"受邀项目","title":"受邀任务","status":"pool","createdAt":"2026-07-01T08:02:00Z","updatedAt":"2026-07-01T08:02:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "task", ID: "task_other", UpdatedAt: "2026-07-01T08:03:00Z", Payload: json.RawMessage(`{"id":"task_other","workspaceId":"` + workspaceID + `","projectId":"project_other","project":"其他项目","title":"其他任务","status":"pool","createdAt":"2026-07-01T08:03:00Z","updatedAt":"2026-07-01T08:03:00Z"}`)},
+	}
+	seedBody, err := json.Marshal(pushRequest{DeviceID: "device_seed", Changes: seedRows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedRecorder := httptest.NewRecorder()
+	api.handleTeamChanges(seedRecorder, httptest.NewRequest(http.MethodPost, "/team/changes", bytes.NewReader(seedBody)), sharedAuth)
+	if seedRecorder.Code != http.StatusOK {
+		t.Fatalf("seed team changes status = %d, body = %s", seedRecorder.Code, seedRecorder.Body.String())
+	}
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_invited","email":"project-invitee@example.com","roles":["executor"]}`))
+	api.handleProjectInvitations(inviteRecorder, httptest.NewRequest(http.MethodPost, "/project-invitations", inviteBody), sharedAuth)
+	if inviteRecorder.Code != http.StatusOK {
+		t.Fatalf("project invite status = %d, body = %s", inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var invitePayload struct {
+		Invitation projectInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(inviteRecorder.Body.Bytes(), &invitePayload); err != nil {
+		t.Fatal(err)
+	}
+	if invitePayload.Invitation.ProjectName != "受邀项目" || invitePayload.Invitation.InviteeAccountID != accountPayload.Account.ID {
+		t.Fatalf("project invitation = %#v", invitePayload.Invitation)
+	}
+
+	inviteeLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(inviteeLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"project-invitee@example.com","password":"secret","device_id":"device_project_invitee"}`))))
+	if inviteeLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("invitee login status = %d, body = %s", inviteeLoginRecorder.Code, inviteeLoginRecorder.Body.String())
+	}
+	var inviteeLogin loginResponse
+	if err := json.Unmarshal(inviteeLoginRecorder.Body.Bytes(), &inviteeLogin); err != nil {
+		t.Fatal(err)
+	}
+	inviteeAuth := authContext{AccountID: inviteeLogin.Account.ID, WorkspaceID: inviteeLogin.Workspace.ID}
+
+	listRecorder := httptest.NewRecorder()
+	api.handleProjectInvitations(listRecorder, httptest.NewRequest(http.MethodGet, "/project-invitations", nil), inviteeAuth)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("list project invitations status = %d, body = %s", listRecorder.Code, listRecorder.Body.String())
+	}
+	var listPayload struct {
+		Invitations []projectInvitationSummary `json:"invitations"`
+	}
+	if err := json.Unmarshal(listRecorder.Body.Bytes(), &listPayload); err != nil {
+		t.Fatal(err)
+	}
+	if len(listPayload.Invitations) != 1 || listPayload.Invitations[0].ID != invitePayload.Invitation.ID {
+		t.Fatalf("project invitations = %#v", listPayload.Invitations)
+	}
+
+	acceptRecorder := httptest.NewRecorder()
+	api.handleProjectInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/project-invitations/"+invitePayload.Invitation.ID+"/accept", nil), inviteeAuth)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("accept project invitation status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+	var acceptedPayload struct {
+		Invitation projectInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(acceptRecorder.Body.Bytes(), &acceptedPayload); err != nil {
+		t.Fatal(err)
+	}
+	if acceptedPayload.Invitation.Status != "accepted" || acceptedPayload.Invitation.AcceptedAt == "" {
+		t.Fatalf("accepted project invitation = %#v", acceptedPayload.Invitation)
+	}
+
+	var workspaceMembershipCount int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM workspace_memberships WHERE workspace_id = ? AND account_id = ?`, workspaceID, inviteeLogin.Account.ID).Scan(&workspaceMembershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if workspaceMembershipCount != 0 {
+		t.Fatalf("project invitation should not add workspace membership, got %d", workspaceMembershipCount)
+	}
+	var projectMembershipCount int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL AND COALESCE(NULLIF(status, ''), 'active') = 'active'`, workspaceID, "project_invited", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if projectMembershipCount != 1 {
+		t.Fatalf("project membership count = %d", projectMembershipCount)
+	}
+
+	workspacesRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspacesRecorder, httptest.NewRequest(http.MethodGet, "/workspaces", nil), inviteeAuth)
+	if workspacesRecorder.Code != http.StatusOK {
+		t.Fatalf("project invitee workspaces status = %d, body = %s", workspacesRecorder.Code, workspacesRecorder.Body.String())
+	}
+	var workspacesPayload struct {
+		Workspaces  []workspaceSummary           `json:"workspaces"`
+		Memberships []workspaceMembershipSummary `json:"memberships"`
+	}
+	if err := json.Unmarshal(workspacesRecorder.Body.Bytes(), &workspacesPayload); err != nil {
+		t.Fatal(err)
+	}
+	hasProjectWorkspace := false
+	for _, workspace := range workspacesPayload.Workspaces {
+		if workspace.ID == workspaceID {
+			hasProjectWorkspace = true
+		}
+	}
+	if !hasProjectWorkspace {
+		t.Fatalf("project invitee workspaces missing project workspace: %#v", workspacesPayload.Workspaces)
+	}
+	for _, membership := range workspacesPayload.Memberships {
+		if membership.WorkspaceID == workspaceID {
+			t.Fatalf("project invitee should not receive workspace membership: %#v", workspacesPayload.Memberships)
+		}
+	}
+
+	stateRecorder := httptest.NewRecorder()
+	api.handleTeamStateAll(stateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), inviteeAuth)
+	if stateRecorder.Code != http.StatusOK {
+		t.Fatalf("project invitee team state status = %d, body = %s", stateRecorder.Code, stateRecorder.Body.String())
+	}
+	var stateResponse pullResponse
+	if err := json.Unmarshal(stateRecorder.Body.Bytes(), &stateResponse); err != nil {
+		t.Fatal(err)
+	}
+	visible := map[string]bool{}
+	for _, row := range stateResponse.Changes {
+		visible[row.Entity+"/"+row.ID] = true
+	}
+	if !visible["project/project_invited"] || !visible["task/task_invited"] {
+		t.Fatalf("project invitee state missing invited project rows: %#v", visible)
+	}
+	if visible["project/project_other"] || visible["task/task_other"] {
+		t.Fatalf("project invitee state leaked other project rows: %#v", visible)
+	}
+}
+
+func TestMySQLWorkspaceUpdateCanChangeSharedWorkspaceOwner(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	accountRecorder := httptest.NewRecorder()
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"新负责人","email":"new-owner@example.com","password":"secret"}`))), adminAuth)
+	if accountRecorder.Code != http.StatusOK {
+		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
+	}
+	var accountPayload platformAccountResponse
+	if err := json.Unmarshal(accountRecorder.Body.Bytes(), &accountPayload); err != nil {
+		t.Fatal(err)
+	}
+
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"待转负责人协作区"}`))), adminAuth)
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+	now := time.Now().UTC().Format(time.RFC3339)
+	tx, err := db.BeginTx(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := mysqlEnsureWorkspaceMembership(context.Background(), tx, sharedLogin.Workspace.ID, accountPayload.Account.ID, "member", "active", now); err != nil {
+		_ = tx.Rollback()
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	updateRecorder := httptest.NewRecorder()
+	api.handleWorkspaceByID(
+		updateRecorder,
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"已转负责人协作区","type":"shared","owner_account_id":"`+accountPayload.Account.ID+`"}`))),
+		sharedAuth,
+	)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("update workspace owner status = %d, body = %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+	var updatePayload struct {
+		Workspace workspaceSummary `json:"workspace"`
+	}
+	if err := json.Unmarshal(updateRecorder.Body.Bytes(), &updatePayload); err != nil {
+		t.Fatal(err)
+	}
+	if updatePayload.Workspace.OwnerAccountID != accountPayload.Account.ID {
+		t.Fatalf("workspace owner = %q, want %q", updatePayload.Workspace.OwnerAccountID, accountPayload.Account.ID)
+	}
+
+	var oldOwnerRole string
+	if err := db.QueryRowContext(context.Background(), `SELECT role FROM workspace_memberships WHERE workspace_id = ? AND account_id = ?`, sharedLogin.Workspace.ID, adminLogin.Account.ID).Scan(&oldOwnerRole); err != nil {
+		t.Fatal(err)
+	}
+	if oldOwnerRole != "member" {
+		t.Fatalf("old owner role = %q", oldOwnerRole)
+	}
+	var newOwnerRole string
+	if err := db.QueryRowContext(context.Background(), `SELECT role FROM workspace_memberships WHERE workspace_id = ? AND account_id = ?`, sharedLogin.Workspace.ID, accountPayload.Account.ID).Scan(&newOwnerRole); err != nil {
+		t.Fatal(err)
+	}
+	if newOwnerRole != "owner" {
+		t.Fatalf("new owner role = %q", newOwnerRole)
+	}
+}
+
+func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	for _, body := range []string{
+		`{"name":"已加入成员","email":"joined@example.com","password":"secret"}`,
+		`{"name":"待邀请成员","email":"pending@example.com","password":"secret"}`,
+	} {
+		recorder := httptest.NewRecorder()
+		api.handleAdminAccounts(recorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(body))), adminAuth)
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("create platform account status = %d, body = %s", recorder.Code, recorder.Body.String())
+		}
+	}
+
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"协作待转私有"}`))), adminAuth)
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+
+	inviteJoinedRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitations(
+		inviteJoinedRecorder,
+		httptest.NewRequest(http.MethodPost, "/workspace-invitations", bytes.NewReader([]byte(`{"workspace_id":"`+sharedLogin.Workspace.ID+`","email":"joined@example.com"}`))),
+		sharedAuth,
+	)
+	if inviteJoinedRecorder.Code != http.StatusOK {
+		t.Fatalf("invite joined status = %d, body = %s", inviteJoinedRecorder.Code, inviteJoinedRecorder.Body.String())
+	}
+	var joinedInvite struct {
+		Invitation workspaceInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(inviteJoinedRecorder.Body.Bytes(), &joinedInvite); err != nil {
+		t.Fatal(err)
+	}
+
+	joinedLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(joinedLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"joined@example.com","password":"secret","device_id":"device_joined"}`))))
+	if joinedLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("joined login status = %d, body = %s", joinedLoginRecorder.Code, joinedLoginRecorder.Body.String())
+	}
+	var joinedLogin loginResponse
+	if err := json.Unmarshal(joinedLoginRecorder.Body.Bytes(), &joinedLogin); err != nil {
+		t.Fatal(err)
+	}
+	acceptRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitationByID(
+		acceptRecorder,
+		httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+joinedInvite.Invitation.ID+"/accept", nil),
+		authContext{AccountID: joinedLogin.Account.ID, WorkspaceID: joinedLogin.Workspace.ID},
+	)
+	if acceptRecorder.Code != http.StatusOK {
+		t.Fatalf("accept status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
+	}
+
+	pendingRecorder := httptest.NewRecorder()
+	api.handleWorkspaceInvitations(
+		pendingRecorder,
+		httptest.NewRequest(http.MethodPost, "/workspace-invitations", bytes.NewReader([]byte(`{"workspace_id":"`+sharedLogin.Workspace.ID+`","email":"pending@example.com"}`))),
+		sharedAuth,
+	)
+	if pendingRecorder.Code != http.StatusOK {
+		t.Fatalf("invite pending status = %d, body = %s", pendingRecorder.Code, pendingRecorder.Body.String())
+	}
+
+	updateRecorder := httptest.NewRecorder()
+	api.handleWorkspaceByID(
+		updateRecorder,
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"转为私人","type":"private"}`))),
+		sharedAuth,
+	)
+	if updateRecorder.Code != http.StatusOK {
+		t.Fatalf("update workspace status = %d, body = %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+	var updatePayload struct {
+		Workspace workspaceSummary `json:"workspace"`
+	}
+	if err := json.Unmarshal(updateRecorder.Body.Bytes(), &updatePayload); err != nil {
+		t.Fatal(err)
+	}
+	if updatePayload.Workspace.Type != "private" || updatePayload.Workspace.Name != "转为私人" {
+		t.Fatalf("updated workspace = %#v", updatePayload.Workspace)
+	}
+
+	var joinedStatus string
+	if err := db.QueryRowContext(context.Background(), `SELECT status FROM workspace_memberships WHERE workspace_id = ? AND account_id = ?`, sharedLogin.Workspace.ID, joinedLogin.Account.ID).Scan(&joinedStatus); err != nil {
+		t.Fatal(err)
+	}
+	if joinedStatus != "disabled" {
+		t.Fatalf("joined membership status = %q", joinedStatus)
+	}
+	var pendingStatus string
+	if err := db.QueryRowContext(context.Background(), `SELECT status FROM workspace_invitations WHERE workspace_id = ? AND invitee_email = ?`, sharedLogin.Workspace.ID, "pending@example.com").Scan(&pendingStatus); err != nil {
+		t.Fatal(err)
+	}
+	if pendingStatus != "cancelled" {
+		t.Fatalf("pending invitation status = %q", pendingStatus)
+	}
+	workspaces, err := mysqlWorkspaceSummariesForAccount(context.Background(), db, joinedLogin.Account.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, workspace := range workspaces {
+		if workspace.ID == sharedLogin.Workspace.ID {
+			t.Fatalf("private workspace leaked to former member: %#v", workspaces)
+		}
+	}
+}
+
+func TestMySQLWorkspaceUpdateRejectsPrivateWorkspaceTypeChange(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var login loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
+		t.Fatal(err)
+	}
+	if login.Workspace.Type != "private" {
+		t.Fatalf("login workspace = %#v", login.Workspace)
+	}
+
+	updateRecorder := httptest.NewRecorder()
+	api.handleWorkspaceByID(
+		updateRecorder,
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+login.Workspace.ID, bytes.NewReader([]byte(`{"name":"仍是私人工作区","type":"shared"}`))),
+		authContext{AccountID: login.Account.ID, WorkspaceID: login.Workspace.ID},
+	)
+	if updateRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("update private workspace status = %d, body = %s", updateRecorder.Code, updateRecorder.Body.String())
+	}
+
+	workspace, found, err := mysqlWorkspaceByID(context.Background(), db, login.Workspace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found || workspace.Type != "private" {
+		t.Fatalf("workspace after rejected update = %#v, found=%v", workspace, found)
 	}
 }
 
@@ -829,6 +1226,80 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	var member memberResponse
 	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &member); err != nil {
 		t.Fatal(err)
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	if _, err := db.ExecContext(
+		context.Background(),
+		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
+		 VALUES (?, ?, ?, 'member', 'active', ?, ?)
+		 ON DUPLICATE KEY UPDATE status = 'active', updated_at = VALUES(updated_at)`,
+		"membership_"+privateLogin.Workspace.ID+"_"+member.Account.ID,
+		privateLogin.Workspace.ID,
+		member.Account.ID,
+		now,
+		now,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(context.Background(), `UPDATE accounts SET workspace_id = ? WHERE id = ?`, privateLogin.Workspace.ID, member.Account.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	memberLoginBody := bytes.NewReader([]byte(`{"email":"member@example.com","password":"member-secret","device_id":"device_member"}`))
+	memberLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(memberLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", memberLoginBody))
+	if memberLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("member login status = %d, body = %s", memberLoginRecorder.Code, memberLoginRecorder.Body.String())
+	}
+	var memberLogin loginResponse
+	if err := json.Unmarshal(memberLoginRecorder.Body.Bytes(), &memberLogin); err != nil {
+		t.Fatal(err)
+	}
+	if memberLogin.Workspace.ID == privateLogin.Workspace.ID {
+		t.Fatalf("member defaulted into another account private workspace: %#v", memberLogin.Workspace)
+	}
+	memberPrivateID := privateWorkspaceID(member.Account.ID)
+	hasMemberPrivate := false
+	hasSharedWorkspace := false
+	for _, workspace := range memberLogin.Workspaces {
+		if workspace.ID == privateLogin.Workspace.ID {
+			t.Fatalf("member workspaces leaked owner private workspace: %#v", memberLogin.Workspaces)
+		}
+		if workspace.ID == memberPrivateID {
+			hasMemberPrivate = true
+		}
+		if workspace.ID == sharedLogin.Workspace.ID {
+			hasSharedWorkspace = true
+		}
+	}
+	if !hasMemberPrivate || !hasSharedWorkspace {
+		t.Fatalf("member workspaces missing expected entries: %#v", memberLogin.Workspaces)
+	}
+
+	memberAuth := authContext{AccountID: memberLogin.Account.ID, WorkspaceID: memberLogin.Workspace.ID}
+	deniedSwitchBody := bytes.NewReader([]byte(`{"workspace_id":"` + privateLogin.Workspace.ID + `","device_id":"device_member"}`))
+	deniedSwitchRecorder := httptest.NewRecorder()
+	api.handleSwitchWorkspace(deniedSwitchRecorder, httptest.NewRequest(http.MethodPost, "/auth/switch-workspace", deniedSwitchBody), memberAuth)
+	if deniedSwitchRecorder.Code != http.StatusForbidden {
+		t.Fatalf("switch into another private workspace status = %d, body = %s", deniedSwitchRecorder.Code, deniedSwitchRecorder.Body.String())
+	}
+
+	staleToken, err := api.signToken(tokenClaims{
+		UserID:      memberLogin.Account.ID,
+		AccountID:   memberLogin.Account.ID,
+		WorkspaceID: privateLogin.Workspace.ID,
+		Exp:         time.Now().UTC().Add(time.Hour).Unix(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	staleRequest := httptest.NewRequest(http.MethodGet, "/sync/pull", nil)
+	staleRequest.Header.Set("Authorization", "Bearer "+staleToken)
+	staleRecorder := httptest.NewRecorder()
+	api.withAuth(api.handlePull)(staleRecorder, staleRequest)
+	if staleRecorder.Code != http.StatusUnauthorized {
+		t.Fatalf("stale private workspace token status = %d, body = %s", staleRecorder.Code, staleRecorder.Body.String())
 	}
 
 	createSecondBody := bytes.NewReader([]byte(`{"name":"协作二组"}`))
@@ -991,6 +1462,128 @@ func TestMySQLHTTPHandlersSmoke(t *testing.T) {
 	}
 	if revision.CurrentRevision != 1 {
 		t.Fatalf("revision = %d", revision.CurrentRevision)
+	}
+}
+
+func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, _, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), emptyStore(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	createSharedRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(createSharedRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"交付协作区"}`))), adminAuth)
+	if createSharedRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared status = %d, body = %s", createSharedRecorder.Code, createSharedRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(createSharedRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: sharedLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+	workspaceID := sharedLogin.Workspace.ID
+	seedRows := []syncRow{
+		{WorkspaceID: workspaceID, Entity: "project", ID: "project_visible", UpdatedAt: "2026-07-01T08:00:00Z", Payload: json.RawMessage(`{"id":"project_visible","workspaceId":"` + workspaceID + `","name":"可见项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:00:00Z","updatedAt":"2026-07-01T08:00:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "project", ID: "project_hidden", UpdatedAt: "2026-07-01T08:01:00Z", Payload: json.RawMessage(`{"id":"project_hidden","workspaceId":"` + workspaceID + `","name":"不可见项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:01:00Z","updatedAt":"2026-07-01T08:01:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "task", ID: "task_visible", UpdatedAt: "2026-07-01T08:02:00Z", Payload: json.RawMessage(`{"id":"task_visible","workspaceId":"` + workspaceID + `","projectId":"project_visible","project":"可见项目","title":"可见任务","status":"pool","createdAt":"2026-07-01T08:02:00Z","updatedAt":"2026-07-01T08:02:00Z"}`)},
+		{WorkspaceID: workspaceID, Entity: "task", ID: "task_hidden", UpdatedAt: "2026-07-01T08:03:00Z", Payload: json.RawMessage(`{"id":"task_hidden","workspaceId":"` + workspaceID + `","projectId":"project_hidden","project":"不可见项目","title":"不可见任务","status":"pool","createdAt":"2026-07-01T08:03:00Z","updatedAt":"2026-07-01T08:03:00Z"}`)},
+	}
+	seedBody, err := json.Marshal(pushRequest{DeviceID: "device_seed", Changes: seedRows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedRecorder := httptest.NewRecorder()
+	api.handleTeamChanges(seedRecorder, httptest.NewRequest(http.MethodPost, "/team/changes", bytes.NewReader(seedBody)), sharedAuth)
+	if seedRecorder.Code != http.StatusOK {
+		t.Fatalf("seed team changes status = %d, body = %s", seedRecorder.Code, seedRecorder.Body.String())
+	}
+
+	memberRecorder := httptest.NewRecorder()
+	memberBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"demo","roles":["executor"]}`))
+	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", memberBody), sharedAuth)
+	if memberRecorder.Code != http.StatusOK {
+		t.Fatalf("create project-only member status = %d, body = %s", memberRecorder.Code, memberRecorder.Body.String())
+	}
+	var member memberResponse
+	if err := json.Unmarshal(memberRecorder.Body.Bytes(), &member); err != nil {
+		t.Fatal(err)
+	}
+	var sharedMembershipCount int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM workspace_memberships WHERE workspace_id = ? AND account_id = ?`, workspaceID, member.Account.ID).Scan(&sharedMembershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if sharedMembershipCount != 0 {
+		t.Fatalf("project-only member should not have workspace membership, got %d", sharedMembershipCount)
+	}
+
+	projectOnlyLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(projectOnlyLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"project-only@example.com","password":"demo","device_id":"device_member"}`))))
+	if projectOnlyLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("project-only login status = %d, body = %s", projectOnlyLoginRecorder.Code, projectOnlyLoginRecorder.Body.String())
+	}
+	var projectOnlyLogin loginResponse
+	if err := json.Unmarshal(projectOnlyLoginRecorder.Body.Bytes(), &projectOnlyLogin); err != nil {
+		t.Fatal(err)
+	}
+	projectOnlyAuth := authContext{AccountID: projectOnlyLogin.Account.ID, WorkspaceID: projectOnlyLogin.Workspace.ID}
+	stateRecorder := httptest.NewRecorder()
+	api.handleTeamStateAll(stateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), projectOnlyAuth)
+	if stateRecorder.Code != http.StatusOK {
+		t.Fatalf("team state all status = %d, body = %s", stateRecorder.Code, stateRecorder.Body.String())
+	}
+	var stateResponse pullResponse
+	if err := json.Unmarshal(stateRecorder.Body.Bytes(), &stateResponse); err != nil {
+		t.Fatal(err)
+	}
+	visible := map[string]bool{}
+	for _, row := range stateResponse.Changes {
+		visible[row.Entity+"/"+row.ID] = true
+	}
+	if !visible["project/project_visible"] || !visible["task/task_visible"] {
+		t.Fatalf("project-only state missing visible project rows: %#v", visible)
+	}
+	if visible["project/project_hidden"] || visible["task/task_hidden"] {
+		t.Fatalf("project-only state leaked hidden project rows: %#v", visible)
+	}
+
+	disableRecorder := httptest.NewRecorder()
+	disableBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","status":"disabled","roles":["executor"]}`))
+	api.handleMemberByID(disableRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+member.Member.ID, disableBody), sharedAuth)
+	if disableRecorder.Code != http.StatusOK {
+		t.Fatalf("disable project member status = %d, body = %s", disableRecorder.Code, disableRecorder.Body.String())
+	}
+
+	rejoinRecorder := httptest.NewRecorder()
+	rejoinBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"should-not-change","roles":["executor"]}`))
+	api.handleMembers(rejoinRecorder, httptest.NewRequest(http.MethodPost, "/members", rejoinBody), sharedAuth)
+	if rejoinRecorder.Code != http.StatusOK {
+		t.Fatalf("rejoin project member status = %d, body = %s", rejoinRecorder.Code, rejoinRecorder.Body.String())
+	}
+
+	oldPasswordRecorder := httptest.NewRecorder()
+	api.handleLogin(oldPasswordRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"project-only@example.com","password":"demo","device_id":"device_member_old_password"}`))))
+	if oldPasswordRecorder.Code != http.StatusOK {
+		t.Fatalf("project-only old password login status = %d, body = %s", oldPasswordRecorder.Code, oldPasswordRecorder.Body.String())
+	}
+	changedPasswordRecorder := httptest.NewRecorder()
+	api.handleLogin(changedPasswordRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"project-only@example.com","password":"should-not-change","device_id":"device_member_changed_password"}`))))
+	if changedPasswordRecorder.Code == http.StatusOK {
+		t.Fatalf("project-level rejoin should not change existing account password")
 	}
 }
 
@@ -1231,14 +1824,7 @@ func TestMajorSyncFeaturesPublishAndPullQuickly(t *testing.T) {
 			ID:        "member_realtime_owner",
 			DeviceID:  "device_a",
 			UpdatedAt: "2026-06-18T09:02:00Z",
-			Payload:   json.RawMessage(`{"id":"member_realtime_owner","projectId":"project_realtime","teamMemberId":"team_member_realtime","accountId":"account_owner","name":"测试成员","email":"owner@example.com","roles":["project_owner","executor"],"status":"active","createdAt":"2026-06-18T09:02:00Z","updatedAt":"2026-06-18T09:02:00Z"}`),
-		},
-		{
-			Entity:    "team_member",
-			ID:        "team_member_realtime",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-06-18T09:02:30Z",
-			Payload:   json.RawMessage(`{"id":"team_member_realtime","accountId":"account_owner","name":"测试成员","email":"owner@example.com","status":"active","createdAt":"2026-06-18T09:02:30Z","updatedAt":"2026-06-18T09:02:30Z"}`),
+			Payload:   json.RawMessage(`{"id":"member_realtime_owner","projectId":"project_realtime","accountId":"account_owner","name":"测试成员","email":"owner@example.com","roles":["project_owner","executor"],"status":"active","createdAt":"2026-06-18T09:02:00Z","updatedAt":"2026-06-18T09:02:00Z"}`),
 		},
 		{
 			Entity:    "task",
@@ -1269,7 +1855,7 @@ func TestMajorSyncFeaturesPublishAndPullQuickly(t *testing.T) {
 			Payload:   json.RawMessage(`{"id":"signal_realtime","workSessionId":"work_session_realtime","taskId":"task_realtime","executorMemberId":"member_realtime_owner","type":"work_started","createdAt":"2026-06-18T09:05:01Z","payload":{"mode":"focus"}}`),
 		},
 	})
-	if len(pushed.Accepted) != 7 || len(pushed.Conflicts) != 0 {
+	if len(pushed.Accepted) != 6 || len(pushed.Conflicts) != 0 {
 		t.Fatalf("accepted = %d conflicts = %#v", len(pushed.Accepted), pushed.Conflicts)
 	}
 
@@ -1292,7 +1878,6 @@ func TestMajorSyncFeaturesPublishAndPullQuickly(t *testing.T) {
 	}
 	for _, expected := range []string{
 		key("project", "project_realtime"),
-		key("team_member", "team_member_realtime"),
 		key("project_member", "member_realtime_owner"),
 		key("task", "task_realtime"),
 		key("daily_plan", "plan_2026-06-18"),
@@ -1476,8 +2061,8 @@ func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 		t.Fatalf("login with patched password status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
 	pulled := pullRows(t, api, ownerAuth(), 0)
-	if len(pulled.Changes) != 4 {
-		t.Fatalf("expected four workspace rows, got %d", len(pulled.Changes))
+	if len(pulled.Changes) != 3 {
+		t.Fatalf("expected three workspace rows, got %d", len(pulled.Changes))
 	}
 }
 
@@ -1512,10 +2097,10 @@ func TestProjectOwnerCreatesWorkspaceMemberAccount(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
-	if response.Account.Email != "directory@example.com" || response.Member.Entity != "team_member" {
+	if response.Account.Email != "directory@example.com" || response.Member.Entity != "" {
 		t.Fatalf("unexpected workspace member response: %#v", response)
 	}
-	duplicateBody := []byte(`{"name":"重复成员","email":"directory@example.com","password":"demo"}`)
+	duplicateBody := []byte(`{"name":"重复成员","email":"directory@example.com","password":"new-demo"}`)
 	duplicateRecorder := httptest.NewRecorder()
 	api.handleMembers(duplicateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(duplicateBody)), ownerAuth())
 	if duplicateRecorder.Code != http.StatusOK {
@@ -1525,122 +2110,14 @@ func TestProjectOwnerCreatesWorkspaceMemberAccount(t *testing.T) {
 	if err := json.Unmarshal(duplicateRecorder.Body.Bytes(), &duplicateResponse); err != nil {
 		t.Fatal(err)
 	}
-	if duplicateResponse.Member.ID != response.Member.ID {
-		t.Fatalf("duplicate workspace member should update existing member: %#v", duplicateResponse.Member)
-	}
-	patchBody := bytes.NewReader([]byte(`{"password":"new-demo"}`))
-	patchRecorder := httptest.NewRecorder()
-	api.handleMemberByID(patchRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+response.Member.ID, patchBody), ownerAuth())
-	if patchRecorder.Code != http.StatusOK {
-		t.Fatalf("patch workspace member status = %d, body = %s", patchRecorder.Code, patchRecorder.Body.String())
+	if duplicateResponse.Account.ID != response.Account.ID || duplicateResponse.Member.Entity != "" {
+		t.Fatalf("duplicate workspace member should update account only: %#v", duplicateResponse)
 	}
 	loginBody := bytes.NewReader([]byte(`{"email":"directory@example.com","password":"new-demo","device_id":"device_directory"}`))
 	loginRecorder := httptest.NewRecorder()
 	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("login with patched workspace member password status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
-	}
-}
-
-func TestPatchLegacyAccountBackfillsMissingTeamMember(t *testing.T) {
-	api := testApp(t)
-	seed := pushRows(t, api, ownerAuth(), "device_a", []syncRow{
-		{
-			Entity:    "project",
-			ID:        "project_sync",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-05-10T08:01:00Z",
-			Payload:   json.RawMessage(`{"id":"project_sync","name":"同步项目","defaultExpectedStartHours":6,"updatedAt":"2026-05-10T08:01:00Z"}`),
-		},
-		{
-			Entity:    "project_member",
-			ID:        "member_sync",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-05-10T08:03:00Z",
-			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"负责人","roles":["project_owner","executor"],"updatedAt":"2026-05-10T08:03:00Z"}`),
-		},
-	})
-	if len(seed.Accepted) != 2 {
-		t.Fatalf("seed accepted = %d", len(seed.Accepted))
-	}
-	hash, err := hashPassword("old-demo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	api.store.Accounts["account_legacy"] = accountRecord{
-		ID:           "account_legacy",
-		WorkspaceID:  "workspace_test",
-		Name:         "旧成员",
-		Email:        "legacy@example.com",
-		PasswordHash: hash,
-		CreatedAt:    "2026-05-10T08:00:00Z",
-		UpdatedAt:    "2026-05-10T08:00:00Z",
-	}
-	patchBody := bytes.NewReader([]byte(`{"password":"new-demo"}`))
-	patchRecorder := httptest.NewRecorder()
-	api.handleMemberByID(patchRecorder, httptest.NewRequest(http.MethodPatch, "/members/team_member_account_legacy", patchBody), ownerAuth())
-	if patchRecorder.Code != http.StatusOK {
-		t.Fatalf("patch legacy member status = %d, body = %s", patchRecorder.Code, patchRecorder.Body.String())
-	}
-	if _, exists := api.store.Workspaces["workspace_test"].Rows[key("team_member", "team_member_account_legacy")]; !exists {
-		t.Fatalf("expected missing team_member row to be backfilled")
-	}
-	loginBody := bytes.NewReader([]byte(`{"email":"legacy@example.com","password":"new-demo","device_id":"device_legacy"}`))
-	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
-	if loginRecorder.Code != http.StatusOK {
-		t.Fatalf("login with patched legacy password status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
-	}
-}
-
-func TestPatchWorkspaceMemberBackfillsMissingAccount(t *testing.T) {
-	api := testApp(t)
-	seed := pushRows(t, api, ownerAuth(), "device_a", []syncRow{
-		{
-			Entity:    "project",
-			ID:        "project_sync",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-05-10T08:01:00Z",
-			Payload:   json.RawMessage(`{"id":"project_sync","name":"同步项目","defaultExpectedStartHours":6,"updatedAt":"2026-05-10T08:01:00Z"}`),
-		},
-		{
-			Entity:    "project_member",
-			ID:        "member_sync_owner",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-05-10T08:02:00Z",
-			Payload:   json.RawMessage(`{"id":"member_sync_owner","projectId":"project_sync","accountId":"account_owner","name":"负责人","roles":["project_owner","executor"],"updatedAt":"2026-05-10T08:02:00Z"}`),
-		},
-		{
-			Entity:    "team_member",
-			ID:        "team_member_missing_account",
-			DeviceID:  "device_a",
-			UpdatedAt: "2026-05-10T08:03:00Z",
-			Payload:   json.RawMessage(`{"id":"team_member_missing_account","accountId":"account_missing","name":"王硕","email":"wangshuo","status":"active","updatedAt":"2026-05-10T08:03:00Z"}`),
-		},
-	})
-	if len(seed.Accepted) != 3 {
-		t.Fatalf("seed accepted = %d", len(seed.Accepted))
-	}
-
-	patchBody := bytes.NewReader([]byte(`{"password":"123"}`))
-	patchRecorder := httptest.NewRecorder()
-	api.handleMemberByID(patchRecorder, httptest.NewRequest(http.MethodPatch, "/members/team_member_missing_account", patchBody), ownerAuth())
-	if patchRecorder.Code != http.StatusOK {
-		t.Fatalf("patch member missing account status = %d, body = %s", patchRecorder.Code, patchRecorder.Body.String())
-	}
-	account, exists := api.store.Accounts["account_missing"]
-	if !exists {
-		t.Fatalf("expected missing account to be backfilled")
-	}
-	if account.Email != "wangshuo" || !checkPassword("123", account.PasswordHash) {
-		t.Fatalf("unexpected backfilled account: %#v", account)
-	}
-
-	loginBody := bytes.NewReader([]byte(`{"email":"wangshuo","password":"123","device_id":"device_wangshuo"}`))
-	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
-	if loginRecorder.Code != http.StatusOK {
-		t.Fatalf("login with backfilled account status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
 }
 

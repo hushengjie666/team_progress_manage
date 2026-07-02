@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420",
-    "build": "tsc && vite build",
+    "build": "tsc -p tsconfig.app.json && vite build",
+    "typecheck": "tsc -p tsconfig.app.json",
+    "typecheck:test": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "verify:fast": "npm test -- --run && npm run build",
     "verify:e2e": "npm run test:e2e",

@@ -7,16 +7,20 @@ import type {
   Interruption,
   Onboarding,
   Project,
+  ProjectInvitation,
   ProjectMember,
+  ProjectMemberRole,
   RewardState,
   Settings,
   StrictViolation,
   SyncConflict,
   SyncState,
   Task,
-  TeamMember,
   Workspace,
+  WorkspaceInvitation,
   WorkspaceMembership,
+  WorkspaceMembershipUpdateInput,
+  WorkspaceUpdateInput,
   WorkSession,
   ExecutionSignal,
 } from "./types";
@@ -28,7 +32,6 @@ type SyncEntity =
   | "settings"
   | "onboarding"
   | "reward_state"
-  | "team_member"
   | "project"
   | "project_member"
   | "task"
@@ -44,7 +47,6 @@ type SyncPayload =
   | Settings
   | Onboarding
   | RewardState
-  | TeamMember
   | Project
   | ProjectMember
   | Task
@@ -57,6 +59,7 @@ type SyncPayload =
   | BlockProfile;
 
 export interface SyncChange {
+  workspace_id?: string;
   entity: SyncEntity;
   id: string;
   device_id: string;
@@ -113,6 +116,40 @@ interface ServerWorkspaceMembership {
   updated_at: string;
 }
 
+interface ServerWorkspaceInvitation {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  workspace_type?: "private" | "shared";
+  inviter_account_id: string;
+  inviter_name: string;
+  inviter_email: string;
+  invitee_account_id: string;
+  invitee_email: string;
+  status: "pending" | "accepted" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  accepted_at?: string;
+}
+
+interface ServerProjectInvitation {
+  id: string;
+  workspace_id: string;
+  workspace_name: string;
+  project_id: string;
+  project_name: string;
+  inviter_account_id: string;
+  inviter_name: string;
+  inviter_email: string;
+  invitee_account_id: string;
+  invitee_email: string;
+  roles: ProjectMemberRole[];
+  status: "pending" | "accepted" | "cancelled";
+  created_at: string;
+  updated_at: string;
+  accepted_at?: string;
+}
+
 export interface AuthStatusResponse {
   bootstrapped: boolean;
   workspace_id?: string;
@@ -136,6 +173,7 @@ export interface BootstrapPayload {
 }
 
 export interface MemberAccountPayload {
+  workspaceId?: string;
   projectId?: string;
   name: string;
   email: string;
@@ -161,6 +199,50 @@ interface PullResponse {
 
 interface RevisionResponse {
   current_revision: number;
+}
+
+interface WorkspacesResponse {
+  workspaces: ServerWorkspace[];
+  memberships?: ServerWorkspaceMembership[];
+}
+
+interface WorkspaceResponse {
+  workspace: ServerWorkspace;
+}
+
+interface WorkspaceMembershipResponse {
+  membership: ServerWorkspaceMembership;
+}
+
+interface WorkspaceInvitationsResponse {
+  invitations: ServerWorkspaceInvitation[];
+}
+
+interface WorkspaceInvitationResponse {
+  invitation: ServerWorkspaceInvitation;
+}
+
+interface ProjectInvitationsResponse {
+  invitations: ServerProjectInvitation[];
+}
+
+interface ProjectInvitationResponse {
+  invitation: ServerProjectInvitation;
+}
+
+interface PlatformAccountsResponse {
+  accounts: ServerAccount[];
+}
+
+interface PlatformAccountResponse {
+  account: ServerAccount;
+}
+
+export interface PlatformAccountPayload {
+  name?: string;
+  email?: string;
+  password?: string;
+  status?: "active" | "disabled";
 }
 
 export interface SyncRevisionEvent {
@@ -292,6 +374,40 @@ const mapWorkspaceMembership = (membership: ServerWorkspaceMembership): Workspac
   updatedAt: membership.updated_at,
 });
 
+const mapWorkspaceInvitation = (invitation: ServerWorkspaceInvitation): WorkspaceInvitation => ({
+  id: invitation.id,
+  workspaceId: invitation.workspace_id,
+  workspaceName: invitation.workspace_name,
+  workspaceType: invitation.workspace_type === "private" ? "private" : "shared",
+  inviterAccountId: invitation.inviter_account_id,
+  inviterName: invitation.inviter_name,
+  inviterEmail: invitation.inviter_email,
+  inviteeAccountId: invitation.invitee_account_id,
+  inviteeEmail: invitation.invitee_email,
+  status: invitation.status,
+  createdAt: invitation.created_at,
+  updatedAt: invitation.updated_at,
+  acceptedAt: invitation.accepted_at || undefined,
+});
+
+const mapProjectInvitation = (invitation: ServerProjectInvitation): ProjectInvitation => ({
+  id: invitation.id,
+  workspaceId: invitation.workspace_id,
+  workspaceName: invitation.workspace_name,
+  projectId: invitation.project_id,
+  projectName: invitation.project_name,
+  inviterAccountId: invitation.inviter_account_id,
+  inviterName: invitation.inviter_name,
+  inviterEmail: invitation.inviter_email,
+  inviteeAccountId: invitation.invitee_account_id,
+  inviteeEmail: invitation.invitee_email,
+  roles: invitation.roles?.length ? invitation.roles : ["executor"],
+  status: invitation.status,
+  createdAt: invitation.created_at,
+  updatedAt: invitation.updated_at,
+  acceptedAt: invitation.accepted_at || undefined,
+});
+
 const sessionFromLogin = (payload: LoginResponse): AuthSession => ({
   token: payload.token,
   expiresAt: payload.expires_at,
@@ -358,6 +474,169 @@ export async function createWorkspace(sync: SyncState, token: string, name: stri
   return sessionFromLogin(payload);
 }
 
+export async function fetchWorkspaces(sync: SyncState, token: string): Promise<{ workspaces: Workspace[]; memberships: WorkspaceMembership[] }> {
+  const payload = await requestJson<WorkspacesResponse>(apiUrl(sync.serverUrl, "/workspaces"), {
+    headers: authHeaders(token),
+  });
+  return {
+    workspaces: payload.workspaces.map(mapWorkspace),
+    memberships: (payload.memberships ?? []).map(mapWorkspaceMembership),
+  };
+}
+
+export async function updateWorkspace(
+  sync: SyncState,
+  token: string,
+  workspaceId: string,
+  input: WorkspaceUpdateInput,
+): Promise<Workspace> {
+  const payload = await requestJson<WorkspaceResponse>(apiUrl(sync.serverUrl, `/workspaces/${encodeURIComponent(workspaceId)}`), {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: input.name,
+      type: input.type ?? "shared",
+      owner_account_id: input.ownerAccountId,
+    }),
+  });
+  return mapWorkspace(payload.workspace);
+}
+
+export async function updateWorkspaceMembership(
+  sync: SyncState,
+  token: string,
+  workspaceId: string,
+  membershipId: string,
+  input: WorkspaceMembershipUpdateInput,
+): Promise<WorkspaceMembership> {
+  const payload = await requestJson<WorkspaceMembershipResponse>(
+    apiUrl(sync.serverUrl, `/workspaces/${encodeURIComponent(workspaceId)}/members/${encodeURIComponent(membershipId)}`),
+    {
+      method: "PATCH",
+      headers: authHeaders(token),
+      body: JSON.stringify({
+        status: input.status,
+      }),
+    },
+  );
+  return mapWorkspaceMembership(payload.membership);
+}
+
+export async function fetchWorkspaceInvitations(sync: SyncState, token: string): Promise<WorkspaceInvitation[]> {
+  const payload = await requestJson<WorkspaceInvitationsResponse>(apiUrl(sync.serverUrl, "/workspace-invitations"), {
+    headers: authHeaders(token),
+  });
+  return payload.invitations.map(mapWorkspaceInvitation);
+}
+
+export async function inviteWorkspaceMember(
+  sync: SyncState,
+  token: string,
+  workspaceId: string,
+  email: string,
+): Promise<WorkspaceInvitation> {
+  const payload = await requestJson<WorkspaceInvitationResponse>(apiUrl(sync.serverUrl, "/workspace-invitations"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      workspace_id: workspaceId,
+      email,
+    }),
+  });
+  return mapWorkspaceInvitation(payload.invitation);
+}
+
+export async function acceptWorkspaceInvitation(sync: SyncState, token: string, invitationId: string): Promise<WorkspaceInvitation> {
+  const payload = await requestJson<WorkspaceInvitationResponse>(
+    apiUrl(sync.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}/accept`),
+    {
+      method: "POST",
+      headers: authHeaders(token),
+    },
+  );
+  return mapWorkspaceInvitation(payload.invitation);
+}
+
+export async function fetchProjectInvitations(sync: SyncState, token: string): Promise<ProjectInvitation[]> {
+  const payload = await requestJson<ProjectInvitationsResponse>(apiUrl(sync.serverUrl, "/project-invitations"), {
+    headers: authHeaders(token),
+  });
+  return payload.invitations.map(mapProjectInvitation);
+}
+
+export async function inviteProjectMember(
+  sync: SyncState,
+  token: string,
+  input: { workspaceId?: string; projectId: string; email: string; roles: ProjectMemberRole[] },
+): Promise<ProjectInvitation> {
+  const payload = await requestJson<ProjectInvitationResponse>(apiUrl(sync.serverUrl, "/project-invitations"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      workspace_id: input.workspaceId,
+      project_id: input.projectId,
+      email: input.email,
+      roles: input.roles.length ? input.roles : ["executor"],
+    }),
+  });
+  return mapProjectInvitation(payload.invitation);
+}
+
+export async function acceptProjectInvitation(sync: SyncState, token: string, invitationId: string): Promise<ProjectInvitation> {
+  const payload = await requestJson<ProjectInvitationResponse>(
+    apiUrl(sync.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}/accept`),
+    {
+      method: "POST",
+      headers: authHeaders(token),
+    },
+  );
+  return mapProjectInvitation(payload.invitation);
+}
+
+export async function fetchPlatformAccounts(sync: SyncState, token: string): Promise<Account[]> {
+  const payload = await requestJson<PlatformAccountsResponse>(apiUrl(sync.serverUrl, "/admin/accounts"), {
+    headers: authHeaders(token),
+  });
+  return payload.accounts.map(mapAccount);
+}
+
+export async function createPlatformAccount(
+  sync: SyncState,
+  token: string,
+  payload: Required<Pick<PlatformAccountPayload, "name" | "email" | "password">> & Pick<PlatformAccountPayload, "status">,
+): Promise<Account> {
+  const result = await requestJson<PlatformAccountResponse>(apiUrl(sync.serverUrl, "/admin/accounts"), {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      status: payload.status,
+    }),
+  });
+  return mapAccount(result.account);
+}
+
+export async function updatePlatformAccount(
+  sync: SyncState,
+  token: string,
+  accountId: string,
+  payload: PlatformAccountPayload,
+): Promise<Account> {
+  const result = await requestJson<PlatformAccountResponse>(apiUrl(sync.serverUrl, `/admin/accounts/${encodeURIComponent(accountId)}`), {
+    method: "PATCH",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      name: payload.name,
+      email: payload.email,
+      password: payload.password,
+      status: payload.status,
+    }),
+  });
+  return mapAccount(result.account);
+}
+
 export async function loginToSyncServer(sync: SyncState, password: string): Promise<SyncState> {
   const payload = await loginToWorkspace(sync, sync.username, password);
   return withStatus(sync, {
@@ -384,6 +663,7 @@ export async function createMemberAccount(sync: SyncState, token: string, payloa
     headers: authHeaders(token),
     body: JSON.stringify({
       project_id: payload.projectId,
+      workspace_id: payload.workspaceId,
       name: payload.name,
       email: payload.email,
       password: payload.password,
@@ -391,27 +671,6 @@ export async function createMemberAccount(sync: SyncState, token: string, payloa
     }),
   });
   return result.member.payload as ProjectMember;
-}
-
-export async function createTeamMemberAccount(
-  sync: SyncState,
-  token: string,
-  payload: Omit<MemberAccountPayload, "projectId" | "roles"> & { forceRecreate?: boolean },
-): Promise<TeamMember> {
-  const { forceRecreate, ...memberPayload } = payload;
-  const result = await requestJson<MemberResponse>(
-    forceRecreate ? `${apiUrl(sync.serverUrl, "/members")}?force_recreate=1` : apiUrl(sync.serverUrl, "/members"),
-    {
-      method: "POST",
-      headers: authHeaders(token),
-      body: JSON.stringify({
-        name: memberPayload.name,
-        email: memberPayload.email,
-        password: memberPayload.password,
-      }),
-    },
-  );
-  return result.member.payload as TeamMember;
 }
 
 export async function updateMemberAccount(
@@ -425,31 +684,13 @@ export async function updateMemberAccount(
     headers: authHeaders(token),
     body: JSON.stringify({
       name: payload.name,
+      workspace_id: payload.workspaceId,
       email: payload.email,
       password: payload.password,
       roles: payload.roles,
     }),
   });
   return result.member.payload as ProjectMember;
-}
-
-export async function updateTeamMemberAccount(
-  sync: SyncState,
-  token: string,
-  memberId: string,
-  payload: Partial<Omit<MemberAccountPayload, "projectId" | "roles">>,
-): Promise<TeamMember> {
-  const result = await requestJson<MemberResponse>(apiUrl(sync.serverUrl, `/members/${encodeURIComponent(memberId)}`), {
-    method: "PATCH",
-    headers: authHeaders(token),
-    body: JSON.stringify({
-      name: payload.name,
-      email: payload.email,
-      password: payload.password,
-      status: payload.status,
-    }),
-  });
-  return result.member.payload as TeamMember;
 }
 
 const isAfter = (value: string, baseline?: string) => !baseline || value > baseline;
@@ -465,8 +706,20 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
   const deviceID = state.sync.deviceId;
   const changedAfter = options.changedAfter;
   const activeTaskIds = activeWorkSessionTaskIds(state);
+  const currentWorkspaceId = state.auth.workspace?.id;
+  const projectWorkspaceIds = new Map(state.projects.map((project) => [project.id, project.workspaceId ?? currentWorkspaceId]));
+  const taskWorkspaceIds = new Map(
+    state.tasks.map((task) => [task.id, task.workspaceId ?? projectWorkspaceIds.get(task.projectId) ?? currentWorkspaceId]),
+  );
+  const workspaceIdForPayload = (payload: unknown, fallback?: string) => {
+    if (isObject(payload) && typeof payload.workspaceId === "string" && payload.workspaceId.trim()) {
+      return payload.workspaceId;
+    }
+    return fallback;
+  };
   const changes: SyncChange[] = [
     {
+      workspace_id: currentWorkspaceId,
       entity: "settings",
       id: "default",
       device_id: deviceID,
@@ -474,6 +727,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: state.settings,
     },
     {
+      workspace_id: currentWorkspaceId,
       entity: "onboarding",
       id: "default",
       device_id: deviceID,
@@ -481,6 +735,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: state.onboarding,
     },
     {
+      workspace_id: currentWorkspaceId,
       entity: "reward_state",
       id: "default",
       device_id: deviceID,
@@ -488,20 +743,15 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: state.rewardState,
     },
     ...state.projects.map((project) => ({
+      workspace_id: workspaceIdForPayload(project, currentWorkspaceId),
       entity: "project" as const,
       id: project.id,
       device_id: deviceID,
       updated_at: project.updatedAt,
       payload: project,
     })),
-    ...state.teamMembers.map((member) => ({
-      entity: "team_member" as const,
-      id: member.id,
-      device_id: deviceID,
-      updated_at: member.updatedAt,
-      payload: member,
-    })),
     ...state.projectMembers.map((member) => ({
+      workspace_id: workspaceIdForPayload(member, projectWorkspaceIds.get(member.projectId) ?? currentWorkspaceId),
       entity: "project_member" as const,
       id: member.id,
       device_id: deviceID,
@@ -509,6 +759,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: member,
     })),
     ...state.tasks.map((task) => ({
+      workspace_id: workspaceIdForPayload(task, projectWorkspaceIds.get(task.projectId) ?? currentWorkspaceId),
       entity: "task" as const,
       id: task.id,
       device_id: deviceID,
@@ -516,6 +767,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: task,
     })),
     ...state.workSessions.map((session) => ({
+      workspace_id: workspaceIdForPayload(session, taskWorkspaceIds.get(session.taskId) ?? currentWorkspaceId),
       entity: "work_session" as const,
       id: session.id,
       device_id: deviceID,
@@ -523,6 +775,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: session,
     })),
     ...state.executionSignals.map((signal) => ({
+      workspace_id: workspaceIdForPayload(signal, taskWorkspaceIds.get(signal.taskId) ?? currentWorkspaceId),
       entity: "execution_signal" as const,
       id: signal.id,
       device_id: deviceID,
@@ -530,6 +783,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: signal,
     })),
     ...state.dailyPlans.map((plan) => ({
+      workspace_id: workspaceIdForPayload(plan, currentWorkspaceId),
       entity: "daily_plan" as const,
       id: plan.id,
       device_id: deviceID,
@@ -537,6 +791,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: plan,
     })),
     ...state.focusSessions.map((session) => ({
+      workspace_id: workspaceIdForPayload(session, session.taskId ? taskWorkspaceIds.get(session.taskId) : currentWorkspaceId),
       entity: "focus_session" as const,
       id: session.id,
       device_id: deviceID,
@@ -544,6 +799,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: session,
     })),
     ...state.interruptions.map((interruption) => ({
+      workspace_id: workspaceIdForPayload(interruption, interruption.taskId ? taskWorkspaceIds.get(interruption.taskId) : currentWorkspaceId),
       entity: "interruption" as const,
       id: interruption.id,
       device_id: deviceID,
@@ -551,6 +807,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: interruption,
     })),
     ...state.strictViolations.map((violation) => ({
+      workspace_id: workspaceIdForPayload(violation, violation.taskId ? taskWorkspaceIds.get(violation.taskId) : currentWorkspaceId),
       entity: "strict_violation" as const,
       id: violation.id,
       device_id: deviceID,
@@ -558,6 +815,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       payload: violation,
     })),
     ...state.blockProfiles.map((profile) => ({
+      workspace_id: workspaceIdForPayload(profile, currentWorkspaceId),
       entity: "block_profile" as const,
       id: profile.id,
       device_id: deviceID,
@@ -569,6 +827,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
   for (const tombstone of state.sync.tombstones ?? []) {
     if (!isAfter(tombstone.deletedAt, changedAfter)) continue;
     changes.push({
+      workspace_id: tombstone.workspaceId ?? currentWorkspaceId,
       entity: tombstone.entity as SyncEntity,
       id: tombstone.id,
       device_id: deviceID,
@@ -589,6 +848,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
 export function syncableStateFingerprint(state: AppState): string {
   return JSON.stringify(
     flattenStateToChanges(state).map((change) => ({
+      workspaceId: change.workspace_id,
       entity: change.entity,
       id: change.id,
       updatedAt: singletonEntities.includes(change.entity) ? undefined : change.updated_at,
@@ -687,7 +947,6 @@ export function mergeSyncedStateIntoLatest(latest: AppState, source: AppState, s
     onboarding: latestHasLocalSingletonChanges ? latest.onboarding : synced.onboarding,
     rewardState: latestHasLocalSingletonChanges ? latest.rewardState : synced.rewardState,
     projects: mergeEntityListIntoLatest("project", latest.projects, source.projects, synced.projects, source.updatedAt),
-    teamMembers: mergeEntityListIntoLatest("team_member", latest.teamMembers, source.teamMembers, synced.teamMembers, source.updatedAt),
     projectMembers: mergeEntityListIntoLatest("project_member", latest.projectMembers, source.projectMembers, synced.projectMembers, source.updatedAt),
     tasks: mergeEntityListIntoLatest("task", latest.tasks, source.tasks, synced.tasks, source.updatedAt),
     workSessions: mergeEntityListIntoLatest("work_session", latest.workSessions, source.workSessions, synced.workSessions, source.updatedAt),

@@ -24,6 +24,7 @@ export const createExecutionSignal = (
   idFactory: IdFactory = uid,
 ): ExecutionSignal => ({
   id: idFactory("signal"),
+  workspaceId: workSession.workspaceId,
   workSessionId: workSession.id,
   taskId: workSession.taskId,
   executorMemberId: workSession.executorMemberId,
@@ -49,6 +50,7 @@ export const ensurePlanInState = (state: AppState, date: string, timestamp: stri
 
   const plan: DailyPlan = {
     id: `plan_${date}`,
+    workspaceId: state.auth.workspace?.id,
     date,
     capacityPomodoros: Math.max(4, state.rewardState.dailyGoal),
     committedTaskIds: [],
@@ -251,8 +253,10 @@ export const startWorkSessionInState = (
     : undefined;
 
   const idFactory = options.idFactory ?? uid;
+  const workspaceId = currentTask.workspaceId ?? state.projects.find((project) => project.id === currentTask.projectId)?.workspaceId ?? next.auth.workspace?.id;
   const focusSession: FocusSession = {
     id: idFactory("session"),
+    workspaceId,
     taskId,
     mode: "focus",
     duration: next.settings.focusMinutes * 60,
@@ -261,6 +265,7 @@ export const startWorkSessionInState = (
   };
   const workSession: WorkSession = {
     id: idFactory("work_session"),
+    workspaceId,
     taskId,
     executorMemberId,
     focusSessionId: focusSession.id,

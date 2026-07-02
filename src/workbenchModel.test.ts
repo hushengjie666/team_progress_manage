@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState, todayKey } from "./seed";
 import { currentMemberForState, currentTaskForFocus, deriveWorkspaceModel } from "./workbenchModel";
-import type { ProjectMember, Task } from "./types";
+import type { ProjectMember, Task, WorkspaceMembership } from "./types";
 
 const task = (id: string, status: Task["status"], sortOrder: number): Task => ({
   id,
@@ -65,13 +65,12 @@ describe("workbench focus model", () => {
 });
 
 describe("workbench activity pool", () => {
-  it("uses the authenticated account instead of a stale currentMemberId for the workbench queue", () => {
+  it("uses the authenticated account while keeping accessible project tasks visible", () => {
     const state = createInitialState();
     const owner = state.projectMembers[0];
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "王硕",
       email: "wangshuo@example.com",
@@ -99,7 +98,6 @@ describe("workbench activity pool", () => {
     };
     const loggedInState = {
       ...state,
-      currentMemberId: teammate.id,
       auth: {
         ...state.auth,
         status: "authenticated" as const,
@@ -125,7 +123,7 @@ describe("workbench activity pool", () => {
     );
 
     expect(currentMemberForState(loggedInState)?.id).toBe(owner.id);
-    expect(model.committedWorkbenchTasks.map((item) => item.id)).toEqual(["task_owner"]);
+    expect(model.committedWorkbenchTasks.map((item) => item.id)).toEqual(["task_owner", "task_teammate"]);
   });
 
   it("does not fall back to another person when the authenticated account has no project member", () => {
@@ -154,7 +152,6 @@ describe("workbench activity pool", () => {
     };
     const loggedInState = {
       ...state,
-      currentMemberId: undefined,
       auth: {
         ...state.auth,
         status: "authenticated" as const,
@@ -183,6 +180,172 @@ describe("workbench activity pool", () => {
     expect(model.committedWorkbenchTasks).toEqual([]);
   });
 
+  it("shows workspace-accessible projects and their active tasks even without a project member binding", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_disinfection";
+    const unassignedTask = {
+      ...task("task_disinfection_unassigned", "pool", 10),
+      projectId: state.projects[0].id,
+      project: "消毒中心",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+    };
+    const otherAssignedTask = {
+      ...task("task_disinfection_assigned_other", "pool", 20),
+      projectId: state.projects[0].id,
+      project: "消毒中心",
+      primaryExecutorMemberId: "member_other",
+    };
+    const membership: WorkspaceMembership = {
+      id: "membership_wangshuo_disinfection",
+      workspaceId,
+      accountId: "account_wangshuo",
+      name: "王硕",
+      email: "wangshuo@example.com",
+      role: "member",
+      status: "active",
+      createdAt: "2026-06-30T08:00:00.000Z",
+      updatedAt: "2026-06-30T08:00:00.000Z",
+    };
+    const loggedInState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated" as const,
+        account: {
+          id: "account_wangshuo",
+          workspaceId,
+          name: "王硕",
+          email: "wangshuo@example.com",
+          createdAt: "2026-06-30T08:00:00.000Z",
+          updatedAt: "2026-06-30T08:00:00.000Z",
+        },
+        workspace: {
+          id: workspaceId,
+          name: "宁波团队出击",
+          type: "shared" as const,
+          ownerAccountId: "account_owner",
+          createdAt: "2026-06-30T08:00:00.000Z",
+          updatedAt: "2026-06-30T08:00:00.000Z",
+        },
+        workspaces: [{
+          id: workspaceId,
+          name: "宁波团队出击",
+          type: "shared" as const,
+          ownerAccountId: "account_owner",
+          createdAt: "2026-06-30T08:00:00.000Z",
+          updatedAt: "2026-06-30T08:00:00.000Z",
+        }],
+        workspaceMemberships: [membership],
+      },
+      projects: state.projects.map((project) => ({ ...project, name: "消毒中心", workspaceId })),
+      projectMembers: [],
+      tasks: [unassignedTask, otherAssignedTask],
+    };
+    const todayPlan = {
+      id: "plan_test_today",
+      date: todayKey(),
+      capacityPomodoros: 4,
+      committedTaskIds: [],
+      completedPomodoros: 0,
+      suggestedTaskIds: [],
+      reflection: "",
+      review: { mood: "normal" as const, wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
+      createdAt: "2026-06-30T08:00:00.000Z",
+      updatedAt: "2026-06-30T08:00:00.000Z",
+    };
+
+    const model = deriveWorkspaceModel(
+      loggedInState,
+      todayPlan,
+      0,
+      [],
+      [unassignedTask, otherAssignedTask],
+      [],
+    );
+
+    expect(currentMemberForState(loggedInState)).toBeUndefined();
+    expect(model.myProjectTaskCards.map((card) => card.name)).toEqual(["消毒中心"]);
+    expect(model.availableWorkbenchProjectIds).toEqual([state.projects[0].id]);
+    expect(model.poolWorkbenchTasks.map((item) => item.id)).toEqual([
+      "task_disinfection_unassigned",
+      "task_disinfection_assigned_other",
+    ]);
+  });
+
+  it("does not treat the authenticated workspace list as access without membership or project binding", () => {
+    const state = createInitialState();
+    const privateWorkspace = {
+      id: "workspace_wangshuo_private",
+      name: "王硕的私人工作区",
+      type: "private" as const,
+      ownerAccountId: "account_wangshuo",
+      createdAt: "2026-06-30T08:00:00.000Z",
+      updatedAt: "2026-06-30T08:00:00.000Z",
+    };
+    const sharedWorkspace = {
+      id: "workspace_disinfection",
+      name: "宁波团队出击",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-06-30T08:00:00.000Z",
+      updatedAt: "2026-06-30T08:00:00.000Z",
+    };
+    const unassignedTask = {
+      ...task("task_disinfection_unassigned", "pool", 10),
+      projectId: state.projects[0].id,
+      project: "消毒中心",
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+    };
+    const loggedInState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated" as const,
+        account: {
+          id: "account_wangshuo",
+          workspaceId: privateWorkspace.id,
+          name: "王硕",
+          email: "wangshuo@example.com",
+          createdAt: "2026-06-30T08:00:00.000Z",
+          updatedAt: "2026-06-30T08:00:00.000Z",
+        },
+        workspace: privateWorkspace,
+        workspaces: [privateWorkspace, sharedWorkspace],
+        workspaceMemberships: [],
+      },
+      projects: state.projects.map((project) => ({ ...project, name: "消毒中心", workspaceId: sharedWorkspace.id })),
+      projectMembers: [],
+      tasks: [unassignedTask],
+    };
+    const todayPlan = {
+      id: "plan_test_today",
+      date: todayKey(),
+      capacityPomodoros: 4,
+      committedTaskIds: [],
+      completedPomodoros: 0,
+      suggestedTaskIds: [],
+      reflection: "",
+      review: { mood: "normal" as const, wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
+      createdAt: "2026-06-30T08:00:00.000Z",
+      updatedAt: "2026-06-30T08:00:00.000Z",
+    };
+
+    const model = deriveWorkspaceModel(
+      loggedInState,
+      todayPlan,
+      0,
+      [],
+      [unassignedTask],
+      [],
+    );
+
+    expect(currentMemberForState(loggedInState)).toBeUndefined();
+    expect(model.myProjectTaskCards.map((card) => card.name)).toEqual([]);
+    expect(model.poolWorkbenchTasks.map((item) => item.id)).toEqual([]);
+  });
+
   it("keeps completed committed tasks visible in today's work queue", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
@@ -190,13 +353,13 @@ describe("workbench activity pool", () => {
       ...task("task_completed_today", "completed", 10),
       projectId,
       project: state.projects[0].name,
-      primaryExecutorMemberId: state.currentMemberId,
+      primaryExecutorMemberId: state.projectMembers[0].id,
     };
     const committedTask = {
       ...task("task_committed_today", "committed", 20),
       projectId,
       project: state.projects[0].name,
-      primaryExecutorMemberId: state.currentMemberId,
+      primaryExecutorMemberId: state.projectMembers[0].id,
     };
     const todayPlan = {
       id: "plan_test_today",
@@ -229,7 +392,7 @@ describe("workbench activity pool", () => {
       ...task("task_completed_removed_from_plan", "completed", 10),
       projectId,
       project: state.projects[0].name,
-      primaryExecutorMemberId: state.currentMemberId,
+      primaryExecutorMemberId: state.projectMembers[0].id,
       completedAt: `${todayKey()}T09:30:00.000Z`,
     };
     const todayPlan = {
@@ -264,7 +427,7 @@ describe("workbench activity pool", () => {
       ...task("task_completed_yesterday", "completed", 10),
       projectId,
       project: state.projects[0].name,
-      primaryExecutorMemberId: state.currentMemberId,
+      primaryExecutorMemberId: state.projectMembers[0].id,
       completedAt: "2026-06-29T09:30:00.000Z",
     };
     const todayPlan = {
@@ -321,7 +484,7 @@ describe("workbench activity pool", () => {
           {
             id: "work_session_test",
             taskId: completedTask.id,
-            executorMemberId: state.currentMemberId,
+            executorMemberId: state.projectMembers[0].id,
             focusSessionId: "session_test",
             status: "ended",
             startedAt: `${todayKey()}T09:00:00.000Z`,
@@ -401,7 +564,7 @@ describe("workbench activity pool", () => {
       ...task("task_assigned", "pool", 20),
       projectId,
       project: state.projects[0].name,
-      primaryExecutorMemberId: state.currentMemberId,
+      primaryExecutorMemberId: state.projectMembers[0].id,
     };
     const todayPlan = {
       id: "plan_test_today",

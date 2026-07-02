@@ -25,14 +25,20 @@ Keep routine changes scoped so Codex does not exhaust context on generated outpu
 
 Start with the smallest module that owns the product concept before opening app-shell files.
 
-- Workspace / Personal Workbench: `src/workbenchModel.ts`, `src/components/WorkspaceView.tsx`, and `src/timerDomain.test.ts` for timer-adjacent workbench behavior.
-- Project Detail: `src/projectDetail.ts`, `src/components/ProjectDetailView.tsx`, and `src/projectOverview.test.ts`.
-- Project Overview cards and my project filters: `src/projectOverview.ts` and `src/projectOverview.test.ts`.
+- Workspace / Personal Workbench: `src/workbenchModel.ts`, `src/components/WorkspaceView.tsx` for page composition, and focused panels in `src/components/workspace/ProjectOverviewCardsPanel.tsx`, `MyProjectTaskFilterPanel.tsx`, or `WorkbenchTaskColumns.tsx`.
+- Project Detail: `src/projectDetail.ts`, `src/components/ProjectDetailView.tsx` for tab composition, and focused panels in `src/components/projectDetail/ProjectOverviewTaskBoard.tsx`, `ProjectTaskRow.tsx`, `ProjectMemberBindingPanel.tsx`, `AddProjectMemberModal.tsx`, or `ProjectAcceptedTasksPanel.tsx`.
+- Project Overview cards and my project filters: `src/projectOverview.ts`, `src/components/workspace/ProjectOverviewCardsPanel.tsx`, `src/components/workspace/MyProjectTaskFilterPanel.tsx`, and `src/projectOverview.test.ts`.
 - Progress Board: `src/progressBoard.ts` and `src/progressBoard.test.ts`.
 - Recurring tasks: `src/recurrence.ts` and `src/recurrence.test.ts`.
-- App shell keyboard shortcuts: `src/keyboardRuntime.ts`; only open `src/App.tsx` for wiring changes.
-- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/syncRuntime.ts`, and `src/timerRuntime.ts`.
+- App boot and app shell wiring: `src/appBootRuntime.ts`, `src/keyboardRuntime.ts`, `src/dataPortabilityRuntime.ts`, and `src/conflictResolutionModel.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
+- Workspace accounts and invitations: `src/workspaceAccountRuntime.ts` before touching login/session, platform accounts, workspace invitations, or workspace update flows.
+- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/syncRequestRuntime.ts`, `src/syncRuntime.ts`, and `src/timerRuntime.ts`.
+- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsWorkspacesPanel.tsx`, `SettingsProjectsPanel.tsx`, `SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsFocusPanel.tsx`, `SettingsSyncPanel.tsx`, `SettingsDataPanel.tsx`, `SettingsSystemPanel.tsx`, or `SettingsDemoPanel.tsx`.
 - Test setup data: use `src/test/fixtures.ts` instead of copying full `AppState` literals.
+
+## Frontend Scope
+
+Treat the current production UI as desktop-first. Do not add or change mobile-specific responsive adaptations unless the user explicitly asks for mobile support.
 
 ## Build, Test, and Development Commands
 

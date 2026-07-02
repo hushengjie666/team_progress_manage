@@ -10,7 +10,6 @@ describe("member identity resolution", () => {
     const teammate: ProjectMember = {
       ...owner,
       id: "member_teammate",
-      teamMemberId: "team_member_teammate",
       accountId: "account_teammate",
       name: "王硕",
       email: "wangshuo@example.com",
@@ -18,7 +17,6 @@ describe("member identity resolution", () => {
     };
     const loggedInState = {
       ...state,
-      currentMemberId: teammate.id,
       auth: {
         ...state.auth,
         status: "authenticated" as const,
@@ -48,7 +46,6 @@ describe("member identity resolution", () => {
     };
     const loggedInState = {
       ...state,
-      currentMemberId: otherMember.id,
       auth: {
         ...state.auth,
         status: "authenticated" as const,

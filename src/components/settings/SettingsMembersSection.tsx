@@ -1,51 +1,52 @@
 import { Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { ProjectMember, TeamMember } from "../../types";
+import type { Account, ProjectMember } from "../../types";
 
 export function SettingsMembersSection({
-  teamMembers,
+  accounts,
   projectMembers,
-  createTeamMember,
-  updateTeamMember,
-  updateTeamMemberPassword,
-  deleteTeamMember,
+  createAccount,
+  updateAccount,
+  updateAccountPassword,
+  disableAccount,
 }: {
-  teamMembers: TeamMember[];
+  accounts: Account[];
   projectMembers: ProjectMember[];
-  createTeamMember: (name: string, email: string, password?: string) => void;
-  updateTeamMember: (member: TeamMember) => void;
-  updateTeamMemberPassword: (member: TeamMember, password: string) => void;
-  deleteTeamMember: (teamMemberId: string) => void;
+  createAccount: (name: string, email: string, password?: string) => void;
+  updateAccount: (account: Account) => void;
+  updateAccountPassword: (account: Account, password: string) => void;
+  disableAccount: (accountId: string) => void;
 }) {
   const [memberDraft, setMemberDraft] = useState({ name: "", email: "", password: "1234" });
   const [memberDraftWarning, setMemberDraftWarning] = useState("");
   const [memberPasswordDrafts, setMemberPasswordDrafts] = useState<Record<string, string>>({});
-  const canManageWorkspaceProjects = true;
-  const activeTeamMembers = teamMembers.filter((member) => member.status !== "disabled");
+  const activeAccounts = accounts.filter((account) => !account.disabledAt);
   const normalizedMemberDraftEmail = memberDraft.email.trim().toLowerCase();
   const memberDraftEmailExists = Boolean(
     normalizedMemberDraftEmail &&
-      activeTeamMembers.some((member) => member.email?.trim().toLowerCase() === normalizedMemberDraftEmail),
+      activeAccounts.some((account) => account.email.trim().toLowerCase() === normalizedMemberDraftEmail),
   );
   const memberDraftValidationMessage = memberDraftEmailExists
-    ? "该登录邮箱或手机号已存在于成员库，请直接编辑现有成员或绑定到项目。"
+    ? "该登录邮箱或手机号已存在于平台账号库，请直接编辑现有账号。"
     : "";
 
   return (
     <section className="band settings-panel">
       <div className="section-title">
         <div>
-          <p className="eyebrow">成员管理</p>
-          <h2>团队成员库</h2>
+          <p className="eyebrow">账号管理</p>
+          <h2>平台账号库</h2>
         </div>
         <Sparkles size={20} />
       </div>
-      <p className="muted section-helper">成员先在这里统一创建和维护，项目页面只负责把成员绑定进项目并设置项目内角色。</p>
+      <p className="muted section-helper">
+        这里统一创建和维护可登录系统的平台账号。协作工作区成员关系在“工作区”页面维护，项目内角色在项目页面绑定。
+      </p>
       <section className="member-create-panel workspace-member-create">
         <div className="section-title compact-title">
           <div>
-            <p className="eyebrow">新增成员</p>
-            <h2>创建成员账号</h2>
+            <p className="eyebrow">新增账号</p>
+            <h2>创建平台账号</h2>
           </div>
         </div>
         <div className="settings-grid">
@@ -53,7 +54,6 @@ export function SettingsMembersSection({
             成员姓名
             <input
               value={memberDraft.name}
-              disabled={!canManageWorkspaceProjects}
               onChange={(event) => {
                 setMemberDraft({ ...memberDraft, name: event.target.value });
                 setMemberDraftWarning("");
@@ -64,7 +64,6 @@ export function SettingsMembersSection({
             登录邮箱或手机号
             <input
               value={memberDraft.email}
-              disabled={!canManageWorkspaceProjects}
               onChange={(event) => {
                 setMemberDraft({ ...memberDraft, email: event.target.value });
                 setMemberDraftWarning("");
@@ -76,7 +75,6 @@ export function SettingsMembersSection({
             <input
               type="password"
               value={memberDraft.password}
-              disabled={!canManageWorkspaceProjects}
               onChange={(event) => {
                 setMemberDraft({ ...memberDraft, password: event.target.value });
                 setMemberDraftWarning("");
@@ -87,7 +85,6 @@ export function SettingsMembersSection({
         <div className="button-row">
           <button
             className="primary-button"
-            disabled={!canManageWorkspaceProjects}
             onClick={() => {
               if (!memberDraft.name.trim() || !memberDraft.email.trim() || !memberDraft.password.trim()) {
                 setMemberDraftWarning("请先填写成员姓名、登录邮箱或手机号和初始密码。");
@@ -97,12 +94,12 @@ export function SettingsMembersSection({
                 setMemberDraftWarning(memberDraftValidationMessage);
                 return;
               }
-              createTeamMember(memberDraft.name, memberDraft.email, memberDraft.password);
+              createAccount(memberDraft.name, memberDraft.email, memberDraft.password);
               setMemberDraft({ name: "", email: "", password: "1234" });
               setMemberDraftWarning("");
             }}
           >
-            创建成员账号
+            创建平台账号
           </button>
         </div>
         {(memberDraftWarning || memberDraftValidationMessage) && (
@@ -110,105 +107,99 @@ export function SettingsMembersSection({
         )}
       </section>
       <div className="member-directory">
-        {activeTeamMembers.map((member) => (
-          <TeamMemberCard
-            key={member.id}
-            member={member}
-            teamMembers={activeTeamMembers}
-            projectCount={projectMembers.filter((binding) => binding.teamMemberId === member.id && binding.status !== "disabled").length}
-            canManage={canManageWorkspaceProjects}
-            passwordDraft={memberPasswordDrafts[member.id] ?? ""}
-            updateMember={updateTeamMember}
-            deleteMember={() => deleteTeamMember(member.id)}
-            updatePasswordDraft={(password) => setMemberPasswordDrafts({ ...memberPasswordDrafts, [member.id]: password })}
+        {activeAccounts.map((account) => (
+          <AccountCard
+            key={account.id}
+            account={account}
+            accounts={activeAccounts}
+            projectCount={projectMembers.filter((binding) => binding.status !== "disabled" && binding.accountId === account.id).length}
+            passwordDraft={memberPasswordDrafts[account.id] ?? ""}
+            updateAccount={updateAccount}
+            disableAccount={() => disableAccount(account.id)}
+            updatePasswordDraft={(password) => setMemberPasswordDrafts({ ...memberPasswordDrafts, [account.id]: password })}
             updatePassword={(password) => {
-              updateTeamMemberPassword(member, password);
-              setMemberPasswordDrafts({ ...memberPasswordDrafts, [member.id]: "" });
+              updateAccountPassword(account, password);
+              setMemberPasswordDrafts({ ...memberPasswordDrafts, [account.id]: "" });
             }}
           />
         ))}
-        {!activeTeamMembers.length && <p className="empty">还没有团队成员，请先创建成员账号。</p>}
+        {!activeAccounts.length && <p className="empty">还没有平台账号，请先创建账号。</p>}
       </div>
     </section>
   );
 }
 
-function TeamMemberCard({
-  member,
-  teamMembers,
+function AccountCard({
+  account,
+  accounts,
   projectCount,
-  canManage,
-  updateMember,
-  deleteMember,
+  updateAccount,
+  disableAccount,
   passwordDraft,
   updatePasswordDraft,
   updatePassword,
 }: {
-  member: TeamMember;
-  teamMembers: TeamMember[];
+  account: Account;
+  accounts: Account[];
   projectCount: number;
-  canManage: boolean;
-  updateMember: (member: TeamMember) => void;
-  deleteMember: () => void;
+  updateAccount: (account: Account) => void;
+  disableAccount: () => void;
   passwordDraft: string;
   updatePasswordDraft: (password: string) => void;
   updatePassword: (password: string) => void;
 }) {
-  const [draft, setDraft] = useState({ name: member.name, email: member.email ?? "" });
+  const [draft, setDraft] = useState({ name: account.name, email: account.email });
   const normalizedEmail = draft.email.trim().toLowerCase();
   const nameValue = draft.name.trim();
-  const originalEmail = member.email ?? "";
-  const hasChanges = draft.name !== member.name || draft.email !== originalEmail;
-  const emailRequired = true;
-  const emailMissing = emailRequired && !normalizedEmail;
-  const emailDuplicate = Boolean(normalizedEmail) && teamMembers.some(
-    (item) => item.id !== member.id && item.status !== "disabled" && item.email?.trim().toLowerCase() === normalizedEmail,
+  const hasChanges = draft.name !== account.name || draft.email !== account.email;
+  const emailDuplicate = Boolean(normalizedEmail) && accounts.some(
+    (item) => item.id !== account.id && !item.disabledAt && item.email.trim().toLowerCase() === normalizedEmail,
   );
   const validationMessage = !nameValue
     ? "请输入成员姓名"
-    : emailMissing
-      ? "已绑定账号的成员必须保留登录邮箱或手机号"
+    : !normalizedEmail
+      ? "请输入登录邮箱或手机号"
       : emailDuplicate
-        ? "该登录邮箱或手机号已存在于成员库"
+        ? "该登录邮箱或手机号已存在于平台账号库"
         : "";
-  const canSave = canManage && hasChanges && !validationMessage;
+  const canSave = hasChanges && !validationMessage;
 
   useEffect(() => {
-    setDraft({ name: member.name, email: member.email ?? "" });
-  }, [member.id, member.name, member.email]);
+    setDraft({ name: account.name, email: account.email });
+  }, [account.id, account.name, account.email]);
 
   return (
-    <article className="member-card team-member-card" key={member.id}>
+    <article className="member-card team-member-card" key={account.id}>
       <div className="member-profile-editor">
         <div className="member-card-main">
           <label>
             姓名
-            <input value={draft.name} disabled={!canManage} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
+            <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
           </label>
           <label>
             登录邮箱或手机号
-            <input value={draft.email} disabled={!canManage} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
+            <input value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
           </label>
         </div>
         {validationMessage && hasChanges && <p className="member-validation">{validationMessage}</p>}
       </div>
       <div className="member-role-row">
-        <span className="status-pill">{member.status === "disabled" ? "已停用" : "启用中"}</span>
+        <span className="status-pill">启用中</span>
         <span className="status-pill">{projectCount} 个项目</span>
-        <span className="status-pill">{member.accountId ? "已绑定账号" : "本地成员"}</span>
+        <span className="status-pill">平台账号</span>
         <button
           className="secondary-button"
           disabled={!canSave}
-          onClick={() => updateMember({ ...member, name: nameValue, email: normalizedEmail || undefined })}
+          onClick={() => updateAccount({ ...account, name: nameValue, email: normalizedEmail })}
         >
           保存资料
         </button>
         {hasChanges && (
-          <button className="small-button" disabled={!canManage} onClick={() => setDraft({ name: member.name, email: member.email ?? "" })}>
+          <button className="small-button" onClick={() => setDraft({ name: account.name, email: account.email })}>
             重置
           </button>
         )}
-        <button className="icon-button small danger" disabled={!canManage} title="删除成员" onClick={deleteMember}>
+        <button className="icon-button small danger" title="停用账号" onClick={disableAccount}>
           <Trash2 size={15} />
         </button>
       </div>
@@ -218,12 +209,11 @@ function TeamMemberCard({
           <input
             type="password"
             value={passwordDraft}
-            disabled={!canManage || !member.accountId}
-            placeholder={member.accountId ? "输入后点击修改" : "该成员未绑定账号"}
+            placeholder="输入后点击修改"
             onChange={(event) => updatePasswordDraft(event.target.value)}
           />
         </label>
-        <button className="secondary-button" disabled={!canManage || !member.accountId || !passwordDraft.trim()} onClick={() => updatePassword(passwordDraft)}>
+        <button className="secondary-button" disabled={!passwordDraft.trim()} onClick={() => updatePassword(passwordDraft)}>
           修改密码
         </button>
       </div>

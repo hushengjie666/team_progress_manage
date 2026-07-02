@@ -1,6 +1,5 @@
 import { createInitialState } from "./seed";
 import { ensureTodayPlan } from "./appModel";
-import { currentProjectMemberForAccount } from "./authModel";
 import { flattenStateToChanges, mergeRowsIntoState, type SyncRow } from "./sync";
 import type { AppState, ExecutionSignal, FocusSession, SyncState, Task, WorkSession } from "./types";
 
@@ -92,9 +91,7 @@ const preserveLocalActiveRuntime = (remote: AppState, local: AppState): AppState
 const createEmptyTeamStateBase = (local: AppState, token: string): AppState => ({
   ...createInitialState(),
   auth: local.auth,
-  currentMemberId: undefined,
   projects: [],
-  teamMembers: [],
   projectMembers: [],
   tasks: [],
   dailyPlans: [],
@@ -119,16 +116,14 @@ const createEmptyTeamStateBase = (local: AppState, token: string): AppState => (
 export async function loadTeamState(local: AppState): Promise<AppState> {
   const token = local.auth.token ?? local.sync.token;
   if (!token) return local;
-  const payload = await readResponse<TeamStateResponse>(await fetch(apiUrl(local.sync.serverUrl, "/team/state"), {
+  const payload = await readResponse<TeamStateResponse>(await fetch(apiUrl(local.sync.serverUrl, "/team/state/all"), {
     headers: authHeaders(token),
   }));
   const base = createEmptyTeamStateBase(local, token);
   const merged = mergeRowsIntoState(base, payload.changes, payload.current_revision, { forceRemote: true });
   const restored = preserveLocalActiveRuntime(merged, local);
-  const currentMember = currentProjectMemberForAccount(restored);
   return {
     ...restored,
-    currentMemberId: currentMember?.id,
     auth: local.auth,
     sync: {
       ...restored.sync,

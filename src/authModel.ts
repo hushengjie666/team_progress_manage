@@ -1,58 +1,19 @@
-import { uid } from "./seed";
-import { currentProjectMemberForAccount } from "./memberIdentity";
-import type { AppState, AuthState, TeamMember } from "./types";
+import type { AppState, AuthState } from "./types";
 
 export { currentProjectMemberForAccount, projectMemberMatchesAccount } from "./memberIdentity";
-
-type BindAccountOptions = {
-  createMissingTeamMember?: boolean;
-};
 
 export const bindAccountToMembers = (
   value: AppState,
   auth: AuthState,
   timestamp = new Date().toISOString(),
-  options: BindAccountOptions = {},
 ): AppState => {
   const account = auth.account;
   if (!account) return value;
 
-  const existingTeamMember =
-    value.teamMembers.find((member) => member.accountId === account.id) ??
-    value.teamMembers.find((member) => !member.accountId && member.email?.toLowerCase() === account.email.toLowerCase());
-
-  const teamMember: TeamMember | undefined = existingTeamMember
-    ? {
-        ...existingTeamMember,
-        accountId: account.id,
-        name: existingTeamMember.name || account.name,
-        email: existingTeamMember.email ?? account.email,
-        status: existingTeamMember.status ?? "active",
-        updatedAt: timestamp,
-      }
-    : options.createMissingTeamMember
-      ? {
-          id: uid("team_member"),
-          accountId: account.id,
-          name: account.name,
-          email: account.email,
-          status: "active",
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        }
-      : undefined;
-
-  const teamMembers = existingTeamMember
-    ? value.teamMembers.map((member) => (member.id === existingTeamMember.id && teamMember ? teamMember : member))
-    : teamMember
-      ? [teamMember, ...value.teamMembers]
-      : value.teamMembers;
-
   const hasAccountOwnerForProject = (projectId: string) =>
     value.projectMembers.some((member) => member.projectId === projectId && member.accountId === account.id && member.roles.includes("project_owner"));
   const memberHasIdentity = (member: AppState["projectMembers"][number]) => {
-    const teamMember = member.teamMemberId ? value.teamMembers.find((item) => item.id === member.teamMemberId) : undefined;
-    return Boolean(member.accountId || member.email || teamMember?.accountId || teamMember?.email);
+    return Boolean(member.accountId || member.email);
   };
   const projectHasIdentifiedMember = (projectId: string) =>
     value.projectMembers.some((member) => member.projectId === projectId && memberHasIdentity(member));
@@ -60,11 +21,8 @@ export const bindAccountToMembers = (
   const shouldBindProjectMember = (member: AppState["projectMembers"][number]) => {
     if (member.accountId === account.id) return true;
     if (member.accountId) return false;
-    if (teamMember && member.teamMemberId && member.teamMemberId === teamMember.id) return true;
     if (member.email?.toLowerCase() === accountEmail) return true;
     return (
-      Boolean(teamMember) &&
-      member.id === value.currentMemberId &&
       member.roles.includes("project_owner") &&
       !hasAccountOwnerForProject(member.projectId) &&
       !projectHasIdentifiedMember(member.projectId) &&
@@ -76,7 +34,6 @@ export const bindAccountToMembers = (
     shouldBindProjectMember(member)
       ? {
           ...member,
-          teamMemberId: teamMember?.id ?? member.teamMemberId,
           accountId: account.id,
           name: member.name || account.name,
           email: member.email ?? account.email,
@@ -86,13 +43,9 @@ export const bindAccountToMembers = (
       : { ...member, status: member.status ?? "active" },
   );
 
-  const currentMember = currentProjectMemberForAccount({ ...value, auth, teamMembers, projectMembers });
-
   return {
     ...value,
     auth,
-    teamMembers,
-    currentMemberId: currentMember?.id,
     projectMembers,
     sync: {
       ...value.sync,

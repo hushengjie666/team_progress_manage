@@ -1,11 +1,7 @@
 import { createInitialState, defaultNativeCapabilities, defaultTaskTemplates } from "./seed";
 import { isTauri } from "./env";
-import { currentProjectMemberForAccount } from "./memberIdentity";
 import {
-  attachTeamMembersToProjectMembers,
   dedupeProjectMemberBindingsWithAliases,
-  dedupeTeamMembers,
-  migrateTeamMembers,
   normalizeProjectMember,
 } from "./storageTeamMembers";
 import type {
@@ -25,17 +21,32 @@ import type {
   Task,
   TaskStage,
   TaskStatus,
-  TeamMember,
   WorkSession,
   WorkSessionStatus,
 } from "./types";
 
 const STORAGE_KEY = "timemanage.app_state.v1";
 
-type NormalizableAppState = Omit<Partial<AppState>, "projects" | "teamMembers" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
+type LegacyTeamMemberPayload = {
+  id?: string;
+  workspaceId?: string;
+  accountId?: string;
+  name?: string;
+  email?: string;
+  status?: "active" | "disabled";
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+type LegacyProjectMemberPayload = Partial<ProjectMember> & {
+  teamMemberId?: string;
+};
+
+type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
+  currentMemberId?: string;
   projects?: Partial<Project>[];
-  teamMembers?: Partial<TeamMember>[];
-  projectMembers?: Partial<ProjectMember>[];
+  teamMembers?: LegacyTeamMemberPayload[];
+  projectMembers?: LegacyProjectMemberPayload[];
   tasks?: Partial<Task>[];
   workSessions?: Partial<WorkSession>[];
   executionSignals?: Partial<ExecutionSignal>[];
@@ -44,11 +55,16 @@ type NormalizableAppState = Omit<Partial<AppState>, "projects" | "teamMembers" |
 const normalizeProject = (project: Partial<Project>, fallback: Project, index: number): Project => {
   const timestamp = project.updatedAt ?? project.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
   const sortOrder = Number.isFinite(project.sortOrder) ? project.sortOrder : project.id === fallback.id ? fallback.sortOrder : undefined;
+  const taskStageMode = project.taskStageMode === "regular" || project.taskStageMode === "software"
+    ? project.taskStageMode
+    : fallback.taskStageMode ?? "software";
   return {
     id: project.id ?? (index === 0 ? fallback.id : `project_migrated_${index}`),
+    workspaceId: project.workspaceId ?? fallback.workspaceId,
     name: project.name?.trim() || fallback.name,
     description: project.description ?? "",
     defaultExpectedStartHours: Math.max(1, project.defaultExpectedStartHours ?? fallback.defaultExpectedStartHours ?? 24),
+    taskStageMode,
     sortOrder,
     createdAt: project.createdAt ?? timestamp,
     updatedAt: timestamp,
@@ -58,13 +74,14 @@ const normalizeProject = (project: Partial<Project>, fallback: Project, index: n
 
 const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
 const allowedTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
-const allowedTaskStages: TaskStage[] = ["sales", "requirements", "design", "development", "testing", "deployment", "acceptance"];
+const allowedTaskStages: TaskStage[] = ["planning", "execution", "check", "sales", "requirements", "design", "development", "testing", "deployment", "acceptance"];
 
 const normalizeTask = (task: Partial<Task>, index: number, projectId: string): Task => {
   const timestamp = task.updatedAt ?? task.createdAt ?? new Date().toISOString();
   const allowedRepeatRules: RepeatRule[] = ["none", "daily", "weekly", "interval", "weekdays", "monthly", "after_completion"];
   return {
     id: task.id ?? `task_migrated_${index}`,
+    workspaceId: task.workspaceId,
     title: task.title ?? "未命名任务",
     notes: task.notes ?? "",
     tags: task.tags ?? [],
@@ -132,6 +149,7 @@ const normalizePlan = (plan: Partial<DailyPlan>): DailyPlan => {
   const timestamp = plan.updatedAt ?? plan.createdAt ?? new Date().toISOString();
   return {
     id: plan.id ?? `plan_${plan.date ?? timestamp.slice(0, 10)}`,
+    workspaceId: plan.workspaceId,
     date: plan.date ?? timestamp.slice(0, 10),
     capacityPomodoros: plan.capacityPomodoros ?? 8,
     committedTaskIds: plan.committedTaskIds ?? [],
@@ -154,6 +172,7 @@ const normalizeWorkSession = (session: Partial<WorkSession>, index: number): Wor
   const allowedStatuses: WorkSessionStatus[] = ["active", "paused", "ended"];
   return {
     id: session.id ?? `work_session_migrated_${index}`,
+    workspaceId: session.workspaceId,
     taskId: session.taskId,
     executorMemberId: session.executorMemberId,
     focusSessionId: session.focusSessionId,
@@ -173,6 +192,7 @@ const normalizeExecutionSignal = (signal: Partial<ExecutionSignal>, index: numbe
   const timestamp = signal.createdAt ?? new Date().toISOString();
   return {
     id: signal.id ?? `signal_migrated_${index}`,
+    workspaceId: signal.workspaceId,
     workSessionId: signal.workSessionId,
     taskId: signal.taskId,
     executorMemberId: signal.executorMemberId,
@@ -229,16 +249,10 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
   const projects = (parsed.projects ?? initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
   const starterProjectId = projects[0]?.id ?? initial.projects[0].id;
   const rawProjectMembers = (parsed.projectMembers ?? initial.projectMembers).map((member, index) =>
-    normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index),
+    normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index, parsed.teamMembers),
   );
-  const migratedTeamMembers = migrateTeamMembers(rawProjectMembers, parsed.teamMembers, initial.teamMembers[0]);
-  const deduped = dedupeTeamMembers(migratedTeamMembers, rawProjectMembers, parsed.auth?.account?.id);
-  const teamMembers = deduped.teamMembers;
-  const dedupedProjectMembers = dedupeProjectMemberBindingsWithAliases(attachTeamMembersToProjectMembers(deduped.projectMembers, teamMembers));
+  const dedupedProjectMembers = dedupeProjectMemberBindingsWithAliases(rawProjectMembers);
   const projectMembers = dedupedProjectMembers.projectMembers;
-  const currentMemberId = parsed.currentMemberId && projectMembers.some((member) => member.id === parsed.currentMemberId)
-    ? parsed.currentMemberId
-    : projectMembers[0]?.id;
   const tasks = restoreSplitParentTasks((parsed.tasks ?? initial.tasks).map((task, index) => {
     const taskProjectId = task.projectId && projects.some((project) => project.id === task.projectId) ? task.projectId : starterProjectId;
     return normalizeTask(task, index, taskProjectId);
@@ -253,7 +267,6 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     tombstones: parsed.sync?.tombstones ?? [],
     conflicts: parsed.sync?.conflicts ?? [],
     entityAliases: [
-      ...deduped.teamMemberAliases.map((alias) => ({ entity: "team_member" as const, ...alias })),
       ...dedupedProjectMembers.projectMemberAliases.map((alias) => ({ entity: "project_member" as const, ...alias })),
     ],
   };
@@ -263,9 +276,7 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     onboarding: { ...initial.onboarding, ...parsed.onboarding, completed: true },
     settings: mergeSettings(initial.settings, parsed.settings),
     auth: { ...initial.auth, ...parsed.auth },
-    currentMemberId,
     projects,
-    teamMembers,
     projectMembers,
     tasks,
     dailyPlans: (parsed.dailyPlans ?? initial.dailyPlans).map(normalizePlan),
@@ -280,8 +291,7 @@ export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState
     activeTimer: normalizeActiveTimer(parsed.activeTimer),
     sync: normalizedSync,
   } as AppState;
-  const authenticatedMember = normalized.auth.account ? currentProjectMemberForAccount(normalized) : undefined;
-  return authenticatedMember ? { ...normalized, currentMemberId: authenticatedMember.id } : normalized;
+  return normalized;
 };
 
 const mergeStoredState = (payload: string): AppState => normalizeAppStatePayload(JSON.parse(payload) as Partial<AppState>);

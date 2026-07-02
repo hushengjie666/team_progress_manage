@@ -4,19 +4,16 @@ import { resolveMemberIdForProject } from "../../src/memberIdentity.js";
 import { createInitialState, todayKey, uid } from "../../src/seed.js";
 import { loginToWorkspace, mergeRowsIntoState, syncAppState, type AuthSession } from "../../src/sync.js";
 import {
+  addProjectMemberToState,
   acceptTaskInState,
   assignTaskInState,
-  bindTeamMemberToProjectInState,
   createProjectInState,
-  createTeamMemberInState,
-  deleteTeamMemberInState,
   projectMembersForProject,
   returnTaskForReviewInState,
   submitTaskForReviewInState,
   updateProjectInState,
   updateProjectMemberInState,
   updateTaskProgressInState,
-  updateTeamMemberInState,
 } from "../../src/teamProgress.js";
 import type {
   AppState,
@@ -31,7 +28,6 @@ import type {
   Task,
   TaskStage,
   TaskStatus,
-  TeamMember,
 } from "../../src/types.js";
 import {
   addTaskToTodayInState as addToTodayInState,
@@ -94,24 +90,27 @@ type CreateProjectInput = {
   name: string;
   description?: string;
   defaultExpectedStartHours?: number;
+  taskStageMode?: "regular" | "software";
 };
 
 type UpdateProjectInput = Partial<{
   name: string;
   description: string;
   defaultExpectedStartHours: number;
+  taskStageMode: "regular" | "software";
 }>;
 
 type CreateMemberInput = {
+  projectId: string;
   name: string;
   email?: string;
   accountId?: string;
+  roles?: ProjectMemberRole[];
 };
 
 type UpdateMemberInput = Partial<{
   name: string;
   email: string;
-  accountId: string;
   status: "active" | "disabled";
 }>;
 
@@ -148,9 +147,7 @@ const createEmptySyncState = (config: TimeManageMcpConfig, session: AuthSession)
   const initial = createInitialState();
   return {
     ...initial,
-    currentMemberId: undefined,
     projects: [],
-    teamMembers: [],
     projectMembers: [],
     tasks: [],
     dailyPlans: [],
@@ -191,20 +188,7 @@ const createEmptySyncState = (config: TimeManageMcpConfig, session: AuthSession)
   };
 };
 
-const memberMatchesAccount = (member: ProjectMember, session: AuthSession) => {
-  if (member.status === "disabled") return false;
-  if (member.accountId && member.accountId === session.account.id) return true;
-  if (member.email && member.email.toLowerCase() === session.account.email.toLowerCase()) return true;
-  return false;
-};
-
-const hydrateCurrentMember = (state: AppState, session: AuthSession, preferredProjectId?: string): AppState => {
-  const preferred = preferredProjectId
-    ? state.projectMembers.find((member) => member.projectId === preferredProjectId && memberMatchesAccount(member, session))
-    : undefined;
-  const fallback = state.projectMembers.find((member) => memberMatchesAccount(member, session));
-  return { ...state, currentMemberId: preferred?.id ?? fallback?.id ?? state.currentMemberId };
-};
+const hydrateCurrentMember = (state: AppState, _session: AuthSession, _preferredProjectId?: string): AppState => state;
 
 const compactTask = (state: AppState, task: Task) => {
   const executor = task.primaryExecutorMemberId
@@ -291,6 +275,18 @@ const activeWorkSessionsForTasks = (state: AppState, tasks: Task[]) => {
 
 const memberLabel = (member?: ProjectMember) => member?.name || member?.email || "未分配";
 
+const projectMemberIdentity = (member: ProjectMember) => member.accountId || member.email?.toLowerCase() || member.id;
+
+const uniqueProjectMembers = (members: ProjectMember[]) => {
+  const seen = new Set<string>();
+  return sortedByUpdatedAt(members).filter((member) => {
+    const identity = projectMemberIdentity(member);
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
+};
+
 const compactProject = (state: AppState, project: Project) => {
   const tasks = state.tasks.filter((task) => task.projectId === project.id && task.status !== "archived" && task.status !== "split");
   const members = projectMembersForProject(state, project.id);
@@ -300,6 +296,7 @@ const compactProject = (state: AppState, project: Project) => {
     name: project.name,
     description: project.description,
     defaultExpectedStartHours: project.defaultExpectedStartHours,
+    taskStageMode: project.taskStageMode ?? "software",
     archivedAt: project.archivedAt,
     progressPercent: board.projectProgress,
     taskCount: tasks.length,
@@ -317,7 +314,6 @@ const unbindProjectMemberInState = (state: AppState, projectMemberId: string, ti
   return {
     ...state,
     projectMembers: state.projectMembers.filter((item) => item.id !== projectMemberId),
-    currentMemberId: state.currentMemberId === projectMemberId ? undefined : state.currentMemberId,
     tasks: state.tasks.map((task) => {
       const touched =
         task.creatorMemberId === projectMemberId ||
@@ -405,7 +401,7 @@ export class TimeManageMcpClient {
         .filter((project) => includes(project.name, project.description))
         .slice(0, limit)
         .map((project) => compactProject(state, project)),
-      members: state.teamMembers
+      members: uniqueProjectMembers(state.projectMembers)
         .filter((member) => includes(member.name, member.email))
         .slice(0, limit),
       tasks: state.tasks
@@ -422,6 +418,7 @@ export class TimeManageMcpClient {
         accountId: session?.account.id,
         name: session?.account.name,
         email: session?.account.email,
+        taskStageMode: input.taskStageMode,
       });
       const created = next.projects.find((project) => !state.projects.some((item) => item.id === project.id));
       if (!created) throw new Error("Project was not created. Check project name.");
@@ -443,6 +440,7 @@ export class TimeManageMcpClient {
         defaultExpectedStartHours: input.defaultExpectedStartHours === undefined
           ? project.defaultExpectedStartHours
           : Math.max(0, Math.round(input.defaultExpectedStartHours)),
+        taskStageMode: input.taskStageMode ?? project.taskStageMode,
       };
       const next = {
         ...updateProjectInState(state, nextProject, timestamp),
@@ -476,55 +474,82 @@ export class TimeManageMcpClient {
 
   async listMembers(projectId?: string, includeDisabled = false) {
     const state = await this.readState(projectId);
-    if (projectId) {
-      return state.projectMembers
-        .filter((member) => member.projectId === projectId)
-        .filter((member) => includeDisabled || member.status !== "disabled");
-    }
-    return state.teamMembers.filter((member) => includeDisabled || member.status !== "disabled");
+    const members = projectId
+      ? state.projectMembers.filter((member) => member.projectId === projectId)
+      : uniqueProjectMembers(state.projectMembers);
+    return members.filter((member) => includeDisabled || member.status !== "disabled");
   }
 
   async createMember(input: CreateMemberInput) {
-    return this.mutate(undefined, (state, timestamp) => {
-      const next = createTeamMemberInState(state, input.name, input.email ?? "", timestamp, uid, input.accountId);
+    return this.mutate(input.projectId, (state, timestamp) => {
+      const project = state.projects.find((item) => item.id === input.projectId);
+      if (!project) throw new Error(`Project not found: ${input.projectId}`);
+      const next = addProjectMemberToState(state, input.projectId, input.name, input.email ?? "", input.roles ?? ["executor"], timestamp, uid, {
+        accountId: input.accountId,
+        workspaceId: project.workspaceId,
+      });
       const normalizedEmail = input.email?.trim().toLowerCase();
-      const created = normalizedEmail
-        ? next.teamMembers.find((member) => member.email?.toLowerCase() === normalizedEmail)
-        : sortedByUpdatedAt(next.teamMembers).find((member) => member.name === (input.name.trim() || "新成员"));
-      if (!created) throw new Error("Member was not created. Check member input.");
+      const created = next.projectMembers.find(
+        (member) =>
+          member.projectId === input.projectId &&
+          (
+            (input.accountId && member.accountId === input.accountId) ||
+            (normalizedEmail && member.email?.toLowerCase() === normalizedEmail) ||
+            member.name === (input.name.trim() || "新成员")
+          ),
+      );
+      if (!created) throw new Error("Project member was not created. Check member input.");
       return { state: next, result: created };
     });
   }
 
-  async updateMember(teamMemberId: string, input: UpdateMemberInput) {
+  async updateMember(projectMemberId: string, input: UpdateMemberInput) {
     return this.mutate(undefined, (state, timestamp) => {
-      const member = state.teamMembers.find((item) => item.id === teamMemberId);
-      if (!member) throw new Error(`Team member not found: ${teamMemberId}`);
-      const nextMember: TeamMember = {
+      const member = state.projectMembers.find((item) => item.id === projectMemberId);
+      if (!member) throw new Error(`Project member not found: ${projectMemberId}`);
+      const nextMember: ProjectMember = {
         ...member,
         name: input.name?.trim() || member.name,
         email: input.email === undefined ? member.email : input.email.trim() || undefined,
-        accountId: input.accountId === undefined ? member.accountId : input.accountId || undefined,
         status: input.status ?? member.status ?? "active",
       };
-      const next = updateTeamMemberInState(state, nextMember, timestamp);
-      return { state: next, result: next.teamMembers.find((item) => item.id === teamMemberId)! };
+      const next = updateProjectMemberInState(state, nextMember, timestamp);
+      return { state: next, result: next.projectMembers.find((item) => item.id === projectMemberId)! };
     });
   }
 
-  async deleteMember(teamMemberId: string) {
+  async deleteMember(projectMemberId: string) {
     return this.mutate(undefined, (state, timestamp) => {
-      if (!state.teamMembers.some((member) => member.id === teamMemberId)) throw new Error(`Team member not found: ${teamMemberId}`);
-      return { state: deleteTeamMemberInState(state, teamMemberId, timestamp), result: { deletedTeamMemberId: teamMemberId } };
+      if (!state.projectMembers.some((member) => member.id === projectMemberId)) throw new Error(`Project member not found: ${projectMemberId}`);
+      return { state: unbindProjectMemberInState(state, projectMemberId, timestamp), result: { deletedProjectMemberId: projectMemberId } };
     });
   }
 
-  async bindMemberToProject(projectId: string, teamMemberId: string, roles: ProjectMemberRole[] = ["executor"]) {
+  async bindMemberToProject(projectId: string, memberRef: string, roles: ProjectMemberRole[] = ["executor"]) {
     return this.mutate(projectId, (state, timestamp) => {
-      if (!state.projects.some((project) => project.id === projectId)) throw new Error(`Project not found: ${projectId}`);
-      if (!state.teamMembers.some((member) => member.id === teamMemberId)) throw new Error(`Team member not found: ${teamMemberId}`);
-      const next = bindTeamMemberToProjectInState(state, projectId, teamMemberId, roles, timestamp);
-      const projectMember = next.projectMembers.find((member) => member.projectId === projectId && member.teamMemberId === teamMemberId);
+      const project = state.projects.find((item) => item.id === projectId);
+      if (!project) throw new Error(`Project not found: ${projectId}`);
+      const normalizedRef = memberRef.trim().toLowerCase();
+      const source = state.projectMembers.find(
+        (member) =>
+          member.id === memberRef ||
+          member.accountId === memberRef ||
+          member.email?.toLowerCase() === normalizedRef,
+      );
+      if (!source) throw new Error(`Project member source not found: ${memberRef}`);
+      const next = addProjectMemberToState(state, projectId, source.name, source.email ?? "", roles, timestamp, uid, {
+        accountId: source.accountId,
+        workspaceId: project.workspaceId ?? source.workspaceId,
+      });
+      const projectMember = next.projectMembers.find(
+        (member) =>
+          member.projectId === projectId &&
+          (
+            (source.accountId && member.accountId === source.accountId) ||
+            (source.email && member.email?.toLowerCase() === source.email.toLowerCase()) ||
+            member.name === source.name
+          ),
+      );
       return { state: next, result: projectMember };
     });
   }
@@ -1012,7 +1037,7 @@ export class TimeManageMcpClient {
       },
       counts: {
         projects: state.projects.length,
-        teamMembers: state.teamMembers.length,
+        members: uniqueProjectMembers(state.projectMembers).length,
         projectMembers: state.projectMembers.length,
         tasks: state.tasks.length,
         dailyPlans: state.dailyPlans.length,
