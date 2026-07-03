@@ -36,7 +36,7 @@ func (a *app) handleWorkspaceInvitationCreate(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
 	}
-	if fallback(workspace.Type, "shared") == "private" {
+	if workspace.Type == "private" {
 		writeError(w, http.StatusForbidden, "private workspace does not support invitations")
 		return
 	}

@@ -23,7 +23,7 @@ func seedProjectOwnerRows(t *testing.T, api *app) pushResponse {
 			ID:        "member_sync",
 			DeviceID:  "device_a",
 			UpdatedAt: "2026-05-10T08:03:00Z",
-			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"负责人","roles":["project_owner","executor"],"updatedAt":"2026-05-10T08:03:00Z"}`),
+			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"负责人","roles":["project_owner","executor"],"status":"active","updatedAt":"2026-05-10T08:03:00Z"}`),
 		},
 	})
 }
@@ -34,7 +34,7 @@ func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 	if seed.CurrentRevision != 2 {
 		t.Fatalf("seed current revision = %d", seed.CurrentRevision)
 	}
-	body := bytes.NewReader([]byte(`{"project_id":"project_sync","name":"执行者","email":"executor@example.com","password":"demo","roles":["executor"]}`))
+	body := bytes.NewReader([]byte(`{"project_id":"project_sync","name":"执行者","email":"executor@example.com","password":"demo","roles":["executor"],"status":"active"}`))
 	recorder := httptest.NewRecorder()
 	api.handleMembers(recorder, httptest.NewRequest(http.MethodPost, "/members", body), ownerAuth())
 	if recorder.Code != http.StatusOK {
@@ -71,7 +71,7 @@ func TestProjectOwnerCreatesWorkspaceMemberAccount(t *testing.T) {
 	if seed.CurrentRevision != 2 {
 		t.Fatalf("seed current revision = %d", seed.CurrentRevision)
 	}
-	body := []byte(`{"name":"成员库成员","email":"directory@example.com","password":"demo"}`)
+	body := []byte(`{"name":"成员库成员","email":"directory@example.com","password":"demo","status":"active"}`)
 	recorder := httptest.NewRecorder()
 	api.handleMembers(recorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(body)), ownerAuth())
 	if recorder.Code != http.StatusOK {
@@ -84,7 +84,7 @@ func TestProjectOwnerCreatesWorkspaceMemberAccount(t *testing.T) {
 	if response.Account.Email != "directory@example.com" || response.Member.Entity != "" {
 		t.Fatalf("unexpected workspace member response: %#v", response)
 	}
-	duplicateBody := []byte(`{"name":"重复成员","email":"directory@example.com","password":"new-demo"}`)
+	duplicateBody := []byte(`{"name":"重复成员","email":"directory@example.com","password":"new-demo","status":"active"}`)
 	duplicateRecorder := httptest.NewRecorder()
 	api.handleMembers(duplicateRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(duplicateBody)), ownerAuth())
 	if duplicateRecorder.Code != http.StatusOK {

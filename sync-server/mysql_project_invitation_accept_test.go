@@ -31,7 +31,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
 
 	accountRecorder := httptest.NewRecorder()
-	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"项目受邀人","email":"project-invitee@example.com","password":"secret"}`))), adminAuth)
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"项目受邀人","email":"project-invitee@example.com","password":"secret","status":"active"}`))), adminAuth)
 	if accountRecorder.Code != http.StatusOK {
 		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
 	}
@@ -41,7 +41,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 	}
 
 	workspaceRecorder := httptest.NewRecorder()
-	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"项目邀请协作区"}`))), adminAuth)
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"项目邀请协作区","type":"shared"}`))), adminAuth)
 	if workspaceRecorder.Code != http.StatusOK {
 		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
 	}
@@ -123,7 +123,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 		t.Fatalf("project invitation should not add workspace membership, got %d", workspaceMembershipCount)
 	}
 	var projectMembershipCount int
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL AND COALESCE(NULLIF(status, ''), 'active') = 'active'`, workspaceID, "project_invited", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL AND status = 'active'`, workspaceID, "project_invited", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
 		t.Fatal(err)
 	}
 	if projectMembershipCount != 1 {

@@ -57,7 +57,7 @@ func (a *app) handleWorkspaceInvitationByID(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	if !foundWorkspace || fallback(workspace.Type, "shared") == "private" {
+	if !foundWorkspace || workspace.Type == "private" {
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
 	}

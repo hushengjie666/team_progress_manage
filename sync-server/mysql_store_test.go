@@ -91,6 +91,7 @@ func TestMySQLStoreRoundTrip(t *testing.T) {
 			"workspace_mysql": {
 				ID:        "workspace_mysql",
 				Name:      "MySQL 团队",
+				Type:      "shared",
 				CreatedAt: "2026-06-29T08:00:00Z",
 				UpdatedAt: "2026-06-29T09:00:00Z",
 				Rows: map[string]syncRow{
@@ -174,6 +175,7 @@ func TestMySQLIncrementalHandlersDoNotDependOnMemoryStore(t *testing.T) {
 			"workspace_test": {
 				ID:        "workspace_test",
 				Name:      "测试团队",
+				Type:      "shared",
 				Rows:      map[string]syncRow{},
 				CreatedAt: "2026-05-10T08:00:00Z",
 				UpdatedAt: "2026-05-10T08:00:00Z",

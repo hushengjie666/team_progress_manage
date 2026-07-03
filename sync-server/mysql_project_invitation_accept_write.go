@@ -41,7 +41,7 @@ func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authConte
 	if err != nil {
 		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
-	if !foundWorkspace || fallback(workspace.Type, "shared") == "private" {
+	if !foundWorkspace || workspace.Type == "private" {
 		return memberWriteFailure{status: http.StatusNotFound, message: "workspace not found"}
 	}
 	now := time.Now().UTC().Format(time.RFC3339)

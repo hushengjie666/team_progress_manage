@@ -9,6 +9,8 @@
     "typecheck": "tsc -p tsconfig.app.json",
     "typecheck:unused": "tsc -p tsconfig.app.json --noUnusedLocals --noUnusedParameters --pretty false",
     "typecheck:test": "tsc --noEmit",
+    "audit:health": "node scripts/audit-code-health.mjs",
+    "verify:quality": "npm run typecheck:unused && npm run audit:health",
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "verify:fast": "npm test -- --run && npm run build",
     "verify:e2e": "npm run test:e2e",

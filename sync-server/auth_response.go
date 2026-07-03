@@ -54,7 +54,7 @@ func publicWorkspace(workspace workspaceData) workspaceSummary {
 	return workspaceSummary{
 		ID:             workspace.ID,
 		Name:           workspace.Name,
-		Type:           fallback(workspace.Type, "shared"),
+		Type:           workspace.Type,
 		OwnerAccountID: workspace.OwnerAccountID,
 		CreatedAt:      workspace.CreatedAt,
 		UpdatedAt:      workspace.UpdatedAt,

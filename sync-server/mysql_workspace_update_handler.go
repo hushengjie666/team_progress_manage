@@ -34,7 +34,7 @@ func (a *app) handleWorkspaceByIDMySQL(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	workspaceType := strings.TrimSpace(req.Type)
-	if workspaceType != "" && workspaceType != "private" && workspaceType != "shared" {
+	if !isWorkspaceType(workspaceType) {
 		writeError(w, http.StatusBadRequest, "workspace type must be private or shared")
 		return
 	}

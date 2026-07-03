@@ -1,5 +1,3 @@
-import type { Priority } from "./taskTypes";
-
 export type InterruptionType = "internal" | "external";
 export type InterruptionAction = "defer" | "inbox" | "abort";
 export type InsightKind = "capacity" | "estimate" | "interruption" | "reward" | "commitment" | "rhythm";

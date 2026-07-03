@@ -14,7 +14,7 @@ func validateMemberWriteTarget(ctx context.Context, tx *sql.Tx, auth authContext
 	if !foundWorkspace {
 		return memberWriteFailure{status: http.StatusNotFound, message: "workspace not found"}
 	}
-	if fallback(targetWorkspace.Type, "shared") == "private" {
+	if targetWorkspace.Type == "private" {
 		return memberWriteFailure{status: http.StatusForbidden, message: "private workspace does not support members"}
 	}
 	canManageWorkspace, err := teamAccountCanManageWorkspace(ctx, tx, auth, targetWorkspaceID)

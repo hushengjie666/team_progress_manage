@@ -1,4 +1,4 @@
-import { createProjectAccessibleMemberCollector, type ProjectAccessibleMember } from "./projectAccessMemberCollector";
+import { createProjectAccessibleMemberCollector } from "./projectAccessMemberCollector";
 import {
   accountBelongsToWorkspace,
   workspaceMembershipsForState,

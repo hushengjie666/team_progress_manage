@@ -30,7 +30,7 @@ func TestMySQLWorkspaceMemberCreationDoesNotWriteTeamRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	workspaceBody := []byte(`{"name":"协作区"}`)
+	workspaceBody := []byte(`{"name":"协作区","type":"shared"}`)
 	workspaceRecorder := httptest.NewRecorder()
 	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader(workspaceBody)), authContext{AccountID: login.Account.ID, WorkspaceID: login.Workspace.ID})
 	if workspaceRecorder.Code != http.StatusOK {
@@ -42,7 +42,7 @@ func TestMySQLWorkspaceMemberCreationDoesNotWriteTeamRows(t *testing.T) {
 	}
 	sharedAuth := authContext{AccountID: login.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 
-	memberBody := []byte(`{"name":"成员","email":"member@example.com","password":"member-secret"}`)
+	memberBody := []byte(`{"name":"成员","email":"member@example.com","password":"member-secret","status":"active"}`)
 	memberRecorder := httptest.NewRecorder()
 	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(memberBody)), sharedAuth)
 	if memberRecorder.Code != http.StatusOK {

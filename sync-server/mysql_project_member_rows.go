@@ -11,10 +11,10 @@ func makeProjectMemberRow(auth authContext, account accountRecord, workspaceID s
 		"workspaceId": workspaceID,
 		"projectId":   projectID,
 		"accountId":   account.ID,
-		"name":        fallback(strings.TrimSpace(name), account.Name),
+		"name":        strings.TrimSpace(name),
 		"email":       account.Email,
 		"roles":       normalizeRoles(roles),
-		"status":      fallback(strings.TrimSpace(status), "active"),
+		"status":      strings.TrimSpace(status),
 		"createdAt":   now,
 		"updatedAt":   now,
 	})

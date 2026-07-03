@@ -9,7 +9,7 @@ describe("data import and export", () => {
     const imported = mergeImportedState(
       state,
       {
-        version: state.version,
+        ...state,
         tasks: [
           {
             ...state.tasks[0],
@@ -33,7 +33,20 @@ describe("data import and export", () => {
     const state = createInitialState();
     const backup = createBackupSnapshot(state, "before_import", "2026-05-10T10:00:00.000Z");
 
-    expect(() => mergeImportedState(state, { version: 1, tasks: [] }, backup)).toThrow("版本不兼容");
+    expect(() => mergeImportedState(state, { ...state, version: 1 }, backup)).toThrow("当前版本");
+  });
+
+  it("rejects incomplete imports instead of backfilling missing fields", () => {
+    const state = createInitialState();
+    const backup = createBackupSnapshot(state, "before_import", "2026-05-10T10:00:00.000Z");
+    const incomplete = { ...state };
+    delete (incomplete as Partial<typeof state>).dailyPlans;
+
+    const summary = summarizeImportPayload(incomplete);
+
+    expect(summary.valid).toBe(false);
+    expect(summary.message).toContain("完整");
+    expect(() => mergeImportedState(state, incomplete, backup)).toThrow("完整");
   });
 
   it("summarizes imports, creates backups, and exports CSV", () => {

@@ -12,11 +12,11 @@ func privateWorkspaceID(accountID string) string {
 func mysqlEnsurePrivateWorkspaceForAccount(ctx context.Context, tx *sql.Tx, account accountRecord, now string) (workspaceData, error) {
 	workspace := workspaceData{
 		ID:             privateWorkspaceID(account.ID),
-		Name:           fallback(account.Name, account.Email) + "的私人工作区",
+		Name:           account.Name + "的私人工作区",
 		Type:           "private",
 		OwnerAccountID: account.ID,
 		Rows:           map[string]syncRow{},
-		CreatedAt:      fallback(account.CreatedAt, now),
+		CreatedAt:      account.CreatedAt,
 		UpdatedAt:      now,
 	}
 	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
@@ -48,7 +48,7 @@ func mysqlDefaultWorkspaceForAccount(ctx context.Context, q sqlRunner, account a
 		 FROM workspace_memberships m
 		 JOIN workspaces w ON w.id = m.workspace_id
 		 WHERE m.account_id = ? AND m.status = 'active'
-		   AND (COALESCE(NULLIF(w.type, ''), 'shared') <> 'private' OR w.owner_account_id = ?)
+		   AND (w.type <> 'private' OR w.owner_account_id = ?)
 		 ORDER BY w.created_at ASC LIMIT 1`,
 		account.ID,
 		account.ID,

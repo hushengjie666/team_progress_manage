@@ -11,7 +11,7 @@ func teamProjectIDsForAccount(ctx context.Context, q sqlRunner, workspaceID stri
 		`SELECT DISTINCT project_id
 		 FROM team_project_members
 		 WHERE workspace_id = ? AND account_ref = ? AND project_id IS NOT NULL AND project_id <> ''
-		   AND deleted_at IS NULL AND COALESCE(NULLIF(status, ''), 'active') = 'active'`,
+			   AND deleted_at IS NULL AND status = 'active'`,
 		workspaceID,
 		accountID,
 	)
@@ -40,7 +40,7 @@ func teamAccountCanAccessProject(ctx context.Context, q sqlRunner, workspaceID s
 		`SELECT COUNT(*)
 		 FROM team_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
-		   AND deleted_at IS NULL AND COALESCE(NULLIF(status, ''), 'active') = 'active'`,
+			   AND deleted_at IS NULL AND status = 'active'`,
 		workspaceID,
 		projectID,
 		accountID,
@@ -68,7 +68,7 @@ func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, worksp
 		`SELECT workspace_id, 'project_member' AS entity, id, user_id, account_id, device_id, updated_at, deleted_at, version, revision, payload
 		 FROM team_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
-		   AND deleted_at IS NULL AND COALESCE(NULLIF(status, ''), 'active') = 'active'`,
+			   AND deleted_at IS NULL AND status = 'active'`,
 		workspaceID,
 		projectID,
 		accountID,

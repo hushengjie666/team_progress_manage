@@ -37,6 +37,11 @@ func (a *app) handleAdminAccounts(w http.ResponseWriter, r *http.Request, auth a
 			writeError(w, http.StatusBadRequest, "email is required")
 			return
 		}
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
+			writeError(w, http.StatusBadRequest, "name is required")
+			return
+		}
 		status := normalizePlatformAccountStatus(req.Status)
 		if status == "" {
 			writeError(w, http.StatusBadRequest, "invalid account status")
@@ -70,7 +75,7 @@ func (a *app) handleAdminAccounts(w http.ResponseWriter, r *http.Request, auth a
 			account = accountRecord{
 				ID:           accountID,
 				WorkspaceID:  privateWorkspaceID(accountID),
-				Name:         fallback(strings.TrimSpace(req.Name), email),
+				Name:         name,
 				Email:        email,
 				PasswordHash: hash,
 				CreatedAt:    now,
@@ -78,7 +83,7 @@ func (a *app) handleAdminAccounts(w http.ResponseWriter, r *http.Request, auth a
 			}
 		} else {
 			account.WorkspaceID = privateWorkspaceID(account.ID)
-			account.Name = fallback(strings.TrimSpace(req.Name), account.Name)
+			account.Name = name
 			account.Email = email
 			account.UpdatedAt = now
 			if strings.TrimSpace(req.Password) != "" {

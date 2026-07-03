@@ -9,7 +9,7 @@ import {
   filterTodayCommittedTasksForMember,
 } from "./projectOverview";
 import { accessibleProjectIdsForCurrentUser } from "./accessControl";
-import type { AppState, DailyPlan, ProjectMember, Task } from "./types";
+import type { AppState, DailyPlan, Task } from "./types";
 import { currentMemberForState } from "./workbenchFocusModel";
 
 export { committedTasksForPlan, currentMemberForState, currentTaskForFocus, focusTasksForMember, taskById } from "./workbenchFocusModel";

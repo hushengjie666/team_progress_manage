@@ -31,7 +31,7 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
 
 	accountRecorder := httptest.NewRecorder()
-	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"被邀请人","email":"invitee@example.com","password":"secret"}`))), adminAuth)
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"被邀请人","email":"invitee@example.com","password":"secret","status":"active"}`))), adminAuth)
 	if accountRecorder.Code != http.StatusOK {
 		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
 	}
@@ -41,7 +41,7 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	}
 
 	workspaceRecorder := httptest.NewRecorder()
-	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"邀请协作区"}`))), adminAuth)
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"邀请协作区","type":"shared"}`))), adminAuth)
 	if workspaceRecorder.Code != http.StatusOK {
 		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
 	}

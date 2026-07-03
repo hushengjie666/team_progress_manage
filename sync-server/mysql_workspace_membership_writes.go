@@ -3,9 +3,16 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 func mysqlUpsertWorkspaceMembership(ctx context.Context, tx *sql.Tx, membership workspaceMembershipRecord) error {
+	if !isWorkspaceMembershipRole(membership.Role) {
+		return fmt.Errorf("workspace membership role is required")
+	}
+	if !isWorkspaceMembershipStatus(membership.Status) {
+		return fmt.Errorf("workspace membership status is required")
+	}
 	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
@@ -14,8 +21,8 @@ func mysqlUpsertWorkspaceMembership(ctx context.Context, tx *sql.Tx, membership 
 		membership.ID,
 		membership.WorkspaceID,
 		membership.AccountID,
-		fallback(membership.Role, "member"),
-		fallback(membership.Status, "active"),
+		membership.Role,
+		membership.Status,
 		membership.CreatedAt,
 		membership.UpdatedAt,
 	)
@@ -27,8 +34,8 @@ func mysqlEnsureWorkspaceMembership(ctx context.Context, tx *sql.Tx, workspaceID
 		ID:          "membership_" + workspaceID + "_" + accountID,
 		WorkspaceID: workspaceID,
 		AccountID:   accountID,
-		Role:        fallback(role, "member"),
-		Status:      fallback(status, "active"),
+		Role:        role,
+		Status:      status,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	})

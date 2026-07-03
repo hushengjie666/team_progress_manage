@@ -31,7 +31,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
 
 	createSharedRecorder := httptest.NewRecorder()
-	api.handleWorkspaces(createSharedRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"交付协作区"}`))), adminAuth)
+	api.handleWorkspaces(createSharedRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"交付协作区","type":"shared"}`))), adminAuth)
 	if createSharedRecorder.Code != http.StatusOK {
 		t.Fatalf("create shared status = %d, body = %s", createSharedRecorder.Code, createSharedRecorder.Body.String())
 	}
@@ -49,7 +49,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	})
 
 	memberRecorder := httptest.NewRecorder()
-	memberBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"demo","roles":["executor"]}`))
+	memberBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"demo","roles":["executor"],"status":"active"}`))
 	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", memberBody), sharedAuth)
 	if memberRecorder.Code != http.StatusOK {
 		t.Fatalf("create project-only member status = %d, body = %s", memberRecorder.Code, memberRecorder.Body.String())
@@ -104,7 +104,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	}
 
 	rejoinRecorder := httptest.NewRecorder()
-	rejoinBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"should-not-change","roles":["executor"]}`))
+	rejoinBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_visible","name":"项目成员","email":"project-only@example.com","password":"should-not-change","roles":["executor"],"status":"active"}`))
 	api.handleMembers(rejoinRecorder, httptest.NewRequest(http.MethodPost, "/members", rejoinBody), sharedAuth)
 	if rejoinRecorder.Code != http.StatusOK {
 		t.Fatalf("rejoin project member status = %d, body = %s", rejoinRecorder.Code, rejoinRecorder.Body.String())

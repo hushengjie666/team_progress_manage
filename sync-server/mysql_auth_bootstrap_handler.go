@@ -56,10 +56,19 @@ func (a *app) handleBootstrapMySQL(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	accountID := newID("account")
-	accountName := fallback(strings.TrimSpace(req.Name), "用户")
+	accountName := strings.TrimSpace(req.Name)
+	if accountName == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	workspaceName := strings.TrimSpace(req.WorkspaceName)
+	if workspaceName == "" {
+		writeError(w, http.StatusBadRequest, "workspace_name is required")
+		return
+	}
 	workspace := workspaceData{
 		ID:             privateWorkspaceID(accountID),
-		Name:           firstNonEmpty(strings.TrimSpace(req.WorkspaceName), accountName+"的私人工作区"),
+		Name:           workspaceName,
 		Type:           "private",
 		OwnerAccountID: accountID,
 		Rows:           map[string]syncRow{},

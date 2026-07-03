@@ -21,7 +21,7 @@ func TestSyncServerStoresTeamProgressEntities(t *testing.T) {
 			ID:        "member_sync",
 			DeviceID:  "device_a",
 			UpdatedAt: "2026-05-10T08:03:00Z",
-			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"执行者","roles":["project_owner","executor"],"updatedAt":"2026-05-10T08:03:00Z"}`),
+			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"执行者","roles":["project_owner","executor"],"status":"active","updatedAt":"2026-05-10T08:03:00Z"}`),
 		},
 		{
 			Entity:    "task",

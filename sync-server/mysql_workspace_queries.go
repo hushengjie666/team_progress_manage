@@ -27,7 +27,7 @@ func mysqlWorkspaceVisibleToAccount(ctx context.Context, q sqlRunner, accountID 
 	if err != nil || !found {
 		return workspaceData{}, false, err
 	}
-	if fallback(workspace.Type, "shared") == "private" && workspace.OwnerAccountID != accountID {
+	if workspace.Type == "private" && workspace.OwnerAccountID != accountID {
 		return workspaceData{}, false, nil
 	}
 	if _, found, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, q, accountID, workspaceID); err != nil || !found {

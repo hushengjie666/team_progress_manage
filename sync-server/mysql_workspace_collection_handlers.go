@@ -80,6 +80,11 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 			writeError(w, http.StatusBadRequest, "workspace name is required")
 			return
 		}
+		workspaceType := strings.TrimSpace(req.Type)
+		if workspaceType != "shared" {
+			writeError(w, http.StatusBadRequest, "workspace type must be shared")
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
 		account, found, err := mysqlAccountByID(ctx, a.db, auth.AccountID)
@@ -97,7 +102,7 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 		workspace := workspaceData{
 			ID:             newID("workspace"),
 			Name:           name,
-			Type:           "shared",
+			Type:           workspaceType,
 			OwnerAccountID: account.ID,
 			Rows:           map[string]syncRow{},
 			CreatedAt:      now,

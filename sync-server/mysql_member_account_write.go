@@ -29,6 +29,10 @@ func upsertMemberAccountForRequest(
 	projectID string,
 	now string,
 ) (accountRecord, memberWriteFailure) {
+	name := strings.TrimSpace(req.Name)
+	if name == "" {
+		return accountRecord{}, memberWriteFailure{status: http.StatusBadRequest, message: "name is required"}
+	}
 	account, found, err := mysqlAccountByEmail(ctx, tx, email)
 	if err != nil {
 		return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
@@ -46,9 +50,9 @@ func upsertMemberAccountForRequest(
 		if projectID != "" {
 			accountWorkspaceID = privateWorkspaceID(accountID)
 		}
-		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: fallback(strings.TrimSpace(req.Name), email), Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
+		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: name, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
 	} else {
-		account.Name = fallback(strings.TrimSpace(req.Name), account.Name)
+		account.Name = name
 		account.Email = email
 		account.DisabledAt = ""
 		account.UpdatedAt = now

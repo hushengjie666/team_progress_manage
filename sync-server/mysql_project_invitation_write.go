@@ -4,9 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 )
 
 func mysqlUpsertProjectInvitation(ctx context.Context, tx *sql.Tx, invitation projectInvitationSummary) error {
+	if !isInvitationStatus(invitation.Status) {
+		return fmt.Errorf("project invitation status is required")
+	}
 	rolesRaw, err := json.Marshal(normalizeRoles(invitation.Roles))
 	if err != nil {
 		return err
@@ -29,7 +33,7 @@ func mysqlUpsertProjectInvitation(ctx context.Context, tx *sql.Tx, invitation pr
 		invitation.InviteeAccountID,
 		invitation.InviteeEmail,
 		rolesRaw,
-		fallback(invitation.Status, "pending"),
+		invitation.Status,
 		invitation.CreatedAt,
 		invitation.UpdatedAt,
 		nullString(invitation.AcceptedAt),

@@ -37,9 +37,7 @@ func scanProjectInvitationSummary(row interface{ Scan(...any) error }) (projectI
 		invitation.Roles = []string{"executor"}
 	}
 	if projectPayload != "" {
-		invitation.ProjectName = fallback(stringField(json.RawMessage(projectPayload), "name"), invitation.ProjectID)
-	} else {
-		invitation.ProjectName = invitation.ProjectID
+		invitation.ProjectName = stringField(json.RawMessage(projectPayload), "name")
 	}
 	if acceptedAt.Valid {
 		invitation.AcceptedAt = acceptedAt.String

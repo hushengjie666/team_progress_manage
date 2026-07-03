@@ -15,15 +15,15 @@ func mysqlWorkspaceSummariesForAccount(ctx context.Context, q sqlRunner, account
 		   FROM workspace_memberships m
 		   JOIN workspaces w ON w.id = m.workspace_id
 		   WHERE m.account_id = ? AND m.status = 'active'
-		     AND (COALESCE(NULLIF(w.type, ''), 'shared') <> 'private' OR w.owner_account_id = ?)
+			     AND (w.type <> 'private' OR w.owner_account_id = ?)
 		   UNION
 		   SELECT DISTINCT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
 		   FROM team_project_members pm
 		   JOIN workspaces w ON w.id = pm.workspace_id
-		   WHERE pm.account_ref = ? AND pm.deleted_at IS NULL AND COALESCE(NULLIF(pm.status, ''), 'active') = 'active'
-		     AND COALESCE(NULLIF(w.type, ''), 'shared') <> 'private'
+			   WHERE pm.account_ref = ? AND pm.deleted_at IS NULL AND pm.status = 'active'
+			     AND w.type <> 'private'
 		 ) visible_workspaces
-		 ORDER BY CASE WHEN COALESCE(NULLIF(type, ''), 'shared') = 'private' THEN 0 ELSE 1 END, created_at ASC`,
+			 ORDER BY CASE WHEN type = 'private' THEN 0 ELSE 1 END, created_at ASC`,
 		accountID,
 		accountID,
 		accountID,

@@ -5,7 +5,7 @@ import {
 } from "./sync";
 import { bindAccountToMembers } from "./authModel";
 import { loadTeamState } from "./teamApi";
-import { isSuperAdminAccount, loadWorkspaceAccountMetadata } from "./workspaceAccountMetadata";
+import { loadWorkspaceAccountMetadata } from "./workspaceAccountMetadata";
 import { createWorkspaceInvitationRuntime } from "./workspaceInvitationRuntime";
 import { createWorkspaceMutationRuntime } from "./workspaceMutationRuntime";
 import { createWorkspacePlatformAccountRuntime } from "./workspacePlatformAccountRuntime";

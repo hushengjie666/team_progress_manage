@@ -14,7 +14,7 @@ func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS workspaces (
 			id VARCHAR(128) NOT NULL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
-			type VARCHAR(24) NOT NULL DEFAULT 'shared',
+			type VARCHAR(24) NOT NULL,
 			owner_account_id VARCHAR(128) NULL,
 			created_at VARCHAR(40) NOT NULL,
 			updated_at VARCHAR(40) NOT NULL,

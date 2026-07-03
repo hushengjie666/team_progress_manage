@@ -42,7 +42,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 		Payload:   json.RawMessage(`{"id":"project_private","name":"私人项目","updatedAt":"2026-07-01T08:00:00Z"}`),
 	}})
 
-	createSharedBody := bytes.NewReader([]byte(`{"name":"协作一组","device_id":"device_private"}`))
+	createSharedBody := bytes.NewReader([]byte(`{"name":"协作一组","type":"shared","device_id":"device_private"}`))
 	createSharedRecorder := httptest.NewRecorder()
 	api.handleWorkspaces(createSharedRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", createSharedBody), privateAuth)
 	if createSharedRecorder.Code != http.StatusOK {
@@ -87,7 +87,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 		t.Fatalf("switch response = %#v", switched)
 	}
 
-	memberBody := bytes.NewReader([]byte(`{"name":"协作者","email":"member@example.com","password":"member-secret"}`))
+	memberBody := bytes.NewReader([]byte(`{"name":"协作者","email":"member@example.com","password":"member-secret","status":"active"}`))
 	memberRecorder := httptest.NewRecorder()
 	api.handleMembers(memberRecorder, httptest.NewRequest(http.MethodPost, "/members", memberBody), sharedAuth)
 	if memberRecorder.Code != http.StatusOK {
@@ -172,7 +172,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 		t.Fatalf("stale private workspace token status = %d, body = %s", staleRecorder.Code, staleRecorder.Body.String())
 	}
 
-	createSecondBody := bytes.NewReader([]byte(`{"name":"协作二组"}`))
+	createSecondBody := bytes.NewReader([]byte(`{"name":"协作二组","type":"shared"}`))
 	createSecondRecorder := httptest.NewRecorder()
 	api.handleWorkspaces(createSecondRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", createSecondBody), sharedAuth)
 	if createSecondRecorder.Code != http.StatusOK {
@@ -184,7 +184,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	}
 	secondSharedAuth := authContext{AccountID: secondShared.Account.ID, WorkspaceID: secondShared.Workspace.ID}
 
-	existingMemberBody := bytes.NewReader([]byte(`{"name":"协作者","email":"member@example.com"}`))
+	existingMemberBody := bytes.NewReader([]byte(`{"name":"协作者","email":"member@example.com","status":"active"}`))
 	existingMemberRecorder := httptest.NewRecorder()
 	api.handleMembers(existingMemberRecorder, httptest.NewRequest(http.MethodPost, "/members", existingMemberBody), secondSharedAuth)
 	if existingMemberRecorder.Code != http.StatusOK {

@@ -77,9 +77,18 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func fallback(value string, fallback string) string {
-	if strings.TrimSpace(value) == "" {
-		return fallback
-	}
-	return strings.TrimSpace(value)
+func isWorkspaceType(value string) bool {
+	return value == "private" || value == "shared"
+}
+
+func isWorkspaceMembershipRole(value string) bool {
+	return value == "owner" || value == "admin" || value == "member"
+}
+
+func isWorkspaceMembershipStatus(value string) bool {
+	return value == "active" || value == "disabled"
+}
+
+func isInvitationStatus(value string) bool {
+	return value == "pending" || value == "accepted" || value == "cancelled"
 }

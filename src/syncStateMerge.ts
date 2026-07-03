@@ -1,5 +1,4 @@
 import type { AppState } from "./types";
-import { normalizeAppStatePayload } from "./storage";
 import { applySyncRowToState } from "./syncEntityMerge";
 import type { SyncRow } from "./syncPayloadTypes";
 import { withStatus } from "./syncHttp";
@@ -22,7 +21,7 @@ export function mergeRowsIntoState(
   }
 
   const timestamp = nowIso();
-  return normalizeAppStatePayload({
+  return {
     ...next,
     sync: withStatus(next.sync, {
       lastPulledRevision: currentRevision,
@@ -30,5 +29,5 @@ export function mergeRowsIntoState(
       lastSyncedAt: timestamp,
     }),
     updatedAt: timestamp,
-  });
+  };
 }

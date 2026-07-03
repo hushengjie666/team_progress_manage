@@ -6,7 +6,6 @@ import {
   canShowProjectMemberManagementFor,
   projectDetailActiveTabFor,
   projectStageModeFor,
-  type ProjectDetailTab,
   projectTaskStatusPatch,
   projectWorkspaceTagLabel,
 } from "./projectDetailControllerModel";

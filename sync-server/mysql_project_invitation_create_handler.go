@@ -47,7 +47,7 @@ func (a *app) handleProjectInvitationCreate(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "workspace not found")
 		return
 	}
-	if fallback(workspace.Type, "shared") == "private" {
+	if workspace.Type == "private" {
 		writeError(w, http.StatusForbidden, "private workspace does not support project invitations")
 		return
 	}

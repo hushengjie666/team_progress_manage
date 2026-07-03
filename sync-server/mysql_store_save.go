@@ -37,12 +37,15 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 	}
 
 	for _, workspace := range s.Workspaces {
+		if !isWorkspaceType(workspace.Type) {
+			return fmt.Errorf("workspace %s type is required", workspace.ID)
+		}
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
 			workspace.ID,
 			workspace.Name,
-			fallback(workspace.Type, "shared"),
+			workspace.Type,
 			nullString(workspace.OwnerAccountID),
 			workspace.CreatedAt,
 			workspace.UpdatedAt,
@@ -52,6 +55,9 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 	}
 
 	for _, account := range s.Accounts {
+		if account.WorkspaceID == "" {
+			return fmt.Errorf("account %s workspace_id is required", account.ID)
+		}
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO accounts (id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -70,16 +76,16 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 		if _, err := tx.ExecContext(
 			ctx,
 			`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at) VALUES (?, ?, 'private', ?, ?, ?)
-				ON DUPLICATE KEY UPDATE type = 'private', owner_account_id = VALUES(owner_account_id), updated_at = VALUES(updated_at)`,
+					ON DUPLICATE KEY UPDATE type = 'private', owner_account_id = VALUES(owner_account_id), updated_at = VALUES(updated_at)`,
 			privateWorkspaceID,
-			fallback(account.Name, account.Email)+"的私人工作区",
+			account.Name+"的私人工作区",
 			account.ID,
 			account.CreatedAt,
 			account.UpdatedAt,
 		); err != nil {
 			return fmt.Errorf("insert private workspace %s: %w", account.ID, err)
 		}
-		workspaceID := fallback(account.WorkspaceID, "workspace_private_"+account.ID)
+		workspaceID := account.WorkspaceID
 		role := "member"
 		if workspace := s.Workspaces[workspaceID]; workspace.OwnerAccountID == account.ID {
 			role = "owner"
@@ -119,7 +125,9 @@ func saveStoreToMySQL(db *sql.DB, s store) error {
 
 	for _, workspace := range s.Workspaces {
 		for _, row := range workspace.Rows {
-			row.WorkspaceID = fallback(row.WorkspaceID, workspace.ID)
+			if row.WorkspaceID == "" {
+				return fmt.Errorf("team row %s/%s workspace_id is required", row.Entity, row.ID)
+			}
 			if err := teamUpsertRow(ctx, tx, row); err != nil {
 				return fmt.Errorf("insert team row %s/%s: %w", row.Entity, row.ID, err)
 			}

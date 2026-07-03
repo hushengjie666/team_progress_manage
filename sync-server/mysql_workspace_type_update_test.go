@@ -31,8 +31,8 @@ func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
 	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
 
 	for _, body := range []string{
-		`{"name":"已加入成员","email":"joined@example.com","password":"secret"}`,
-		`{"name":"待邀请成员","email":"pending@example.com","password":"secret"}`,
+		`{"name":"已加入成员","email":"joined@example.com","password":"secret","status":"active"}`,
+		`{"name":"待邀请成员","email":"pending@example.com","password":"secret","status":"active"}`,
 	} {
 		recorder := httptest.NewRecorder()
 		api.handleAdminAccounts(recorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(body))), adminAuth)
@@ -42,7 +42,7 @@ func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
 	}
 
 	workspaceRecorder := httptest.NewRecorder()
-	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"协作待转私有"}`))), adminAuth)
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"协作待转私有","type":"shared"}`))), adminAuth)
 	if workspaceRecorder.Code != http.StatusOK {
 		t.Fatalf("create workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
 	}

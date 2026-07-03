@@ -4,6 +4,7 @@ import type { AppState } from "./types";
 import type { SyncRow } from "./syncPayloadTypes";
 import { preserveLocalActiveRuntime } from "./teamActiveRuntimePreservation";
 import { readTeamResponse, teamApiUrl, teamAuthHeaders } from "./teamApiHttp";
+import { dedupeProjectMembersByIdentity } from "./projectMemberDeduplication";
 
 type TeamStateResponse = {
   changes: SyncRow[];
@@ -42,6 +43,7 @@ export async function loadTeamState(local: AppState): Promise<AppState> {
   const restored = preserveLocalActiveRuntime(merged, local);
   return {
     ...restored,
+    projectMembers: dedupeProjectMembersByIdentity(restored.projectMembers),
     auth: local.auth,
     sync: {
       ...restored.sync,

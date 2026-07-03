@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 func scanWorkspaceInvitationSummary(row interface{ Scan(...any) error }) (workspaceInvitationSummary, error) {
@@ -93,6 +94,9 @@ func mysqlPendingWorkspaceInvitation(ctx context.Context, q sqlRunner, workspace
 }
 
 func mysqlUpsertWorkspaceInvitation(ctx context.Context, tx *sql.Tx, invitation workspaceInvitationSummary) error {
+	if !isInvitationStatus(invitation.Status) {
+		return fmt.Errorf("workspace invitation status is required")
+	}
 	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO workspace_invitations (id, workspace_id, inviter_account_id, invitee_account_id, invitee_email, status, created_at, updated_at, accepted_at)
@@ -108,7 +112,7 @@ func mysqlUpsertWorkspaceInvitation(ctx context.Context, tx *sql.Tx, invitation 
 		invitation.InviterAccountID,
 		invitation.InviteeAccountID,
 		invitation.InviteeEmail,
-		fallback(invitation.Status, "pending"),
+		invitation.Status,
 		invitation.CreatedAt,
 		invitation.UpdatedAt,
 		nullString(invitation.AcceptedAt),

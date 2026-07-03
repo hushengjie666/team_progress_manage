@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 func mysqlUpsertWorkspace(ctx context.Context, tx *sql.Tx, workspace workspaceData) error {
+	if !isWorkspaceType(workspace.Type) {
+		return fmt.Errorf("workspace type is required")
+	}
 	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO workspaces (id, name, type, owner_account_id, created_at, updated_at)
@@ -13,7 +17,7 @@ func mysqlUpsertWorkspace(ctx context.Context, tx *sql.Tx, workspace workspaceDa
 			ON DUPLICATE KEY UPDATE name = VALUES(name), type = VALUES(type), owner_account_id = VALUES(owner_account_id), updated_at = VALUES(updated_at)`,
 		workspace.ID,
 		workspace.Name,
-		fallback(workspace.Type, "shared"),
+		workspace.Type,
 		nullString(workspace.OwnerAccountID),
 		workspace.CreatedAt,
 		workspace.UpdatedAt,

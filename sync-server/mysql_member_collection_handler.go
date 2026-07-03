@@ -27,6 +27,11 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusBadRequest, "email is required")
 		return
 	}
+	status := strings.TrimSpace(req.Status)
+	if !isWorkspaceMembershipStatus(status) {
+		writeError(w, http.StatusBadRequest, "member status must be active or disabled")
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
@@ -49,7 +54,6 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 	if writeMemberFailure(w, failure) {
 		return
 	}
-	status := fallback(strings.TrimSpace(req.Status), "active")
 	if projectID == "" {
 		if err := mysqlEnsureWorkspaceMembership(ctx, tx, targetWorkspaceID, account.ID, "member", status, now); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")

@@ -24,10 +24,7 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "workspace access denied"}
 	}
 	workspaceType := input.kind
-	if workspaceType == "" {
-		workspaceType = fallback(workspace.Type, "shared")
-	}
-	if fallback(workspace.Type, "shared") == "private" && workspaceType != "private" {
+	if workspace.Type == "private" && workspaceType != "private" {
 		return workspaceData{}, memberWriteFailure{status: http.StatusBadRequest, message: "private workspace type cannot be changed"}
 	}
 	membership, found, err := mysqlActiveMembershipByAccountAndWorkspace(ctx, tx, auth.AccountID, input.workspaceID)
@@ -78,7 +75,7 @@ func validateWorkspaceOwnerUpdate(
 	currentOwnerAccountID string,
 	ownerAccountID string,
 ) memberWriteFailure {
-	if fallback(workspace.Type, "shared") == "private" && ownerAccountID != currentOwnerAccountID {
+	if workspace.Type == "private" && ownerAccountID != currentOwnerAccountID {
 		return memberWriteFailure{status: http.StatusBadRequest, message: "private workspace owner cannot be changed"}
 	}
 	if workspaceType == "private" && ownerAccountID != auth.AccountID {

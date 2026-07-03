@@ -31,6 +31,17 @@ Optimize for narrow context and narrow verification on small tasks.
 - If the worktree is already large or dirty, do not re-audit unrelated changes. State the touched files explicitly and keep all exploration, edits, and validation scoped to the requested task.
 - Do not continue splitting files only to reduce line count once files are under roughly 250 lines and have a single clear reason to change.
 
+## Code Health Gates
+
+Prevent old compatibility code, unused code, and large files from returning as the project evolves.
+
+- Run `npm run verify:quality` before finishing refactors, cleanup work, or shared architecture changes.
+- Run `npm run audit:health` after adding new modules, moving code, or touching broad feature surfaces.
+- `scripts/audit-code-health.mjs` warns when source/test files exceed 300 lines and fails above 500 lines; CSS warns above 500 lines and fails above 1,000 lines.
+- The health audit fails on unresolved markers such as `TODO`, `FIXME`, `legacy`, `deprecated`, `compat`, `兼容`, `旧`, `临时`, or `以后删除` in production code.
+- Do not add compatibility or migration code without a concrete deletion condition. If a risk marker is legitimate product copy or a negative test fixture, add a narrow allowlist in the audit script instead of weakening the global rule.
+- When a file approaches the warning threshold, split by cohesive product concept before adding more behavior. Do not create pass-through modules just to reduce line count.
+
 ## Frontend Module Map
 
 Start with the smallest module that owns the product concept before opening app-shell files.
@@ -56,6 +67,9 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm run dev`: start Vite at `http://127.0.0.1:1420/`.
 - `npm run build`: type-check and build the frontend.
 - `npm run typecheck`: run the frontend TypeScript check without building assets.
+- `npm run typecheck:unused`: run TypeScript with unused locals and parameters checks.
+- `npm run audit:health`: scan for large files and stale-code markers.
+- `npm run verify:quality`: run unused TypeScript checks and the code health audit.
 - `npm run preview`: serve the built frontend at `http://127.0.0.1:1421/`.
 - `npm run verify:fast`: run unit tests and the frontend build for common frontend changes.
 - `npm run verify:e2e`: run the Playwright end-to-end suite.

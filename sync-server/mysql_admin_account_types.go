@@ -44,7 +44,7 @@ func publicAccountRecords(accounts []accountRecord) []accountRecord {
 
 func normalizePlatformAccountStatus(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", "active":
+	case "active":
 		return "active"
 	case "disabled":
 		return "disabled"
