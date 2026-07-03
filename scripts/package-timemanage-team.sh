@@ -28,8 +28,8 @@ rm -rf dist
 npm run build -- --base=/timemanage-team/
 
 rm -rf "${PACKAGE_DIR}"
-mkdir -p "${PACKAGE_DIR}/web-release" "${PACKAGE_DIR}/sync/release"
-rsync -a --delete dist/ "${PACKAGE_DIR}/web-release/"
+mkdir -p "${PACKAGE_DIR}/web" "${PACKAGE_DIR}/sync"
+rsync -a --delete dist/ "${PACKAGE_DIR}/web/"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "[TimeManage] Docker is required to build the Windows Server 2008 compatible backend." >&2
@@ -47,11 +47,11 @@ docker run --rm -v "${BUILD_DIR}:/src" -w /src "${GO120_IMAGE}" sh -lc '
   GOOS=windows GOARCH=amd64 /usr/local/go/bin/go build -trimpath -ldflags="-s -w" -o bin/timemanage-sync-win2008.exe .
 '
 
-cp "${BUILD_DIR}/bin/timemanage-sync-win2008.exe" "${PACKAGE_DIR}/sync/release/timemanage-sync.exe"
+cp "${BUILD_DIR}/bin/timemanage-sync-win2008.exe" "${PACKAGE_DIR}/sync/timemanage-sync.exe"
 cp sync-server/install-windows-service.ps1 "${PACKAGE_DIR}/sync/install-windows-service.ps1"
+cp sync-server/start-backend.bat "${PACKAGE_DIR}/sync/start-backend.bat"
+cp sync-server/stop-backend.bat "${PACKAGE_DIR}/sync/stop-backend.bat"
 cp sync-server/config.example.json "${PACKAGE_DIR}/sync/sync.example.json"
-cp sync-server/upgrade-backend.bat "${PACKAGE_DIR}/upgrade.bat"
-cp sync-server/rollback-backend.bat "${PACKAGE_DIR}/rollback.bat"
 
 rm -f "${PACKAGE_DIR}/sync/sync.json"
 
@@ -62,26 +62,19 @@ Git tag: ${GIT_TAG:-none}
 Git commit: ${GIT_COMMIT:-unknown}
 Git tree: ${GIT_DIRTY}
 
-Default live project folder:
-  ..\timemanageTeam
+Contents:
+  web\                  frontend files built for /timemanage-team/
+  sync\timemanage-sync.exe
+  sync\sync.example.json
+  sync\start-backend.bat
+  sync\stop-backend.bat
+  sync\install-windows-service.ps1
 
-Recommended unzip location:
-  C:\Users\Administrator\Desktop\
-
-Compatibility:
-  Upgrades old timemanageTeam-no-root deployments with web\ and sync\timemanage-sync.exe.
-  If this release folder is accidentally unzipped inside the live timemanageTeam folder,
-  upgrade.bat will use the parent folder as the live project folder.
-
-Upgrade:
-  double click upgrade.bat
-
-Rollback:
-  double click rollback.bat
-
-If your live project folder is not a sibling named timemanageTeam, pass it as the first argument:
-  upgrade.bat C:\Users\Administrator\Desktop\timemanageTeam
-  rollback.bat C:\Users\Administrator\Desktop\timemanageTeam
+Install:
+  unzip this folder as the live timemanageTeam directory
+  copy sync\sync.example.json to sync\sync.json on first install
+  edit sync\sync.json
+  run sync\start-backend.bat or install the Windows service
 EOF
 
 cd "${DEPLOY_ROOT}"
@@ -91,4 +84,4 @@ COPYFILE_DISABLE=1 zip -Xqr "${DEPLOY_ROOT}/${PACKAGE_NAME}.zip" "${PACKAGE_NAME
 
 echo "[TimeManage] Package ready: ${DEPLOY_ROOT}/${PACKAGE_NAME}.zip"
 echo "[TimeManage] Zip root folder: ${PACKAGE_NAME}/"
-echo "[TimeManage] Upload next to the live timemanageTeam folder, unzip, then run ${PACKAGE_NAME}/upgrade.bat."
+echo "[TimeManage] Upload as the live timemanageTeam folder, edit sync/sync.json, then run sync/start-backend.bat."

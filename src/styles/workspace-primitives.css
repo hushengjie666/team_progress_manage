@@ -1,0 +1,61 @@
+.link-button {
+  border: 0;
+  padding: 0;
+  color: #1f756b;
+  background: transparent;
+  font-weight: 800;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-row.compact {
+  margin-top: 10px;
+  gap: 6px;
+}
+
+.chip {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #cfdbd7;
+  border-radius: 8px;
+  padding: 3px 9px;
+  color: #4b6266;
+  background: #fffdfa;
+  font-size: 12px;
+}
+
+.chip.filled {
+  border-color: transparent;
+  color: #12423d;
+  background: #d8ece6;
+}
+
+.muted,
+.empty,
+.warning {
+  color: #667074;
+  line-height: 1.55;
+}
+
+.compact-copy {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.warning,
+.danger-text {
+  color: #c2644a;
+}

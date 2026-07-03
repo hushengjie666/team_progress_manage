@@ -61,7 +61,6 @@ describe("app boot fallback", () => {
     expect(next.auth.token).toBeUndefined();
     expect(next.auth.account).toBeUndefined();
     expect(next.sync.token).toBeUndefined();
-    expect(next.sync.enabled).toBe(false);
     expect(next.sync.status).toBe("idle");
     expect(next.auth.message).toBe("登录状态已失效或无权访问当前工作区，请重新登录账号");
     expect(next.sync.message).toBe(next.auth.message);

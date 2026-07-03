@@ -1,0 +1,56 @@
+.topbar {
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.topbar-nav {
+  position: relative;
+  z-index: 22;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 4px;
+  border: 1px solid #ddd4c7;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.topbar-nav button {
+  min-height: 32px;
+  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  color: #526065;
+  border-radius: 6px;
+  background: transparent;
+  white-space: nowrap;
+}
+
+.topbar-nav button:hover,
+.topbar-nav button.active {
+  color: #123c3a;
+  background: #d8ece6;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar .secondary-button,
+.topbar .icon-button {
+  min-height: 34px;
+}

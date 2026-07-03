@@ -50,7 +50,7 @@ C:/Users/Administrator/Desktop/timemanageTeam/
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/
 ```
 
-当前线上如果来自旧的 `timemanageTeam-no-root.zip`，正式目录通常是：
+正式目录结构为：
 
 ```text
 C:/Users/Administrator/Desktop/timemanageTeam/web/
@@ -58,29 +58,19 @@ C:/Users/Administrator/Desktop/timemanageTeam/sync/sync.json
 C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe
 ```
 
-这是支持直接升级的旧部署形态。新版本包里的 `upgrade.bat` 会自动备份这些旧文件和数据库，再安装新版本。
-
-推荐把新版本包解压到 `Desktop` 下，与 `timemanageTeam` 同级。若误解压到 `timemanageTeam` 目录内部，脚本会检测父目录里已有 `sync/sync.json` 和 `web/index.html`，并把父目录作为正式目录，避免创建嵌套的 `timemanageTeam/timemanageTeam`。
+推荐把新版本包解压为正式运行目录 `timemanageTeam`，不要再保留旧的升级/回滚脚本链路。
 
 版本包目录里应包含：
 
 ```text
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/upgrade.bat
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/rollback.bat
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/RELEASE.txt
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/web-release/index.html
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/release/timemanage-sync.exe
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/web/index.html
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/timemanage-sync.exe
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/sync.example.json
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/start-backend.bat
 ```
 
-正式运行目录仍然是 `C:/Users/Administrator/Desktop/timemanageTeam/web/` 和 `C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe`。不要手动复制 `web-release` 或 `sync/release`；双击版本包里的 `upgrade.bat` 后，脚本会自动备份正式目录旧版本并复制新版本到正式目录。
-
-如果正式目录不是版本包同级的 `timemanageTeam`，可以把目标目录作为第一个参数传给脚本：
-
-```bat
-upgrade.bat C:\Users\Administrator\Desktop\timemanageTeam
-rollback.bat C:\Users\Administrator\Desktop\timemanageTeam
-```
+正式运行目录仍然是 `C:/Users/Administrator/Desktop/timemanageTeam/web/` 和 `C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe`。首次部署时从 `sync/sync.example.json` 创建 `sync/sync.json` 并编辑数据库、端口和密钥。
 
 ## 当前线上路径
 
@@ -134,7 +124,7 @@ go 1.20
 最终产物会复制到：
 
 ```text
-deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/release/timemanage-sync.exe
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/timemanage-sync.exe
 ```
 
 ## 后端配置
@@ -151,7 +141,7 @@ C:/Users/Administrator/Desktop/timemanageTeam/sync/sync.json
 deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/sync.example.json
 ```
 
-服务器上的 `sync.json` 包含数据库账号和服务密钥，不能提交到仓库。打包文件不会覆盖服务器现有 `sync.json`。当前 `.gitignore` 已忽略 `deploy/**/sync.json`、部署 zip 和后端 exe。
+服务器上的 `sync.json` 包含数据库账号和服务密钥，不能提交到仓库。打包文件只包含 `sync.example.json`，不会生成正式 `sync.json`。当前 `.gitignore` 已忽略 `deploy/**/sync.json`、部署 zip 和后端 exe。
 
 MySQL 数据库名：
 
@@ -203,57 +193,13 @@ location ^~ /timemanage-team/ {
 1. 本地运行 `npm run deploy:team`。
 2. 上传 `deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip` 到服务器的 `C:/Users/Administrator/Desktop/`。
 3. 在 Desktop 下解压，确认出现同名版本目录，例如 `timemanageTeam-v0.1.0-20260701-153000/`。
-4. 首次部署时，如果正式目录还没有 `timemanageTeam/sync/sync.json`，双击版本包里的 `upgrade.bat` 会先生成 `sync.json` 并提示编辑；编辑数据库、端口或密钥后再重新运行 `upgrade.bat`。
-5. 双击版本包根目录的 `upgrade.bat` 升级；脚本会自动定位同级 `timemanageTeam` 正式目录，创建回退点、备份数据库、安装新前后端、执行数据库迁移、启动后端并检查 `/health`。
+4. 如果正式目录还没有 `timemanageTeam/sync/sync.json`，复制 `sync/sync.example.json` 为 `sync/sync.json` 并编辑数据库、端口或密钥。
+5. 运行 `timemanageTeam/sync/start-backend.bat`，或用 `install-windows-service.ps1` 安装 Windows Service。
 6. 重载 Nginx。
 
-需要回退时，直接双击：
+## 数据库初始化
 
-```text
-版本包根目录/rollback.bat
-```
-
-默认会回退同级 `timemanageTeam` 正式目录到最近一次 `upgrade.bat` 创建的回退点，包括数据库、后端 exe 和前端 web 文件。默认情况下不需要进入 `sync/` 目录执行升级或回退脚本。
-
-## 数据库升级与回退细节
-
-`upgrade.bat` 会在修改正式目录和数据库前创建回退点：
-
-```text
-C:/Users/Administrator/Desktop/timemanageTeam/sync/rollback/<yyyyMMdd-HHmmss>/
-```
-
-回退点包含：
-
-```text
-database.sql                    # 升级前完整 MySQL 备份
-timemanage-sync.exe             # 升级前旧后端
-restore-tool.exe                # 本次发布包里的恢复工具
-sync.json                       # 升级前正式配置
-web/                            # 升级前旧前端
-upgrade-info.txt                # 本次升级来源、正式目录、时间戳
-migration-status-before.txt     # 升级前数据库版本状态
-migration-status-after.txt      # 升级后数据库版本状态
-```
-
-数据库备份成功后，脚本会立即写入：
-
-```text
-C:/Users/Administrator/Desktop/timemanageTeam/sync/rollback/latest.txt
-```
-
-所以只要数据库备份已经成功，后续即使安装后端、安装前端、执行迁移或健康检查失败，也可以直接运行版本包里的 `rollback.bat` 回到升级前状态。
-
-回退时会优先使用回退点里的 `restore-tool.exe` 执行数据库恢复；这样即使正式目录里的新 `timemanage-sync.exe` 安装后异常，也不会阻塞数据库回滚。
-
-数据库备份/恢复依赖服务器上能从命令行调用：
-
-```text
-mysqldump
-mysql
-```
-
-如果 Windows 找不到这两个命令，升级脚本会在数据库备份阶段失败并停止，不会继续覆盖正式程序。此时需要把 MySQL 的 `bin` 目录加入系统 `PATH`，或者在命令行窗口中临时设置 `PATH` 后重新运行。
+后端启动时会在 MySQL 中幂等创建当前 schema，不再执行版本化迁移、旧 JSON store 导入或数据库回滚。需要重置时，先备份并重新初始化目标数据库，再启动后端。
 
 ## 验证地址
 

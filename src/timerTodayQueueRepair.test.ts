@@ -1,0 +1,144 @@
+import { describe, expect, it } from "vitest";
+import {
+  ensureTodayPlan,
+  getTodayPlan,
+  startTimerInState,
+} from "./appModel";
+import { todayKey } from "./seed";
+import { createInitialState } from "./test/fixtures";
+import type { AppState } from "./types";
+
+describe("timer today queue repair", () => {
+  it("repairs active work sessions that are missing from today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      "session_repair_today",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      dailyPlans: started.dailyPlans.map((plan) =>
+        plan.date === todayKey() ? { ...plan, committedTaskIds: [] } : plan,
+      ),
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(getTodayPlan(repaired).committedTaskIds).toContain(taskId);
+  });
+
+  it("repairs a focus active timer that is missing its work session", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      `${todayKey()}T08:00:00.000Z`,
+      "session_missing_work_session",
+    );
+    const inconsistent: AppState = {
+      ...started,
+      workSessions: [],
+      executionSignals: [],
+      activeTimer: started.activeTimer ? { ...started.activeTimer, workSessionId: undefined } : undefined,
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(repaired.activeTimer?.workSessionId).toBeDefined();
+    expect(repaired.workSessions[0]).toMatchObject({
+      taskId,
+      focusSessionId: "session_missing_work_session",
+      status: "active",
+    });
+    expect(repaired.executionSignals[0]).toMatchObject({
+      taskId,
+      type: "work_started",
+      payload: expect.objectContaining({ source: "active_timer_repair" }),
+    });
+  });
+
+  it("ends a cross-day active timer even when its work session is missing", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const yesterday = new Date(`${todayKey()}T00:00:00.000Z`);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const inconsistent: AppState = {
+      ...state,
+      tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, status: "in_progress" as const } : task)),
+      workSessions: [],
+      executionSignals: [],
+      activeTimer: {
+        sessionId: "session_missing_cross_day",
+        taskId,
+        mode: "focus",
+        duration: 1500,
+        remaining: 600,
+        isRunning: true,
+        startedAt: `${yesterdayKey}T23:40:00.000Z`,
+        plannedEndAt: `${yesterdayKey}T23:55:00.000Z`,
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+      },
+    };
+
+    const repaired = ensureTodayPlan(inconsistent);
+
+    expect(repaired.activeTimer).toBeUndefined();
+    expect(repaired.workSessions[0]).toMatchObject({
+      taskId,
+      focusSessionId: "session_missing_cross_day",
+      status: "ended",
+    });
+    expect(repaired.executionSignals.map((signal) => signal.type).slice(0, 2)).toEqual(["work_ended", "work_started"]);
+  });
+
+  it("ends stale active work sessions instead of adding them to today's queue", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const yesterday = new Date(new Date(`${todayKey()}T08:00:00.000Z`).getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const stale: AppState = {
+      ...state,
+      workSessions: [
+        {
+          id: "work_stale_today_queue",
+          taskId,
+          executorMemberId: "member_owner",
+          focusSessionId: "session_stale_today_queue",
+          status: "active",
+          startedAt: yesterday,
+          totalPausedSeconds: 0,
+          createdAt: yesterday,
+          updatedAt: yesterday,
+        },
+      ],
+      focusSessions: [
+        {
+          id: "session_stale_today_queue",
+          taskId,
+          mode: "focus",
+          duration: 1500,
+          startedAt: yesterday,
+          interruptionCounts: { internal: 0, external: 0 },
+        },
+      ],
+      dailyPlans: state.dailyPlans.map((plan) => (plan.date === todayKey() ? { ...plan, committedTaskIds: [] } : plan)),
+    };
+
+    const repaired = ensureTodayPlan(stale);
+
+    expect(getTodayPlan(repaired).committedTaskIds).not.toContain(taskId);
+    expect(repaired.workSessions[0]).toMatchObject({ status: "ended" });
+    expect(repaired.executionSignals[0]).toMatchObject({
+      taskId,
+      type: "work_ended",
+      payload: expect.objectContaining({ reason: "stale_active_session" }),
+    });
+  });
+});

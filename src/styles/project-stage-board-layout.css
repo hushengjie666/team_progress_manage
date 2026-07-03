@@ -1,0 +1,56 @@
+.project-stage-overview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.project-stage-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 54px;
+}
+
+.project-stage-label {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  color: #38454a;
+  background: #f7f4ef;
+}
+
+.project-stage-label strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.project-stage-label span {
+  color: #667074;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-stage-task-list {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 8px;
+  align-items: start;
+  padding: 4px 0;
+}
+
+.project-stage-empty {
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed #dfd5c8;
+  border-radius: 8px;
+  color: #667074;
+  font-size: 13px;
+  background: #fbfaf6;
+}

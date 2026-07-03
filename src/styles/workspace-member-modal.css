@@ -1,0 +1,35 @@
+.workspace-member-modal {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.workspace-member-modal-body {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1fr);
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px 22px;
+}
+
+.workspace-member-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.workspace-member-invite {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.workspace-member-invite .primary-button {
+  min-height: 40px;
+  white-space: nowrap;
+}

@@ -1,0 +1,123 @@
+.pomodoro-progress {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  min-height: 30px;
+  color: #586468;
+}
+
+.task-progress-bar {
+  position: relative;
+  height: 18px;
+  display: grid;
+  align-items: center;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid #d8e4df;
+  border-radius: 7px;
+  background: #f4f1eb;
+}
+
+.task-progress-bar span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 3px;
+  border-radius: inherit;
+  background: #b9ded5;
+}
+
+.task-progress-bar strong {
+  position: relative;
+  justify-self: end;
+  padding-right: 7px;
+  color: #24534f;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.task-pomodoro-summary {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  padding: 0;
+  border-radius: 6px;
+  color: #6e5b49;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pomodoro-progress strong {
+  min-width: 42px;
+  color: #b6543d;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.pomodoro-progress > span {
+  color: #7d8588;
+  font-size: 12px;
+}
+
+.pomodoro-progress.compact {
+  justify-content: center;
+  gap: 7px;
+  margin-top: 2px;
+  min-height: 24px;
+}
+
+.pomodoro-progress.compact strong {
+  min-width: auto;
+  font-size: 15px;
+}
+
+.pomodoro-progress.compact .pomodoro-dot {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+.pomodoro-progress.compact .pomodoro-overflow {
+  min-height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+}
+
+.pomodoro-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.pomodoro-dot {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #d5c7b6;
+  border-radius: 50%;
+  background: #fffdfa;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+
+.pomodoro-dot.done {
+  border-color: #b6543d;
+  background: #d96a4b;
+}
+
+.pomodoro-dot.extra {
+  border-color: #8b3d2e;
+  background: #8b3d2e;
+}
+
+.pomodoro-overflow {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 8px;
+  color: #8b3d2e;
+  background: #fff0e3;
+  font-size: 12px;
+  font-weight: 800;
+}

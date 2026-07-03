@@ -1,5 +1,4 @@
 import { formatTime, modeLabel, nowIso } from "./appModel";
-import { updateDesktopTimerPresence } from "./nativeDesktop";
 import { playTimerSound, sendTimerNotification, startWhiteNoise } from "./notifications";
 import type { ActiveTimer, AppState, Settings } from "./types";
 
@@ -21,7 +20,9 @@ export const updateActiveTimerPresence = (active?: ActiveTimer) => {
   const title = active
     ? `${formatTime(active.remaining)} · ${modeLabel[active.mode]} · TimeManage`
     : "TimeManage";
-  return updateDesktopTimerPresence(Boolean(active), title);
+  if (typeof document !== "undefined") {
+    document.title = title;
+  }
 };
 
 export const announceTimerEnd = (settings: Settings, title: string, body: string) => {

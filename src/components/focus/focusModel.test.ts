@@ -79,7 +79,6 @@ describe("focus task ordering", () => {
       plannedEndAt: "2026-06-30T08:25:00.000Z",
       totalPausedSeconds: 0,
       cycleIndex: 1,
-      strictStarted: false,
     };
 
     expect(displayRemainingForTimer(active, new Date("2026-06-30T08:00:00.300Z"))).toBe(25 * 60);

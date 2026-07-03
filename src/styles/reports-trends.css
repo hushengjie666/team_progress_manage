@@ -1,0 +1,84 @@
+.bar-chart {
+  height: 220px;
+  display: grid;
+  grid-template-columns: repeat(14, minmax(18px, 1fr));
+  align-items: end;
+  gap: 10px;
+  padding-top: 20px;
+  min-width: 0;
+}
+
+.bar-item {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bar-item span {
+  width: 100%;
+  max-width: 34px;
+  border-radius: 8px 8px 2px 2px;
+  background: #1f9d8a;
+}
+
+.bar-item small {
+  color: #798286;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: clip;
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 8px;
+}
+
+.heat {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  background: #ece5da;
+}
+
+.heat-1 {
+  background: #cbe8df;
+}
+
+.heat-2 {
+  background: #8fd3c4;
+}
+
+.heat-3 {
+  background: #46ad9c;
+}
+
+.heat-4 {
+  background: #1c756b;
+}
+
+.timeline {
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.timeline-item > span {
+  width: 12px;
+  height: 12px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #f0b35a;
+}
+
+.timeline-item p {
+  margin: 5px 0 0;
+  color: #6b7478;
+}

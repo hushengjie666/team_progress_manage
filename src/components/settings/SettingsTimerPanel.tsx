@@ -1,13 +1,13 @@
 import { AlarmClock, Bell, Sparkles } from "lucide-react";
-import type { Onboarding, Settings } from "../../types";
+import type { Settings } from "../../types";
 
 export function SettingsTimerPanel({
-  onboarding,
+  dailyGoal,
   settings,
   updateSettings,
   askNotificationPermissions,
 }: {
-  onboarding: Pick<Onboarding, "dailyGoalPomodoros" | "preferredFocusMinutes">;
+  dailyGoal: number;
   settings: Settings;
   updateSettings: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   askNotificationPermissions: () => Promise<void>;
@@ -23,7 +23,7 @@ export function SettingsTimerPanel({
           <Sparkles size={20} />
         </div>
         <p className="muted">
-          当前个人计时节奏：每天 {onboarding.dailyGoalPomodoros} 个番茄；偏好 {onboarding.preferredFocusMinutes} 分钟。
+          当前个人计时节奏：每天 {dailyGoal} 个番茄；偏好 {settings.focusMinutes} 分钟。
         </p>
       </section>
 
@@ -54,10 +54,6 @@ export function SettingsTimerPanel({
           </label>
         </div>
         <div className="toggle-row">
-          <label>
-            <input type="checkbox" checked={settings.strictModeEnabled} onChange={(event) => updateSettings("strictModeEnabled", event.target.checked)} />
-            专注时自动启用严格模式
-          </label>
           <label>
             <input type="checkbox" checked={settings.autoStartBreaks} onChange={(event) => updateSettings("autoStartBreaks", event.target.checked)} />
             自动开始休息

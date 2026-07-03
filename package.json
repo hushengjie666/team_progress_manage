@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 1420",
     "build": "tsc -p tsconfig.app.json && vite build",
     "typecheck": "tsc -p tsconfig.app.json",
+    "typecheck:unused": "tsc -p tsconfig.app.json --noUnusedLocals --noUnusedParameters --pretty false",
     "typecheck:test": "tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "verify:fast": "npm test -- --run && npm run build",
@@ -20,16 +21,12 @@
     "test:e2e": "playwright test",
     "mcp:build": "esbuild mcp-server/src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=mcp-server/dist/index.js",
     "mcp:server": "npm run mcp:build --silent && node mcp-server/dist/index.js",
-    "backend:build": "npm run sync:build",
-    "backend:server": "npm run sync:server",
-    "sync:build": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync .",
-    "sync:build:windows": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync.exe .",
-    "sync:server": "./sync-server/bin/timemanage-sync serve --config sync-server/config.local.json",
-    "tauri": "tauri"
+    "backend:build": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync .",
+    "backend:build:windows": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync.exe .",
+    "backend:server": "./sync-server/bin/timemanage-sync serve --config sync-server/config.local.json"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "@tauri-apps/api": "^2.9.0",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -37,7 +34,6 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@tauri-apps/cli": "^2.9.0",
     "@types/node": "^26.0.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",

@@ -110,7 +110,7 @@ export function ShortcutHelpDialog(props: {
             <X size={16} />
           </button>
         </div>
-        <p className="muted">这些是当前流程里最常用的键盘入口，浏览器和 Tauri 体验一致。</p>
+        <p className="muted">这些是当前流程里最常用的键盘入口，适用于 Web 桌面界面。</p>
         <div className="shortcut-grid">
           {shortcuts.map((item) => (
             <div className="shortcut-row" key={item.keys}>

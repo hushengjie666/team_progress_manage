@@ -1,0 +1,156 @@
+.personal-workbench {
+  grid-column: 1 / -1;
+}
+
+.my-project-task-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.my-project-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 260px));
+  justify-content: start;
+  gap: 8px;
+}
+
+.my-project-card-grid.reordering {
+  cursor: grabbing;
+}
+
+.my-project-task-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid #ddd4c7;
+  border-radius: 8px;
+  background: #fffdfa;
+  text-align: left;
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  box-shadow: 0 10px 22px rgba(38, 50, 54, 0.03);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.18s ease,
+    opacity 0.16s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.my-project-task-card:hover {
+  border-color: #cde2dc;
+  background: #fbfffd;
+  box-shadow: 0 14px 28px rgba(31, 157, 138, 0.08);
+  transform: translateY(-1px);
+}
+
+.my-project-task-card:focus-visible {
+  outline: 3px solid rgba(31, 157, 138, 0.2);
+  outline-offset: 2px;
+}
+
+.my-project-task-card.selected {
+  border-color: #1f9d8a;
+  background: #f2faf8;
+  box-shadow: 0 14px 28px rgba(31, 157, 138, 0.08);
+}
+
+.my-project-task-card.reordering {
+  cursor: grabbing;
+  will-change: transform;
+}
+
+.my-project-task-card.reordering:not(.dragging) {
+  transition:
+    border-color 0.14s ease,
+    box-shadow 0.14s ease,
+    opacity 0.14s ease;
+}
+
+.my-project-task-card.dragging {
+  border-color: #1f9d8a;
+  box-shadow:
+    0 18px 34px rgba(31, 157, 138, 0.16),
+    0 2px 8px rgba(38, 50, 54, 0.08);
+  opacity: 0.96;
+  position: relative;
+  transform: translateY(-3px) scale(1.01);
+  z-index: 2;
+}
+
+.my-project-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.my-project-card-main h2 {
+  margin: 2px 0 0;
+  color: #263236;
+  font-size: 17px;
+  letter-spacing: 0;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.my-project-progress {
+  min-width: 52px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cde2dc;
+  border-radius: 8px;
+  background: #f7fcfb;
+}
+
+.my-project-progress strong {
+  color: #1f9d8a;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.my-project-mini-meter {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee7dc;
+}
+
+.my-project-mini-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #1f9d8a;
+}
+
+.my-project-mini-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.my-project-mini-metrics span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 8px;
+  color: #5f6b70;
+  background: #f5f1ea;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-selection-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+}
+
+.risk-panel {
+  grid-column: 1 / -1;
+}

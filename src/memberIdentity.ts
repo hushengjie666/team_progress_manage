@@ -13,7 +13,7 @@ export const sameMemberIdentity = (left: ProjectMember, right: ProjectMember) =>
   return false;
 };
 
-export const projectMemberMatchesAccount = (state: AppState, member: ProjectMember, account: AuthAccount) => {
+export const projectMemberMatchesAccount = (_state: AppState, member: ProjectMember, account: AuthAccount) => {
   const accountEmail = normalizedEmail(account.email);
   return Boolean(
     member.accountId === account.id ||

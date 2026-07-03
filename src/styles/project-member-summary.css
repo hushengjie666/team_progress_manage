@@ -1,0 +1,42 @@
+.project-member-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-member-summary-card {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #d8eee8;
+  border-radius: 8px;
+  background: #f7fcfa;
+}
+
+.project-member-summary-card span {
+  color: #526065;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.project-member-summary-card strong {
+  color: #184d48;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.project-member-summary-card small {
+  color: #667074;
+  font-size: 12px;
+}
+
+.project-member-summary-card.attention {
+  border-color: #efcf91;
+  background: #fff8e8;
+}
+
+.project-member-summary-card.attention strong {
+  color: #a56415;
+}

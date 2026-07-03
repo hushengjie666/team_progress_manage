@@ -1,0 +1,224 @@
+.task-list {
+  display: grid;
+  gap: 10px;
+}
+
+.task-item {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 282px);
+  align-items: center;
+  gap: 18px;
+  min-height: 96px;
+  padding: 14px 14px 14px 18px;
+  border: 1px solid #ded8cf;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fffefd 0%, #fffbf6 100%);
+  box-shadow: 0 10px 22px rgba(38, 50, 54, 0.035);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.task-item::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: transparent;
+}
+
+.task-item:hover {
+  border-color: #cfdad5;
+  background: #fffffc;
+  box-shadow: 0 12px 24px rgba(38, 50, 54, 0.06);
+}
+
+.task-item.sortable-task {
+  cursor: grab;
+}
+
+.task-item.sortable-task:active {
+  cursor: grabbing;
+}
+
+.task-item.dragging-task {
+  opacity: 0.48;
+}
+
+.task-item.drag-over-task {
+  border-color: #7ccfc2;
+  background: #f4fbf9;
+  box-shadow:
+    inset 0 3px 0 #2aa895,
+    0 10px 22px rgba(42, 168, 149, 0.08);
+}
+
+.task-main {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 11px;
+}
+
+.task-item.warning-edge {
+  border-color: #ead8bf;
+  background: #fffdf8;
+}
+
+.task-item.warning-edge::before {
+  background: #d79b4b;
+}
+
+.task-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.task-title-main {
+  flex: 1 1 auto;
+  min-width: 145px;
+  max-width: min(560px, 100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-title-main strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: #263236;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.32;
+  overflow-wrap: anywhere;
+}
+
+.task-title-badges {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.task-card-side {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-content: center;
+  align-items: stretch;
+  justify-content: end;
+  gap: 11px;
+  min-width: 0;
+  align-self: stretch;
+  padding-left: 18px;
+  border-left: 1px solid rgba(215, 207, 196, 0.72);
+}
+
+.task-progress-panel {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.task-progress-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.task-progress-numbers {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 7px;
+  color: #6e5b49;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.task-progress-numbers strong {
+  color: #24534f;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.task-progress-numbers span {
+  color: #6e5b49;
+}
+
+.task-progress-panel .task-progress-bar {
+  height: 8px;
+  margin-top: 0;
+  border-radius: 999px;
+  border-color: transparent;
+  background: #ece8df;
+}
+
+.task-item p {
+  margin: 0;
+  color: #667074;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.task-summary-line {
+  display: block;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.task-summary-line > p {
+  max-width: none;
+  color: #667074;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.task-meta-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 1px;
+}
+
+.task-inline-chip {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border: 1px solid rgba(196, 216, 210, 0.82);
+  border-radius: 6px;
+  color: #355b57;
+  background: #eef7f4;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.task-inline-chip.muted-chip {
+  color: #607076;
+  border-color: rgba(221, 214, 203, 0.8);
+  background: #f4f0e9;
+  font-weight: 600;
+}
+
+.task-inline-chip.danger-chip {
+  color: #8b3d2e;
+  border-color: rgba(239, 197, 176, 0.9);
+  background: #f9e5da;
+}

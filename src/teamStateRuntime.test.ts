@@ -96,8 +96,6 @@ describe("team state runtime", () => {
     const before = withToken(createInitialState());
     const after = changedState(before);
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
-      accepted: [],
-      conflicts: [],
       current_revision: 12,
     }), { status: 200, headers: { "content-type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
@@ -119,8 +117,6 @@ describe("team state runtime", () => {
       const url = String(input);
       if (url.endsWith("/team/changes")) {
         return new Response(JSON.stringify({
-          accepted: [],
-          conflicts: [],
           current_revision: 8,
         }), { status: 200, headers: { "content-type": "application/json" } });
       }
@@ -158,8 +154,6 @@ describe("team state runtime", () => {
       const url = String(input);
       if (url.endsWith("/team/changes")) {
         return new Response(JSON.stringify({
-          accepted: [],
-          conflicts: [],
           current_revision: stateResponseIndex + 1,
         }), { status: 200, headers: { "content-type": "application/json" } });
       }

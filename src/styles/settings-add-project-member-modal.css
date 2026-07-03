@@ -1,0 +1,163 @@
+.add-project-member-modal {
+  width: min(1120px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 32px));
+  max-height: calc(100vh - 32px);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 16px;
+  overflow: hidden;
+}
+
+.add-project-member-modal.no-search {
+  width: min(640px, calc(100vw - 32px));
+  grid-template-rows: auto auto minmax(0, 1fr);
+  height: auto;
+  min-height: 0;
+}
+
+.project-member-direct-create {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #b7d8d1;
+  border-radius: 8px;
+  background: #f4fbf8;
+}
+
+.project-member-direct-create > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.project-member-direct-create strong {
+  color: #244541;
+  font-size: 15px;
+}
+
+.project-member-direct-create span {
+  color: #667074;
+  font-size: 13px;
+}
+
+.project-member-direct-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.project-member-invite-form {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr);
+  gap: 10px;
+}
+
+.project-member-direct-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.project-member-direct-actions .primary-button {
+  margin-left: auto;
+  min-width: 148px;
+}
+
+.add-project-member-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.add-project-member-tools > span {
+  color: #667074;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.add-project-member-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d9d0c4;
+  border-radius: 8px;
+  background: #fbfaf6;
+  color: #5c686c;
+}
+
+.add-project-member-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #263236;
+}
+
+.add-project-member-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+.add-project-member-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) max-content max-content max-content;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.add-project-member-row .primary-button {
+  min-width: 88px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.add-project-member-profile {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.add-project-member-profile strong {
+  color: #263236;
+}
+
+.add-project-member-profile span,
+.modal-heading span {
+  color: #667074;
+  font-size: 13px;
+}
+
+.add-project-member-profile strong,
+.add-project-member-profile span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-project-member-empty {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px dashed #d7cabc;
+  border-radius: 8px;
+  background: #fffdfa;
+}

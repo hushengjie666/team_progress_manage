@@ -6,13 +6,10 @@ import {
   FolderKanban,
   LayoutDashboard,
   ListChecks,
-  Settings,
   UserCheck,
   Users,
 } from "lucide-react";
 import type { AppTopbarNavItem } from "./components/AppTopbar";
-import type { Project } from "./types";
-import type { Tab } from "./appModel";
 
 export type AppNavigationHandlers = {
   openBoard: () => void;
@@ -24,7 +21,6 @@ export type AppNavigationHandlers = {
   openReports: () => void;
   openCalendar: () => void;
   openAdmin: () => void;
-  logout: () => void;
   showMemberStatus?: boolean;
 };
 
@@ -38,7 +34,6 @@ export const createAppNavigation = ({
   openReports,
   openCalendar,
   openAdmin,
-  logout,
   showMemberStatus = true,
 }: AppNavigationHandlers) => {
   const adminNavItem: AppTopbarNavItem = {
@@ -69,48 +64,5 @@ export const createAppNavigation = ({
   ];
 
   const topbarNavItems = [...primaryNavItems, ...secondaryNavItems];
-  const mobileNavItems = [boardNavItem, ...(showMemberStatus ? [memberStatusNavItem] : []), workbenchNavItem, secondaryNavItems[0]].slice(0, 4);
-  const mobileMoreItems: AppTopbarNavItem[] = [
-    secondaryNavItems[1],
-    secondaryNavItems[2],
-    secondaryNavItems[3],
-    adminNavItem,
-    { key: "logout", label: "退出登录", icon: <Settings size={18} />, onClick: logout },
-  ];
-
-  return { topbarNavItems, mobileNavItems, mobileMoreItems };
-};
-
-export const mobileTitleForNavigation = ({
-  tab,
-  activeNavKey,
-  activeProject,
-}: {
-  tab: Tab;
-  activeNavKey: string;
-  activeProject?: Project;
-}) => {
-  if (tab === "project") {
-    return {
-      title: activeProject?.name ?? "项目工作区",
-      subtitle: activeProject?.description || "项目工作区",
-    };
-  }
-
-  const titleByNav: Record<string, string> = {
-    board: "项目总览",
-    workspaces: "工作区",
-    member_status: "成员状况",
-    workbench: "我的任务",
-    admin: "管理中心",
-    focus: "开始工作",
-    calendar: "历史日报",
-    daily: "每日总结",
-    reports: "复盘洞察",
-  };
-
-  return {
-    title: titleByNav[activeNavKey] ?? "团队进度",
-    subtitle: undefined,
-  };
+  return { topbarNavItems };
 };

@@ -1,0 +1,12 @@
+.section-helper {
+  margin: -4px 0 16px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #758084;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

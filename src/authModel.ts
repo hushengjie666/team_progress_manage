@@ -49,14 +49,10 @@ export const bindAccountToMembers = (
     projectMembers,
     sync: {
       ...value.sync,
-      enabled: true,
-      autoSync: true,
       token: auth.token,
       username: account.email,
       message: auth.message,
       status: "idle",
-      retryCount: 0,
-      nextRetryAt: undefined,
     },
     updatedAt: timestamp,
   };

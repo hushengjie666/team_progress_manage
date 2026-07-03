@@ -1,0 +1,57 @@
+.workbench-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.workbench-stats div {
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.workbench-stats span,
+.active-work-line span {
+  color: #667074;
+  font-size: 12px;
+}
+
+.workbench-stats strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #2e383c;
+  font-size: 17px;
+}
+
+.active-work-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #afd8cf;
+  border-radius: 8px;
+  background: #eef8f5;
+}
+
+.active-work-line div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.active-work-line.compact {
+  margin-bottom: 0;
+  padding: 8px;
+}
+
+.task-item.active-edge {
+  border-color: #1f9d8a;
+  background: #f5fbf9;
+}

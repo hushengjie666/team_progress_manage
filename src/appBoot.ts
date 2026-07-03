@@ -41,7 +41,6 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
       },
       sync: {
         ...state.sync,
-        enabled: false,
         token: undefined,
         status: "idle",
         message: authAccessDeniedMessage,

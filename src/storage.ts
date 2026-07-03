@@ -1,302 +1,114 @@
-import { createInitialState, defaultNativeCapabilities, defaultTaskTemplates } from "./seed";
-import { isTauri } from "./env";
-import {
-  dedupeProjectMemberBindingsWithAliases,
-  normalizeProjectMember,
-} from "./storageTeamMembers";
-import type {
-  ActiveTimer,
-  AppState,
-  BlockProfile,
-  DailyPlan,
-  DailyReview,
-  ExecutionSignal,
-  ExecutionSignalType,
-  Project,
-  ProjectMember,
-  RepeatRule,
-  Settings,
-  StrictCheckResult,
-  StrictModeStatus,
-  Task,
-  TaskStage,
-  TaskStatus,
-  WorkSession,
-  WorkSessionStatus,
-} from "./types";
+import { createInitialState } from "./seed";
+import type { ActiveTimer, AppState, ProjectMember, Settings, SyncState } from "./types";
 
-const STORAGE_KEY = "timemanage.app_state.v1";
+const STORAGE_KEY = "timemanage.app_state.v2";
 
-type LegacyTeamMemberPayload = {
-  id?: string;
-  workspaceId?: string;
-  accountId?: string;
-  name?: string;
-  email?: string;
-  status?: "active" | "disabled";
-  createdAt?: string;
-  updatedAt?: string;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value && typeof value === "object" && !Array.isArray(value));
 
-type LegacyProjectMemberPayload = Partial<ProjectMember> & {
-  teamMemberId?: string;
-};
+const arrayOr = <T>(value: unknown, fallback: T[]): T[] => (Array.isArray(value) ? value as T[] : fallback);
 
-type NormalizableAppState = Omit<Partial<AppState>, "projects" | "projectMembers" | "tasks" | "workSessions" | "executionSignals"> & {
-  currentMemberId?: string;
-  projects?: Partial<Project>[];
-  teamMembers?: LegacyTeamMemberPayload[];
-  projectMembers?: LegacyProjectMemberPayload[];
-  tasks?: Partial<Task>[];
-  workSessions?: Partial<WorkSession>[];
-  executionSignals?: Partial<ExecutionSignal>[];
-};
-
-const normalizeProject = (project: Partial<Project>, fallback: Project, index: number): Project => {
-  const timestamp = project.updatedAt ?? project.createdAt ?? fallback.updatedAt ?? new Date().toISOString();
-  const sortOrder = Number.isFinite(project.sortOrder) ? project.sortOrder : project.id === fallback.id ? fallback.sortOrder : undefined;
-  const taskStageMode = project.taskStageMode === "regular" || project.taskStageMode === "software"
-    ? project.taskStageMode
-    : fallback.taskStageMode ?? "software";
-  return {
-    id: project.id ?? (index === 0 ? fallback.id : `project_migrated_${index}`),
-    workspaceId: project.workspaceId ?? fallback.workspaceId,
-    name: project.name?.trim() || fallback.name,
-    description: project.description ?? "",
-    defaultExpectedStartHours: Math.max(1, project.defaultExpectedStartHours ?? fallback.defaultExpectedStartHours ?? 24),
-    taskStageMode,
-    sortOrder,
-    createdAt: project.createdAt ?? timestamp,
-    updatedAt: timestamp,
-    archivedAt: project.archivedAt,
-  };
-};
-
-const clampProgress = (value?: number) => Math.max(0, Math.min(100, value ?? 0));
-const allowedTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
-const allowedTaskStages: TaskStage[] = ["planning", "execution", "check", "sales", "requirements", "design", "development", "testing", "deployment", "acceptance"];
-
-const normalizeTask = (task: Partial<Task>, index: number, projectId: string): Task => {
-  const timestamp = task.updatedAt ?? task.createdAt ?? new Date().toISOString();
-  const allowedRepeatRules: RepeatRule[] = ["none", "daily", "weekly", "interval", "weekdays", "monthly", "after_completion"];
-  return {
-    id: task.id ?? `task_migrated_${index}`,
-    workspaceId: task.workspaceId,
-    title: task.title ?? "未命名任务",
-    notes: task.notes ?? "",
-    tags: task.tags ?? [],
-    projectId: task.projectId ?? projectId,
-    project: task.project ?? "Inbox",
-    creatorMemberId: task.creatorMemberId,
-    primaryExecutorMemberId: task.primaryExecutorMemberId,
-    collaboratorMemberIds: task.collaboratorMemberIds ?? [],
-    expectedStartAt: task.expectedStartAt,
-    expectedFinishAt: task.expectedFinishAt,
-    progressPercent: clampProgress(task.progressPercent),
-    progressNote: task.progressNote ?? "",
-    priority: task.priority ?? "medium",
-    severity: task.severity ?? "medium",
-    stage: task.stage && allowedTaskStages.includes(task.stage) ? task.stage : "requirements",
-    estimatePomodoros: task.estimatePomodoros ?? 1,
-    status: task.status && allowedTaskStatuses.includes(task.status) ? task.status : "pool",
-    dueAt: task.dueAt,
-    reminderAt: task.reminderAt,
-    repeatRule: task.repeatRule && allowedRepeatRules.includes(task.repeatRule) ? task.repeatRule : "none",
-    repeatIntervalDays: task.repeatIntervalDays,
-    repeatWeekdays: task.repeatWeekdays ?? [],
-    repeatDayOfMonth: task.repeatDayOfMonth,
-    recurrenceParentId: task.recurrenceParentId,
-    nextRepeatAt: task.nextRepeatAt,
-    lastReminderSentAt: task.lastReminderSentAt,
-    subtasks: task.subtasks ?? [],
-    sortOrder: task.sortOrder ?? index * 10,
-    actualPomodoros: task.actualPomodoros ?? 0,
-    estimateHistory: task.estimateHistory ?? [],
-    createdAt: task.createdAt ?? timestamp,
-    updatedAt: timestamp,
-    reviewSubmittedAt: task.reviewSubmittedAt,
-    reviewSubmittedByMemberId: task.reviewSubmittedByMemberId,
-    reviewAcceptedAt: task.reviewAcceptedAt,
-    reviewAcceptedByMemberId: task.reviewAcceptedByMemberId,
-    reviewReturnedAt: task.reviewReturnedAt,
-    reviewReturnedByMemberId: task.reviewReturnedByMemberId,
-    reviewReturnReason: task.reviewReturnReason,
-    completedAt: task.completedAt,
-  };
-};
-
-const restoreSplitParentTasks = (tasks: Task[]) =>
-  tasks.map((task) => {
-    if (task.status !== "archived") return task;
-    const hasSplitChildren = tasks.some(
-      (candidate) =>
-        candidate.id !== task.id &&
-        candidate.projectId === task.projectId &&
-        candidate.notes.includes(`由「${task.title}」拆分而来。`),
-    );
-    return hasSplitChildren ? { ...task, status: "split" as const } : task;
-  });
-
-const normalizeReview = (review?: Partial<DailyReview>): DailyReview => ({
-  mood: review?.mood ?? "normal",
-  wins: review?.wins ?? "",
-  blockers: review?.blockers ?? "",
-  interruptionPattern: review?.interruptionPattern ?? "",
-  tomorrowFocus: review?.tomorrowFocus ?? "",
-});
-
-const normalizePlan = (plan: Partial<DailyPlan>): DailyPlan => {
-  const timestamp = plan.updatedAt ?? plan.createdAt ?? new Date().toISOString();
-  return {
-    id: plan.id ?? `plan_${plan.date ?? timestamp.slice(0, 10)}`,
-    workspaceId: plan.workspaceId,
-    date: plan.date ?? timestamp.slice(0, 10),
-    capacityPomodoros: plan.capacityPomodoros ?? 8,
-    committedTaskIds: plan.committedTaskIds ?? [],
-    completedPomodoros: plan.completedPomodoros ?? 0,
-    recommendedCapacityPomodoros: plan.recommendedCapacityPomodoros,
-    suggestedCapacityPomodoros: plan.suggestedCapacityPomodoros,
-    suggestedTaskIds: plan.suggestedTaskIds ?? [],
-    overloadAcknowledged: plan.overloadAcknowledged ?? false,
-    reflection: plan.reflection ?? "",
-    review: normalizeReview(plan.review),
-    reviewedAt: plan.reviewedAt,
-    createdAt: plan.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-};
-
-const normalizeWorkSession = (session: Partial<WorkSession>, index: number): WorkSession | undefined => {
-  if (!session.taskId || !session.focusSessionId) return undefined;
-  const timestamp = session.updatedAt ?? session.createdAt ?? session.startedAt ?? new Date().toISOString();
-  const allowedStatuses: WorkSessionStatus[] = ["active", "paused", "ended"];
-  return {
-    id: session.id ?? `work_session_migrated_${index}`,
-    workspaceId: session.workspaceId,
-    taskId: session.taskId,
-    executorMemberId: session.executorMemberId,
-    focusSessionId: session.focusSessionId,
-    status: session.status && allowedStatuses.includes(session.status) ? session.status : "ended",
-    startedAt: session.startedAt ?? timestamp,
-    pausedAt: session.pausedAt,
-    endedAt: session.endedAt,
-    totalPausedSeconds: session.totalPausedSeconds ?? 0,
-    createdAt: session.createdAt ?? timestamp,
-    updatedAt: timestamp,
-  };
-};
-
-const normalizeExecutionSignal = (signal: Partial<ExecutionSignal>, index: number): ExecutionSignal | undefined => {
-  if (!signal.workSessionId || !signal.taskId) return undefined;
-  const allowedTypes: ExecutionSignalType[] = ["work_started", "work_paused", "work_resumed", "work_ended"];
-  const timestamp = signal.createdAt ?? new Date().toISOString();
-  return {
-    id: signal.id ?? `signal_migrated_${index}`,
-    workspaceId: signal.workspaceId,
-    workSessionId: signal.workSessionId,
-    taskId: signal.taskId,
-    executorMemberId: signal.executorMemberId,
-    type: signal.type && allowedTypes.includes(signal.type) ? signal.type : "work_started",
-    createdAt: timestamp,
-    payload: signal.payload,
-  };
-};
-
-const mergeSettings = (initial: Settings, parsed?: Partial<Settings>): Settings => ({
-  ...initial,
-  ...parsed,
-  dismissedCoachSteps: parsed?.dismissedCoachSteps ?? initial.dismissedCoachSteps ?? [],
-  advancedSyncVisible: parsed?.advancedSyncVisible ?? initial.advancedSyncVisible ?? false,
-  reportFilter: {
-    range: "30d",
-    project: "all",
-    tag: "all",
-    taskId: "all",
-    ...(initial.reportFilter ?? {}),
-    ...parsed?.reportFilter,
-  },
-  calendarViewMode: parsed?.calendarViewMode ?? initial.calendarViewMode ?? "week",
-  commandPaletteHintDismissed: parsed?.commandPaletteHintDismissed ?? initial.commandPaletteHintDismissed ?? false,
-  notificationSettings: {
-    ...initial.notificationSettings,
-    ...parsed?.notificationSettings,
-  },
-});
-
-const normalizeActiveTimer = (timer?: Partial<ActiveTimer>): ActiveTimer | undefined => {
-  if (!timer?.sessionId || !timer.startedAt) return undefined;
-  const duration = timer.duration ?? 25 * 60;
+const normalizeActiveTimer = (timer: unknown): ActiveTimer | undefined => {
+  if (!isRecord(timer) || typeof timer.sessionId !== "string" || typeof timer.startedAt !== "string") return undefined;
+  const duration = typeof timer.duration === "number" ? timer.duration : 25 * 60;
   return {
     sessionId: timer.sessionId,
-    taskId: timer.taskId,
-    workSessionId: timer.workSessionId,
-    mode: timer.mode ?? "focus",
+    taskId: typeof timer.taskId === "string" ? timer.taskId : undefined,
+    workSessionId: typeof timer.workSessionId === "string" ? timer.workSessionId : undefined,
+    mode: timer.mode === "short_break" || timer.mode === "long_break" ? timer.mode : "focus",
     duration,
-    remaining: timer.remaining ?? duration,
-    isRunning: timer.isRunning ?? false,
+    remaining: typeof timer.remaining === "number" ? timer.remaining : duration,
+    isRunning: Boolean(timer.isRunning),
     startedAt: timer.startedAt,
-    plannedEndAt: timer.plannedEndAt ?? new Date(new Date(timer.startedAt).getTime() + duration * 1000).toISOString(),
-    pausedAt: timer.pausedAt,
-    totalPausedSeconds: timer.totalPausedSeconds ?? 0,
-    cycleIndex: timer.cycleIndex ?? 1,
-    pendingSettlement: timer.pendingSettlement,
-    strictStarted: timer.strictStarted ?? false,
+    plannedEndAt: typeof timer.plannedEndAt === "string"
+      ? timer.plannedEndAt
+      : new Date(new Date(timer.startedAt).getTime() + duration * 1000).toISOString(),
+    pausedAt: typeof timer.pausedAt === "string" ? timer.pausedAt : undefined,
+    totalPausedSeconds: typeof timer.totalPausedSeconds === "number" ? timer.totalPausedSeconds : 0,
+    cycleIndex: typeof timer.cycleIndex === "number" ? timer.cycleIndex : 1,
+    pendingSettlement: timer.pendingSettlement === "pending" || timer.pendingSettlement === "none" ? timer.pendingSettlement : undefined,
   };
 };
 
-export const normalizeAppStatePayload = (parsed: NormalizableAppState): AppState => {
-  const initial = createInitialState();
-  const projects = (parsed.projects ?? initial.projects).map((project, index) => normalizeProject(project, initial.projects[0], index));
-  const starterProjectId = projects[0]?.id ?? initial.projects[0].id;
-  const rawProjectMembers = (parsed.projectMembers ?? initial.projectMembers).map((member, index) =>
-    normalizeProjectMember(member, initial.projectMembers[0], member.projectId ?? starterProjectId, index, parsed.teamMembers),
-  );
-  const dedupedProjectMembers = dedupeProjectMemberBindingsWithAliases(rawProjectMembers);
-  const projectMembers = dedupedProjectMembers.projectMembers;
-  const tasks = restoreSplitParentTasks((parsed.tasks ?? initial.tasks).map((task, index) => {
-    const taskProjectId = task.projectId && projects.some((project) => project.id === task.projectId) ? task.projectId : starterProjectId;
-    return normalizeTask(task, index, taskProjectId);
-  }));
-  const syncToken = parsed.auth?.token ?? parsed.sync?.token;
-  const normalizedSync = {
-    ...initial.sync,
-    ...parsed.sync,
-    enabled: Boolean(syncToken) || parsed.sync?.enabled || initial.sync.enabled,
-    autoSync: syncToken ? true : (parsed.sync?.autoSync ?? initial.sync.autoSync),
-    token: syncToken ?? parsed.sync?.token,
-    tombstones: parsed.sync?.tombstones ?? [],
-    conflicts: parsed.sync?.conflicts ?? [],
-    entityAliases: [
-      ...dedupedProjectMembers.projectMemberAliases.map((alias) => ({ entity: "project_member" as const, ...alias })),
-    ],
-  };
-  const normalized = {
+const mergeSettings = (initial: Settings, value: unknown): Settings => {
+  const parsed = isRecord(value) ? value as Partial<Settings> : {};
+  return {
     ...initial,
     ...parsed,
-    onboarding: { ...initial.onboarding, ...parsed.onboarding, completed: true },
-    settings: mergeSettings(initial.settings, parsed.settings),
-    auth: { ...initial.auth, ...parsed.auth },
-    projects,
-    projectMembers,
-    tasks,
-    dailyPlans: (parsed.dailyPlans ?? initial.dailyPlans).map(normalizePlan),
-    workSessions: (parsed.workSessions ?? initial.workSessions).map(normalizeWorkSession).filter((session): session is WorkSession => Boolean(session)),
-    executionSignals: (parsed.executionSignals ?? initial.executionSignals).map(normalizeExecutionSignal).filter((signal): signal is ExecutionSignal => Boolean(signal)),
-    rewardState: { ...initial.rewardState, ...parsed.rewardState },
-    strictViolations: parsed.strictViolations ?? [],
-    backupSnapshots: (parsed.backupSnapshots ?? []).map((snapshot) => ({ ...snapshot, payload: snapshot.payload })),
-    taskTemplates: parsed.taskTemplates?.length ? parsed.taskTemplates : defaultTaskTemplates,
-    templateInstances: parsed.templateInstances ?? [],
-    nativeCapabilities: parsed.nativeCapabilities?.length ? parsed.nativeCapabilities : defaultNativeCapabilities,
-    activeTimer: normalizeActiveTimer(parsed.activeTimer),
-    sync: normalizedSync,
-  } as AppState;
-  return normalized;
+    reportFilter: {
+      ...(initial.reportFilter ?? { range: "30d", project: "all", tag: "all", taskId: "all" }),
+      ...(parsed.reportFilter ?? {}),
+    },
+    notificationSettings: {
+      ...initial.notificationSettings,
+      ...(parsed.notificationSettings ?? {}),
+    },
+  };
 };
 
-const mergeStoredState = (payload: string): AppState => normalizeAppStatePayload(JSON.parse(payload) as Partial<AppState>);
+const mergeSync = (initial: SyncState, value: unknown): SyncState => {
+  const parsed = isRecord(value) ? value as Partial<SyncState> : {};
+  return {
+    ...initial,
+    ...parsed,
+    tombstones: parsed.tombstones ?? [],
+  };
+};
 
-const readBrowserState = (): AppState => {
+const projectMemberIdentityKey = (member: ProjectMember) => {
+  const scope = `${member.workspaceId ?? ""}:${member.projectId}`;
+  if (member.email) return `${scope}:email:${member.email.trim().toLowerCase()}`;
+  if (member.accountId) return `${scope}:account:${member.accountId}`;
+  return `${scope}:member:${member.id}`;
+};
+
+const compareUpdatedAt = (left?: string, right?: string) => (left ?? "").localeCompare(right ?? "");
+
+const normalizeProjectMembers = (members: ProjectMember[]) => {
+  const canonicalByIdentity = new Map<string, ProjectMember>();
+  for (const member of members) {
+    const key = projectMemberIdentityKey(member);
+    const current = canonicalByIdentity.get(key);
+    if (!current || compareUpdatedAt(member.updatedAt, current.updatedAt) > 0) {
+      canonicalByIdentity.set(key, member);
+    }
+  }
+
+  const canonicalIds = new Set(Array.from(canonicalByIdentity.values()).map((member) => member.id));
+  return members.filter((member) => canonicalIds.has(member.id));
+};
+
+export const normalizeAppStatePayload = (payload: unknown): AppState => {
+  const initial = createInitialState();
+  if (!isRecord(payload) || payload.version !== initial.version) return initial;
+  const parsed = payload as Partial<AppState>;
+  const sync = mergeSync(initial.sync, parsed.sync);
+  return {
+    ...initial,
+    ...parsed,
+    settings: mergeSettings(initial.settings, parsed.settings),
+    auth: { ...initial.auth, ...parsed.auth },
+    projects: arrayOr(parsed.projects, initial.projects),
+    projectMembers: normalizeProjectMembers(arrayOr(parsed.projectMembers, initial.projectMembers)),
+    tasks: arrayOr(parsed.tasks, initial.tasks),
+    dailyPlans: arrayOr(parsed.dailyPlans, initial.dailyPlans),
+    focusSessions: arrayOr(parsed.focusSessions, initial.focusSessions),
+    workSessions: arrayOr(parsed.workSessions, initial.workSessions),
+    executionSignals: arrayOr(parsed.executionSignals, initial.executionSignals),
+    interruptions: arrayOr(parsed.interruptions, initial.interruptions),
+    rewardState: { ...initial.rewardState, ...parsed.rewardState },
+    sync,
+    backupSnapshots: arrayOr(parsed.backupSnapshots, initial.backupSnapshots),
+    taskTemplates: arrayOr(parsed.taskTemplates, initial.taskTemplates),
+    templateInstances: arrayOr(parsed.templateInstances, initial.templateInstances),
+    activeTimer: normalizeActiveTimer(parsed.activeTimer),
+    updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : initial.updatedAt,
+  };
+};
+
+const mergeStoredState = (payload: string): AppState => normalizeAppStatePayload(JSON.parse(payload));
+
+export async function loadState(): Promise<AppState> {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) return createInitialState();
   try {
@@ -304,78 +116,8 @@ const readBrowserState = (): AppState => {
   } catch {
     return createInitialState();
   }
-};
-
-export async function loadState(): Promise<AppState> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const payload = await invoke<string | null>("load_state");
-    if (payload) return mergeStoredState(payload);
-  }
-  return readBrowserState();
 }
 
 export async function saveState(state: AppState): Promise<void> {
-  const payload = JSON.stringify({ ...state, updatedAt: new Date().toISOString() });
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    await invoke("save_state", { payload });
-    return;
-  }
-  localStorage.setItem(STORAGE_KEY, payload);
-}
-
-export async function requestStrictPermissions(): Promise<StrictModeStatus> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<StrictModeStatus>("request_strict_permissions");
-  }
-  return {
-    active: false,
-    platform: "browser",
-    permission_state: "unavailable",
-    message: "浏览器预览无法启用系统权限，Tauri Apple 构建会接入前台 App/URL 软检测。",
-  };
-}
-
-export async function startStrictMode(profile?: BlockProfile): Promise<StrictModeStatus> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<StrictModeStatus>("start_strict_mode", {
-      profileJson: JSON.stringify(profile ?? null),
-    });
-  }
-  return {
-    active: true,
-    platform: "browser",
-    permission_state: "unavailable",
-    message: "浏览器预览已进入软严格模式：退出会记录为失败，但不会屏蔽系统 App。",
-  };
-}
-
-export async function stopStrictMode(): Promise<StrictModeStatus> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<StrictModeStatus>("stop_strict_mode");
-  }
-  return {
-    active: false,
-    platform: "browser",
-    permission_state: "unavailable",
-    message: "严格模式已停止。",
-  };
-}
-
-export async function checkStrictModeViolation(profile?: BlockProfile): Promise<StrictCheckResult> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<StrictCheckResult>("check_strict_violation", {
-      profileJson: JSON.stringify(profile ?? null),
-    });
-  }
-  return {
-    platform: "browser",
-    matched: false,
-    message: "浏览器预览无法读取前台 App 或网站，严格模式已降级为软记录。",
-  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, updatedAt: new Date().toISOString() }));
 }

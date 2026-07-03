@@ -1,0 +1,146 @@
+.hotspot-panel {
+  background: #fbfaf6;
+}
+
+.hotspot-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hotspot-item {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) 150px;
+  align-items: center;
+  gap: 12px;
+  color: #596368;
+}
+
+.hotspot-item div {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ece5da;
+}
+
+.hotspot-item div span {
+  display: block;
+  height: 100%;
+  border-radius: 8px;
+  background: #c2644a;
+}
+
+.estimate-panel,
+.distribution-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.estimate-bars {
+  height: 150px;
+  display: grid;
+  grid-template-columns: repeat(14, minmax(16px, 1fr));
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.estimate-day {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.estimate-day span {
+  width: 100%;
+  max-width: 28px;
+  border-radius: 8px 8px 2px 2px;
+  background: #cfd8d5;
+}
+
+.estimate-day span.over {
+  background: #c2644a;
+}
+
+.estimate-day span.under {
+  background: #1f9d8a;
+}
+
+.estimate-day small,
+.insight-item span {
+  color: #798286;
+  font-size: 12px;
+}
+
+.estimate-day small {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.insight-list {
+  display: grid;
+  gap: 8px;
+}
+
+.insight-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.insight-item strong {
+  overflow-wrap: anywhere;
+}
+
+.distribution-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.distribution-list {
+  display: grid;
+  gap: 10px;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 0.7fr) minmax(0, 1.4fr) 32px;
+  align-items: center;
+  gap: 10px;
+  color: #607075;
+  font-size: 13px;
+}
+
+.distribution-row div {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #ece5da;
+}
+
+.distribution-row i {
+  display: block;
+  height: 100%;
+  border-radius: 8px;
+  background: #1f9d8a;
+}
+
+.distribution-row-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+
+.distribution-row-button:hover,
+.distribution-row-button:focus-visible {
+  background: rgba(31, 157, 138, 0.1);
+}

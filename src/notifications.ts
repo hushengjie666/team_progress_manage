@@ -1,23 +1,22 @@
-import { isTauri } from "./env";
-import type { Settings, StrictModeStatus, WhiteNoise } from "./types";
+import type { PermissionState, Settings, WhiteNoise } from "./types";
 
-const makeStatus = (permissionState: StrictModeStatus["permission_state"], message: string): StrictModeStatus => ({
-  active: permissionState === "granted" || permissionState === "unknown",
-  platform: isTauri() ? "tauri_macos" : "browser",
+declare global {
+  interface Window {
+    webkitAudioContext?: typeof AudioContext;
+  }
+}
+
+type NotificationPermissionStatus = {
+  permission_state: PermissionState;
+  message: string;
+};
+
+const makeStatus = (permissionState: PermissionState, message: string): NotificationPermissionStatus => ({
   permission_state: permissionState,
   message,
 });
 
-export async function requestTimerNotifications(): Promise<StrictModeStatus> {
-  if (isTauri()) {
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      return invoke<StrictModeStatus>("request_timer_notifications");
-    } catch {
-      return makeStatus("unknown", "Tauri 通知命令不可用，已降级为 WebView 通知。");
-    }
-  }
-
+export async function requestTimerNotifications(): Promise<NotificationPermissionStatus> {
   if (!("Notification" in window)) {
     return makeStatus("unavailable", "当前浏览器不支持系统通知。");
   }
@@ -30,17 +29,6 @@ export async function requestTimerNotifications(): Promise<StrictModeStatus> {
 
 export async function sendTimerNotification(settings: Settings, title: string, body: string): Promise<void> {
   if (!settings.notificationsEnabled) return;
-
-  if (isTauri()) {
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      await invoke("send_timer_notification", { title, body });
-      return;
-    } catch {
-      // Continue to Web Notification fallback.
-    }
-  }
-
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   new Notification(title, { body });
 }

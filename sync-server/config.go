@@ -8,17 +8,11 @@ import (
 )
 
 type config struct {
-	addr          string
-	mysqlDSN      string
-	username      string
-	password      string
-	secret        string
-	migrateSource string
-	migrateAction string
-	migrateTo     string
-	migrateOutput string
-	migrateInput  string
-	replace       bool
+	addr     string
+	mysqlDSN string
+	username string
+	password string
+	secret   string
 }
 
 type fileConfig struct {
@@ -45,11 +39,6 @@ func parseCLI(args []string) (string, config, string, error) {
 		command = strings.ToLower(strings.TrimSpace(args[0]))
 		args = args[1:]
 	}
-	migrateAction := ""
-	if command == "migrate" && len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		migrateAction = strings.ToLower(strings.TrimSpace(args[0]))
-		args = args[1:]
-	}
 	fs := flag.NewFlagSet(command, flag.ContinueOnError)
 	configPath := fs.String("config", "", "path to JSON config file")
 	addr := fs.String("addr", "", "listen address")
@@ -57,11 +46,6 @@ func parseCLI(args []string) (string, config, string, error) {
 	username := fs.String("user", "", "login username")
 	password := fs.String("password", "", "login password")
 	secret := fs.String("secret", "", "token signing secret")
-	migrateSource := fs.String("source", "", "legacy JSON store path for migrate-file")
-	migrateTo := fs.String("to", "", "target schema version when running migrate down")
-	migrateOutput := fs.String("output", "", "backup output path when running migrate backup")
-	migrateInput := fs.String("input", "", "backup input path when running migrate restore")
-	replace := fs.Bool("replace", false, "replace existing MySQL data when running migrate-file")
 	if err := fs.Parse(args); err != nil {
 		return command, config{}, "", err
 	}
@@ -91,21 +75,6 @@ func parseCLI(args []string) (string, config, string, error) {
 	}
 	if provided["secret"] {
 		cfg.secret = *secret
-	}
-	if provided["source"] {
-		cfg.migrateSource = strings.TrimSpace(*migrateSource)
-	}
-	if command == "migrate" {
-		cfg.migrateAction = migrateAction
-		if cfg.migrateAction == "" {
-			cfg.migrateAction = "status"
-		}
-		cfg.migrateTo = strings.TrimSpace(*migrateTo)
-		cfg.migrateOutput = strings.TrimSpace(*migrateOutput)
-		cfg.migrateInput = strings.TrimSpace(*migrateInput)
-	}
-	if provided["replace"] {
-		cfg.replace = *replace
 	}
 	if cfg.secret == "" {
 		cfg.secret = cfg.password + "-local-secret"

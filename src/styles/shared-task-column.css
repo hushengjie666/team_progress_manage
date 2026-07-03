@@ -1,0 +1,97 @@
+.count-pill {
+  min-width: 32px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  color: #1f4e57;
+  border-radius: 8px;
+  background: #e4f1ef;
+  font-weight: 800;
+}
+
+.task-column-title-row {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.task-column-title-row h2 {
+  margin: 0;
+}
+
+.task-title-accessory {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.unassigned-toggle {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #d9dfda;
+  border-radius: 999px;
+  padding: 0 5px 0 10px;
+  color: #5e686c;
+  background: #fffefa;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.unassigned-toggle i {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #d9dfda;
+  box-shadow: inset 0 0 0 2px #fffefa;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.unassigned-toggle.active {
+  color: #17675d;
+  border-color: #b9e3dc;
+  background: #edf9f6;
+}
+
+.unassigned-toggle.active i {
+  background: #2aa895;
+}
+
+.unassigned-toggle:hover,
+.unassigned-toggle:focus-visible {
+  border-color: #b9d8d1;
+  box-shadow: 0 8px 18px rgba(38, 50, 54, 0.08);
+}
+
+.toggle-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 30;
+  width: max-content;
+  max-width: 280px;
+  padding: 8px 10px;
+  border: 1px solid #d9dfda;
+  border-radius: 8px;
+  color: #465459;
+  background: rgba(255, 254, 250, 0.98);
+  box-shadow: 0 14px 34px rgba(38, 50, 54, 0.14);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.task-title-accessory:hover .toggle-tooltip,
+.task-title-accessory:focus-within .toggle-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

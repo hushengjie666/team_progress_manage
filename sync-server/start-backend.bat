@@ -5,10 +5,6 @@ cd /d "%~dp0"
 
 if not exist "timemanage-sync.exe" (
   echo [TimeManage] timemanage-sync.exe not found in this folder.
-  if exist "%~dp0release\timemanage-sync.exe" (
-    echo [TimeManage] Found release\timemanage-sync.exe.
-    echo [TimeManage] Please run ..\upgrade.bat first to install this release.
-  )
   if "%TM_NO_PAUSE%"=="" pause
   exit /b 1
 )

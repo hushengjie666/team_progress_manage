@@ -1,0 +1,79 @@
+.boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 18px;
+  color: #5a6268;
+}
+
+.boot-mark {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #20343d;
+  color: #f7f4ef;
+}
+
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f4f0e8;
+}
+
+.auth-panel {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid #dfd5c8;
+  border-radius: 8px;
+  background: #fbfaf6;
+  box-shadow: 0 18px 50px rgba(41, 46, 48, 0.12);
+}
+
+.auth-panel h1 {
+  margin: 0;
+  color: #263236;
+  font-size: 28px;
+}
+
+.auth-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #12423d;
+  background: #d8ece6;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.auth-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #4d5a5f;
+  font-size: 13px;
+}
+
+.auth-remember input {
+  min-height: auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}

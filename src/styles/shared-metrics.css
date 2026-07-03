@@ -1,0 +1,21 @@
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  min-height: 112px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fffdfa;
+  display: grid;
+  align-content: space-between;
+  color: #536167;
+}
+
+.metric strong {
+  color: #252a2e;
+  font-size: 30px;
+  letter-spacing: 0;
+}

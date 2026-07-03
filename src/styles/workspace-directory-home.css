@@ -1,0 +1,105 @@
+.workspace-directory-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.workspace-directory-header {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-directory-create {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.workspace-directory-create .primary-button {
+  min-height: 40px;
+}
+
+.workspace-directory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.workspace-directory-card {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #ddd4c7;
+  border-radius: 8px;
+  background: #fffdfa;
+  box-shadow: 0 10px 22px rgba(38, 50, 54, 0.025);
+}
+
+.workspace-directory-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.workspace-directory-card-head h2 {
+  margin: 8px 0 0;
+  color: #263236;
+  font-size: 20px;
+  line-height: 1.18;
+}
+
+.workspace-directory-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.workspace-directory-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 12px;
+  min-width: 0;
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fbfaf6;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.workspace-directory-action:hover,
+.workspace-directory-action:focus-visible {
+  border-color: #8acfc3;
+  background: #f7fbf9;
+  box-shadow: 0 10px 22px rgba(31, 157, 138, 0.08);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.workspace-directory-action span,
+.workspace-directory-action small {
+  color: #667074;
+  font-size: 12px;
+}
+
+.workspace-directory-action strong {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: #263236;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.workspace-directory-action small {
+  font-weight: 700;
+}

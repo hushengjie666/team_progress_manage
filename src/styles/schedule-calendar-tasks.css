@@ -1,0 +1,109 @@
+.schedule-task-bar {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 4px;
+  padding: 5px 9px;
+  border: 1px solid #126b62;
+  border-radius: 0;
+  background: #2f9187;
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 1px 0 rgba(20, 54, 55, 0.12);
+}
+
+.schedule-task-bar.today {
+  border-color: #a96323;
+  background: #f0a35c;
+  color: #2a241f;
+}
+
+.schedule-task-bar.active {
+  border-color: #0f5f55;
+  background: #166b63;
+}
+
+.schedule-task-bar.review {
+  border-color: #d17b91;
+  background: #f0a0ad;
+  color: #2b1c21;
+}
+
+.schedule-task-bar.compact {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+}
+
+.schedule-task-bar.compact .schedule-task-tags {
+  display: none;
+}
+
+.schedule-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schedule-task-tags {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.schedule-task-tags i {
+  flex: 0 0 auto;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 1px 5px;
+  color: inherit;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.schedule-task-tags i.today,
+.schedule-task-tags i.active,
+.schedule-task-tags i.review {
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.unscheduled-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.unscheduled-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.unscheduled-task-card {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid #e0d7ca;
+  border-radius: 8px;
+  background: #fffdfa;
+  color: #253236;
+  text-align: left;
+}
+
+.unscheduled-task-card span {
+  color: #5c686c;
+  font-size: 12px;
+}

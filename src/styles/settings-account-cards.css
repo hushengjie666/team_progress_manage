@@ -1,0 +1,66 @@
+.member-card {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.2fr) minmax(220px, 0.8fr) minmax(260px, 0.9fr);
+  align-items: end;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.team-member-card {
+  grid-template-columns: minmax(320px, 1.2fr) minmax(260px, 0.8fr) minmax(280px, 0.9fr);
+}
+
+.member-profile-editor {
+  display: grid;
+  gap: 6px;
+}
+
+.member-card-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.member-role-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 0 0 8px;
+}
+
+.member-role-row .secondary-button,
+.member-role-row .small-button {
+  min-height: 38px;
+  padding: 8px 12px;
+}
+
+.member-validation {
+  margin: 0;
+  color: #b6543d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.member-password-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.member-create-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.member-create-panel .settings-grid {
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.2fr) minmax(180px, 1fr);
+}

@@ -1,0 +1,20 @@
+@media (max-width: 980px) {
+  .modal-panel.workspace-project-modal {
+    width: min(760px, calc(100vw - 24px));
+  }
+
+  .workspace-project-create,
+  .quick-project-create-form,
+  .workspace-project-card,
+  .workspace-project-edit-grid,
+  .workspace-project-management-head,
+  .workspace-member-modal-body,
+  .workspace-member-invite {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-project-card-metrics {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}

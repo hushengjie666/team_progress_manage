@@ -1,0 +1,73 @@
+.project-binding-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #e1d8cb;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.project-binding-list {
+  display: grid;
+  gap: 10px;
+}
+
+.project-binding-row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(96px, auto) minmax(130px, auto) minmax(110px, auto) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e4dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.project-binding-row.bound {
+  border-color: #b7d8d1;
+  background: #f5fbf8;
+}
+
+.project-binding-row.inherited {
+  border-color: #ded6c9;
+  background: #fffdfa;
+}
+
+.project-binding-row > div {
+  display: grid;
+  gap: 3px;
+}
+
+.project-binding-row strong {
+  color: #263236;
+}
+
+.project-binding-row span {
+  color: #667074;
+  font-size: 13px;
+}
+
+.member-source-pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid rgba(31, 157, 138, 0.2);
+  border-radius: 999px;
+  background: rgba(31, 157, 138, 0.08);
+  color: #23685f;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.member-source-pill.project {
+  border-color: rgba(31, 157, 138, 0.28);
+  background: rgba(31, 157, 138, 0.12);
+}
+
+.project-binding-inherited-note,
+.project-binding-muted {
+  color: #667074;
+  font-size: 13px;
+}

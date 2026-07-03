@@ -1,0 +1,121 @@
+.schedule-board {
+  display: grid;
+  grid-template-columns: 92px minmax(1260px, 1fr);
+  gap: 0;
+  overflow-x: auto;
+  padding: 12px;
+}
+
+.schedule-left-spacer,
+.schedule-stage-label {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #fffdfa;
+}
+
+.schedule-left-spacer {
+  min-height: 32px;
+  border: 1px solid #d9efe9;
+  border-right: 0;
+  border-radius: 8px 0 0 8px;
+}
+
+.schedule-left-spacer.subtle {
+  display: grid;
+  align-items: center;
+  padding: 0 10px;
+  color: #657174;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-month-row,
+.schedule-day-row,
+.schedule-stage-track {
+  display: grid;
+  grid-template-columns: repeat(42, minmax(30px, 1fr));
+}
+
+.schedule-month-row span,
+.schedule-day-row span {
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d8cfc2;
+  border-left: 0;
+  background: #fff6e8;
+  color: #263438;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-month-row span {
+  border-bottom: 0;
+}
+
+.schedule-day-row span {
+  background: #fffdfa;
+}
+
+.schedule-day-row span.today {
+  color: #0f7669;
+  background: #dff3f0;
+}
+
+.schedule-stage-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 92px minmax(1260px, 1fr);
+  min-height: 72px;
+}
+
+.schedule-stage-label {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid #bfe5dc;
+  border-top: 0;
+  background: #e9f7f4;
+  color: #123f3a;
+}
+
+.schedule-stage-label strong {
+  font-size: 15px;
+}
+
+.schedule-stage-label span {
+  color: #59666a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schedule-stage-track {
+  position: relative;
+  align-items: start;
+  min-height: 72px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eadfce;
+  background: #fffdfa;
+}
+
+.schedule-grid-lines {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to right, #eee4d7 1px, transparent 1px);
+  background-size: calc(100% / 42) 100%;
+  pointer-events: none;
+}
+
+.schedule-empty {
+  grid-column: 1 / span 10;
+  align-self: center;
+  grid-row: 1;
+  margin-left: 10px;
+  padding: 7px 12px;
+  border: 1px dashed #e1d2bf;
+  border-radius: 8px;
+  color: #677175;
+  background: #fffaf3;
+}

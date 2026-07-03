@@ -1,0 +1,152 @@
+.coach-panel,
+.plan-assistant {
+  background: #fbfaf6;
+}
+
+.project-tone-1 {
+  --project-accent: #2f7f75;
+  --project-accent-rgb: 47, 127, 117;
+  --project-border: #d5e2df;
+}
+
+.project-tone-2 {
+  --project-accent: #536f91;
+  --project-accent-rgb: 83, 111, 145;
+  --project-border: #d9e0e8;
+}
+
+.project-tone-3 {
+  --project-accent: #8d6f3d;
+  --project-accent-rgb: 141, 111, 61;
+  --project-border: #e5dccb;
+}
+
+.project-tone-4 {
+  --project-accent: #756b94;
+  --project-accent-rgb: 117, 107, 148;
+  --project-border: #dfdce8;
+}
+
+.project-tone-5 {
+  --project-accent: #9c665f;
+  --project-accent-rgb: 156, 102, 95;
+  --project-border: #e6d7d4;
+}
+
+.project-tone-6 {
+  --project-accent: #677c5d;
+  --project-accent-rgb: 103, 124, 93;
+  --project-border: #dce4d8;
+}
+
+.member-project-task-group.project-tone-1,
+.focus-project-group.project-tone-1 {
+  --project-accent: #2f7f75;
+  --project-accent-rgb: 47, 127, 117;
+  --project-border: #d5e2df;
+}
+
+.member-project-task-group.project-tone-2,
+.focus-project-group.project-tone-2 {
+  --project-accent: #536f91;
+  --project-accent-rgb: 83, 111, 145;
+  --project-border: #d9e0e8;
+}
+
+.member-project-task-group.project-tone-3,
+.focus-project-group.project-tone-3 {
+  --project-accent: #8d6f3d;
+  --project-accent-rgb: 141, 111, 61;
+  --project-border: #e5dccb;
+}
+
+.member-project-task-group.project-tone-4,
+.focus-project-group.project-tone-4 {
+  --project-accent: #756b94;
+  --project-accent-rgb: 117, 107, 148;
+  --project-border: #dfdce8;
+}
+
+.member-project-task-group.project-tone-5,
+.focus-project-group.project-tone-5 {
+  --project-accent: #9c665f;
+  --project-accent-rgb: 156, 102, 95;
+  --project-border: #e6d7d4;
+}
+
+.member-project-task-group.project-tone-6,
+.focus-project-group.project-tone-6 {
+  --project-accent: #677c5d;
+  --project-accent-rgb: 103, 124, 93;
+  --project-border: #dce4d8;
+}
+
+.coach-steps,
+.suggestion-list {
+  display: grid;
+  gap: 10px;
+}
+
+.coach-step,
+.suggestion-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.coach-step > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #1f756b;
+  background: #d8ece6;
+}
+
+.coach-step.done {
+  opacity: 0.72;
+}
+
+.coach-step p,
+.suggestion-item span {
+  margin: 3px 0 0;
+  color: #667074;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pressure-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #e4f1ef;
+}
+
+.pressure-card strong {
+  color: #12423d;
+  font-size: 22px;
+}
+
+.pressure-overloaded .pressure-card {
+  background: #fff0e3;
+}
+
+.pressure-overloaded .pressure-card strong {
+  color: #8b3d2e;
+}
+
+.plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  color: #667074;
+}

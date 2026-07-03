@@ -1,0 +1,166 @@
+.progress-signal-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.signal-summary-chip {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #e2d8ca;
+  border-radius: 8px;
+  color: #5f6b70;
+  background: #fffdfa;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.signal-summary-chip strong {
+  color: #263236;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.signal-summary-chip.attention {
+  border-color: #eccb9a;
+  color: #7a4b13;
+  background: #fff7e7;
+}
+
+.signal-summary-chip.normal {
+  border-color: #cfe6df;
+  color: #1f625a;
+  background: #f0faf7;
+}
+
+.progress-signal-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.signal-attention-panel {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fbfaf6;
+  min-height: 0;
+}
+
+.signal-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.signal-panel-heading > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.signal-panel-heading strong {
+  color: #263236;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+.signal-panel-heading span {
+  color: #667074;
+  font-size: 12px;
+}
+
+.signal-panel-heading > span {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #174d49;
+  background: #dff3ef;
+  font-weight: 900;
+}
+
+.signal-task-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 8px;
+}
+
+.signal-task-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid #ebe2d6;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.signal-task-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.signal-task-row strong {
+  overflow: hidden;
+  color: #263236;
+  font-size: 14px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-task-row span:not(.signal-kind-badge),
+.signal-task-row p {
+  color: #667074;
+  font-size: 12px;
+}
+
+.signal-task-row p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signal-kind-badge {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #7a4b13;
+  background: #f7e4c1;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.signal-task-pending_review .signal-kind-badge {
+  color: #15443f;
+  background: #d8ece6;
+}
+
+.signal-task-row .signal-kind-badge {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  width: max-content;
+}
+
+.signal-task-blocked .signal-kind-badge,
+.signal-task-stalled .signal-kind-badge {
+  color: #8b3d2e;
+  background: #ffe5d9;
+}

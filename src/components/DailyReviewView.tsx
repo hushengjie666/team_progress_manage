@@ -8,7 +8,6 @@ export function DailyReviewView(props: {
   state: AppState;
   todayPlan: DailyPlan;
   capacityHint: number;
-  updateReflection: (reflection: string) => void;
   updateReview: (patch: Partial<DailyPlan["review"]>) => void;
   completeReview: () => void;
 }) {
@@ -76,9 +75,6 @@ export function DailyReviewView(props: {
           <button className="primary-button" onClick={props.completeReview}>
             <Check size={16} />
             完成回顾并生成明日建议
-          </button>
-          <button className="secondary-button" onClick={() => props.updateReflection(props.todayPlan.review.wins)}>
-            同步到旧总结
           </button>
         </div>
         <p className="muted">

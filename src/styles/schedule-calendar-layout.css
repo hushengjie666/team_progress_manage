@@ -1,0 +1,20 @@
+.schedule-calendar-layout {
+  display: grid;
+  gap: 18px;
+}
+
+.schedule-calendar-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.schedule-calendar-toolbar.embedded {
+  padding: 0 0 4px;
+}
+
+.project-schedule-panel {
+  display: grid;
+  gap: 14px;
+}

@@ -1,0 +1,89 @@
+.progress-board {
+  grid-column: 1 / -1;
+}
+
+.board-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.board-summary div {
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fffdfa;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.board-summary span,
+.board-section-heading span,
+.board-task span,
+.board-task p {
+  color: #667074;
+  font-size: 12px;
+}
+
+.board-summary strong {
+  color: #1f9d8a;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.board-section-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.board-section {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.board-section-normal {
+  background: #f7faf9;
+}
+
+.board-section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.board-task {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ebe2d6;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.board-task + .board-task {
+  margin-top: 8px;
+}
+
+.board-task div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.board-task strong {
+  overflow-wrap: anywhere;
+}
+
+.board-task p {
+  margin: 0;
+}

@@ -12,17 +12,12 @@ const mocks = vi.hoisted(() => ({
   playTimerSound: vi.fn(),
   sendTimerNotification: vi.fn(),
   startWhiteNoise: vi.fn(),
-  updateDesktopTimerPresence: vi.fn(),
 }));
 
 vi.mock("./notifications", () => ({
   playTimerSound: mocks.playTimerSound,
   sendTimerNotification: mocks.sendTimerNotification,
   startWhiteNoise: mocks.startWhiteNoise,
-}));
-
-vi.mock("./nativeDesktop", () => ({
-  updateDesktopTimerPresence: mocks.updateDesktopTimerPresence,
 }));
 
 const activeTimer = (): ActiveTimer => ({
@@ -36,7 +31,6 @@ const activeTimer = (): ActiveTimer => ({
   plannedEndAt: "2026-07-01T07:55:00.000Z",
   totalPausedSeconds: 0,
   cycleIndex: 1,
-  strictStarted: false,
 });
 
 const stateWithDueTask = (): AppState => {
@@ -77,6 +71,7 @@ const stateWithDueTask = (): AppState => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("timer runtime", () => {
@@ -134,9 +129,11 @@ describe("timer runtime", () => {
     expect(ref.current).toBe(stopNext);
   });
 
-  it("updates desktop timer presence from the active timer", () => {
+  it("updates the document title from the active timer", () => {
+    vi.stubGlobal("document", { title: "" });
+
     updateActiveTimerPresence(activeTimer());
 
-    expect(mocks.updateDesktopTimerPresence).toHaveBeenCalledWith(true, "01:00 · 专注番茄 · TimeManage");
+    expect(document.title).toBe("01:00 · 专注番茄 · TimeManage");
   });
 });

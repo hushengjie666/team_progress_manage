@@ -73,10 +73,10 @@ const withAdminToken = (state: AppState): AppState => ({
   },
 });
 
-const createRuntimeHarness = (initial: AppState | null) => {
+const createRuntimeHarness = (initial: AppState | null, initialPlatformAccounts: Account[] = []) => {
   let current = initial;
   let toast = "";
-  let platformAccounts: Account[] = [];
+  let platformAccounts: Account[] = initialPlatformAccounts;
   let invitationCount = 0;
   let projectInvitationCount = 0;
   const runtime = createWorkspaceAccountRuntime({
@@ -90,6 +90,7 @@ const createRuntimeHarness = (initial: AppState | null) => {
     setPlatformAccounts: (accounts) => {
       platformAccounts = accounts;
     },
+    getPlatformAccounts: () => platformAccounts,
     setWorkspaceInvitations: (invitations) => {
       invitationCount = invitations.length;
     },
@@ -152,7 +153,7 @@ describe("workspace account runtime", () => {
   });
 
   it("normalizes invitation email before sending", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ invitation: { ...serverInvitation, invitee_email: "bob@example.com" } }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -171,7 +172,7 @@ describe("workspace account runtime", () => {
   });
 
   it("normalizes project invitation email before sending", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ invitation: { ...serverProjectInvitation, invitee_email: "bob@example.com" } }), {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -189,6 +190,41 @@ describe("workspace account runtime", () => {
       email: "bob@example.com",
       roles: ["executor"],
     });
+  });
+
+  it("creates platform accounts through the runtime and refreshes the account list", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/admin/accounts") && init?.method === "POST") {
+        return new Response(JSON.stringify({ account: serverAccount }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.endsWith("/admin/accounts")) {
+        return new Response(JSON.stringify({ accounts: [serverAccount] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), {
+        status: 404,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getPlatformAccounts, getToast } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    runtime.createPlatformAccount(" Alice ", " Alice@Example.COM ", "secret");
+    await vi.waitFor(() => expect(getToast()).toBe("平台账号已创建，可在工作区或项目中授权使用"));
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body ?? ""))).toMatchObject({
+      name: "Alice",
+      email: "alice@example.com",
+      password: "secret",
+      status: "active",
+    });
+    expect(getPlatformAccounts()[0]?.email).toBe("alice@example.com");
   });
 
   it("reports workspace update failures through the runtime interface", async () => {

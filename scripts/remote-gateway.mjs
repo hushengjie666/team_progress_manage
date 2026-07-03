@@ -5,9 +5,18 @@ import { extname, join, normalize, resolve, sep } from "node:path";
 const rootDir = resolve(process.env.TM_FRONTEND_DIR ?? join(process.cwd(), "dist"));
 const listenHost = process.env.TM_REMOTE_HOST ?? "127.0.0.1";
 const listenPort = Number(process.env.TM_REMOTE_PORT ?? 1422);
-const syncTarget = new URL(process.env.TM_SYNC_TARGET ?? "http://127.0.0.1:8787");
+const backendTarget = new URL(process.env.TM_BACKEND_TARGET ?? "http://127.0.0.1:8787");
 
-const apiPrefixes = ["/health", "/auth/", "/sync/", "/team/", "/members"];
+const apiPrefixes = [
+  "/health",
+  "/auth/",
+  "/admin/",
+  "/workspaces",
+  "/workspace-invitations",
+  "/project-invitations",
+  "/members",
+  "/team/",
+];
 const mimeTypes = new Map([
   [".html", "text/html; charset=utf-8"],
   [".js", "text/javascript; charset=utf-8"],
@@ -40,18 +49,18 @@ const resolveStaticPath = (requestUrl) => {
   return join(rootDir, "index.html");
 };
 
-const proxyToSync = (clientRequest, clientResponse) => {
-  const upstreamUrl = new URL(clientRequest.url ?? "/", syncTarget);
+const proxyToBackend = (clientRequest, clientResponse) => {
+  const upstreamUrl = new URL(clientRequest.url ?? "/", backendTarget);
   const upstreamRequest = httpRequest(
     {
-      protocol: syncTarget.protocol,
-      hostname: syncTarget.hostname,
-      port: syncTarget.port,
+      protocol: backendTarget.protocol,
+      hostname: backendTarget.hostname,
+      port: backendTarget.port,
       method: clientRequest.method,
       path: `${upstreamUrl.pathname}${upstreamUrl.search}`,
       headers: {
         ...clientRequest.headers,
-        host: syncTarget.host,
+        host: backendTarget.host,
       },
     },
     (upstreamResponse) => {
@@ -61,7 +70,7 @@ const proxyToSync = (clientRequest, clientResponse) => {
   );
   upstreamRequest.on("error", (error) => {
     clientResponse.writeHead(502, { "content-type": "application/json; charset=utf-8" });
-    clientResponse.end(JSON.stringify({ error: `sync proxy failed: ${error.message}` }));
+    clientResponse.end(JSON.stringify({ error: `backend proxy failed: ${error.message}` }));
   });
   clientRequest.pipe(upstreamRequest);
 };
@@ -73,7 +82,7 @@ const server = createServer((request, response) => {
     return;
   }
   if (isApiRequest(new URL(request.url, "http://local").pathname)) {
-    proxyToSync(request, response);
+    proxyToBackend(request, response);
     return;
   }
   sendStatic(response, resolveStaticPath(request.url));
@@ -82,5 +91,5 @@ const server = createServer((request, response) => {
 server.listen(listenPort, listenHost, () => {
   console.log(`TimeManage remote gateway: http://${listenHost}:${listenPort}`);
   console.log(`Static root: ${rootDir}`);
-  console.log(`Sync target: ${syncTarget.toString()}`);
+  console.log(`Backend target: ${backendTarget.toString()}`);
 });

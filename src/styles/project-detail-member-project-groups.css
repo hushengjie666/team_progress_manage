@@ -1,0 +1,97 @@
+.member-project-task-group {
+  --project-accent: #1f9d8a;
+  --project-accent-rgb: 31, 157, 138;
+  --project-border: #b9ded6;
+  display: grid;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.member-project-task-heading {
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 2px 4px;
+  border-bottom: 1px solid #ebe4da;
+}
+
+.member-project-task-heading::before {
+  content: "";
+  width: 5px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--project-accent);
+}
+
+.member-project-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-project-task-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #2d3639;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-project-workspace,
+.member-project-role {
+  flex: 0 0 auto;
+  min-height: 21px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 116px;
+  padding: 0 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.member-project-workspace {
+  border: 1px solid #d8d0c4;
+  border-radius: 999px;
+  color: #4f5b5d;
+  background: #f7f3ec;
+}
+
+.member-project-role {
+  border: 1px solid rgba(var(--project-accent-rgb), 0.2);
+  border-radius: 999px;
+  color: var(--project-accent);
+  background: rgba(var(--project-accent-rgb), 0.06);
+}
+
+.member-project-count {
+  min-width: 22px;
+  min-height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--project-accent);
+  border: 1px solid rgba(var(--project-accent-rgb), 0.2);
+  background: rgba(var(--project-accent-rgb), 0.07);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.member-project-task-list {
+  display: grid;
+  gap: 7px;
+}

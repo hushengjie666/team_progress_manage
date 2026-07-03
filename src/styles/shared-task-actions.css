@@ -1,0 +1,216 @@
+.task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-top: 5px;
+  color: #7d8588;
+  font-size: 12px;
+}
+
+.running-task {
+  border-color: #8acfc3;
+  background: #f3faf8;
+  box-shadow: 0 12px 26px rgba(31, 157, 138, 0.08);
+}
+
+.running-task::before {
+  width: 4px;
+  background: #1f9d8a;
+}
+
+.running-pill {
+  min-height: 21px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border-radius: 7px;
+  color: #17675d;
+  background: #dff3ef;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.task-state-chip {
+  min-height: 21px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid #d7e4df;
+  border-radius: 7px;
+  color: #355b57;
+  background: #f4faf8;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.task-state-chip.review-state {
+  color: #7a4b13;
+  border-color: #efcf91;
+  background: #fff3d6;
+  box-shadow: inset 3px 0 0 #d99428;
+}
+
+.priority {
+  flex: 0 0 auto;
+  min-height: 20px;
+  min-width: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.priority-low {
+  color: #456169;
+  background: #e7edf0;
+}
+
+.priority-medium {
+  color: #585335;
+  background: #f0e8bd;
+}
+
+.priority-high {
+  color: #6d3f2a;
+  background: #f2d8bd;
+}
+
+.priority-urgent {
+  color: #763139;
+  background: #f0c8ce;
+}
+
+.task-actions {
+  --task-action-height: 36px;
+  --task-action-icon-size: 30px;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-items: end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-actions .small-button {
+  flex: 0 0 auto;
+  height: var(--task-action-height);
+  min-height: var(--task-action-height);
+  gap: 5px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.task-actions .icon-button.small {
+  width: var(--task-action-icon-size);
+  min-width: var(--task-action-icon-size);
+  height: var(--task-action-icon-size);
+  min-height: var(--task-action-icon-size);
+  border-radius: 6px;
+}
+
+.task-actions .icon-button.small:not(.danger) {
+  color: #5f6d70;
+  background: transparent;
+  box-shadow: none;
+}
+
+.task-actions .icon-button.small:not(.danger):hover {
+  color: #17675d;
+  background: #edf7f4;
+}
+
+.task-actions .icon-button.small.danger {
+  color: #a65545;
+  background: transparent;
+  box-shadow: none;
+}
+
+.task-actions .icon-button.small.danger:hover {
+  color: #8b3d2e;
+  background: #fae9e2;
+}
+
+.task-primary-actions,
+.task-secondary-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.task-primary-actions .small-button {
+  width: 92px;
+  justify-content: center;
+}
+
+.task-secondary-actions {
+  height: var(--task-action-height);
+  min-height: var(--task-action-height);
+  padding: 2px;
+  border: 1px solid #e2dbd1;
+  border-radius: 8px;
+  background: rgba(248, 245, 239, 0.78);
+  opacity: 0.82;
+  transform: none;
+  transition: opacity 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.task-item:hover .task-secondary-actions,
+.task-item:focus-within .task-secondary-actions {
+  opacity: 1;
+  border-color: #d5cec2;
+  background: rgba(255, 253, 249, 0.96);
+}
+
+.task-primary-action {
+  color: #203936;
+  border-color: #bdd7d0;
+  background: linear-gradient(180deg, #ffffff 0%, #f6fbf9 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.task-primary-action:hover {
+  color: #17675d;
+  border-color: #9ed4c9;
+  background: #effaf7;
+}
+
+.active-action {
+  color: #17675d;
+  border-color: #bfe2db;
+  background: #dff3ef;
+  cursor: default;
+}
+
+.completed-action {
+  color: #17785f;
+  border-color: #b9dfd3;
+  background: #eaf8f3;
+}
+
+.active-action-icon {
+  animation: active-action-pulse 1.15s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes active-action-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: translateY(0) scale(0.96);
+  }
+
+  45% {
+    opacity: 1;
+    transform: translateY(-1px) scale(1.08);
+  }
+}

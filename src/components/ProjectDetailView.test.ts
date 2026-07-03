@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stageTaskCardClassName, stageTaskSortRank, stageTaskStatePills, stageTaskStatusLabel } from "./ProjectDetailView";
+import { stageTaskCardClassName, stageTaskSortRank, stageTaskStatePills, stageTaskStatusLabel } from "../projectTaskDisplay";
 
 describe("stageTaskStatusLabel", () => {
   it("labels in-progress lifecycle as started", () => {

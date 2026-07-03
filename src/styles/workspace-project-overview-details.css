@@ -1,0 +1,236 @@
+.project-overview-create-icon {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #cde2dc;
+  border-radius: 8px;
+  color: #1f9d8a;
+  background: #f7fcfb;
+}
+
+.project-overview-create-card span:last-child {
+  display: grid;
+  gap: 5px;
+}
+
+.project-overview-create-card strong {
+  color: #263236;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.project-overview-create-card small {
+  color: #667074;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.project-overview-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.project-overview-card-header h2 {
+  margin: 4px 0 0;
+  color: #263236;
+  font-size: 20px;
+  letter-spacing: 0;
+  line-height: 1.22;
+}
+
+.project-overview-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-overview-title-line > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.workspace-source-badge {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid rgba(31, 157, 138, 0.18);
+  border-radius: 999px;
+  background: rgba(31, 157, 138, 0.08);
+  color: #2f6860;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview-card-header p:not(.eyebrow) {
+  margin: 6px 0 0;
+  color: #667074;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.project-overview-progress-inline {
+  min-width: 66px;
+  min-height: 50px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border: 1px solid #cde2dc;
+  border-radius: 8px;
+  background: #f7fcfb;
+}
+
+.project-overview-progress-inline strong {
+  color: #1f9d8a;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.project-overview-progress-inline span {
+  color: #667074;
+  font-size: 11px;
+}
+
+.project-overview-meter {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eee7dc;
+}
+
+.project-overview-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1f9d8a, #8acfc3);
+}
+
+.project-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.project-overview-metrics div {
+  min-height: 48px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  padding: 7px 9px;
+  border: 1px solid #e3dacd;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.project-overview-metrics span,
+.project-status-pill span,
+.project-overview-signal span {
+  color: #667074;
+  font-size: 12px;
+}
+
+.project-overview-metrics strong {
+  color: #263236;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.project-overview-metrics .metric-warning {
+  border-color: #f0d3a4;
+  background: #fff7e9;
+}
+
+.project-overview-metrics .metric-danger {
+  border-color: #efc2b0;
+  background: #fff2ed;
+}
+
+.project-overview-metrics .metric-strong strong {
+  font-size: 22px;
+}
+
+.project-overview-metrics .metric-warning strong {
+  color: #b87822;
+}
+
+.project-overview-metrics .metric-danger strong {
+  color: #b6543d;
+}
+
+.project-status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-status-pill {
+  min-width: 0;
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #e4dbcf;
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.project-status-pill strong {
+  color: #263236;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.project-status-pill.status-in_progress,
+.project-status-pill.status-pending_review {
+  border-color: #d7e7e2;
+  background: #f5fbfa;
+}
+
+.project-status-pill.status-pending_review strong {
+  color: #b87822;
+}
+
+.project-overview-signal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-overview-signal span {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: #f4f1eb;
+}
+
+.project-overview-signal .signal-warning {
+  color: #8b5b1f;
+  background: #fff0d2;
+}
+
+.project-overview-signal .signal-live {
+  color: #1f6b61;
+  background: #e7f4f1;
+}
+
+.project-overview-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 0;
+  margin-top: 2px;
+}

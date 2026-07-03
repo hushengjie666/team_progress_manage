@@ -1,0 +1,36 @@
+.app-shell {
+  min-height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #f0b35a;
+  color: #20343d;
+}
+
+.brand strong,
+.brand span {
+  display: block;
+}
+
+.brand span {
+  margin-top: 2px;
+  color: #667074;
+  font-size: 13px;
+}
+
+.main-panel {
+  min-width: 0;
+  padding: 24px;
+}

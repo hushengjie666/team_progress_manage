@@ -1,13 +1,13 @@
-import { flattenStateToChanges, loginToWorkspace, syncAppState } from "./sync";
 import type { AppState, SyncDiagnosticResult, SyncDiagnosticStep } from "./types";
-
-const apiUrl = (serverUrl: string, path: string) => `${serverUrl.replace(/\/+$/, "")}${path}`;
-
-const timed = async <T>(runner: () => Promise<T>) => {
-  const start = performance.now();
-  const result = await runner();
-  return { result, latencyMs: Math.round(performance.now() - start) };
-};
+import {
+  runHealthDiagnosticStep,
+  runLoginDiagnosticStep,
+} from "./syncDiagnosticConnectionSteps";
+import {
+  runPullDiagnosticStep,
+  runPushDiagnosticStep,
+  unauthenticatedTeamDiagnosticSteps,
+} from "./syncDiagnosticTeamSteps";
 
 export const deploymentCommands = (serverUrl: string) => {
   const normalized = serverUrl.replace(/\/+$/, "");
@@ -34,70 +34,27 @@ export async function runSyncDiagnostics(state: AppState, password?: string): Pr
   let workingState = state;
   let lastError: string | undefined;
 
-  try {
-    const { latencyMs } = await timed(async () => {
-      const response = await fetch(apiUrl(state.sync.serverUrl, "/health"));
-      if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
-      return response.text();
-    });
-    steps.push({ id: "health", label: "健康检查", ok: true, latencyMs, detail: "团队后台 /health 可访问。" });
-  } catch (error) {
-    lastError = error instanceof Error ? error.message : "健康检查失败";
-    steps.push({ id: "health", label: "健康检查", ok: false, detail: lastError });
-  }
+  const health = await runHealthDiagnosticStep(state);
+  steps.push(health.step);
+  lastError = health.lastError ?? lastError;
 
-  if (password && state.sync.username) {
-    try {
-      const loginResult = await timed(() => loginToWorkspace(workingState.sync, workingState.sync.username, password));
-      workingState = {
-        ...workingState,
-        auth: {
-          status: "authenticated",
-          token: loginResult.result.token,
-          expiresAt: loginResult.result.expiresAt,
-          account: loginResult.result.account,
-          workspace: loginResult.result.workspace,
-          bootstrapped: true,
-          message: "诊断登录成功",
-        },
-        sync: { ...workingState.sync, enabled: true, token: loginResult.result.token, username: loginResult.result.account.email },
-      };
-      steps.push({ id: "login", label: "登录", ok: true, latencyMs: loginResult.latencyMs, detail: "账号可登录，Token 已刷新。" });
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "登录失败";
-      steps.push({ id: "login", label: "登录", ok: false, detail: lastError });
-    }
-  } else {
-    steps.push({ id: "login", label: "登录", ok: Boolean(state.auth.token ?? state.sync.token), detail: state.auth.token || state.sync.token ? "已有 Token。" : "未提供密码，跳过登录。" });
-  }
+  const login = await runLoginDiagnosticStep(state, workingState, password);
+  steps.push(login.step);
+  workingState = login.state ?? workingState;
+  lastError = login.lastError ?? lastError;
 
-  if (workingState.auth.token ?? workingState.sync.token) {
-    try {
-      const changes = flattenStateToChanges(workingState).length;
-      const syncResult = await timed(() => syncAppState(workingState));
-      workingState = syncResult.result;
-      steps.push({
-        id: "push",
-        label: "Push",
-        ok: true,
-        latencyMs: syncResult.latencyMs,
-        detail: `已尝试推送 ${changes} 条实体快照。`,
-      });
-      steps.push({
-        id: "pull",
-        label: "Pull",
-        ok: true,
-        latencyMs: syncResult.latencyMs,
-        detail: `远端 revision ${workingState.sync.lastPulledRevision}，冲突 ${workingState.sync.conflictCount} 个。`,
-      });
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "推拉同步失败";
-      steps.push({ id: "push", label: "Push", ok: false, detail: lastError });
-      steps.push({ id: "pull", label: "Pull", ok: false, detail: "Push 未通过，跳过 Pull 验证。" });
-    }
+  const token = workingState.auth.token ?? workingState.sync.token;
+  if (token) {
+    const push = await runPushDiagnosticStep(workingState, token);
+    steps.push(push.step);
+    lastError = push.lastError ?? lastError;
+
+    const pull = await runPullDiagnosticStep(workingState, token);
+    steps.push(pull.step);
+    workingState = pull.state ?? workingState;
+    lastError = pull.lastError ?? lastError;
   } else {
-    steps.push({ id: "push", label: "Push", ok: false, detail: "未登录，无法推送。" });
-    steps.push({ id: "pull", label: "Pull", ok: false, detail: "未登录，无法拉取。" });
+    steps.push(...unauthenticatedTeamDiagnosticSteps());
   }
 
   return {
@@ -106,7 +63,6 @@ export async function runSyncDiagnostics(state: AppState, password?: string): Pr
       checkedAt,
       serverUrl: state.sync.serverUrl,
       remoteRevision: workingState.sync.lastPulledRevision,
-      conflictCount: workingState.sync.conflictCount,
       lastError,
       steps,
     },

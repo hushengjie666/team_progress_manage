@@ -1,0 +1,59 @@
+@media (max-width: 1180px) {
+  .calendar-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 820px) {
+  .bar-chart {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 6px;
+    overflow: hidden;
+  }
+
+  .bar-item small,
+  .estimate-day small {
+    max-width: 18px;
+    font-size: 10px;
+    writing-mode: vertical-rl;
+  }
+
+  .estimate-bars {
+    grid-template-columns: repeat(14, minmax(0, 1fr));
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .metric-row,
+  .review-summary-grid,
+  .distribution-grid,
+  .reward-grid,
+  .review-stats,
+  .calendar-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-week,
+  .calendar-month {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .review-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .next-action-item,
+  .hotspot-item,
+  .schedule-box {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .calendar-week,
+  .calendar-month,
+  .template-editor,
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+}

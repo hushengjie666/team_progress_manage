@@ -2,11 +2,10 @@
 
 ## Project Structure & Module Organization
 
-TimeManage is a Vite + React + TypeScript app with a Tauri desktop shell and Go team backend service.
+TimeManage is a Vite + React + TypeScript web app with a Go team backend service.
 
 - `src/`: React UI, domain logic, storage, sync, notifications, and styles.
 - `src/components/`: feature views and shared UI components.
-- `src-tauri/`: Rust/Tauri desktop application, permissions, icons, and build output.
 - `sync-server/`: Go HTTP team backend service, service installers, and example config.
 - `tests/e2e/`: Playwright end-to-end tests.
 - `dist/`: generated frontend output.
@@ -18,8 +17,19 @@ Keep routine changes scoped so Codex does not exhaust context on generated outpu
 
 - Use CodeGraph first when locating code or planning edits in this indexed repo.
 - Do not read all of `src/App.tsx` unless the task is explicitly changing the app shell or migrating logic out of it; ask CodeGraph for the relevant symbol or line range first.
-- Do not use `src-tauri/target`, `sync-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
+- Do not use `sync-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
 - When a test fails, summarize the failing test name, assertion, and relevant stack line instead of pasting full traces or large logs.
+
+## Codex Fast Path
+
+Optimize for narrow context and narrow verification on small tasks.
+
+- For a small bug fix or UI adjustment, inspect only the owning module, its direct callers, and its nearest tests/styles. Avoid broad `git diff`, all-file line counts, or whole-app reads unless the task crosses ownership boundaries.
+- Review only touched paths with commands such as `git diff -- <path>` or `git diff --stat -- <path>`. Use full-worktree status only to detect unrelated dirty state, not as routine review context.
+- Prefer targeted checks first: run the nearest Vitest file, `npm run typecheck`, or the relevant backend package test before escalating to full verification.
+- Run `npm run verify:fast` when TypeScript contracts, shared state, imports, or frontend build output may be affected. Run `npm run verify:e2e` only for navigation, storage flows, timers, settings, sync UI, or browser workflow changes.
+- If the worktree is already large or dirty, do not re-audit unrelated changes. State the touched files explicitly and keep all exploration, edits, and validation scoped to the requested task.
+- Do not continue splitting files only to reduce line count once files are under roughly 250 lines and have a single clear reason to change.
 
 ## Frontend Module Map
 
@@ -30,10 +40,10 @@ Start with the smallest module that owns the product concept before opening app-
 - Project Overview cards and my project filters: `src/projectOverview.ts`, `src/components/workspace/ProjectOverviewCardsPanel.tsx`, `src/components/workspace/MyProjectTaskFilterPanel.tsx`, and `src/projectOverview.test.ts`.
 - Progress Board: `src/progressBoard.ts` and `src/progressBoard.test.ts`.
 - Recurring tasks: `src/recurrence.ts` and `src/recurrence.test.ts`.
-- App boot and app shell wiring: `src/appBootRuntime.ts`, `src/keyboardRuntime.ts`, `src/dataPortabilityRuntime.ts`, and `src/conflictResolutionModel.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
+- App boot and app shell wiring: `src/appBootRuntime.ts`, `src/keyboardRuntime.ts`, and `src/dataPortabilityRuntime.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
 - Workspace accounts and invitations: `src/workspaceAccountRuntime.ts` before touching login/session, platform accounts, workspace invitations, or workspace update flows.
-- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/syncRequestRuntime.ts`, `src/syncRuntime.ts`, and `src/timerRuntime.ts`.
-- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsWorkspacesPanel.tsx`, `SettingsProjectsPanel.tsx`, `SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsFocusPanel.tsx`, `SettingsSyncPanel.tsx`, `SettingsDataPanel.tsx`, `SettingsSystemPanel.tsx`, or `SettingsDemoPanel.tsx`.
+- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/teamApi.ts`, and `src/timerRuntime.ts`.
+- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsSyncPanel.tsx`, `SettingsDataPanel.tsx`, or `SettingsDemoPanel.tsx`.
 - Test setup data: use `src/test/fixtures.ts` instead of copying full `AppState` literals.
 
 ## Frontend Scope
@@ -45,6 +55,7 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm install`: install dependencies.
 - `npm run dev`: start Vite at `http://127.0.0.1:1420/`.
 - `npm run build`: type-check and build the frontend.
+- `npm run typecheck`: run the frontend TypeScript check without building assets.
 - `npm run preview`: serve the built frontend at `http://127.0.0.1:1421/`.
 - `npm run verify:fast`: run unit tests and the frontend build for common frontend changes.
 - `npm run verify:e2e`: run the Playwright end-to-end suite.
@@ -52,11 +63,9 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm test`: run Vitest unit tests.
 - `npm run test:e2e`: run Playwright tests.
 - `npm run backend:build`: build the Go backend binary into `sync-server/bin/`.
+- `npm run backend:build:windows`: build the Windows Go backend binary into `sync-server/bin/`.
 - `npm run backend:server`: start the local backend service.
-- `npm run sync:build`: legacy alias for building the Go backend binary.
-- `npm run sync:server`: legacy alias for starting the local backend service.
 - `npm run deploy:team`: build the `/timemanage-team/` frontend, build a Windows Server 2008 compatible backend, and create `deploy/timemanageTeam-no-root.zip`.
-- `npm run tauri dev`: run the desktop app in development mode.
 
 ## Coding Style & Naming Conventions
 
@@ -80,13 +89,13 @@ Prefer modular development with high cohesion, low coupling, and clear ownership
 
 Vitest is used for unit tests; Playwright is used for browser workflows. Place unit tests next to the module under test using `*.test.ts`, for example `src/domain.test.ts`. Place end-to-end scenarios in `tests/e2e/*.spec.ts`.
 
-Run `npm test` before committing logic changes. Run `npm run test:e2e` when changing navigation, storage flows, timers, settings, or sync UI.
+For small changes, run the nearest target test first, for example `npm test -- progressBoard.test.ts`, then add `npm run typecheck` when shared TypeScript contracts are involved. Run `npm test` or `npm run verify:fast` before committing broader logic changes. Run `npm run test:e2e` when changing navigation, storage flows, timers, settings, or sync UI.
 
 ## Commit & Pull Request Guidelines
 
 This checkout does not include Git metadata, so no repository-specific commit history is available. Use concise imperative commit messages, for example `Add sync conflict diagnostics` or `Fix focus timer reset`.
 
-Pull requests should include a short summary, test results, and screenshots for visible UI changes. Mention any sync-server, Tauri permission, or local-storage migration impact.
+Pull requests should include a short summary, test results, and screenshots for visible UI changes. Mention any sync-server or local-storage migration impact.
 
 ## Security & Configuration Tips
 
