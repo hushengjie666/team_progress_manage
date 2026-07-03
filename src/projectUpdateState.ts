@@ -8,22 +8,6 @@ export function updateProjectInState(state: AppState, project: Project, timestam
   const nextWorkspaceId = project.workspaceId;
   const workspaceChanged = Boolean(existingProject && previousWorkspaceId !== nextWorkspaceId);
   const projectTaskIds = new Set(state.tasks.filter((task) => task.projectId === project.id).map((task) => task.id));
-  const movedProjectMemberIds = state.projectMembers.filter((member) => member.projectId === project.id).map((member) => member.id);
-  const movedWorkSessionIds = state.workSessions.filter((session) => projectTaskIds.has(session.taskId)).map((session) => session.id);
-  const movedExecutionSignalIds = state.executionSignals.filter((signal) => projectTaskIds.has(signal.taskId)).map((signal) => signal.id);
-  const movedFocusSessionIds = state.focusSessions.filter((session) => session.taskId && projectTaskIds.has(session.taskId)).map((session) => session.id);
-  const movedInterruptionIds = state.interruptions.filter((interruption) => interruption.taskId && projectTaskIds.has(interruption.taskId)).map((interruption) => interruption.id);
-  const movedEntityTombstones = workspaceChanged && previousWorkspaceId
-    ? [
-        { entity: "project" as const, id: project.id, workspaceId: previousWorkspaceId, deletedAt: timestamp },
-        ...Array.from(projectTaskIds).map((id) => ({ entity: "task" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-        ...movedProjectMemberIds.map((id) => ({ entity: "project_member" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-        ...movedWorkSessionIds.map((id) => ({ entity: "work_session" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-        ...movedExecutionSignalIds.map((id) => ({ entity: "execution_signal" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-        ...movedFocusSessionIds.map((id) => ({ entity: "focus_session" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-        ...movedInterruptionIds.map((id) => ({ entity: "interruption" as const, id, workspaceId: previousWorkspaceId, deletedAt: timestamp })),
-      ]
-    : [];
   return {
     ...state,
     projects: state.projects.map((item) => (item.id === project.id ? { ...project, updatedAt: timestamp } : item)),
@@ -73,13 +57,6 @@ export function updateProjectInState(state: AppState, project: Project, timestam
         ? { ...interruption, workspaceId: nextWorkspaceId }
         : interruption,
     ),
-    sync: {
-      ...state.sync,
-      tombstones: [
-        ...(state.sync.tombstones ?? []),
-        ...movedEntityTombstones,
-      ],
-    },
     updatedAt: timestamp,
   };
 }

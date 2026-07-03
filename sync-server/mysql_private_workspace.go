@@ -15,7 +15,6 @@ func mysqlEnsurePrivateWorkspaceForAccount(ctx context.Context, tx *sql.Tx, acco
 		Name:           account.Name + "的私人工作区",
 		Type:           "private",
 		OwnerAccountID: account.ID,
-		Rows:           map[string]syncRow{},
 		CreatedAt:      account.CreatedAt,
 		UpdatedAt:      now,
 	}

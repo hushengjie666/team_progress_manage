@@ -8,10 +8,6 @@ import (
 
 func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 	statements := []string{
-		`CREATE TABLE IF NOT EXISTS sync_meta (
-			key_name VARCHAR(64) NOT NULL PRIMARY KEY,
-			value_bigint BIGINT NOT NULL
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE IF NOT EXISTS workspaces (
 			id VARCHAR(128) NOT NULL PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
@@ -75,12 +71,10 @@ func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 			KEY idx_project_invitations_project (workspace_id, project_id, status),
 			KEY idx_project_invitations_lookup (workspace_id, project_id, invitee_account_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS team_projects (
+		`CREATE TABLE IF NOT EXISTS business_projects (
 			workspace_id VARCHAR(128) NOT NULL,
 			id VARCHAR(128) NOT NULL,
-			user_id VARCHAR(128) NULL,
 			account_id VARCHAR(128) NULL,
-			device_id VARCHAR(128) NOT NULL,
 			project_id VARCHAR(128) NULL,
 			task_id VARCHAR(128) NULL,
 			account_ref VARCHAR(128) NULL,
@@ -88,26 +82,23 @@ func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 			kind VARCHAR(64) NULL,
 			row_date VARCHAR(32) NULL,
 			updated_at VARCHAR(40) NOT NULL,
-			deleted_at VARCHAR(40) NULL,
-			version INT NOT NULL,
-			revision BIGINT NOT NULL,
 			payload JSON NOT NULL,
 			PRIMARY KEY (workspace_id, id),
-			KEY idx_team_projects_revision (workspace_id, revision),
-			KEY idx_team_projects_project (workspace_id, project_id),
-			KEY idx_team_projects_task (workspace_id, task_id),
-			KEY idx_team_projects_status (workspace_id, status)
+			KEY idx_business_projects_project (workspace_id, project_id),
+			KEY idx_business_projects_task (workspace_id, task_id),
+			KEY idx_business_projects_account (workspace_id, account_id),
+			KEY idx_business_projects_status (workspace_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-		`CREATE TABLE IF NOT EXISTS team_project_members LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_tasks LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_daily_plans LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_focus_sessions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_work_sessions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_execution_signals LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_interruptions LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_settings LIKE team_projects`,
-		`CREATE TABLE IF NOT EXISTS team_reward_state LIKE team_projects`,
-		`INSERT IGNORE INTO sync_meta (key_name, value_bigint) VALUES ('next_revision', 1)`,
+		`CREATE TABLE IF NOT EXISTS business_project_members LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_tasks LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_daily_plans LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_focus_sessions LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_work_sessions LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_execution_signals LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_interruptions LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_reward_state LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_task_templates LIKE business_projects`,
+		`CREATE TABLE IF NOT EXISTS business_template_instances LIKE business_projects`,
 	}
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {

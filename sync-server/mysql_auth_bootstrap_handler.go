@@ -40,10 +40,6 @@ func (a *app) handleBootstrapMySQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer mysqlRollback(tx)
-	if _, err := mysqlNextRevisionForUpdate(ctx, tx); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
 	count, err := mysqlAccountCount(ctx, tx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
@@ -71,7 +67,6 @@ func (a *app) handleBootstrapMySQL(w http.ResponseWriter, r *http.Request) {
 		Name:           workspaceName,
 		Type:           "private",
 		OwnerAccountID: accountID,
-		Rows:           map[string]syncRow{},
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

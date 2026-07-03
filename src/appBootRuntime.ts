@@ -6,15 +6,15 @@ import { defaultSyncServerUrl } from "./seed";
 import { loadState } from "./storage";
 import { fetchWorkspaces, getAuthStatus } from "./sync";
 import { shouldUseRemoteOriginForSync } from "./syncModel";
-import { loadTeamState } from "./teamApi";
-import type { PersistTeamChangesOptions } from "./teamStateRuntime";
+import { loadTeamBusinessState } from "./teamBusinessApi";
+import type { PersistBusinessChangesOptions } from "./teamStateRuntime";
 import type { Account, AppState, ProjectInvitation, WorkspaceInvitation } from "./types";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountRuntime";
 
-type PersistTeamChanges = (
+type PersistBusinessChanges = (
   before: AppState,
   after: AppState,
-  options?: PersistTeamChangesOptions,
+  options?: PersistBusinessChangesOptions,
 ) => Promise<AppState | undefined>;
 
 export type AppBootResult = {
@@ -26,7 +26,7 @@ export type AppBootResult = {
 };
 
 export type AppBootRuntimeOptions = {
-  persistTeamChanges: PersistTeamChanges;
+  persistBusinessChanges: PersistBusinessChanges;
 };
 
 const shouldLoadDemoData = () => {
@@ -38,7 +38,7 @@ const shouldLoadDemoData = () => {
   return shouldLoadDemo;
 };
 
-export async function loadInitialAppState({ persistTeamChanges }: AppBootRuntimeOptions): Promise<AppBootResult> {
+export async function loadInitialAppState({ persistBusinessChanges }: AppBootRuntimeOptions): Promise<AppBootResult> {
   const value = await loadState();
   const shouldLoadDemo = shouldLoadDemoData();
   let next = ensureTodayPlan(restoreTimerInState(value));
@@ -88,7 +88,7 @@ export async function loadInitialAppState({ persistTeamChanges }: AppBootRuntime
       // Cached workspace metadata is good enough for boot; team state loading is the critical path.
     }
     try {
-      next = await loadTeamState(next);
+      next = await loadTeamBusinessState(next);
     } catch (error) {
       next = applyTeamStateLoadFailure(next, error);
     }
@@ -100,7 +100,7 @@ export async function loadInitialAppState({ persistTeamChanges }: AppBootRuntime
 
   if (shouldLoadDemo && next.auth.status === "authenticated" && next.auth.token) {
     const demoState = ensureTodayPlan(mergeDemoDataIntoState(next, next.projects[0]?.id));
-    const saved = await persistTeamChanges(next, demoState, { applySuccessState: false, refreshAfterSave: true });
+    const saved = await persistBusinessChanges(next, demoState, { applySuccessState: false, refreshAfterSave: true });
     if (!saved) {
       return { platformAccounts, workspaceInvitations, projectInvitations };
     }

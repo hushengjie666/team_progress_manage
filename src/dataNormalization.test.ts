@@ -3,44 +3,73 @@ import { isCurrentAppStatePayload, parseCurrentAppStatePayload } from "./storage
 import { createInitialState } from "./test/fixtures";
 
 describe("current app state payload", () => {
-  it("accepts the complete current state shape", () => {
+  it("accepts the runtime cache shape without business data", () => {
     const state = createInitialState();
+    const payload = {
+      version: 3,
+      settings: state.settings,
+      auth: state.auth,
+      sync: {
+        serverUrl: state.sync.serverUrl,
+        username: state.sync.username,
+        deviceId: state.sync.deviceId,
+        token: state.sync.token,
+      },
+      updatedAt: state.updatedAt,
+    };
 
-    expect(isCurrentAppStatePayload(state)).toBe(true);
-    expect(parseCurrentAppStatePayload(state)).toEqual(state);
+    expect(isCurrentAppStatePayload(payload)).toBe(true);
+    expect(parseCurrentAppStatePayload(payload)).toMatchObject({
+      settings: state.settings,
+      auth: state.auth,
+      projects: expect.any(Array),
+      tasks: [],
+      dailyPlans: [],
+    });
   });
 
-  it("returns only the complete current state fields", () => {
+  it("does not restore business arrays from cached payloads", () => {
     const state = createInitialState();
-    const parsed = parseCurrentAppStatePayload({ ...state, obsoleteFeatureData: [{ id: "old" }] });
+    const parsed = parseCurrentAppStatePayload({
+      version: 3,
+      settings: state.settings,
+      auth: state.auth,
+      sync: {
+        serverUrl: state.sync.serverUrl,
+        username: state.sync.username,
+        deviceId: state.sync.deviceId,
+      },
+      projects: [{ id: "cached_project" }],
+      tasks: [{ id: "cached_task" }],
+      dailyPlans: [{ id: "cached_plan" }],
+      updatedAt: state.updatedAt,
+    });
 
-    expect(parsed).toEqual(state);
-    expect("obsoleteFeatureData" in parsed).toBe(false);
+    expect(parsed.projects).toEqual(createInitialState().projects);
+    expect(parsed.tasks).toEqual([]);
+    expect(parsed.dailyPlans).toEqual([]);
   });
 
   it("rejects unsupported schema versions instead of normalizing them", () => {
     const state = createInitialState();
-    const legacy = { ...state, version: state.version - 1 };
+    const legacy = { ...state, version: 2 };
 
     expect(isCurrentAppStatePayload(legacy)).toBe(false);
     expect(() => parseCurrentAppStatePayload(legacy)).toThrow("当前版本");
   });
 
-  it("rejects incomplete current-version payloads instead of backfilling fields", () => {
+  it("rejects runtime caches missing required auth", () => {
     const state = createInitialState();
-    const incomplete = { ...state };
-    delete (incomplete as Partial<typeof state>).tasks;
-
-    expect(isCurrentAppStatePayload(incomplete)).toBe(false);
-    expect(() => parseCurrentAppStatePayload(incomplete)).toThrow("完整");
-  });
-
-  it("rejects payloads missing required sync tombstones", () => {
-    const state = createInitialState();
-    const sync = { ...state.sync };
-    delete (sync as Partial<typeof sync>).tombstones;
-
-    const incomplete = { ...state, sync };
+    const incomplete = {
+      version: 3,
+      settings: state.settings,
+      sync: {
+        serverUrl: state.sync.serverUrl,
+        username: state.sync.username,
+        deviceId: state.sync.deviceId,
+      },
+      updatedAt: state.updatedAt,
+    };
 
     expect(isCurrentAppStatePayload(incomplete)).toBe(false);
     expect(() => parseCurrentAppStatePayload(incomplete)).toThrow("完整");

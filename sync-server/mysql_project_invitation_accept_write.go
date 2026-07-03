@@ -45,11 +45,7 @@ func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authConte
 		return memberWriteFailure{status: http.StatusNotFound, message: "workspace not found"}
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	nextRevision, err := mysqlNextRevisionForUpdate(ctx, tx)
-	if err != nil {
-		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
-	}
-	nextRevision, failure := ensureProjectInvitationMember(ctx, tx, auth, invitation, account, now, nextRevision)
+	failure := ensureProjectInvitationMember(ctx, tx, auth, invitation, account, now)
 	if failure.status != 0 {
 		return failure
 	}
@@ -62,9 +58,6 @@ func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authConte
 	); err != nil {
 		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
-	if err := mysqlSetNextRevision(ctx, tx, nextRevision); err != nil {
-		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
-	}
 	return memberWriteFailure{}
 }
 
@@ -75,37 +68,35 @@ func ensureProjectInvitationMember(
 	invitation projectInvitationSummary,
 	account accountRecord,
 	now string,
-	nextRevision int64,
-) (int64, memberWriteFailure) {
+) memberWriteFailure {
 	alreadyMember, err := teamAccountCanAccessProject(ctx, tx, invitation.WorkspaceID, auth.AccountID, invitation.ProjectID)
 	if err != nil {
-		return nextRevision, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
 	if alreadyMember {
-		return nextRevision, memberWriteFailure{}
+		return memberWriteFailure{}
 	}
 	memberID := "member_" + invitation.ProjectID + "_" + account.ID
-	existingProjectMemberRow, exists, err := teamExistingRow(ctx, tx, invitation.WorkspaceID, "project_member", memberID)
+	existingProjectMemberRow, exists, err := businessExistingRow(ctx, tx, invitation.WorkspaceID, "project_member", memberID)
 	if err != nil {
-		return nextRevision, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
-	if exists && existingProjectMemberRow.DeletedAt == "" {
+	if exists {
 		var existingProjectMemberPayload map[string]any
 		if err := json.Unmarshal(existingProjectMemberRow.Payload, &existingProjectMemberPayload); err != nil {
-			return nextRevision, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+			return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 		}
 		status, _ := existingProjectMemberPayload["status"].(string)
 		if !strings.EqualFold(strings.TrimSpace(status), "disabled") {
-			return nextRevision, memberWriteFailure{}
+			return memberWriteFailure{}
 		}
 	}
-	projectMemberRow := makeProjectMemberRow(auth, account, invitation.WorkspaceID, invitation.ProjectID, memberID, account.Name, invitation.Roles, "active", now, nextRevision)
-	nextRevision++
-	if err := teamUpsertRow(ctx, tx, projectMemberRow); err != nil {
-		return nextRevision, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+	projectMemberRow := makeProjectMemberRow(account, invitation.WorkspaceID, invitation.ProjectID, memberID, account.Name, invitation.Roles, "active", now)
+	if err := businessUpsertRow(ctx, tx, projectMemberRow); err != nil {
+		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
 	if err := mysqlTouchWorkspace(ctx, tx, invitation.WorkspaceID, now); err != nil {
-		return nextRevision, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
-	return nextRevision, memberWriteFailure{}
+	return memberWriteFailure{}
 }

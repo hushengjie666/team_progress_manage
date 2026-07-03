@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { STORAGE_KEY } from "./support/constants";
+import type { BusinessRow } from "../../src/teamBusinessRows";
+import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 
 test.beforeEach(async ({ page }) => {
@@ -51,29 +52,28 @@ test("creates a project from overview add card without navigating away", async (
   await dialog.getByLabel("所属工作区").selectOption("workspace_e2e");
   await dialog.getByLabel("项目类型").selectOption("regular");
   await dialog.getByLabel("项目说明").fill("从项目总览弹窗创建。");
+  const saveRequest = page.waitForRequest((request) =>
+    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+  );
   await dialog.getByRole("button", { name: "添加项目" }).click();
 
   await expect(dialog).toHaveCount(0);
   await expect(projectOverview).toContainText("E2E 总览弹窗项目");
   await expect(page.getByRole("heading", { name: "我的工作区" })).toHaveCount(0);
-
-  await expect
-    .poll(async () =>
-      page.evaluate((key) => {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const project = parsed.projects?.find((item: { name: string }) => item.name === "E2E 总览弹窗项目");
-        return project
-          ? { workspaceId: project.workspaceId, taskStageMode: project.taskStageMode, description: project.description }
-          : null;
-      }, STORAGE_KEY),
-    )
-    .toEqual({
-      workspaceId: "workspace_e2e",
-      taskStageMode: "regular",
-      description: "从项目总览弹窗创建。",
-    });
+  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
+  expect(requestBody.changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        workspace_id: "workspace_e2e",
+        entity: "project",
+        payload: expect.objectContaining({
+          name: "E2E 总览弹窗项目",
+          taskStageMode: "regular",
+          description: "从项目总览弹窗创建。",
+        }),
+      }),
+    ]),
+  );
 });
 
 test("hides project member management for private workspace projects", async ({ page }) => {

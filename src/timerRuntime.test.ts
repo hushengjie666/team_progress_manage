@@ -87,19 +87,19 @@ describe("timer runtime", () => {
   it("marks due task reminders and commits the updated state", () => {
     const state = stateWithDueTask();
     const sentIds = new Set<string>();
-    const commitTeamState = vi.fn();
+    const commitBusinessState = vi.fn();
 
     runDueTaskReminders(
       state,
       sentIds,
-      commitTeamState,
+      commitBusinessState,
       Date.parse("2026-07-01T08:00:00.000Z"),
       "2026-07-01T08:00:00.000Z",
     );
 
     expect(sentIds.has("task_due")).toBe(true);
     expect(mocks.sendTimerNotification).toHaveBeenCalledWith(state.settings, "任务提醒", "到期提醒任务");
-    expect(commitTeamState).toHaveBeenCalledWith(state, expect.objectContaining({
+    expect(commitBusinessState).toHaveBeenCalledWith(state, expect.objectContaining({
       tasks: [expect.objectContaining({
         id: "task_due",
         lastReminderSentAt: "2026-07-01T08:00:00.000Z",

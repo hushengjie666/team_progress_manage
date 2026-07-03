@@ -5,11 +5,8 @@ import (
 	"strings"
 )
 
-func projectMemberCanBeRecreated(row syncRow, exists bool) bool {
+func projectMemberCanBeRecreated(row businessRow, exists bool) bool {
 	if !exists {
-		return true
-	}
-	if row.DeletedAt != "" {
 		return true
 	}
 	var payload map[string]any

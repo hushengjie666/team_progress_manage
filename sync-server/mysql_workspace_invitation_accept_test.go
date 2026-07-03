@@ -51,16 +51,16 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	}
 	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 	ownerStateRecorder := httptest.NewRecorder()
-	api.handleTeamStateAll(ownerStateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), sharedAuth)
+	api.handleBusinessState(ownerStateRecorder, httptest.NewRequest(http.MethodGet, "/team/business-state", nil), sharedAuth)
 	if ownerStateRecorder.Code != http.StatusOK {
 		t.Fatalf("owner team state status = %d, body = %s", ownerStateRecorder.Code, ownerStateRecorder.Body.String())
 	}
-	var ownerState pullResponse
+	var ownerState businessStateResponse
 	if err := json.Unmarshal(ownerStateRecorder.Body.Bytes(), &ownerState); err != nil {
 		t.Fatal(err)
 	}
-	if len(ownerState.Changes) != 0 {
-		t.Fatalf("owner team state should not include workspace member sync rows: %#v", ownerState.Changes)
+	if len(ownerState.Rows) != 0 {
+		t.Fatalf("owner business state should not include workspace member rows: %#v", ownerState.Rows)
 	}
 
 	inviteBody := bytes.NewReader([]byte(`{"workspace_id":"` + sharedLogin.Workspace.ID + `","email":"invitee@example.com"}`))
@@ -167,16 +167,16 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	}
 
 	inviteeStateRecorder := httptest.NewRecorder()
-	api.handleTeamStateAll(inviteeStateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), inviteeAuth)
+	api.handleBusinessState(inviteeStateRecorder, httptest.NewRequest(http.MethodGet, "/team/business-state", nil), inviteeAuth)
 	if inviteeStateRecorder.Code != http.StatusOK {
 		t.Fatalf("invitee team state status = %d, body = %s", inviteeStateRecorder.Code, inviteeStateRecorder.Body.String())
 	}
-	var inviteeState pullResponse
+	var inviteeState businessStateResponse
 	if err := json.Unmarshal(inviteeStateRecorder.Body.Bytes(), &inviteeState); err != nil {
 		t.Fatal(err)
 	}
-	if len(inviteeState.Changes) != 0 {
-		t.Fatalf("invitee team state should not include workspace member sync rows: %#v", inviteeState.Changes)
+	if len(inviteeState.Rows) != 0 {
+		t.Fatalf("invitee business state should not include workspace member rows: %#v", inviteeState.Rows)
 	}
 }
 

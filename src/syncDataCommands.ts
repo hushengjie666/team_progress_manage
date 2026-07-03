@@ -2,7 +2,7 @@ import { applyTeamStateLoadFailure } from "./appBoot";
 import { ensureTodayPlan, nowIso } from "./appModel";
 import type { SetSyncStatus, SyncCommandRuntimeOptions, SyncDataCommands } from "./syncCommandTypes";
 import { runSyncDiagnostics as runSyncDiagnosticsApi } from "./syncDiagnostics";
-import { loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamBusinessApi";
 
 type SyncDataCommandOptions = Pick<
   SyncCommandRuntimeOptions,
@@ -28,7 +28,7 @@ export function createSyncDataCommands({
     }
     setSyncStatus({ status: "syncing", message: "正在刷新团队在线数据" });
     try {
-      const next = ensureTodayPlan(await loadTeamState(current));
+      const next = ensureTodayPlan(await loadTeamBusinessState(current));
       setState(next);
       setToast("团队在线数据已刷新");
     } catch (error) {

@@ -12,9 +12,6 @@ func ensureDefaultAdminAccount(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	defer mysqlRollback(tx)
-	if _, err := mysqlNextRevisionForUpdate(ctx, tx); err != nil {
-		return err
-	}
 	count, err := mysqlAccountCount(ctx, tx)
 	if err != nil {
 		return err
@@ -36,7 +33,6 @@ func ensureDefaultAdminAccount(ctx context.Context, db *sql.DB) error {
 		Name:           defaultAdminName + "的私人工作区",
 		Type:           "private",
 		OwnerAccountID: accountID,
-		Rows:           map[string]syncRow{},
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

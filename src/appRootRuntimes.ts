@@ -2,7 +2,7 @@ import { ensureTodayPlan } from "./appModel";
 import type { useAppShellState } from "./appShellState";
 import { createAuthSessionRuntime } from "./authSessionRuntime";
 import { createSyncCommandRuntime } from "./syncCommandRuntime";
-import { createTeamStateRuntime } from "./teamStateRuntime";
+import { createTeamBusinessRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 import { createWorkspaceAccountRuntime } from "./workspaceAccountRuntime";
 
@@ -26,7 +26,7 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     setSyncDiagnostic,
     stateRef,
   } = shell;
-  const { persistTeamChanges, commitTeamState } = createTeamStateRuntime({
+  const { persistBusinessChanges, commitBusinessState } = createTeamBusinessRuntime({
     getState: () => stateRef.current,
     setState,
     setToast,
@@ -46,7 +46,7 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     if (!current) return;
     const next = ensureTodayPlan(updater(current));
     stateRef.current = next;
-    commitTeamState(current, next);
+    commitBusinessState(current, next);
   };
   const syncActions = createSyncCommandRuntime({
     getState: () => stateRef.current,
@@ -72,8 +72,8 @@ export function createAppRootRuntimes(shell: AppShellSource) {
   });
 
   return {
-    persistTeamChanges,
-    commitTeamState,
+    persistBusinessChanges,
+    commitBusinessState,
     workspaceAccountRuntime,
     updateState,
     syncActions,

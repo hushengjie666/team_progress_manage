@@ -1,9 +1,6 @@
 package main
 
-import (
-	"sort"
-	"strings"
-)
+import "strings"
 
 func teamUniqueStrings(values []string) []string {
 	seen := map[string]bool{}
@@ -28,30 +25,4 @@ func teamPlaceholders(count int) string {
 		parts[index] = "?"
 	}
 	return strings.Join(parts, ",")
-}
-
-func teamRowsDedupeAndSort(groups ...[]syncRow) []syncRow {
-	byKey := map[string]syncRow{}
-	for _, rows := range groups {
-		for _, row := range rows {
-			key := row.WorkspaceID + "/" + row.Entity + "/" + row.ID
-			if existing, ok := byKey[key]; !ok || row.Revision >= existing.Revision {
-				byKey[key] = row
-			}
-		}
-	}
-	result := make([]syncRow, 0, len(byKey))
-	for _, row := range byKey {
-		result = append(result, row)
-	}
-	sort.SliceStable(result, func(i, j int) bool {
-		if result[i].Revision != result[j].Revision {
-			return result[i].Revision < result[j].Revision
-		}
-		if result[i].Entity != result[j].Entity {
-			return result[i].Entity < result[j].Entity
-		}
-		return result[i].ID < result[j].ID
-	})
-	return result
 }

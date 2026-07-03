@@ -21,8 +21,8 @@ export function useRunningTimerInterval({
   stateRef,
   setState,
   setToast,
-  commitTeamState,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitTeamState">) {
+  commitBusinessState,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitBusinessState">) {
   useEffect(() => {
     if (!state?.activeTimer?.isRunning) return;
     const handle = window.setInterval(() => {
@@ -46,7 +46,7 @@ export function useRunningTimerInterval({
           : "休息结束，可以回到当下清单。";
       setToast(title);
       announceTimerEnd(current.settings, title, body);
-      commitTeamState(current, finishExpiredTimerInState(current, timestamp));
+      commitBusinessState(current, finishExpiredTimerInState(current, timestamp));
     }, 1000);
     return () => window.clearInterval(handle);
   }, [state?.activeTimer?.isRunning]);
@@ -56,8 +56,8 @@ export function useTimerRestoreListeners({
   stateRef,
   setState,
   setToast,
-  commitTeamState,
-}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "commitTeamState">) {
+  commitBusinessState,
+}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "commitBusinessState">) {
   useEffect(() => {
     const handle = () => {
       const current = stateRef.current;
@@ -69,7 +69,7 @@ export function useTimerRestoreListeners({
       if (shouldFinish) {
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         setToast(`${title}，已自动记录`);
-        commitTeamState(current, next);
+        commitBusinessState(current, next);
         return;
       }
       setState(next);
@@ -108,14 +108,14 @@ export function useTaskReminderInterval({
   state,
   stateRef,
   reminderSentRef,
-  commitTeamState,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "commitTeamState">) {
+  commitBusinessState,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "commitBusinessState">) {
   useEffect(() => {
     if (!state?.settings.notificationsEnabled) return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current) return;
-      runDueTaskReminders(current, reminderSentRef.current, commitTeamState);
+      runDueTaskReminders(current, reminderSentRef.current, commitBusinessState);
     }, 30_000);
     return () => window.clearInterval(handle);
   }, [state?.settings.notificationsEnabled]);

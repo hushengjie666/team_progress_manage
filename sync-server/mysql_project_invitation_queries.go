@@ -15,7 +15,7 @@ func mysqlProjectInvitationSummariesForAccount(ctx context.Context, q sqlRunner,
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
-		 LEFT JOIN team_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id AND p.deleted_at IS NULL
+		 LEFT JOIN business_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id
 		 WHERE i.invitee_account_id = ? AND i.status = 'pending'
 		 ORDER BY i.created_at ASC`,
 		accountID,
@@ -44,7 +44,7 @@ func mysqlProjectInvitationSummaryByID(ctx context.Context, q sqlRunner, invitat
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
-		 LEFT JOIN team_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id AND p.deleted_at IS NULL
+		 LEFT JOIN business_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id
 		 WHERE i.id = ?`,
 		invitationID,
 	))
@@ -63,7 +63,7 @@ func mysqlPendingProjectInvitation(ctx context.Context, q sqlRunner, workspaceID
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
-		 LEFT JOIN team_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id AND p.deleted_at IS NULL
+		 LEFT JOIN business_projects p ON p.workspace_id = i.workspace_id AND p.id = i.project_id
 		 WHERE i.workspace_id = ? AND i.project_id = ? AND i.invitee_account_id = ? AND i.status = 'pending'`,
 		workspaceID,
 		projectID,

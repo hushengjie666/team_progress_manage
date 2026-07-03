@@ -12,7 +12,7 @@ type memberRequest struct {
 
 type memberResponse struct {
 	Account accountRecord `json:"account"`
-	Member  syncRow       `json:"member"`
+	Member  businessRow   `json:"member"`
 }
 
 type changePasswordRequest struct {

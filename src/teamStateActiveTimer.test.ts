@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamApi";
 import type { ActiveTimer, FocusSession, SyncState, Task, WorkSession } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -112,21 +112,18 @@ describe("team backend active timer state loading", () => {
     };
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      current_revision: 2,
-      changes: [
+      rows: [
         {
+          workspace_id: "workspace_test",
           entity: "task",
           id: task.id,
-          device_id: "remote",
           updated_at: task.updatedAt,
-          revision: 2,
-          version: 1,
           payload: task,
         },
       ],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamState(local);
+    const loaded = await loadTeamBusinessState(local);
 
     expect(loaded.activeTimer?.sessionId).toBe(activeTimer.sessionId);
     expect(loaded.workSessions.find((session) => session.id === workSession.id)?.status).toBe("active");

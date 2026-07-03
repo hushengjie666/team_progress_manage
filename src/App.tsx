@@ -23,8 +23,8 @@ export function App() {
     stateRef, reminderSentRef, stopNoiseRef, undoTimerRef, tabRef, selectedTaskIdRef,
   } = appShell;
   const {
-    persistTeamChanges,
-    commitTeamState,
+    persistBusinessChanges,
+    commitBusinessState,
     workspaceAccountRuntime,
     updateState,
     syncActions,
@@ -43,8 +43,8 @@ export function App() {
     undoTimerRef,
     stopNoiseRef,
     reminderSentRef,
-    persistTeamChanges,
-    commitTeamState,
+    persistBusinessChanges,
+    commitBusinessState,
     setState,
     setToast,
     setToastVisible,
@@ -85,7 +85,7 @@ export function App() {
     state,
     viewModel: appViewModel,
     updateState,
-    persistTeamChanges,
+    persistBusinessChanges,
   });
   loadedRuntimesRef.current = loadedRuntimes;
   if (state.auth.status !== "authenticated" || !state.auth.token) {

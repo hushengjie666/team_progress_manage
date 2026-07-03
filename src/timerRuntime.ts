@@ -33,7 +33,7 @@ export const announceTimerEnd = (settings: Settings, title: string, body: string
 export const runDueTaskReminders = (
   state: AppState,
   reminderSentIds: Set<string>,
-  commitTeamState: CommitTeamState,
+  commitBusinessState: CommitTeamState,
   nowMs = Date.now(),
   timestamp = nowIso(),
 ) => {
@@ -46,7 +46,7 @@ export const runDueTaskReminders = (
     if (!Number.isNaN(reminderTime) && reminderTime <= nowMs) {
       reminderSentIds.add(task.id);
       void sendTimerNotification(state.settings, "任务提醒", task.title);
-      commitTeamState(state, {
+      commitBusinessState(state, {
         ...state,
         tasks: state.tasks.map((item) =>
           item.id === task.id ? { ...item, lastReminderSentAt: timestamp, updatedAt: timestamp } : item,

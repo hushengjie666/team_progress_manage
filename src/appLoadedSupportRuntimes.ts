@@ -6,7 +6,7 @@ import type { createAppFocusActionsRuntime } from "./appFocusActionsRuntime";
 import type { createAppProjectActionsRuntime } from "./appProjectActionsRuntime";
 import type { useAppShellState } from "./appShellState";
 import type { useAppViewModelHooks } from "./appViewModelHooks";
-import type { TeamStateRuntime } from "./teamStateRuntime";
+import type { TeamBusinessRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
@@ -16,7 +16,7 @@ type AppLoadedSupportRuntimesOptions = {
   state: AppState;
   viewModel: ReturnType<typeof useAppViewModelHooks>;
   updateState: UpdateState;
-  persistTeamChanges: TeamStateRuntime["persistTeamChanges"];
+  persistBusinessChanges: TeamBusinessRuntime["persistBusinessChanges"];
   currentProjectId: string;
   focusActions: ReturnType<typeof createAppFocusActionsRuntime>;
   projectActions: ReturnType<typeof createAppProjectActionsRuntime>;
@@ -27,7 +27,7 @@ export function createAppLoadedSupportRuntimes({
   state,
   viewModel,
   updateState,
-  persistTeamChanges,
+  persistBusinessChanges,
   currentProjectId,
   focusActions,
   projectActions,
@@ -35,7 +35,7 @@ export function createAppLoadedSupportRuntimes({
   const { loadDemoData } = createAppDemoDataRuntime({
     getState: () => shell.stateRef.current,
     getSelectedProjectId: () => shell.selectedProjectId,
-    persistTeamChanges,
+    persistBusinessChanges,
     setState: shell.setState,
     setToast: shell.setToast,
     setSelectedProjectId: shell.setSelectedProjectId,

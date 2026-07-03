@@ -96,7 +96,6 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 			Name:           name,
 			Type:           workspaceType,
 			OwnerAccountID: account.ID,
-			Rows:           map[string]syncRow{},
 			CreatedAt:      now,
 			UpdatedAt:      now,
 		}

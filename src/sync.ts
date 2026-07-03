@@ -7,12 +7,6 @@ export type {
   MemberAccountPayload,
   PlatformAccountPayload,
 } from "./syncAdminTypes";
-export type {
-  SyncChange,
-  SyncEntity,
-  SyncPayload,
-  SyncRow,
-} from "./syncPayloadTypes";
 
 export {
   bootstrapWorkspace,
@@ -44,7 +38,3 @@ export {
   updateMemberAccount,
   updatePlatformAccount,
 } from "./syncAdminApi";
-export {
-  flattenStateToChanges,
-  mergeRowsIntoState,
-} from "./syncStateSync";

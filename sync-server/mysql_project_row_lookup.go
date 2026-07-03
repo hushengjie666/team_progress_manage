@@ -5,17 +5,17 @@ import (
 	"strings"
 )
 
-func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, projectID string) (syncRow, bool, error) {
+func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, projectID string) (businessRow, bool, error) {
 	workspaceID = strings.TrimSpace(workspaceID)
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
-		return syncRow{}, false, nil
+		return businessRow{}, false, nil
 	}
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project' AS entity, id, user_id, account_id, device_id, updated_at, deleted_at, version, revision, payload
-		 FROM team_projects
-		 WHERE id = ? AND (? = '' OR workspace_id = ?) AND deleted_at IS NULL
+		`SELECT workspace_id, 'project' AS entity, id, account_id, updated_at, payload
+		 FROM business_projects
+		 WHERE id = ? AND (? = '' OR workspace_id = ?)
 		 ORDER BY updated_at DESC
 		 LIMIT 1`,
 		projectID,
@@ -23,15 +23,15 @@ func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, p
 		workspaceID,
 	)
 	if err != nil {
-		return syncRow{}, false, err
+		return businessRow{}, false, err
 	}
 	defer rows.Close()
-	items, err := scanSyncRows(rows)
+	items, err := scanBusinessRows(rows)
 	if err != nil {
-		return syncRow{}, false, err
+		return businessRow{}, false, err
 	}
 	if len(items) == 0 {
-		return syncRow{}, false, nil
+		return businessRow{}, false, nil
 	}
 	return items[0], true, nil
 }

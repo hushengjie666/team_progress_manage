@@ -38,12 +38,7 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 	if failure := validateMemberWriteTarget(ctx, tx, auth, targetWorkspaceID, ""); writeMemberFailure(w, failure) {
 		return
 	}
-	nextRevision, err := mysqlNextRevisionForUpdate(ctx, tx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	existing, found, err := teamExistingRow(ctx, tx, targetWorkspaceID, "project_member", memberID)
+	existing, found, err := businessExistingRow(ctx, tx, targetWorkspaceID, "project_member", memberID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
@@ -63,23 +58,14 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	bytes, _ := json.Marshal(payload)
-	existing.UserID = auth.AccountID
-	existing.AccountID = auth.AccountID
 	existing.WorkspaceID = targetWorkspaceID
-	existing.DeviceID = "server"
 	existing.UpdatedAt = now
-	existing.Revision = nextRevision
 	existing.Payload = bytes
-	nextRevision++
-	if err := teamUpsertRow(ctx, tx, existing); err != nil {
+	if err := businessUpsertRow(ctx, tx, existing); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if err := mysqlTouchWorkspace(ctx, tx, targetWorkspaceID, now); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if err := mysqlSetNextRevision(ctx, tx, nextRevision); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}

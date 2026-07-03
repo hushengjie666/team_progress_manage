@@ -4,7 +4,7 @@ import {
   type AuthSession,
 } from "./sync";
 import { bindAccountToMembers } from "./authModel";
-import { loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamBusinessApi";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountMetadata";
 import { createWorkspaceInvitationRuntime } from "./workspaceInvitationRuntime";
 import { createWorkspaceMutationRuntime } from "./workspaceMutationRuntime";
@@ -51,7 +51,7 @@ export async function loadAuthenticatedWorkspaceSession(
   });
   const metadata = await loadWorkspaceAccountMetadata(bound, token);
   return {
-    state: ensureTodayPlan(await loadTeamState(bound)),
+    state: ensureTodayPlan(await loadTeamBusinessState(bound)),
     platformAccounts: metadata.platformAccounts,
     workspaceInvitations: metadata.workspaceInvitations,
     projectInvitations: metadata.projectInvitations,

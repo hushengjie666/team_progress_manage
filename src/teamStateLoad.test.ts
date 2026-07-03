@@ -1,15 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { loadTeamState } from "./teamApi";
-import type { SyncRow } from "./sync";
+import { loadTeamBusinessState } from "./teamApi";
+import type { BusinessRow } from "./teamBusinessRows";
 import type { SyncState } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
-const syncRow = (row: Omit<SyncRow, "device_id" | "revision" | "version">): SyncRow => ({
-  device_id: "remote",
-  revision: 1,
-  version: 1,
+const businessRow = (row: BusinessRow): BusinessRow => ({
   ...row,
 });
 
@@ -50,11 +47,10 @@ describe("team backend state loading", () => {
     };
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      current_revision: 7,
-      changes: [],
+      rows: [],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamState(local);
+    const loaded = await loadTeamBusinessState(local);
 
     expect(loaded.projects).toEqual([]);
     expect(loaded.projectMembers).toEqual([]);
@@ -104,21 +100,23 @@ describe("team backend state loading", () => {
     };
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      current_revision: 12,
-      changes: [
-        syncRow({
+      rows: [
+        businessRow({
+          workspace_id: "workspace_test",
           entity: "project",
           id: base.projects[0].id,
           updated_at: base.projects[0].updatedAt,
           payload: base.projects[0],
         }),
-        syncRow({
+        businessRow({
+          workspace_id: "workspace_test",
           entity: "project_member",
           id: canonicalProjectMember.id,
           updated_at: canonicalProjectMember.updatedAt,
           payload: canonicalProjectMember,
         }),
-        syncRow({
+        businessRow({
+          workspace_id: "workspace_test",
           entity: "project_member",
           id: duplicateProjectMember.id,
           updated_at: duplicateProjectMember.updatedAt,
@@ -127,7 +125,7 @@ describe("team backend state loading", () => {
       ],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamState(local);
+    const loaded = await loadTeamBusinessState(local);
 
     expect(loaded.projectMembers.map((member) => member.id)).toEqual([canonicalProjectMember.id]);
   });

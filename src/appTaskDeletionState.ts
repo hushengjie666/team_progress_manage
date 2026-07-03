@@ -13,13 +13,6 @@ export function deleteTaskFromState(state: AppState, task: Task, timestamp: stri
         ...plan,
         committedTaskIds: plan.committedTaskIds.filter((id) => id !== task.id),
       })),
-      sync: {
-        ...state.sync,
-        tombstones: [
-          ...(state.sync.tombstones ?? []).filter((item) => !(item.entity === "task" && item.id === task.id)),
-          { entity: "task" as const, id: task.id, workspaceId: task.workspaceId, deletedAt: timestamp },
-        ],
-      },
       updatedAt: timestamp,
     },
   };
@@ -35,10 +28,6 @@ export function undoDeleteTaskInState(state: AppState, snapshot: DeletedTaskSnap
         ? { ...plan, committedTaskIds: [...plan.committedTaskIds, task.id], updatedAt: timestamp }
         : plan,
     ),
-    sync: {
-      ...state.sync,
-      tombstones: (state.sync.tombstones ?? []).filter((item) => !(item.entity === "task" && item.id === task.id)),
-    },
     updatedAt: timestamp,
   };
 }

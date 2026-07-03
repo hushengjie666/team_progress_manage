@@ -13,7 +13,7 @@ import {
   useTimerRestoreListeners,
   useTimerRuntimeEffects,
 } from "./appLifecycleTimerHooks";
-import { useTeamRevisionPolling, useTodayPlanRepair } from "./appLifecycleTeamHooks";
+import { useTeamBusinessRefresh, useTodayPlanRepair } from "./appLifecycleTeamHooks";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
 
 export type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
@@ -30,8 +30,8 @@ export function useAppLifecycleHooks({
   undoTimerRef,
   stopNoiseRef,
   reminderSentRef,
-  persistTeamChanges,
-  commitTeamState,
+  persistBusinessChanges,
+  commitBusinessState,
   setState,
   setToast,
   setToastVisible,
@@ -45,7 +45,7 @@ export function useAppLifecycleHooks({
   useUndoTimerCleanup({ undoTimerRef });
   useNavigationRefs({ tab, selectedTaskId, tabRef, selectedTaskIdRef });
   useInitialAppLoad({
-    persistTeamChanges,
+    persistBusinessChanges,
     setState,
     setToast,
     setLoaded,
@@ -54,11 +54,11 @@ export function useAppLifecycleHooks({
     setProjectInvitations,
   });
   useDebouncedStatePersistence({ state, loaded, setToast });
-  useTeamRevisionPolling({ state, loaded, stateRef, setState });
+  useTeamBusinessRefresh({ state, loaded, stateRef, setState });
   usePageLifecycleStateFlush({ stateRef });
-  useRunningTimerInterval({ state, stateRef, setState, setToast, commitTeamState });
-  useTimerRestoreListeners({ stateRef, setState, setToast, commitTeamState });
-  useTodayPlanRepair({ state, commitTeamState });
+  useRunningTimerInterval({ state, stateRef, setState, setToast, commitBusinessState });
+  useTimerRestoreListeners({ stateRef, setState, setToast, commitBusinessState });
+  useTodayPlanRepair({ state, commitBusinessState });
   useTimerRuntimeEffects({ state, stopNoiseRef });
-  useTaskReminderInterval({ state, stateRef, reminderSentRef, commitTeamState });
+  useTaskReminderInterval({ state, stateRef, reminderSentRef, commitBusinessState });
 }

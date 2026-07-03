@@ -49,7 +49,7 @@ export async function runSyncDiagnostics(state: AppState, password?: string): Pr
     steps.push(push.step);
     lastError = push.lastError ?? lastError;
 
-    const pull = await runPullDiagnosticStep(workingState, token);
+    const pull = await runPullDiagnosticStep(workingState);
     steps.push(pull.step);
     workingState = pull.state ?? workingState;
     lastError = pull.lastError ?? lastError;

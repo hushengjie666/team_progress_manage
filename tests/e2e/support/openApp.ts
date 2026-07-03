@@ -3,11 +3,34 @@ import { authenticatedState } from "./authenticatedState";
 import { STORAGE_KEY } from "./constants";
 import { mockTeamBackend } from "./mockTeamBackend";
 import type { MockTeamBackendOptions } from "./mockTypes";
+import type { AppState } from "../../../src/types";
 
 export const clearStoredApp = async (page: Page) => {
   await page.goto("/");
   await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
 };
+
+const storedRuntimeForState = (state: AppState) => ({
+  version: 3,
+  settings: state.settings,
+  auth: {
+    status: state.auth.status,
+    token: state.auth.token,
+    expiresAt: state.auth.expiresAt,
+    account: state.auth.account,
+    workspace: state.auth.workspace,
+    membership: state.auth.membership,
+    bootstrapped: state.auth.bootstrapped,
+    message: state.auth.message,
+  },
+  sync: {
+    serverUrl: state.sync.serverUrl,
+    username: state.sync.username,
+    deviceId: state.sync.deviceId,
+    token: state.sync.token,
+  },
+  updatedAt: state.updatedAt,
+});
 
 export const openApp = async (page: Page, state = authenticatedState(), backendOptions: MockTeamBackendOptions = {}) => {
   await mockTeamBackend(page, state, backendOptions);
@@ -15,7 +38,7 @@ export const openApp = async (page: Page, state = authenticatedState(), backendO
     ({ key, value }) => {
       localStorage.setItem(key, JSON.stringify(value));
     },
-    { key: STORAGE_KEY, value: state },
+    { key: STORAGE_KEY, value: storedRuntimeForState(state) },
   );
   await page.goto("/");
 };

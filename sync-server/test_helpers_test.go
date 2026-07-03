@@ -30,22 +30,53 @@ func mysqlSeededApp(t *testing.T) *app {
 	t.Cleanup(func() {
 		_ = db.Close()
 	})
-	if err := saveStoreToMySQL(db, seededStore()); err != nil {
+	if err := seedMySQLStore(db, seededStore()); err != nil {
 		t.Fatal(err)
 	}
 	return newApp(defaultConfig(), db)
 }
+
+func seedMySQLStore(db *sql.DB, seed store) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer mysqlRollback(tx)
+	for _, workspace := range seed.Workspaces {
+		if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+			return err
+		}
+	}
+	for _, account := range seed.Accounts {
+		if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+			return err
+		}
+		workspaceID := account.WorkspaceID
+		role := "member"
+		if workspace := seed.Workspaces[workspaceID]; workspace.OwnerAccountID == account.ID {
+			role = "owner"
+		}
+		if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspaceID, account.ID, role, "active", account.UpdatedAt); err != nil {
+			return err
+		}
+		if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, account.UpdatedAt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func seededStore() store {
 	return store{
-		Version:      2,
-		NextRevision: 1,
+		Version: 2,
 		Workspaces: map[string]workspaceData{
 			"workspace_test": {
 				ID:             "workspace_test",
 				Name:           "测试团队",
 				Type:           "shared",
 				OwnerAccountID: "account_owner",
-				Rows:           map[string]syncRow{},
 				CreatedAt:      "2026-05-10T08:00:00Z",
 				UpdatedAt:      "2026-05-10T08:00:00Z",
 			},
@@ -82,42 +113,35 @@ func defaultAdminLoginBody(t *testing.T, deviceID string) *bytes.Reader {
 	t.Helper()
 	return bytes.NewReader(defaultAdminLoginPayload(t, deviceID))
 }
-func pushRows(t *testing.T, api *app, auth authContext, deviceID string, changes []syncRow) pushResponse {
+
+func pushRows(t *testing.T, api *app, auth authContext, _ string, changes []businessRow) businessStateResponse {
 	t.Helper()
-	body, err := json.Marshal(pushRequest{DeviceID: deviceID, Changes: changes})
+	body, err := json.Marshal(businessChangesRequest{Changes: changes})
 	if err != nil {
 		t.Fatal(err)
 	}
 	recorder := httptest.NewRecorder()
-	api.handleTeamChanges(recorder, httptest.NewRequest(http.MethodPost, "/team/changes", bytes.NewReader(body)), auth)
+	api.handleBusinessChanges(recorder, httptest.NewRequest(http.MethodPost, "/team/business-changes", bytes.NewReader(body)), auth)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("push status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	var response pushResponse
+	var response businessStateResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
 	}
 	return response
 }
-func pullRows(t *testing.T, api *app, auth authContext, since int64) pullResponse {
+
+func pullRows(t *testing.T, api *app, auth authContext, _ int64) businessStateResponse {
 	t.Helper()
 	recorder := httptest.NewRecorder()
-	api.handleTeamState(recorder, httptest.NewRequest(http.MethodGet, "/team/state", nil), auth)
+	api.handleBusinessState(recorder, httptest.NewRequest(http.MethodGet, "/team/business-state", nil), auth)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("pull status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	var response pullResponse
+	var response businessStateResponse
 	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
 		t.Fatal(err)
-	}
-	if since > 0 {
-		filtered := response.Changes[:0]
-		for _, row := range response.Changes {
-			if row.Revision > since {
-				filtered = append(filtered, row)
-			}
-		}
-		response.Changes = filtered
 	}
 	return response
 }

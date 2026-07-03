@@ -1,6 +1,6 @@
 # TimeManage Backend Service
 
-P0 team backend service. It is a small Go HTTP server with MySQL persistence, designed to be built as a single binary for low-memory servers that already have MySQL available. The binary and package paths still use `timemanage-sync` / `sync-server` for compatibility, but the service now owns authentication, members, project state, and sync APIs.
+P0 team backend service. It is a small Go HTTP server with MySQL persistence, designed to be built as a single binary for low-memory servers that already have MySQL available. The service owns authentication, members, workspace invitations, project invitations, and online business state APIs.
 
 ## Build
 
@@ -42,7 +42,7 @@ Configuration priority is `flags > env > config file > defaults`.
 
 ## 数据库初始化
 
-服务启动时会在 MySQL 中幂等创建当前 schema。旧 JSON store、旧 MySQL 迁移链和回滚命令不再保留；如果 schema 需要重置，应重新初始化目标数据库后启动服务。
+服务启动时会在 MySQL 中幂等创建当前 schema。如果 schema 需要重置，应重新初始化目标数据库后启动服务。
 
 Windows 部署包包含：
 
@@ -54,10 +54,8 @@ Windows 部署包包含：
 
 - `GET /health`
 - `POST /auth/login`
-- `GET /team/state`
-- `GET /team/state/all`
-- `GET /team/revision`
-- `POST /team/changes`
+- `GET /team/business-state`
+- `POST /team/business-changes`
 
 The React app defaults to `http://127.0.0.1:8787`, username `admin`, password `hu626699`.
 

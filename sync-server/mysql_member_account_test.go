@@ -8,20 +8,18 @@ import (
 	"testing"
 )
 
-func seedProjectOwnerRows(t *testing.T, api *app) pushResponse {
+func seedProjectOwnerRows(t *testing.T, api *app) businessStateResponse {
 	t.Helper()
-	return pushRows(t, api, ownerAuth(), "device_a", []syncRow{
+	return pushRows(t, api, ownerAuth(), "device_a", []businessRow{
 		{
 			Entity:    "project",
 			ID:        "project_sync",
-			DeviceID:  "device_a",
 			UpdatedAt: "2026-05-10T08:01:00Z",
 			Payload:   json.RawMessage(`{"id":"project_sync","name":"同步项目","defaultExpectedStartHours":6,"updatedAt":"2026-05-10T08:01:00Z"}`),
 		},
 		{
 			Entity:    "project_member",
 			ID:        "member_sync",
-			DeviceID:  "device_a",
 			UpdatedAt: "2026-05-10T08:03:00Z",
 			Payload:   json.RawMessage(`{"id":"member_sync","projectId":"project_sync","accountId":"account_owner","name":"负责人","roles":["project_owner","executor"],"status":"active","updatedAt":"2026-05-10T08:03:00Z"}`),
 		},
@@ -30,10 +28,7 @@ func seedProjectOwnerRows(t *testing.T, api *app) pushResponse {
 
 func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 	api := mysqlSeededApp(t)
-	seed := seedProjectOwnerRows(t, api)
-	if seed.CurrentRevision != 2 {
-		t.Fatalf("seed current revision = %d", seed.CurrentRevision)
-	}
+	seedProjectOwnerRows(t, api)
 	body := bytes.NewReader([]byte(`{"project_id":"project_sync","name":"执行者","email":"executor@example.com","password":"demo","roles":["executor"],"status":"active"}`))
 	recorder := httptest.NewRecorder()
 	api.handleMembers(recorder, httptest.NewRequest(http.MethodPost, "/members", body), ownerAuth())
@@ -60,17 +55,14 @@ func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 		t.Fatalf("login with patched password status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
 	pulled := pullRows(t, api, ownerAuth(), 0)
-	if len(pulled.Changes) != 3 {
-		t.Fatalf("expected three workspace rows, got %d", len(pulled.Changes))
+	if len(pulled.Rows) != 3 {
+		t.Fatalf("expected three workspace rows, got %d", len(pulled.Rows))
 	}
 }
 
 func TestProjectOwnerCreatesWorkspaceMemberAccount(t *testing.T) {
 	api := mysqlSeededApp(t)
-	seed := seedProjectOwnerRows(t, api)
-	if seed.CurrentRevision != 2 {
-		t.Fatalf("seed current revision = %d", seed.CurrentRevision)
-	}
+	seedProjectOwnerRows(t, api)
 	body := []byte(`{"name":"成员库成员","email":"directory@example.com","password":"demo","status":"active"}`)
 	recorder := httptest.NewRecorder()
 	api.handleMembers(recorder, httptest.NewRequest(http.MethodPost, "/members", bytes.NewReader(body)), ownerAuth())

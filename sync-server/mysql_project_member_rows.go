@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func makeProjectMemberRow(auth authContext, account accountRecord, workspaceID string, projectID string, memberID string, name string, roles []string, status string, now string, revision int64) syncRow {
+func makeProjectMemberRow(account accountRecord, workspaceID string, projectID string, memberID string, name string, roles []string, status string, now string) businessRow {
 	payload, _ := json.Marshal(map[string]any{
 		"id":          memberID,
 		"workspaceId": workspaceID,
@@ -18,5 +18,5 @@ func makeProjectMemberRow(auth authContext, account accountRecord, workspaceID s
 		"createdAt":   now,
 		"updatedAt":   now,
 	})
-	return syncRow{UserID: auth.AccountID, AccountID: auth.AccountID, WorkspaceID: workspaceID, Entity: "project_member", ID: memberID, DeviceID: "server", UpdatedAt: now, Version: 1, Revision: revision, Payload: payload}
+	return businessRow{WorkspaceID: workspaceID, Entity: "project_member", ID: memberID, UpdatedAt: now, Payload: payload}
 }

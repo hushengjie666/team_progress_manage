@@ -35,7 +35,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	}
 	privateAuth := authContext{AccountID: privateLogin.Account.ID, WorkspaceID: privateLogin.Workspace.ID}
 
-	pushRows(t, api, privateAuth, "device_private", []syncRow{{
+	pushRows(t, api, privateAuth, "device_private", []businessRow{{
 		Entity:    "project",
 		ID:        "project_private",
 		UpdatedAt: "2026-07-01T08:00:00Z",
@@ -57,7 +57,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	}
 	sharedAuth := authContext{AccountID: sharedLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 
-	pushRows(t, api, sharedAuth, "device_shared", []syncRow{{
+	pushRows(t, api, sharedAuth, "device_shared", []businessRow{{
 		Entity:    "project",
 		ID:        "project_shared",
 		UpdatedAt: "2026-07-01T08:10:00Z",
@@ -65,11 +65,11 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	}})
 
 	privateRows := pullRows(t, api, privateAuth, 0)
-	if len(privateRows.Changes) != 1 || privateRows.Changes[0].ID != "project_private" {
+	if len(privateRows.Rows) != 1 || privateRows.Rows[0].ID != "project_private" {
 		t.Fatalf("private workspace rows leaked or missing: %#v", privateRows)
 	}
 	sharedRows := pullRows(t, api, sharedAuth, 0)
-	if len(sharedRows.Changes) != 1 || sharedRows.Changes[0].ID != "project_shared" {
+	if len(sharedRows.Rows) != 1 || sharedRows.Rows[0].ID != "project_shared" {
 		t.Fatalf("shared workspace rows leaked or missing: %#v", sharedRows)
 	}
 
@@ -164,10 +164,10 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	staleRequest := httptest.NewRequest(http.MethodGet, "/team/state", nil)
+	staleRequest := httptest.NewRequest(http.MethodGet, "/team/business-state", nil)
 	staleRequest.Header.Set("Authorization", "Bearer "+staleToken)
 	staleRecorder := httptest.NewRecorder()
-	api.withAuth(api.handleTeamState)(staleRecorder, staleRequest)
+	api.withAuth(api.handleBusinessState)(staleRecorder, staleRequest)
 	if staleRecorder.Code != http.StatusUnauthorized {
 		t.Fatalf("stale private workspace token status = %d, body = %s", staleRecorder.Code, staleRecorder.Body.String())
 	}

@@ -24,7 +24,6 @@ export function SettingsSyncAdvancedPanel({
       {syncDiagnostic && (
         <div className="diagnostic-panel">
           <strong>诊断结果：{new Date(syncDiagnostic.checkedAt).toLocaleString()}</strong>
-          <span>远端 revision {syncDiagnostic.remoteRevision ?? 0}</span>
           {syncDiagnostic.steps.map((step) => (
             <article className={step.ok ? "diagnostic-step ok" : "diagnostic-step"} key={step.id}>
               <strong>{step.label}</strong>
@@ -66,10 +65,8 @@ export function SettingsSyncAdvancedPanel({
           <strong>{dataSummary.focusSessionCount}</strong>
           <span>中断</span>
           <strong>{dataSummary.interruptionCount}</strong>
-          <span>远端版本</span>
-          <strong>{sync.lastPulledRevision}</strong>
-          <span>上次同步</span>
-          <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "未同步"}</strong>
+          <span>上次刷新</span>
+          <strong>{sync.lastSyncedAt ? new Date(sync.lastSyncedAt).toLocaleTimeString() : "未刷新"}</strong>
         </div>
       )}
     </>

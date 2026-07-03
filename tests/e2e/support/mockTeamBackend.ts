@@ -4,8 +4,8 @@ import { MOCK_SERVER } from "./constants";
 import { handleMockAuthRoute } from "./mockTeamBackendAuthRoutes";
 import { handleMockInvitationRoute } from "./mockTeamBackendInvitationRoutes";
 import { fulfillError } from "./mockTeamBackendResponses";
+import { handleMockBusinessRoute } from "./mockTeamBackendBusinessRoutes";
 import { createMockTeamBackendRuntime } from "./mockTeamBackendRuntime";
-import { handleMockSyncRoute } from "./mockTeamBackendSyncRoutes";
 import { handleMockWorkspaceRoute } from "./mockTeamBackendWorkspaceRoutes";
 import type { MockTeamBackendOptions } from "./mockTypes";
 
@@ -16,7 +16,7 @@ export const mockTeamBackend = async (page: Page, initialState: AppState, option
     if (await handleMockAuthRoute(route, url, runtime)) return;
     if (await handleMockInvitationRoute(route, url, runtime)) return;
     if (await handleMockWorkspaceRoute(route, url, runtime)) return;
-    if (await handleMockSyncRoute(route, url, runtime)) return;
+    if (await handleMockBusinessRoute(route, url, runtime)) return;
     await fulfillError(route, 404, `unhandled mock route: ${url.pathname}`);
   });
 };

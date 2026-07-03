@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { STORAGE_KEY } from "./support/constants";
+import type { BusinessRow } from "../../src/teamBusinessRows";
+import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 
 test.beforeEach(async ({ page }) => {
@@ -24,25 +25,26 @@ test("opens a project and creates a task with the unified task form", async ({ p
   await dialog.getByLabel("标题").fill("E2E 项目弹窗任务");
   await dialog.getByRole("radio", { name: "开发" }).click();
   await dialog.getByLabel("估算时长（小时）").fill("2");
+  const saveRequest = page.waitForRequest((request) =>
+    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+  );
   await dialog.getByRole("button", { name: "创建任务" }).click();
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("E2E 项目弹窗任务").first()).toBeVisible();
-
-  await expect
-    .poll(async () => {
-      return page.evaluate((key) => {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        return parsed.tasks?.find((task: { title: string }) => task.title === "E2E 项目弹窗任务") ?? null;
-      }, STORAGE_KEY);
-    })
-    .toMatchObject({
-      title: "E2E 项目弹窗任务",
-      stage: "development",
-      estimatePomodoros: 5,
-    });
+  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
+  expect(requestBody.changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        entity: "task",
+        payload: expect.objectContaining({
+          title: "E2E 项目弹窗任务",
+          stage: "development",
+          estimatePomodoros: 5,
+        }),
+      }),
+    ]),
+  );
 });
 
 test("edits task detail and persists progress fields", async ({ page }) => {
@@ -54,19 +56,24 @@ test("edits task detail and persists progress fields", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: /任务详情：整理时间管理系统 PRD/ });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("spinbutton", { name: "进度百分比" }).fill("45");
+  const progressRequest = page.waitForRequest((request) => {
+    if (request.url() !== `${MOCK_SERVER}/team/business-changes` || request.method() !== "POST") return false;
+    const body = request.postDataJSON() as { changes?: BusinessRow[] };
+    return Boolean(body.changes?.some((row) => row.entity === "task" && "progressNote" in row.payload && row.payload.progressNote === "E2E 进度已持久化。"));
+  });
   await dialog.getByLabel("进展说明").fill("E2E 进度已持久化。");
-
-  await expect
-    .poll(async () => {
-      return page.evaluate((key) => {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const task = parsed.tasks?.find((item: { title: string }) => item.title === "整理时间管理系统 PRD");
-        return task ? { progressPercent: task.progressPercent, progressNote: task.progressNote } : null;
-      }, STORAGE_KEY);
-    })
-    .toEqual({ progressPercent: 45, progressNote: "E2E 进度已持久化。" });
+  const requestBody = (await progressRequest).postDataJSON() as { changes: BusinessRow[] };
+  expect(requestBody.changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        entity: "task",
+        payload: expect.objectContaining({
+          progressPercent: 45,
+          progressNote: "E2E 进度已持久化。",
+        }),
+      }),
+    ]),
+  );
 
   await expect(dialog.getByRole("spinbutton", { name: "进度百分比" })).toHaveValue("45");
   await expect(dialog.getByLabel("进展说明")).toHaveValue("E2E 进度已持久化。");

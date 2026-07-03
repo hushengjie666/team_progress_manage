@@ -1,6 +1,6 @@
 import { ensureTodayPlan } from "./appModel";
 import { fetchWorkspaces } from "./sync";
-import { loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamBusinessApi";
 import type { AppState, Workspace } from "./types";
 
 export async function loadStateWithFreshWorkspaces(
@@ -21,5 +21,5 @@ export async function loadStateWithFreshWorkspaces(
       workspaceMemberships: workspacePayload.memberships,
     },
   };
-  return ensureTodayPlan(await loadTeamState(nextWithWorkspaces));
+  return ensureTodayPlan(await loadTeamBusinessState(nextWithWorkspaces));
 }

@@ -51,7 +51,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 	}
 	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 	workspaceID := sharedLogin.Workspace.ID
-	pushRows(t, api, sharedAuth, "device_seed", []syncRow{
+	pushRows(t, api, sharedAuth, "device_seed", []businessRow{
 		{WorkspaceID: workspaceID, Entity: "project", ID: "project_invited", UpdatedAt: "2026-07-01T08:00:00Z", Payload: json.RawMessage(`{"id":"project_invited","workspaceId":"` + workspaceID + `","name":"受邀项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:00:00Z","updatedAt":"2026-07-01T08:00:00Z"}`)},
 		{WorkspaceID: workspaceID, Entity: "project", ID: "project_other", UpdatedAt: "2026-07-01T08:01:00Z", Payload: json.RawMessage(`{"id":"project_other","workspaceId":"` + workspaceID + `","name":"其他项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:01:00Z","updatedAt":"2026-07-01T08:01:00Z"}`)},
 		{WorkspaceID: workspaceID, Entity: "task", ID: "task_invited", UpdatedAt: "2026-07-01T08:02:00Z", Payload: json.RawMessage(`{"id":"task_invited","workspaceId":"` + workspaceID + `","projectId":"project_invited","project":"受邀项目","title":"受邀任务","status":"pool","createdAt":"2026-07-01T08:02:00Z","updatedAt":"2026-07-01T08:02:00Z"}`)},
@@ -123,7 +123,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 		t.Fatalf("project invitation should not add workspace membership, got %d", workspaceMembershipCount)
 	}
 	var projectMembershipCount int
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL AND status = 'active'`, workspaceID, "project_invited", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM business_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND status = 'active'`, workspaceID, "project_invited", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
 		t.Fatal(err)
 	}
 	if projectMembershipCount != 1 {
@@ -158,16 +158,16 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 	}
 
 	stateRecorder := httptest.NewRecorder()
-	api.handleTeamStateAll(stateRecorder, httptest.NewRequest(http.MethodGet, "/team/state/all", nil), inviteeAuth)
+	api.handleBusinessState(stateRecorder, httptest.NewRequest(http.MethodGet, "/team/business-state", nil), inviteeAuth)
 	if stateRecorder.Code != http.StatusOK {
 		t.Fatalf("project invitee team state status = %d, body = %s", stateRecorder.Code, stateRecorder.Body.String())
 	}
-	var stateResponse pullResponse
+	var stateResponse businessStateResponse
 	if err := json.Unmarshal(stateRecorder.Body.Bytes(), &stateResponse); err != nil {
 		t.Fatal(err)
 	}
 	visible := map[string]bool{}
-	for _, row := range stateResponse.Changes {
+	for _, row := range stateResponse.Rows {
 		visible[row.Entity+"/"+row.ID] = true
 	}
 	if !visible["project/project_invited"] || !visible["task/task_invited"] {
@@ -216,7 +216,7 @@ func TestMySQLProjectInvitationCancelHidesPendingInvitation(t *testing.T) {
 	}
 	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
 	workspaceID := sharedLogin.Workspace.ID
-	pushRows(t, api, sharedAuth, "device_seed_cancel", []syncRow{
+	pushRows(t, api, sharedAuth, "device_seed_cancel", []businessRow{
 		{WorkspaceID: workspaceID, Entity: "project", ID: "project_cancelled_invite", UpdatedAt: "2026-07-01T08:00:00Z", Payload: json.RawMessage(`{"id":"project_cancelled_invite","workspaceId":"` + workspaceID + `","name":"取消邀请项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:00:00Z","updatedAt":"2026-07-01T08:00:00Z"}`)},
 	})
 
@@ -275,7 +275,7 @@ func TestMySQLProjectInvitationCancelHidesPendingInvitation(t *testing.T) {
 	}
 
 	var projectMembershipCount int
-	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL`, workspaceID, "project_cancelled_invite", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM business_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ?`, workspaceID, "project_cancelled_invite", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
 		t.Fatal(err)
 	}
 	if projectMembershipCount != 0 {

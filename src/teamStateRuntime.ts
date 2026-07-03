@@ -1,15 +1,14 @@
 import { applyTeamStateLoadFailure } from "./appBoot";
-import { ensureTodayPlan } from "./appModel";
-import { loadTeamState, pushTeamChanges } from "./teamApi";
+import { loadTeamBusinessState, saveTeamBusinessChanges } from "./teamBusinessApi";
 import type { AppState } from "./types";
 
-export type TeamStateRuntimeOptions = {
+export type TeamBusinessRuntimeOptions = {
   getState: () => AppState | null;
   setState: (updater: AppState | null | ((current: AppState | null) => AppState | null)) => void;
   setToast: (message: string) => void;
 };
 
-export type PersistTeamChangesOptions = {
+export type PersistBusinessChangesOptions = {
   showFailureToast?: boolean;
   refreshAfterSave?: boolean;
   applySuccessState?: boolean;
@@ -17,22 +16,22 @@ export type PersistTeamChangesOptions = {
   canApplyState?: () => boolean;
 };
 
-export type TeamStateRuntime = {
-  persistTeamChanges: (
+export type TeamBusinessRuntime = {
+  persistBusinessChanges: (
     before: AppState,
     after: AppState,
-    options?: PersistTeamChangesOptions,
+    options?: PersistBusinessChangesOptions,
   ) => Promise<AppState | undefined>;
-  commitTeamState: (before: AppState, after: AppState) => void;
+  commitBusinessState: (before: AppState, after: AppState) => void;
 };
 
-export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeOptions): TeamStateRuntime => {
+export const createTeamBusinessRuntime = ({ setState, setToast }: TeamBusinessRuntimeOptions): TeamBusinessRuntime => {
   let commitSequence = 0;
 
-  const persistTeamChanges = async (
+  const persistBusinessChanges = async (
     before: AppState,
     after: AppState,
-    options: PersistTeamChangesOptions = {},
+    options: PersistBusinessChangesOptions = {},
   ) => {
     const token = before.auth.token ?? before.sync.token;
     if (!token) {
@@ -44,18 +43,9 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
     const applyFailureState = options.applyFailureState ?? true;
     const canApplyState = options.canApplyState ?? (() => true);
     try {
-      const revision = await pushTeamChanges(before.sync, token, before, after);
-      const saved = {
-        ...after,
-        sync: {
-          ...after.sync,
-          lastPulledRevision: Math.max(after.sync.lastPulledRevision, revision ?? after.sync.lastPulledRevision),
-          status: "synced" as const,
-          message: "团队在线数据已保存",
-        },
-      };
-      const finalState = options.refreshAfterSave ? ensureTodayPlan(await loadTeamState(saved)) : saved;
-      if (applySuccessState && canApplyState()) setState(finalState);
+      const saved = await saveTeamBusinessChanges(before.sync, token, before, after);
+      const finalState = options.refreshAfterSave && saved ? await loadTeamBusinessState(saved) : saved;
+      if (finalState && applySuccessState && canApplyState()) setState(finalState);
       return finalState;
     } catch (error) {
       const failed = applyTeamStateLoadFailure(after, error);
@@ -65,7 +55,7 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
     }
   };
 
-  const commitTeamState = (before: AppState, after: AppState) => {
+  const commitBusinessState = (before: AppState, after: AppState) => {
     const token = before.auth.token ?? before.sync.token;
     if (!token) {
       setState(after);
@@ -80,11 +70,11 @@ export const createTeamStateRuntime = ({ setState, setToast }: TeamStateRuntimeO
         message: "正在写入团队后台",
       },
     });
-    void persistTeamChanges(before, after, {
+    void persistBusinessChanges(before, after, {
       refreshAfterSave: true,
       canApplyState: () => sequence === commitSequence,
     });
   };
 
-  return { persistTeamChanges, commitTeamState };
+  return { persistBusinessChanges, commitBusinessState };
 };

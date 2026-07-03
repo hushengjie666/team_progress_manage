@@ -1,6 +1,6 @@
 import type { ProjectMember } from "./types";
 import type { ServerAccount } from "./syncServerCoreTypes";
-import type { SyncRow } from "./syncPayloadTypes";
+import type { BusinessRow } from "./teamBusinessRows";
 
 export interface MemberAccountPayload {
   workspaceId?: string;
@@ -13,7 +13,7 @@ export interface MemberAccountPayload {
 }
 
 export interface MemberResponse {
-  member: SyncRow;
+  member: BusinessRow;
 }
 
 export interface PlatformAccountsResponse {

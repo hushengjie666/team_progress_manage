@@ -1,6 +1,6 @@
 package main
 
-func teamProjectID(row syncRow) string {
+func businessProjectID(row businessRow) string {
 	if row.Entity == "project" {
 		return row.ID
 	}
@@ -10,28 +10,28 @@ func teamProjectID(row syncRow) string {
 	return ""
 }
 
-func teamTaskID(row syncRow) string {
+func businessTaskID(row businessRow) string {
 	if row.Entity == "task" {
 		return row.ID
 	}
 	return stringField(row.Payload, "taskId")
 }
 
-func teamAccountRef(row syncRow) string {
+func businessAccountRef(row businessRow) string {
 	if value := stringField(row.Payload, "accountId"); value != "" {
 		return value
 	}
 	return row.AccountID
 }
 
-func teamStatus(row syncRow) string {
+func businessStatus(row businessRow) string {
 	if value := stringField(row.Payload, "status"); value != "" {
 		return value
 	}
 	return stringField(row.Payload, "outcome")
 }
 
-func teamKind(row syncRow) string {
+func businessKind(row businessRow) string {
 	for _, field := range []string{"stage", "mode", "type", "priority", "severity"} {
 		if value := stringField(row.Payload, field); value != "" {
 			return value
@@ -40,7 +40,7 @@ func teamKind(row syncRow) string {
 	return ""
 }
 
-func teamRowDate(row syncRow) string {
+func businessRowDate(row businessRow) string {
 	if row.Entity == "daily_plan" {
 		return stringField(row.Payload, "date")
 	}

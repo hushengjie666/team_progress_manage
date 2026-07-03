@@ -30,15 +30,13 @@ test("keeps private workspace member management locked to the owner", async ({ p
 
   const dialog = page.getByRole("dialog", { name: "项目负责人私人区 成员管理" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("工作区属性")).toHaveValue("私人工作区");
-  await expect(dialog.getByLabel("工作区属性")).toBeDisabled();
-  await expect(dialog.getByLabel("工作区负责人")).toBeDisabled();
+  await expect(dialog).toContainText("私人工作区");
   await expect(dialog).toContainText("私人工作区只允许本人使用，不支持添加成员。");
   await expect(dialog.getByLabel("成员登录账号")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "发送邀请" })).toHaveCount(0);
 });
 
-test("edits shared workspace owner and sends workspace invitation", async ({ page }) => {
+test("sends workspace invitation from shared workspace", async ({ page }) => {
   await openApp(page);
 
   await page.getByLabel("页面导航").getByRole("button", { name: "工作区" }).click();
@@ -46,8 +44,6 @@ test("edits shared workspace owner and sends workspace invitation", async ({ pag
 
   const dialog = page.getByRole("dialog", { name: "E2E 工作区 成员管理" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByLabel("工作区属性")).toBeEnabled();
-  await expect(dialog.getByLabel("工作区负责人")).toBeEnabled();
   const ownerRow = dialog.locator(".workspace-member-row").filter({ has: page.locator("strong", { hasText: "项目负责人" }) });
   const wangshuoRow = dialog.locator(".workspace-member-row").filter({ has: page.locator("strong", { hasText: "王硕" }) });
   await expect(ownerRow.getByLabel("负责人")).toBeChecked();
@@ -55,17 +51,6 @@ test("edits shared workspace owner and sends workspace invitation", async ({ pag
   await expect(wangshuoRow.getByLabel("负责人")).not.toBeChecked();
   await expect(wangshuoRow.getByLabel("执行者")).toBeChecked();
   await expect(wangshuoRow.getByLabel("执行者")).toBeDisabled();
-
-  const updateRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/workspaces/workspace_e2e` && request.method() === "PATCH",
-  );
-  await wangshuoRow.getByLabel("负责人").check();
-  expect((await updateRequest).postDataJSON()).toMatchObject({
-    name: "E2E 工作区",
-    type: "shared",
-    owner_account_id: "account_wangshuo",
-  });
-  await expect(page.getByText("工作区已更新")).toBeVisible();
 
   await dialog.getByLabel("成员登录账号").fill(" NewMember@Example.COM ");
   const inviteRequest = page.waitForRequest((request) =>
@@ -106,7 +91,7 @@ test("unbinds a shared workspace member from workspace member list", async ({ pa
 test("workspace member can see shared workspace projects and project tasks", async ({ page }) => {
   await openApp(page, workspaceMemberState());
 
-  await expect(page.getByText("账号：王硕")).toBeVisible();
+  await expect(page.getByRole("button", { name: "退出登录：王硕" })).toBeVisible();
   const projectOverview = page.getByLabel("项目卡片总览");
   await expect(projectOverview).toContainText("TimeManage 团队进度");
   await expect(projectOverview.locator("article").filter({ hasText: "TimeManage 团队进度" })).toContainText("协作 · E2E 工作区");

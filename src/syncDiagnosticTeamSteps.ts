@@ -1,6 +1,6 @@
 import { authHeaders, apiUrl, readResponse, timed } from "./syncDiagnosticHttp";
 import type { DiagnosticStepResult } from "./syncDiagnosticStepTypes";
-import { getTeamRevision, loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamApi";
 import type { AppState, SyncDiagnosticStep } from "./types";
 
 export const unauthenticatedTeamDiagnosticSteps = (): SyncDiagnosticStep[] => [
@@ -11,11 +11,10 @@ export const unauthenticatedTeamDiagnosticSteps = (): SyncDiagnosticStep[] => [
 export const runPushDiagnosticStep = async (workingState: AppState, token: string): Promise<DiagnosticStepResult> => {
   try {
     const pushResult = await timed(async () =>
-      readResponse<{ current_revision: number }>(await fetch(apiUrl(workingState.sync.serverUrl, "/team/changes"), {
+      readResponse<{ rows: unknown[] }>(await fetch(apiUrl(workingState.sync.serverUrl, "/team/business-changes"), {
         method: "POST",
         headers: authHeaders(token),
         body: JSON.stringify({
-          device_id: workingState.sync.deviceId,
           changes: [],
         }),
       })),
@@ -26,7 +25,7 @@ export const runPushDiagnosticStep = async (workingState: AppState, token: strin
         label: "写入检查",
         ok: true,
         latencyMs: pushResult.latencyMs,
-        detail: `团队变更接口可写，远端 revision ${pushResult.result.current_revision}。`,
+        detail: `团队业务接口可写，返回 ${pushResult.result.rows.length} 条业务记录。`,
       },
     };
   } catch (error) {
@@ -38,10 +37,9 @@ export const runPushDiagnosticStep = async (workingState: AppState, token: strin
   }
 };
 
-export const runPullDiagnosticStep = async (workingState: AppState, token: string): Promise<DiagnosticStepResult> => {
+export const runPullDiagnosticStep = async (workingState: AppState): Promise<DiagnosticStepResult> => {
   try {
-    const pullResult = await timed(() => loadTeamState(workingState));
-    const revision = await getTeamRevision(pullResult.result.sync, token);
+    const pullResult = await timed(() => loadTeamBusinessState(workingState));
     return {
       state: pullResult.result,
       step: {
@@ -49,7 +47,7 @@ export const runPullDiagnosticStep = async (workingState: AppState, token: strin
         label: "拉取检查",
         ok: true,
         latencyMs: pullResult.latencyMs,
-        detail: `团队状态可拉取，远端 revision ${revision}。`,
+        detail: "团队业务状态可拉取。",
       },
     };
   } catch (error) {

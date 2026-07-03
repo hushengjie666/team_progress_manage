@@ -2,11 +2,11 @@ import { useEffect } from "react";
 import { applyTeamStateLoadFailure } from "./appBoot";
 import { ensureTodayPlan } from "./appModel";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
-import { getTeamRevision, loadTeamState } from "./teamApi";
+import { loadTeamBusinessState } from "./teamBusinessApi";
 
-const TEAM_REVISION_POLL_MS = 1000;
+const TEAM_BUSINESS_REFRESH_MS = 5000;
 
-export function useTeamRevisionPolling({
+export function useTeamBusinessRefresh({
   state,
   loaded,
   stateRef,
@@ -24,9 +24,7 @@ export function useTeamRevisionPolling({
       if (!current || !currentToken) return;
       inFlight = true;
       try {
-        const revision = await getTeamRevision(current.sync, currentToken);
-        if (cancelled || revision <= current.sync.lastPulledRevision) return;
-        const next = await loadTeamState(current);
+        const next = await loadTeamBusinessState(current);
         if (!cancelled) setState(ensureTodayPlan(next));
       } catch (error) {
         if (!cancelled) setState((value) => (value ? applyTeamStateLoadFailure(value, error) : value));
@@ -34,8 +32,8 @@ export function useTeamRevisionPolling({
         inFlight = false;
       }
     };
-    const immediate = window.setTimeout(() => void refreshIfNeeded(), TEAM_REVISION_POLL_MS);
-    const interval = window.setInterval(() => void refreshIfNeeded(), TEAM_REVISION_POLL_MS);
+    const immediate = window.setTimeout(() => void refreshIfNeeded(), TEAM_BUSINESS_REFRESH_MS);
+    const interval = window.setInterval(() => void refreshIfNeeded(), TEAM_BUSINESS_REFRESH_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(immediate);
@@ -46,13 +44,13 @@ export function useTeamRevisionPolling({
 
 export function useTodayPlanRepair({
   state,
-  commitTeamState,
-}: Pick<AppLifecycleHooksOptions, "state" | "commitTeamState">) {
+  commitBusinessState,
+}: Pick<AppLifecycleHooksOptions, "state" | "commitBusinessState">) {
   useEffect(() => {
     if (!state) return;
     const repaired = ensureTodayPlan(state);
     if (repaired !== state) {
-      commitTeamState(state, repaired);
+      commitBusinessState(state, repaired);
     }
   }, [state]);
 }

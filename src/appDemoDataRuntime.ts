@@ -3,7 +3,7 @@ import { ensureTodayPlan, initialFilters, nowIso, type Tab, type TaskFilters } f
 import { demoTaskIdForProject, mergeDemoDataIntoState } from "./demoData";
 import type { AppState } from "./types";
 
-type PersistTeamChanges = (
+type PersistBusinessChanges = (
   current: AppState,
   next: AppState,
   options?: { refreshAfterSave?: boolean },
@@ -13,7 +13,7 @@ type Setter<T> = (value: T | ((current: T) => T)) => void;
 export type AppDemoDataRuntimeOptions = {
   getState: () => AppState | null;
   getSelectedProjectId: () => string | null;
-  persistTeamChanges: PersistTeamChanges;
+  persistBusinessChanges: PersistBusinessChanges;
   setState: Setter<AppState | null>;
   setToast: (message: string) => void;
   setSelectedProjectId: Setter<string | null>;
@@ -30,7 +30,7 @@ export type AppDemoDataRuntime = {
 export function createAppDemoDataRuntime({
   getState,
   getSelectedProjectId,
-  persistTeamChanges,
+  persistBusinessChanges,
   setState,
   setToast,
   setSelectedProjectId,
@@ -58,7 +58,7 @@ export function createAppDemoDataRuntime({
     setToast("正在写入团队后台...");
     try {
       const next = ensureTodayPlan(mergeDemoDataIntoState(current, targetProjectId, nowIso()));
-      const saved = await persistTeamChanges(current, next, { refreshAfterSave: true });
+      const saved = await persistBusinessChanges(current, next, { refreshAfterSave: true });
       if (!saved) return;
       setSelectedProjectId(targetProjectId);
       setProjectDetailTab("overview");

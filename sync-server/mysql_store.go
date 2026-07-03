@@ -12,10 +12,9 @@ import (
 
 func emptyStore() store {
 	return store{
-		Version:      2,
-		NextRevision: 1,
-		Workspaces:   map[string]workspaceData{},
-		Accounts:     map[string]accountRecord{},
+		Version:    2,
+		Workspaces: map[string]workspaceData{},
+		Accounts:   map[string]accountRecord{},
 	}
 }
 

@@ -44,11 +44,6 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 	if failure := validateMemberWriteTarget(ctx, tx, auth, targetWorkspaceID, projectID); writeMemberFailure(w, failure) {
 		return
 	}
-	nextRevision, err := mysqlNextRevisionForUpdate(ctx, tx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	account, failure := upsertMemberAccountForRequest(ctx, tx, req, email, targetWorkspaceID, projectID, now)
 	if writeMemberFailure(w, failure) {
@@ -67,10 +62,6 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
-		if err := mysqlSetNextRevision(ctx, tx, nextRevision); err != nil {
-			writeError(w, http.StatusInternalServerError, "save failed")
-			return
-		}
 		if err := tx.Commit(); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
@@ -78,7 +69,7 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeJSON(w, http.StatusOK, memberResponse{Account: account})
 		return
 	}
-	existingProjectMemberRow, projectMemberExists, err := teamExistingRow(ctx, tx, targetWorkspaceID, "project_member", memberID)
+	existingProjectMemberRow, projectMemberExists, err := businessExistingRow(ctx, tx, targetWorkspaceID, "project_member", memberID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
@@ -87,17 +78,12 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusConflict, "account already belongs to this project")
 		return
 	}
-	row := makeProjectMemberRow(auth, account, targetWorkspaceID, projectID, memberID, req.Name, req.Roles, req.Status, now, nextRevision)
-	nextRevision++
-	if err := teamUpsertRow(ctx, tx, row); err != nil {
+	row := makeProjectMemberRow(account, targetWorkspaceID, projectID, memberID, req.Name, req.Roles, req.Status, now)
+	if err := businessUpsertRow(ctx, tx, row); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if err := mysqlTouchWorkspace(ctx, tx, targetWorkspaceID, now); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if err := mysqlSetNextRevision(ctx, tx, nextRevision); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}

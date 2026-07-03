@@ -9,9 +9,9 @@ func teamProjectIDsForAccount(ctx context.Context, q sqlRunner, workspaceID stri
 	rows, err := q.QueryContext(
 		ctx,
 		`SELECT DISTINCT project_id
-		 FROM team_project_members
+		 FROM business_project_members
 		 WHERE workspace_id = ? AND account_ref = ? AND project_id IS NOT NULL AND project_id <> ''
-			   AND deleted_at IS NULL AND status = 'active'`,
+			   AND status = 'active'`,
 		workspaceID,
 		accountID,
 	)
@@ -38,9 +38,9 @@ func teamAccountCanAccessProject(ctx context.Context, q sqlRunner, workspaceID s
 	err := q.QueryRowContext(
 		ctx,
 		`SELECT COUNT(*)
-		 FROM team_project_members
+		 FROM business_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
-			   AND deleted_at IS NULL AND status = 'active'`,
+			   AND status = 'active'`,
 		workspaceID,
 		projectID,
 		accountID,
@@ -65,10 +65,10 @@ func teamAccountCanManageWorkspace(ctx context.Context, q sqlRunner, auth authCo
 func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, workspaceID string, accountID string, projectID string) (bool, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project_member' AS entity, id, user_id, account_id, device_id, updated_at, deleted_at, version, revision, payload
-		 FROM team_project_members
+		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, payload
+		 FROM business_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
-			   AND deleted_at IS NULL AND status = 'active'`,
+			   AND status = 'active'`,
 		workspaceID,
 		projectID,
 		accountID,
@@ -77,7 +77,7 @@ func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, worksp
 		return false, err
 	}
 	defer rows.Close()
-	items, err := scanSyncRows(rows)
+	items, err := scanBusinessRows(rows)
 	if err != nil {
 		return false, err
 	}

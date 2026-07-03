@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
-import { MOCK_SERVER, STORAGE_KEY } from "./support/constants";
+import type { BusinessRow } from "../../src/teamBusinessRows";
+import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { projectInviteeScenario } from "./support/scenarioStates";
 
@@ -11,7 +12,7 @@ test("shows inherited workspace members in project member management", async ({ 
   await openApp(page);
 
   await page.getByRole("button", { name: "进入项目" }).first().click();
-  await page.getByRole("button", { name: "项目成员管理" }).click();
+  await page.getByRole("button", { name: "成员管理" }).click();
 
   const summary = page.locator(".project-member-summary-grid");
   await expect(summary.locator("article").filter({ hasText: "项目成员" })).toContainText("2");
@@ -24,30 +25,31 @@ test("shows inherited workspace members in project member management", async ({ 
   await expect(wangshuoRow.getByLabel("执行者")).toBeChecked();
   await expect(wangshuoRow.getByLabel("项目负责人")).not.toBeChecked();
 
+  const saveRequest = page.waitForRequest((request) =>
+    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+  );
   await wangshuoRow.getByLabel("项目负责人").check();
-  await expect
-    .poll(async () =>
-      page.evaluate((key) => {
-        const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw);
-        const member = parsed.projectMembers?.find((item: { projectId: string; accountId?: string }) =>
-          item.projectId === "project_starter" && item.accountId === "account_wangshuo",
-        );
-        return member ? { roles: member.roles, status: member.status } : null;
-      }, STORAGE_KEY),
-    )
-    .toEqual({
-      roles: expect.arrayContaining(["executor", "project_owner"]),
-      status: "active",
-    });
+  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
+  expect(requestBody.changes).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        entity: "project_member",
+        payload: expect.objectContaining({
+          projectId: "project_starter",
+          accountId: "account_wangshuo",
+          roles: expect.arrayContaining(["executor", "project_owner"]),
+          status: "active",
+        }),
+      }),
+    ]),
+  );
 });
 
 test("sends project member invitation from current project", async ({ page }) => {
   await openApp(page);
 
   await page.getByRole("button", { name: "进入项目" }).first().click();
-  await page.getByRole("button", { name: "项目成员管理" }).click();
+  await page.getByRole("button", { name: "成员管理" }).click();
   await page.getByRole("button", { name: "添加成员" }).click();
 
   const dialog = page.getByRole("dialog", { name: "邀请项目成员" });

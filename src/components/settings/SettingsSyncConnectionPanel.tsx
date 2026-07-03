@@ -5,7 +5,7 @@ const syncActionStatusLabel = (status: SyncState["status"]) => (
   status === "synced"
     ? "已同步"
     : status === "syncing"
-      ? "同步中"
+      ? "刷新中"
       : status === "authenticating"
         ? "登录中"
         : status === "error"
@@ -51,10 +51,6 @@ export function SettingsSyncConnectionPanel({
           密码
           <input type="password" value={syncPassword} onChange={(event) => setSyncPassword(event.target.value)} />
         </label>
-        <label>
-          设备 ID
-          <input value={sync.deviceId} onChange={(event) => updateSyncSetting("deviceId", event.target.value)} />
-        </label>
       </div>
       <div className="sync-actions">
         <button
@@ -79,7 +75,7 @@ export function SettingsSyncConnectionPanel({
           onClick={() => void handleSyncNow()}
         >
           <RefreshCw size={16} />
-          立即同步
+          刷新在线数据
         </button>
         <button className="secondary-button" onClick={() => void runSyncDiagnostics()}>
           <Server size={16} />
