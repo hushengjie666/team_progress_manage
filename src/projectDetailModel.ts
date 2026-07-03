@@ -14,6 +14,14 @@ import type { ProjectAccess, ProjectTaskFilters } from "./projectDetailTypes";
 
 const projectTaskStatuses: TaskStatus[] = ["pool", "committed", "in_progress", "pending_review", "completed", "split", "archived"];
 
+const teamTodayTaskIdsForProject = (state: AppState, projectTaskIds: Set<string>, date: string) =>
+  Array.from(new Set(
+    state.dailyPlans
+      .filter((plan) => plan.date === date)
+      .flatMap((plan) => plan.committedTaskIds)
+      .filter((taskId) => projectTaskIds.has(taskId)),
+  ));
+
 export const projectAccessForCurrentMember = (state: AppState, projectId: string): ProjectAccess => {
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return { canView: false, canEditTasks: false, canReviewTasks: false };
@@ -49,11 +57,13 @@ export const deriveProjectDetailModel = (
   const accessibleExecutorCount = accessibleProjectMembers.filter((member) => member.roles.includes("executor")).length;
   const executors = projectMembers.filter((member) => member.roles.includes("executor"));
   const allProjectTasks = projectTasksForProject(state, project.id);
+  const allProjectTaskIds = new Set(allProjectTasks.map((task) => task.id));
   const overviewTasks = allProjectTasks.filter((task) => task.status !== "completed" && task.status !== "split" && task.status !== "archived");
   const acceptedTasks = allProjectTasks
     .filter((task) => task.status === "completed" && Boolean(task.reviewAcceptedAt))
     .sort((left, right) => (right.reviewAcceptedAt ?? "").localeCompare(left.reviewAcceptedAt ?? ""));
   const todayPlan = currentAccountDailyPlanForDate(state, date);
+  const teamTodayTaskIds = teamTodayTaskIdsForProject(state, allProjectTaskIds, date);
   const runnableProjectTaskIds = new Set(allProjectTasks.filter((task) => task.status === "in_progress").map((task) => task.id));
   const activeProjectTaskIds = state.workSessions
     .filter((session) => session.status === "active" && runnableProjectTaskIds.has(session.taskId))
@@ -87,6 +97,7 @@ export const deriveProjectDetailModel = (
     overviewTasks,
     acceptedTasks,
     todayPlan,
+    teamTodayTaskIds,
     activeProjectTaskIds,
     filteredTasks,
     board,

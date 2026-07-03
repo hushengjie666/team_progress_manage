@@ -42,7 +42,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
           overviewTasks={detail.overviewTasks}
           acceptedTasks={detail.acceptedTasks}
           projectMembers={detail.projectMembers}
-          todayTaskIds={detail.todayPlan?.committedTaskIds ?? []}
+          todayTaskIds={detail.teamTodayTaskIds}
           activeProjectTaskIds={detail.activeProjectTaskIds}
           taskStageMode={detail.projectStageMode}
           canEditTasks={detail.access.canEditTasks}
@@ -79,7 +79,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
           allProjectTasks={detail.allProjectTasks}
           projectMembers={detail.projectMembers}
           activeProjectTaskIds={detail.activeProjectTaskIds}
-          todayTaskIds={detail.todayPlan?.committedTaskIds ?? []}
+          todayTaskIds={detail.teamTodayTaskIds}
           taskStageMode={detail.projectStageMode}
           selectTask={props.selectTask}
         />

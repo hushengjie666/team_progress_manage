@@ -119,4 +119,94 @@ describe("project detail overview model", () => {
     expect(model?.overviewTasks.map((task) => task.id)).not.toContain("manual_done");
     expect(model?.acceptedTasks.map((task) => task.id)).toEqual(["accepted_new", "accepted_old"]);
   });
+
+  it("uses team daily plans for project today labels instead of only the viewer's plan", () => {
+    const state = createInitialState();
+    const projectId = state.projects[0].id;
+    const owner = state.projectMembers.find((member) => member.id === "member_owner")!;
+    const teammate: ProjectMember = {
+      ...owner,
+      id: "member_teammate_today",
+      accountId: "account_teammate",
+      name: "王昱桥",
+      email: "wangyuqiao",
+      roles: ["executor"],
+    };
+    const baseTask = state.tasks[0];
+    const ownerTask = {
+      ...baseTask,
+      id: "project_today_owner_task",
+      projectId,
+      primaryExecutorMemberId: owner.id,
+      status: "committed" as const,
+    };
+    const teammateTask = {
+      ...baseTask,
+      id: "project_today_teammate_task",
+      projectId,
+      primaryExecutorMemberId: teammate.id,
+      status: "committed" as const,
+    };
+    const otherProjectTask = {
+      ...baseTask,
+      id: "other_project_today_task",
+      projectId: "project_other_today",
+      primaryExecutorMemberId: teammate.id,
+      status: "committed" as const,
+    };
+
+    const model = deriveProjectDetailModel(
+      {
+        ...state,
+        auth: {
+          ...state.auth,
+          status: "authenticated",
+          account: {
+            id: "account_owner",
+            workspaceId: "workspace_test",
+            name: "项目负责人",
+            email: "owner@example.com",
+            createdAt: `${todayKey()}T08:00:00.000Z`,
+            updatedAt: `${todayKey()}T08:00:00.000Z`,
+          },
+        },
+        projectMembers: [owner, teammate],
+        tasks: [ownerTask, teammateTask, otherProjectTask],
+        dailyPlans: [
+          {
+            id: `plan_account_owner_${todayKey()}`,
+            ownerAccountId: "account_owner",
+            date: todayKey(),
+            capacityPomodoros: 8,
+            committedTaskIds: [ownerTask.id],
+            completedPomodoros: 0,
+            suggestedTaskIds: [],
+            reflection: "",
+            review: { mood: "normal", wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
+            createdAt: `${todayKey()}T08:00:00.000Z`,
+            updatedAt: `${todayKey()}T08:00:00.000Z`,
+          },
+          {
+            id: `plan_account_teammate_${todayKey()}`,
+            ownerAccountId: "account_teammate",
+            date: todayKey(),
+            capacityPomodoros: 8,
+            committedTaskIds: [teammateTask.id, otherProjectTask.id],
+            completedPomodoros: 0,
+            suggestedTaskIds: [],
+            reflection: "",
+            review: { mood: "normal", wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
+            createdAt: `${todayKey()}T08:00:00.000Z`,
+            updatedAt: `${todayKey()}T08:00:00.000Z`,
+          },
+        ],
+      },
+      projectId,
+      { query: "", status: "all", executor: "all", priority: "all", sort: "status" },
+      todayKey(),
+    );
+
+    expect(model?.todayPlan?.committedTaskIds).toEqual([ownerTask.id]);
+    expect(model?.teamTodayTaskIds).toEqual([ownerTask.id, teammateTask.id]);
+  });
 });
