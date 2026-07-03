@@ -37,6 +37,7 @@ export type SyncPayload =
 
 export interface SyncChange {
   workspace_id?: string;
+  account_id?: string;
   entity: SyncEntity;
   id: string;
   device_id: string;

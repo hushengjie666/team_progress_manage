@@ -6,6 +6,7 @@ import type {
   Interruption,
   Task,
 } from "./types";
+import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
 
 export const defaultReview = (): DailyReview => ({
   mood: "normal",
@@ -16,7 +17,7 @@ export const defaultReview = (): DailyReview => ({
 });
 
 export const planForDate = (state: AppState, date: string): DailyPlan | undefined =>
-  state.dailyPlans.find((plan) => plan.date === date);
+  currentAccountDailyPlanForDate(state, date);
 
 export const completedFocusSessions = (state: AppState) =>
   state.focusSessions.filter((session) => session.mode === "focus" && session.outcome === "completed");

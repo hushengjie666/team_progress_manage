@@ -1,6 +1,10 @@
 import type { AppState, WorkSession } from "./types";
 import type { SyncChange, SyncEntity } from "./syncPayloadTypes";
 import { buildSyncStateFlattenWorkspace } from "./syncStateFlattenWorkspace";
+import {
+  currentDailyPlanOwnerAccountId,
+  dailyPlanBelongsToCurrentAccount,
+} from "./dailyPlanScope";
 
 const isAfter = (value: string, baseline?: string) => !baseline || value > baseline;
 
@@ -16,6 +20,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
   const changedAfter = options.changedAfter;
   const activeTaskIds = activeWorkSessionTaskIds(state);
   const workspace = buildSyncStateFlattenWorkspace(state);
+  const ownerAccountId = currentDailyPlanOwnerAccountId(state);
   const changes: SyncChange[] = [
     {
       workspace_id: workspace.currentWorkspaceId,
@@ -73,13 +78,14 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       updated_at: signal.createdAt,
       payload: signal,
     })),
-    ...state.dailyPlans.map((plan) => ({
+    ...state.dailyPlans.filter((plan) => dailyPlanBelongsToCurrentAccount(state, plan)).map((plan) => ({
       workspace_id: workspace.workspaceIdForPayload(plan, workspace.currentWorkspaceId),
+      account_id: ownerAccountId,
       entity: "daily_plan" as const,
       id: plan.id,
       device_id: deviceID,
       updated_at: plan.updatedAt,
-      payload: plan,
+      payload: ownerAccountId && !plan.ownerAccountId ? { ...plan, ownerAccountId } : plan,
     })),
     ...state.focusSessions.map((session) => ({
       workspace_id: workspace.workspaceIdForPayload(

@@ -46,8 +46,16 @@ export {
   shouldFinishExpiredTimerInState,
 } from "./appTimerExpirationState";
 export {
+  createDailyPlanForDate,
   getTodayPlan,
 } from "./appTodayPlan";
+export {
+  currentAccountDailyPlanForDate,
+  currentDailyPlanOwnerAccountId,
+  dailyPlanBelongsToCurrentAccount,
+  dailyPlanIdForDate,
+  dailyPlansForCurrentAccount,
+} from "./dailyPlanScope";
 export {
   ensureTodayPlan,
   removeTaskFromTodayInState,

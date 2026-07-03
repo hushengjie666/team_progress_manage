@@ -111,4 +111,76 @@ describe("team progress sync flattening", () => {
     expect(keys).toContain("task:task_sync");
     expect(keys).not.toContain("project:project_sync");
   });
+
+  it("pushes only the current account daily plans", () => {
+    const state = teamState();
+    const workspace = {
+      id: "workspace_shared",
+      name: "协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: state.updatedAt,
+      updatedAt: state.updatedAt,
+    };
+    const basePlan = {
+      workspaceId: workspace.id,
+      date: "2026-07-04",
+      capacityPomodoros: 8,
+      committedTaskIds: [],
+      completedPomodoros: 0,
+      suggestedTaskIds: [],
+      reflection: "",
+      review: {
+        mood: "normal" as const,
+        wins: "",
+        blockers: "",
+        interruptionPattern: "",
+        tomorrowFocus: "",
+      },
+      createdAt: iso("2026-07-04T08:00:00Z"),
+      updatedAt: iso("2026-07-04T09:00:00Z"),
+    };
+    const changes = flattenStateToChanges({
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        token: "token_owner",
+        account: {
+          id: "account_owner",
+          workspaceId: workspace.id,
+          name: "负责人",
+          email: "owner@example.com",
+          createdAt: state.updatedAt,
+          updatedAt: state.updatedAt,
+        },
+        workspace,
+      },
+      dailyPlans: [
+        {
+          ...basePlan,
+          id: "plan_account_owner_2026-07-04",
+          ownerAccountId: "account_owner",
+          committedTaskIds: ["task_owner_today"],
+        },
+        {
+          ...basePlan,
+          id: "plan_account_teammate_2026-07-04",
+          ownerAccountId: "account_teammate",
+          committedTaskIds: ["task_teammate_today"],
+        },
+      ],
+    });
+    const dailyPlanChanges = changes.filter((change) => change.entity === "daily_plan");
+
+    expect(dailyPlanChanges.map((change) => change.id)).toEqual(["plan_account_owner_2026-07-04"]);
+    expect(dailyPlanChanges[0]).toMatchObject({
+      workspace_id: workspace.id,
+      account_id: "account_owner",
+      payload: {
+        ownerAccountId: "account_owner",
+        committedTaskIds: ["task_owner_today"],
+      },
+    });
+  });
 });

@@ -37,6 +37,7 @@ export type SyncPayload =
 
 export interface SyncMergeRow {
   workspace_id?: string;
+  account_id?: string;
   entity: SyncEntity;
   id: string;
   updated_at: string;

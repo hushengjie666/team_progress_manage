@@ -1,5 +1,6 @@
 import { todayKey } from "./seed";
 import type { AppState, BadgeRule, RewardState } from "./types";
+import { dailyPlansForCurrentAccount } from "./dailyPlanScope";
 import {
   completedFocusSessions,
   interruptionsOnDate,
@@ -14,7 +15,7 @@ const dayBefore = (date: Date, offset: number) => {
 
 export const badgeRules = (state: AppState): BadgeRule[] => {
   const completed = completedFocusSessions(state).length;
-  const lowInterruptionDay = state.dailyPlans.some((plan) => plan.completedPomodoros >= state.rewardState.dailyGoal && interruptionsOnDate(state, plan.date).length <= 1);
+  const lowInterruptionDay = dailyPlansForCurrentAccount(state).some((plan) => plan.completedPomodoros >= state.rewardState.dailyGoal && interruptionsOnDate(state, plan.date).length <= 1);
   const accurateEstimate = state.tasks.some((task) =>
     task.estimateHistory.some((entry) => Math.abs(entry.actualPomodoros - entry.estimatedPomodoros) <= 1),
   );

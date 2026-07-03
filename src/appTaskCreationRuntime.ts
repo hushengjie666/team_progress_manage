@@ -1,9 +1,14 @@
-import { defaultReview } from "./domain";
 import { addTaskToTodayInState } from "./workSessionTransitions";
 import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
 import { uid } from "./seed";
 import { createTaskFromDraft, moveCommittedTaskInState } from "./appTaskState";
-import { initialDraft, nowIso, removeTaskFromTodayInState } from "./appModel";
+import {
+  createDailyPlanForDate,
+  currentAccountDailyPlanForDate,
+  initialDraft,
+  nowIso,
+  removeTaskFromTodayInState,
+} from "./appModel";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 import type { DailyPlan } from "./types";
 
@@ -71,24 +76,14 @@ export function createAppTaskCreationRuntime({
   const scheduleTaskForDate = (date: string, taskId: string) => {
     const timestamp = nowIso();
     updateState((value) => {
-      const existing = value.dailyPlans.find((plan) => plan.date === date);
-      const plan: DailyPlan =
-        existing ??
-        {
-          id: `plan_${date}`,
-          date,
-          capacityPomodoros: value.rewardState.dailyGoal,
-          committedTaskIds: [],
-          completedPomodoros: 0,
-          recommendedCapacityPomodoros: value.rewardState.dailyGoal,
-          suggestedCapacityPomodoros: value.rewardState.dailyGoal,
-          suggestedTaskIds: [],
-          overloadAcknowledged: false,
-          reflection: "",
-          review: defaultReview(),
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        };
+      const existing = currentAccountDailyPlanForDate(value, date);
+      const plan: DailyPlan = existing ?? {
+        ...createDailyPlanForDate(value, date, timestamp),
+        capacityPomodoros: value.rewardState.dailyGoal,
+        recommendedCapacityPomodoros: value.rewardState.dailyGoal,
+        suggestedCapacityPomodoros: value.rewardState.dailyGoal,
+        overloadAcknowledged: false,
+      };
       const nextPlan = {
         ...plan,
         committedTaskIds: Array.from(new Set([...plan.committedTaskIds, taskId])),

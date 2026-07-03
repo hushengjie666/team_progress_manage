@@ -17,6 +17,7 @@ export type CommandAction =
 export interface DailyPlan {
   id: string;
   workspaceId?: string;
+  ownerAccountId?: string;
   date: string;
   capacityPomodoros: number;
   committedTaskIds: string[];

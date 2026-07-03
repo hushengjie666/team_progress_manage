@@ -18,6 +18,7 @@ export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: stri
   const demo = createDemoState();
   const projectId = targetProject.id;
   const workspaceId = targetProject.workspaceId ?? current.auth.workspace?.id;
+  const ownerAccountId = current.auth.account?.id;
   const tasks = cloneDemoTasksForProject({
     current,
     demoTasks: demo.tasks,
@@ -39,6 +40,7 @@ export const mergeDemoDataIntoState = (current: AppState, targetProjectId?: stri
     dailyPlans: demo.dailyPlans,
     projectId,
     workspaceId,
+    ownerAccountId,
     timestamp,
   });
 

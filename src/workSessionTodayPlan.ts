@@ -1,25 +1,14 @@
-import { defaultReview } from "./domain";
 import { resolveMemberIdForProject } from "./memberIdentity";
 import { todayKey } from "./seed";
 import type { AppState, DailyPlan, Task } from "./types";
+import { createDailyPlanForDate } from "./appTodayPlan";
+import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
 
 export const ensurePlanInState = (state: AppState, date: string, timestamp: string): { state: AppState; plan: DailyPlan } => {
-  const existing = state.dailyPlans.find((plan) => plan.date === date);
+  const existing = currentAccountDailyPlanForDate(state, date);
   if (existing) return { state, plan: existing };
 
-  const plan: DailyPlan = {
-    id: `plan_${date}`,
-    workspaceId: state.auth.workspace?.id,
-    date,
-    capacityPomodoros: Math.max(4, state.rewardState.dailyGoal),
-    committedTaskIds: [],
-    completedPomodoros: 0,
-    suggestedTaskIds: [],
-    reflection: "",
-    review: defaultReview(),
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
+  const plan = createDailyPlanForDate(state, date, timestamp);
   return { state: { ...state, dailyPlans: [plan, ...state.dailyPlans], updatedAt: timestamp }, plan };
 };
 

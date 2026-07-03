@@ -76,7 +76,10 @@ export const applyUpsertSyncRow = (state: AppState, row: SyncMergeRow, options: 
       : state;
   }
   if (row.entity === "daily_plan") {
-    const incoming = payload as unknown as DailyPlan;
+    const incomingPayload = payload as unknown as DailyPlan;
+    const incoming: DailyPlan = row.account_id && !incomingPayload.ownerAccountId
+      ? { ...incomingPayload, ownerAccountId: row.account_id }
+      : incomingPayload;
     const existing = state.dailyPlans.find((plan) => plan.id === row.id);
     if (existing) {
       return {

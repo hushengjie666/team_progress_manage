@@ -32,4 +32,47 @@ describe("data sync merge", () => {
 
     expect(merged.dailyPlans[0].committedTaskIds).toEqual([]);
   });
+
+  it("uses the row account id as the daily plan owner when loading team state", () => {
+    const state = createInitialState();
+    const remotePlan = {
+      id: "plan_2026-07-04",
+      workspaceId: "workspace_team",
+      date: "2026-07-04",
+      capacityPomodoros: 8,
+      committedTaskIds: ["task_remote_today"],
+      completedPomodoros: 0,
+      suggestedTaskIds: [],
+      reflection: "",
+      review: {
+        mood: "normal" as const,
+        wins: "",
+        blockers: "",
+        interruptionPattern: "",
+        tomorrowFocus: "",
+      },
+      createdAt: "2026-07-04T08:00:00.000Z",
+      updatedAt: "2026-07-04T09:00:00.000Z",
+    };
+    const row: SyncRow = {
+      workspace_id: "workspace_team",
+      account_id: "account_hushengjie",
+      entity: "daily_plan",
+      id: remotePlan.id,
+      device_id: "other_browser",
+      updated_at: remotePlan.updatedAt,
+      payload: remotePlan,
+      revision: 13,
+      version: 1,
+    };
+
+    const merged = mergeRowsIntoState({ ...state, dailyPlans: [] }, [row], 13, { forceRemote: true });
+
+    expect(merged.dailyPlans[0]).toMatchObject({
+      id: "plan_2026-07-04",
+      workspaceId: "workspace_team",
+      ownerAccountId: "account_hushengjie",
+      committedTaskIds: ["task_remote_today"],
+    });
+  });
 });

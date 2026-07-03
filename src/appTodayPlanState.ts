@@ -4,6 +4,7 @@ import type { AppState, WorkSession } from "./types";
 import { createExecutionSignal } from "./workSessionTransitions";
 import { nowIso, today } from "./appClock";
 import { getTodayPlan } from "./appTodayPlan";
+import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
 import { endActiveWorkSessionsForTaskInState } from "./appTimerWorkSession";
 
 export const removeTaskFromTodayInState = (state: AppState, taskId: string, timestamp: string): AppState => {
@@ -81,7 +82,7 @@ export const ensureTodayPlan = (state: AppState): AppState => {
         (task) => task.id === taskId && task.status !== "completed" && task.status !== "split" && task.status !== "archived",
       ),
     );
-  const existing = normalizedState.dailyPlans.find((plan) => plan.date === todayDate);
+  const existing = currentAccountDailyPlanForDate(normalizedState, todayDate);
   if (!existing) {
     const plan = getTodayPlan(normalizedState);
     return {

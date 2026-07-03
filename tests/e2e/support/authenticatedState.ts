@@ -131,7 +131,9 @@ export const authenticatedState = (): AppState => {
     ],
     dailyPlans: [
       {
-        id: `plan_${today}`,
+        id: `plan_account_owner_${today}`,
+        ownerAccountId: "account_owner",
+        workspaceId: "workspace_e2e",
         date: today,
         capacityPomodoros: 8,
         committedTaskIds: ["task_e2e_prd"],

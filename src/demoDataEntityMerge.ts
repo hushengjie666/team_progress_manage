@@ -45,17 +45,20 @@ export const cloneDemoDailyPlansForProject = ({
   dailyPlans,
   projectId,
   workspaceId,
+  ownerAccountId,
   timestamp,
 }: {
   dailyPlans: DailyPlan[];
   projectId: string;
   workspaceId?: string;
+  ownerAccountId?: string;
   timestamp: string;
 }): DailyPlan[] =>
   dailyPlans.map((plan) => ({
     ...plan,
-    id: demoEntityIdForProject(plan.id, projectId),
+    id: demoEntityIdForProject(ownerAccountId ? `${plan.id}_${ownerAccountId}` : plan.id, projectId),
     workspaceId,
+    ownerAccountId,
     committedTaskIds: plan.committedTaskIds.map((taskId) => demoTaskIdForProject(taskId, projectId)),
     suggestedTaskIds: plan.suggestedTaskIds.map((taskId) => demoTaskIdForProject(taskId, projectId)),
     createdAt: timestamp,
@@ -67,10 +70,11 @@ export const mergeDemoDailyPlans = (
   demoPlans: DailyPlan[],
   timestamp: string,
 ): DailyPlan[] => {
-  const plansByDate = new Map(currentDailyPlans.map((plan) => [plan.date, plan]));
+  const planKey = (plan: DailyPlan) => `${plan.ownerAccountId ?? ""}:${plan.date}`;
+  const plansByKey = new Map(currentDailyPlans.map((plan) => [planKey(plan), plan]));
   return [
     ...currentDailyPlans.map((plan) => {
-      const demoPlan = demoPlans.find((item) => item.date === plan.date);
+      const demoPlan = demoPlans.find((item) => planKey(item) === planKey(plan));
       if (!demoPlan) return plan;
       return {
         ...plan,
@@ -79,6 +83,6 @@ export const mergeDemoDailyPlans = (
         updatedAt: timestamp,
       };
     }),
-    ...demoPlans.filter((plan) => !plansByDate.has(plan.date)),
+    ...demoPlans.filter((plan) => !plansByKey.has(planKey(plan))),
   ].sort((left, right) => right.date.localeCompare(left.date));
 };

@@ -1,5 +1,6 @@
 import { todayKey } from "./seed";
 import type { AppState, DailyPlan, PlanPressure, Task, TaskSuggestion } from "./types";
+import { dailyPlanBelongsToCurrentAccount } from "./dailyPlanScope";
 import {
   interruptionsOnDate,
   planForDate,
@@ -7,7 +8,7 @@ import {
 
 export const planCapacityHint = (state: AppState, date = todayKey()) => {
   const history = state.dailyPlans
-    .filter((plan) => plan.date !== date)
+    .filter((plan) => plan.date !== date && dailyPlanBelongsToCurrentAccount(state, plan))
     .slice(-7)
     .map((plan) => plan.completedPomodoros)
     .filter((value) => value > 0);

@@ -8,6 +8,7 @@ import {
 import { resolveMemberForProject } from "./memberIdentity";
 import { buildProgressBoard } from "./progressBoard";
 import type { Account, AppState, TaskStatus } from "./types";
+import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
 import { filterProjectTasks, projectTasksForProject } from "./projectDetailTaskFilters";
 import type { ProjectAccess, ProjectTaskFilters } from "./projectDetailTypes";
 
@@ -52,7 +53,7 @@ export const deriveProjectDetailModel = (
   const acceptedTasks = allProjectTasks
     .filter((task) => task.status === "completed" && Boolean(task.reviewAcceptedAt))
     .sort((left, right) => (right.reviewAcceptedAt ?? "").localeCompare(left.reviewAcceptedAt ?? ""));
-  const todayPlan = state.dailyPlans.find((plan) => plan.date === date);
+  const todayPlan = currentAccountDailyPlanForDate(state, date);
   const runnableProjectTaskIds = new Set(allProjectTasks.filter((task) => task.status === "in_progress").map((task) => task.id));
   const activeProjectTaskIds = state.workSessions
     .filter((session) => session.status === "active" && runnableProjectTaskIds.has(session.taskId))
