@@ -30,6 +30,8 @@ export {
 export {
   acceptProjectInvitation,
   acceptWorkspaceInvitation,
+  deleteProjectInvitation,
+  deleteWorkspaceInvitation,
   fetchProjectInvitations,
   fetchWorkspaceInvitations,
   inviteProjectMember,

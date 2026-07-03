@@ -72,10 +72,16 @@
   background: #fbfaf6;
 }
 
-.invitation-item > div {
+.invitation-copy {
   min-width: 0;
   display: grid;
   gap: 5px;
+}
+
+.invitation-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .invitation-item strong,

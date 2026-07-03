@@ -121,6 +121,8 @@ export type AppAuthenticatedShellProps = {
     | "updateWorkspaceMembership"
     | "acceptPendingWorkspaceInvitation"
     | "acceptPendingProjectInvitation"
+    | "deletePendingWorkspaceInvitation"
+    | "deletePendingProjectInvitation"
     | "createPlatformAccount"
     | "updatePlatformAccountProfile"
     | "updatePlatformAccountPassword"

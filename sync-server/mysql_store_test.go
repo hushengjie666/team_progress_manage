@@ -37,6 +37,13 @@ func TestMySQLSchemaEnsureIsIdempotentAndCurrent(t *testing.T) {
 	if err := ensureMySQLSchema(context.Background(), db); err != nil {
 		t.Fatal(err)
 	}
+	statusUniqueIndexExists, err := mysqlIndexExists(context.Background(), db, "workspace_invitations", "idx_workspace_invitations_unique_status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusUniqueIndexExists {
+		t.Fatal("workspace invitation status unique index should not exist")
+	}
 
 	for _, table := range []string{
 		"sync_meta",
@@ -72,6 +79,35 @@ func TestMySQLSchemaEnsureIsIdempotentAndCurrent(t *testing.T) {
 		if exists {
 			t.Fatalf("legacy table %s should not exist", table)
 		}
+	}
+}
+
+func TestMySQLSchemaDropsWorkspaceInvitationStatusUniqueIndex(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+
+	db, err := openMySQLDB(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	ctx := context.Background()
+	if err := ensureMySQLSchema(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE workspace_invitations ADD UNIQUE KEY idx_workspace_invitations_unique_status (workspace_id, invitee_account_id, status)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureMySQLSchema(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	statusUniqueIndexExists, err := mysqlIndexExists(ctx, db, "workspace_invitations", "idx_workspace_invitations_unique_status")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if statusUniqueIndexExists {
+		t.Fatal("workspace invitation status unique index should be removed")
 	}
 }
 func TestMySQLStoreRoundTrip(t *testing.T) {

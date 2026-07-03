@@ -1,6 +1,8 @@
 import {
   acceptProjectInvitation,
   acceptWorkspaceInvitation,
+  deleteProjectInvitation,
+  deleteWorkspaceInvitation,
   inviteProjectMember as sendProjectInvitation,
   inviteWorkspaceMember as sendWorkspaceInvitation,
 } from "./sync";
@@ -126,10 +128,58 @@ export function createWorkspaceInvitationCommands({
     })();
   };
 
+  const deletePendingWorkspaceInvitation = (invitationId: string) => {
+    const source = getState();
+    const token = tokenForState(source);
+    if (!source || !token) {
+      setToast("请先登录后台后再删除邀请");
+      return;
+    }
+    void (async () => {
+      try {
+        await deleteWorkspaceInvitation(source.sync, token, invitationId);
+      } catch (error) {
+        setToast(errorMessage(error, "工作区邀请删除失败"));
+        return;
+      }
+      try {
+        await refreshWorkspaceInvitations(source);
+        setToast("已删除工作区邀请");
+      } catch {
+        setToast("已删除工作区邀请，刷新邀请失败，请刷新页面");
+      }
+    })();
+  };
+
+  const deletePendingProjectInvitation = (invitationId: string) => {
+    const source = getState();
+    const token = tokenForState(source);
+    if (!source || !token) {
+      setToast("请先登录后台后再删除邀请");
+      return;
+    }
+    void (async () => {
+      try {
+        await deleteProjectInvitation(source.sync, token, invitationId);
+      } catch (error) {
+        setToast(errorMessage(error, "项目邀请删除失败"));
+        return;
+      }
+      try {
+        await refreshProjectInvitations(source);
+        setToast("已删除项目邀请");
+      } catch {
+        setToast("已删除项目邀请，刷新邀请失败，请刷新页面");
+      }
+    })();
+  };
+
   return {
     inviteWorkspaceMember,
     inviteProjectMember,
     acceptPendingWorkspaceInvitation,
     acceptPendingProjectInvitation,
+    deletePendingWorkspaceInvitation,
+    deletePendingProjectInvitation,
   };
 }

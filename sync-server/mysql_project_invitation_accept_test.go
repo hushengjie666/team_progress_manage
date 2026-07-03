@@ -177,3 +177,108 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 		t.Fatalf("project invitee state leaked other project rows: %#v", visible)
 	}
 }
+
+func TestMySQLProjectInvitationCancelHidesPendingInvitation(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	api := newApp(defaultConfig(), db)
+
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", defaultAdminLoginBody(t, "device_admin")))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var adminLogin loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &adminLogin); err != nil {
+		t.Fatal(err)
+	}
+	adminAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: adminLogin.Workspace.ID}
+
+	accountRecorder := httptest.NewRecorder()
+	api.handleAdminAccounts(accountRecorder, httptest.NewRequest(http.MethodPost, "/admin/accounts", bytes.NewReader([]byte(`{"name":"项目取消受邀人","email":"cancel-project@example.com","password":"secret","status":"active"}`))), adminAuth)
+	if accountRecorder.Code != http.StatusOK {
+		t.Fatalf("create platform account status = %d, body = %s", accountRecorder.Code, accountRecorder.Body.String())
+	}
+
+	workspaceRecorder := httptest.NewRecorder()
+	api.handleWorkspaces(workspaceRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", bytes.NewReader([]byte(`{"name":"项目取消协作区","type":"shared"}`))), adminAuth)
+	if workspaceRecorder.Code != http.StatusOK {
+		t.Fatalf("create shared workspace status = %d, body = %s", workspaceRecorder.Code, workspaceRecorder.Body.String())
+	}
+	var sharedLogin loginResponse
+	if err := json.Unmarshal(workspaceRecorder.Body.Bytes(), &sharedLogin); err != nil {
+		t.Fatal(err)
+	}
+	sharedAuth := authContext{AccountID: adminLogin.Account.ID, WorkspaceID: sharedLogin.Workspace.ID}
+	workspaceID := sharedLogin.Workspace.ID
+	pushRows(t, api, sharedAuth, "device_seed_cancel", []syncRow{
+		{WorkspaceID: workspaceID, Entity: "project", ID: "project_cancelled_invite", UpdatedAt: "2026-07-01T08:00:00Z", Payload: json.RawMessage(`{"id":"project_cancelled_invite","workspaceId":"` + workspaceID + `","name":"取消邀请项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:00:00Z","updatedAt":"2026-07-01T08:00:00Z"}`)},
+	})
+
+	inviteRecorder := httptest.NewRecorder()
+	inviteBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","project_id":"project_cancelled_invite","email":"cancel-project@example.com","roles":["executor"]}`))
+	api.handleProjectInvitations(inviteRecorder, httptest.NewRequest(http.MethodPost, "/project-invitations", inviteBody), sharedAuth)
+	if inviteRecorder.Code != http.StatusOK {
+		t.Fatalf("project invite status = %d, body = %s", inviteRecorder.Code, inviteRecorder.Body.String())
+	}
+	var invitePayload struct {
+		Invitation projectInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(inviteRecorder.Body.Bytes(), &invitePayload); err != nil {
+		t.Fatal(err)
+	}
+
+	inviteeLoginRecorder := httptest.NewRecorder()
+	api.handleLogin(inviteeLoginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"cancel-project@example.com","password":"secret","device_id":"device_cancel_project"}`))))
+	if inviteeLoginRecorder.Code != http.StatusOK {
+		t.Fatalf("invitee login status = %d, body = %s", inviteeLoginRecorder.Code, inviteeLoginRecorder.Body.String())
+	}
+	var inviteeLogin loginResponse
+	if err := json.Unmarshal(inviteeLoginRecorder.Body.Bytes(), &inviteeLogin); err != nil {
+		t.Fatal(err)
+	}
+	inviteeAuth := authContext{AccountID: inviteeLogin.Account.ID, WorkspaceID: inviteeLogin.Workspace.ID}
+
+	cancelRecorder := httptest.NewRecorder()
+	api.handleProjectInvitationByID(cancelRecorder, httptest.NewRequest(http.MethodDelete, "/project-invitations/"+invitePayload.Invitation.ID, nil), inviteeAuth)
+	if cancelRecorder.Code != http.StatusOK {
+		t.Fatalf("cancel project invitation status = %d, body = %s", cancelRecorder.Code, cancelRecorder.Body.String())
+	}
+	var cancelPayload struct {
+		Invitation projectInvitationSummary `json:"invitation"`
+	}
+	if err := json.Unmarshal(cancelRecorder.Body.Bytes(), &cancelPayload); err != nil {
+		t.Fatal(err)
+	}
+	if cancelPayload.Invitation.Status != "cancelled" {
+		t.Fatalf("cancelled project invitation = %#v", cancelPayload.Invitation)
+	}
+
+	listRecorder := httptest.NewRecorder()
+	api.handleProjectInvitations(listRecorder, httptest.NewRequest(http.MethodGet, "/project-invitations", nil), inviteeAuth)
+	if listRecorder.Code != http.StatusOK {
+		t.Fatalf("list project invitations status = %d, body = %s", listRecorder.Code, listRecorder.Body.String())
+	}
+	var listPayload struct {
+		Invitations []projectInvitationSummary `json:"invitations"`
+	}
+	if err := json.Unmarshal(listRecorder.Body.Bytes(), &listPayload); err != nil {
+		t.Fatal(err)
+	}
+	if len(listPayload.Invitations) != 0 {
+		t.Fatalf("cancelled project invitation should not be listed: %#v", listPayload.Invitations)
+	}
+
+	var projectMembershipCount int
+	if err := db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM team_project_members WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND deleted_at IS NULL`, workspaceID, "project_cancelled_invite", inviteeLogin.Account.ID).Scan(&projectMembershipCount); err != nil {
+		t.Fatal(err)
+	}
+	if projectMembershipCount != 0 {
+		t.Fatalf("cancelled project invitation should not add project membership, got %d", projectMembershipCount)
+	}
+}

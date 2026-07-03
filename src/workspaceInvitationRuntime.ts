@@ -10,6 +10,8 @@ type WorkspaceInvitationRuntime = Pick<
   | "inviteProjectMember"
   | "acceptPendingWorkspaceInvitation"
   | "acceptPendingProjectInvitation"
+  | "deletePendingWorkspaceInvitation"
+  | "deletePendingProjectInvitation"
 >;
 
 type WorkspaceInvitationRuntimeOptions = Pick<

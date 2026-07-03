@@ -21,6 +21,8 @@ export function AppAuthenticatedShellTopbarActions({
         projectInvitations={chrome.projectInvitations}
         acceptWorkspaceInvitation={workspaceAccountActions.acceptPendingWorkspaceInvitation}
         acceptProjectInvitation={workspaceAccountActions.acceptPendingProjectInvitation}
+        deleteWorkspaceInvitation={workspaceAccountActions.deletePendingWorkspaceInvitation}
+        deleteProjectInvitation={workspaceAccountActions.deletePendingProjectInvitation}
         refreshInvitations={async () => {
           await Promise.all([
             workspaceAccountActions.refreshWorkspaceInvitations(),

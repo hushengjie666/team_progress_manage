@@ -40,6 +40,8 @@ export type WorkspaceAccountRuntime = {
   updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: WorkspaceMembershipUpdateInput) => Promise<boolean>;
   acceptPendingWorkspaceInvitation: (invitationId: string) => void;
   acceptPendingProjectInvitation: (invitationId: string) => void;
+  deletePendingWorkspaceInvitation: (invitationId: string) => void;
+  deletePendingProjectInvitation: (invitationId: string) => void;
 };
 
 export type WorkspaceSessionLoadOptions = {

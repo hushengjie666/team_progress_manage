@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
@@ -56,8 +57,7 @@ func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 			updated_at VARCHAR(40) NOT NULL,
 			accepted_at VARCHAR(40) NULL,
 			KEY idx_workspace_invitations_invitee (invitee_account_id, status),
-			KEY idx_workspace_invitations_workspace (workspace_id, status),
-			UNIQUE KEY idx_workspace_invitations_unique_status (workspace_id, invitee_account_id, status)
+			KEY idx_workspace_invitations_workspace (workspace_id, status)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 		`CREATE TABLE IF NOT EXISTS project_invitations (
 			id VARCHAR(160) NOT NULL PRIMARY KEY,
@@ -114,5 +114,36 @@ func ensureMySQLSchema(ctx context.Context, db *sql.DB) error {
 			return err
 		}
 	}
+	if err := dropMySQLIndexIfExists(ctx, db, "workspace_invitations", "idx_workspace_invitations_unique_status"); err != nil {
+		return err
+	}
 	return nil
+}
+
+func mysqlIndexExists(ctx context.Context, q sqlRunner, tableName string, indexName string) (bool, error) {
+	var count int
+	if err := q.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+		tableName,
+		indexName,
+	).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func dropMySQLIndexIfExists(ctx context.Context, db *sql.DB, tableName string, indexName string) error {
+	exists, err := mysqlIndexExists(ctx, db, tableName, indexName)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
+	_, err = db.ExecContext(
+		ctx,
+		fmt.Sprintf("ALTER TABLE `%s` DROP INDEX `%s`", escapeMySQLIdentifier(tableName), escapeMySQLIdentifier(indexName)),
+	)
+	return err
 }

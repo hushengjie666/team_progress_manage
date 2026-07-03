@@ -38,6 +38,17 @@ export async function acceptWorkspaceInvitation(sync: SyncState, token: string, 
   return mapWorkspaceInvitation(payload.invitation);
 }
 
+export async function deleteWorkspaceInvitation(sync: SyncState, token: string, invitationId: string): Promise<WorkspaceInvitation> {
+  const payload = await requestJson<WorkspaceInvitationResponse>(
+    apiUrl(sync.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}`),
+    {
+      method: "DELETE",
+      headers: authHeaders(token),
+    },
+  );
+  return mapWorkspaceInvitation(payload.invitation);
+}
+
 export async function fetchProjectInvitations(sync: SyncState, token: string): Promise<ProjectInvitation[]> {
   const payload = await requestJson<ProjectInvitationsResponse>(apiUrl(sync.serverUrl, "/project-invitations"), {
     headers: authHeaders(token),
@@ -60,6 +71,17 @@ export async function inviteProjectMember(
       roles: input.roles.length ? input.roles : ["executor"],
     }),
   });
+  return mapProjectInvitation(payload.invitation);
+}
+
+export async function deleteProjectInvitation(sync: SyncState, token: string, invitationId: string): Promise<ProjectInvitation> {
+  const payload = await requestJson<ProjectInvitationResponse>(
+    apiUrl(sync.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}`),
+    {
+      method: "DELETE",
+      headers: authHeaders(token),
+    },
+  );
   return mapProjectInvitation(payload.invitation);
 }
 

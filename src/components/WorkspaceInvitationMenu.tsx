@@ -1,4 +1,4 @@
-import { BellRing, Check, RefreshCw } from "lucide-react";
+import { BellRing, Check, RefreshCw, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { ProjectInvitation, WorkspaceInvitation } from "../types";
 
@@ -7,12 +7,16 @@ export function WorkspaceInvitationMenu({
   projectInvitations,
   acceptWorkspaceInvitation,
   acceptProjectInvitation,
+  deleteWorkspaceInvitation,
+  deleteProjectInvitation,
   refreshInvitations,
 }: {
   workspaceInvitations: WorkspaceInvitation[];
   projectInvitations: ProjectInvitation[];
   acceptWorkspaceInvitation: (invitationId: string) => void;
   acceptProjectInvitation: (invitationId: string) => void;
+  deleteWorkspaceInvitation: (invitationId: string) => void;
+  deleteProjectInvitation: (invitationId: string) => void;
   refreshInvitations: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +34,11 @@ export function WorkspaceInvitationMenu({
     void Promise.resolve(refreshInvitationsRef.current())
       .catch(() => undefined)
       .finally(() => setRefreshing(false));
+  };
+  const confirmDelete = (label: string, deleteInvitation: () => void) => {
+    if (window.confirm(`确认删除「${label}」这条邀请吗？删除后将从待处理列表移除。`)) {
+      deleteInvitation();
+    }
   };
 
   useEffect(() => {
@@ -63,22 +72,33 @@ export function WorkspaceInvitationMenu({
             {!refreshing && pendingCount === 0 && <p className="empty">暂无待处理邀请。</p>}
             {!refreshing && pendingWorkspaceInvitations.map((invitation) => (
               <article className="invitation-item" key={invitation.id}>
-                <div>
+                <div className="invitation-copy">
                   <span className="workspace-source-badge">
                     {(invitation.workspaceType ?? "shared") === "private" ? "私人" : "协作"} · {invitation.workspaceName}
                   </span>
                   <strong>{invitation.workspaceName}</strong>
                   <small>{invitation.inviterName || invitation.inviterEmail} 邀请你加入</small>
                 </div>
-                <button className="primary-button" onClick={() => acceptWorkspaceInvitation(invitation.id)} type="button">
-                  <Check size={15} />
-                  同意加入
-                </button>
+                <div className="invitation-actions">
+                  <button className="primary-button" onClick={() => acceptWorkspaceInvitation(invitation.id)} type="button">
+                    <Check size={15} />
+                    同意加入
+                  </button>
+                  <button
+                    className="icon-button small danger"
+                    onClick={() => confirmDelete(invitation.workspaceName, () => deleteWorkspaceInvitation(invitation.id))}
+                    title="删除邀请"
+                    aria-label={`删除 ${invitation.workspaceName} 邀请`}
+                    type="button"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </article>
             ))}
             {!refreshing && pendingProjectInvitations.map((invitation) => (
               <article className="invitation-item" key={invitation.id}>
-                <div>
+                <div className="invitation-copy">
                   <span className="workspace-source-badge">项目 · {invitation.workspaceName}</span>
                   <strong>{invitation.projectName}</strong>
                   <small>
@@ -86,10 +106,21 @@ export function WorkspaceInvitationMenu({
                     {invitation.roles.includes("project_owner") ? "，担任项目负责人" : "，担任执行者"}
                   </small>
                 </div>
-                <button className="primary-button" onClick={() => acceptProjectInvitation(invitation.id)} type="button">
-                  <Check size={15} />
-                  同意加入
-                </button>
+                <div className="invitation-actions">
+                  <button className="primary-button" onClick={() => acceptProjectInvitation(invitation.id)} type="button">
+                    <Check size={15} />
+                    同意加入
+                  </button>
+                  <button
+                    className="icon-button small danger"
+                    onClick={() => confirmDelete(invitation.projectName, () => deleteProjectInvitation(invitation.id))}
+                    title="删除邀请"
+                    aria-label={`删除 ${invitation.projectName} 邀请`}
+                    type="button"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
               </article>
             ))}
           </div>

@@ -13,6 +13,8 @@ export const buildWorkspaceAccountShellActions = (
   updateWorkspaceMembership: runtime.updateWorkspaceMembership,
   acceptPendingWorkspaceInvitation: runtime.acceptPendingWorkspaceInvitation,
   acceptPendingProjectInvitation: runtime.acceptPendingProjectInvitation,
+  deletePendingWorkspaceInvitation: runtime.deletePendingWorkspaceInvitation,
+  deletePendingProjectInvitation: runtime.deletePendingProjectInvitation,
   createPlatformAccount: runtime.createPlatformAccount,
   updatePlatformAccountProfile: runtime.updatePlatformAccountProfile,
   updatePlatformAccountPassword: runtime.updatePlatformAccountPassword,

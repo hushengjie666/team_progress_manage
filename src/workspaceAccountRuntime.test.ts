@@ -238,6 +238,66 @@ describe("workspace account runtime", () => {
     });
   });
 
+  it("deletes a pending workspace invitation through the runtime", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/workspace-invitations/invitation_1") && init?.method === "DELETE") {
+        return new Response(JSON.stringify({ invitation: { ...serverInvitation, status: "cancelled" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.endsWith("/workspace-invitations")) {
+        return new Response(JSON.stringify({ invitations: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 404, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getToast, getWorkspaceInvitationUpdateCounts } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    runtime.deletePendingWorkspaceInvitation("invitation_1");
+    await vi.waitFor(() => expect(getToast()).toBe("已删除工作区邀请"));
+
+    expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
+      ["http://127.0.0.1:8787/workspace-invitations/invitation_1", "DELETE"],
+      ["http://127.0.0.1:8787/workspace-invitations", "GET"],
+    ]);
+    expect(getWorkspaceInvitationUpdateCounts()).toEqual([0]);
+  });
+
+  it("deletes a pending project invitation through the runtime", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/project-invitations/project_invitation_1") && init?.method === "DELETE") {
+        return new Response(JSON.stringify({ invitation: { ...serverProjectInvitation, status: "cancelled" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url.endsWith("/project-invitations")) {
+        return new Response(JSON.stringify({ invitations: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 404, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getToast, getProjectInvitationUpdateCounts } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    runtime.deletePendingProjectInvitation("project_invitation_1");
+    await vi.waitFor(() => expect(getToast()).toBe("已删除项目邀请"));
+
+    expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
+      ["http://127.0.0.1:8787/project-invitations/project_invitation_1", "DELETE"],
+      ["http://127.0.0.1:8787/project-invitations", "GET"],
+    ]);
+    expect(getProjectInvitationUpdateCounts()).toEqual([0]);
+  });
+
   it("does not report project invitation acceptance as failed when only state refresh fails", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
