@@ -1,5 +1,6 @@
 import { resolveMemberIdForProject } from "./memberIdentity";
-import { todayKey } from "./seed";
+import { todayKey, uid } from "./seed";
+import { addProjectMemberToState } from "./projectMemberState";
 import type { AppState, DailyPlan, Task } from "./types";
 import { createDailyPlanForDate } from "./appTodayPlan";
 import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
@@ -18,15 +19,63 @@ export const currentProjectMemberIdForTask = (state: AppState, task: Task) => {
   return resolveMemberIdForProject(state, task.projectId);
 };
 
+const taskHasAssignee = (task: Task) =>
+  Boolean(task.primaryExecutorMemberId || (task.collaboratorMemberIds ?? []).length > 0);
+
+const currentWorkspaceMembershipForTask = (state: AppState, task: Task) => {
+  const account = state.auth.account;
+  if (!account) return undefined;
+  const project = state.projects.find((item) => item.id === task.projectId);
+  const workspaceId = project?.workspaceId ?? task.workspaceId ?? state.auth.workspace?.id;
+  return state.auth.workspaceMemberships?.find(
+    (membership) =>
+      membership.status === "active" &&
+      membership.accountId === account.id &&
+      (!workspaceId || membership.workspaceId === workspaceId),
+  ) ?? (
+    state.auth.membership?.status === "active" &&
+    state.auth.membership.accountId === account.id &&
+    (!workspaceId || state.auth.membership.workspaceId === workspaceId)
+      ? state.auth.membership
+      : undefined
+  );
+};
+
+export const ensureCurrentProjectMemberForTask = (state: AppState, task: Task, timestamp: string) => {
+  const currentMemberId = currentProjectMemberIdForTask(state, task);
+  if (currentMemberId) return { state, memberId: currentMemberId };
+  const account = state.auth.account;
+  const membership = currentWorkspaceMembershipForTask(state, task);
+  if (!account || !membership) return { state, memberId: undefined };
+  const project = state.projects.find((item) => item.id === task.projectId);
+  const nextState = addProjectMemberToState(
+    state,
+    task.projectId,
+    account.name || membership.name,
+    account.email || membership.email,
+    ["executor"],
+    timestamp,
+    uid,
+    {
+      accountId: account.id,
+      workspaceId: project?.workspaceId ?? task.workspaceId ?? membership.workspaceId,
+    },
+  );
+  return { state: nextState, memberId: currentProjectMemberIdForTask(nextState, task) };
+};
+
 export const claimTaskForCurrentMemberIfUnassigned = (state: AppState, task: Task) => {
-  if (task.primaryExecutorMemberId || (task.collaboratorMemberIds ?? []).length > 0) return task.primaryExecutorMemberId;
+  if (taskHasAssignee(task)) return task.primaryExecutorMemberId;
   return currentProjectMemberIdForTask(state, task);
 };
 
 export const addTaskToTodayInState = (state: AppState, taskId: string, timestamp: string) => {
   const task = state.tasks.find((item) => item.id === taskId);
   if (!task) throw new Error(`Task not found: ${taskId}`);
-  const { state: withPlan, plan } = ensureTodayPlanInState(state, timestamp);
+  const stateWithMember = taskHasAssignee(task)
+    ? state
+    : ensureCurrentProjectMemberForTask(state, task, timestamp).state;
+  const { state: withPlan, plan } = ensureTodayPlanInState(stateWithMember, timestamp);
   const committedTaskIds = Array.from(new Set([...plan.committedTaskIds, taskId]));
   return {
     ...withPlan,
@@ -43,6 +92,26 @@ export const addTaskToTodayInState = (state: AppState, taskId: string, timestamp
     dailyPlans: withPlan.dailyPlans.map((item) => (item.id === plan.id ? { ...item, committedTaskIds, updatedAt: timestamp } : item)),
     updatedAt: timestamp,
   };
+};
+
+export const claimTodayPlanTasksForCurrentMemberInState = (state: AppState, plan: DailyPlan, timestamp: string) => {
+  let nextState = state;
+  let changed = false;
+  for (const taskId of plan.committedTaskIds) {
+    const task = nextState.tasks.find((item) => item.id === taskId);
+    if (!task || taskHasAssignee(task)) continue;
+    const withMember = ensureCurrentProjectMemberForTask(nextState, task, timestamp);
+    if (!withMember.memberId) continue;
+    nextState = {
+      ...withMember.state,
+      tasks: withMember.state.tasks.map((item) =>
+        item.id === task.id ? { ...item, primaryExecutorMemberId: withMember.memberId, updatedAt: timestamp } : item,
+      ),
+      updatedAt: timestamp,
+    };
+    changed = true;
+  }
+  return changed ? nextState : state;
 };
 
 export const removeTaskFromTodayQueueInState = (state: AppState, taskId: string, timestamp: string) => ({

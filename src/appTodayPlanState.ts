@@ -2,6 +2,7 @@ import { resolveMemberIdForProject } from "./memberIdentity";
 import { uid } from "./seed";
 import type { AppState, WorkSession } from "./types";
 import { createExecutionSignal } from "./workSessionTransitions";
+import { claimTodayPlanTasksForCurrentMemberInState } from "./workSessionTodayPlan";
 import { nowIso, today } from "./appClock";
 import { getTodayPlan } from "./appTodayPlan";
 import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
@@ -85,7 +86,7 @@ export const ensureTodayPlan = (state: AppState): AppState => {
   const existing = currentAccountDailyPlanForDate(normalizedState, todayDate);
   if (!existing) {
     const plan = getTodayPlan(normalizedState);
-    return {
+    const withPlan = {
       ...normalizedState,
       dailyPlans: [
         ...normalizedState.dailyPlans,
@@ -95,10 +96,14 @@ export const ensureTodayPlan = (state: AppState): AppState => {
         },
       ],
     };
+    const createdPlan = withPlan.dailyPlans.find((item) => item.id === plan.id);
+    return createdPlan ? claimTodayPlanTasksForCurrentMemberInState(withPlan, createdPlan, timestamp) : withPlan;
   }
   const missingActiveTaskIds = activeTaskIds.filter((taskId) => !existing.committedTaskIds.includes(taskId));
-  if (missingActiveTaskIds.length === 0) return normalizedState;
-  return {
+  if (missingActiveTaskIds.length === 0) {
+    return existing ? claimTodayPlanTasksForCurrentMemberInState(normalizedState, existing, timestamp) : normalizedState;
+  }
+  const withActiveTasks = {
     ...normalizedState,
     dailyPlans: normalizedState.dailyPlans.map((plan) =>
       plan.id === existing.id
@@ -111,4 +116,6 @@ export const ensureTodayPlan = (state: AppState): AppState => {
     ),
     updatedAt: timestamp,
   };
+  const repairedPlan = withActiveTasks.dailyPlans.find((plan) => plan.id === existing.id);
+  return repairedPlan ? claimTodayPlanTasksForCurrentMemberInState(withActiveTasks, repairedPlan, timestamp) : withActiveTasks;
 };

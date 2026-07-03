@@ -101,6 +101,74 @@ describe("timer today queue", () => {
     expect(queued.tasks.find((item) => item.id === task.id)?.primaryExecutorMemberId).toBe(secondMember.id);
   });
 
+  it("creates a project executor binding when a workspace member claims an unassigned task", () => {
+    const state = createInitialState();
+    const workspace = {
+      id: "workspace_claim",
+      name: "协作工作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-05-10T09:00:00.000Z",
+      updatedAt: "2026-05-10T09:00:00.000Z",
+    };
+    const task: Task = {
+      ...state.tasks[3],
+      id: "queue_workspace_member_claim",
+      workspaceId: workspace.id,
+      projectId: state.projects[0].id,
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "pool",
+    };
+    const queued = addTaskToTodayInState(
+      {
+        ...state,
+        auth: {
+          ...state.auth,
+          status: "authenticated",
+          account: {
+            id: "account_wangyuqiao",
+            workspaceId: workspace.id,
+            name: "王昱桥",
+            email: "wangyuqiao",
+            createdAt: "2026-05-10T09:00:00.000Z",
+            updatedAt: "2026-05-10T09:00:00.000Z",
+          },
+          workspace,
+          workspaces: [workspace],
+          workspaceMemberships: [{
+            id: "membership_workspace_claim_wangyuqiao",
+            workspaceId: workspace.id,
+            accountId: "account_wangyuqiao",
+            name: "王昱桥",
+            email: "wangyuqiao",
+            role: "member",
+            status: "active",
+            createdAt: "2026-05-10T09:00:00.000Z",
+            updatedAt: "2026-05-10T09:00:00.000Z",
+          }],
+        },
+        projects: state.projects.map((project) => ({ ...project, workspaceId: workspace.id })),
+        projectMembers: [],
+        tasks: [task],
+      },
+      task.id,
+      "2026-05-10T09:10:00.000Z",
+    );
+    const createdMember = queued.projectMembers.find((member) => member.accountId === "account_wangyuqiao");
+
+    expect(createdMember).toMatchObject({
+      projectId: state.projects[0].id,
+      workspaceId: workspace.id,
+      name: "王昱桥",
+      roles: ["executor"],
+    });
+    expect(queued.tasks.find((item) => item.id === task.id)).toMatchObject({
+      primaryExecutorMemberId: createdMember?.id,
+      status: "committed",
+    });
+  });
+
   it("ends active work sessions when removing a task from today's queue", () => {
     const state = createInitialState();
     const taskId = state.tasks[0].id;

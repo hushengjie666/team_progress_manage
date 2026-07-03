@@ -31,6 +31,80 @@ describe("timer today queue repair", () => {
     expect(getTodayPlan(repaired).committedTaskIds).toContain(taskId);
   });
 
+  it("claims existing unassigned tasks in the current account today queue", () => {
+    const state = createInitialState();
+    const workspace = {
+      id: "workspace_repair_claim",
+      name: "协作工作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: `${todayKey()}T08:00:00.000Z`,
+      updatedAt: `${todayKey()}T08:00:00.000Z`,
+    };
+    const task = {
+      ...state.tasks[3],
+      id: "repair_today_unassigned_claim",
+      workspaceId: workspace.id,
+      projectId: state.projects[0].id,
+      primaryExecutorMemberId: undefined,
+      collaboratorMemberIds: [],
+      status: "committed" as const,
+    };
+    const todayPlan = getTodayPlan({
+      ...state,
+      auth: {
+        ...state.auth,
+        account: {
+          id: "account_wangyuqiao",
+          workspaceId: workspace.id,
+          name: "王昱桥",
+          email: "wangyuqiao",
+          createdAt: `${todayKey()}T08:00:00.000Z`,
+          updatedAt: `${todayKey()}T08:00:00.000Z`,
+        },
+      },
+    });
+    const repaired = ensureTodayPlan({
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        account: {
+          id: "account_wangyuqiao",
+          workspaceId: workspace.id,
+          name: "王昱桥",
+          email: "wangyuqiao",
+          createdAt: `${todayKey()}T08:00:00.000Z`,
+          updatedAt: `${todayKey()}T08:00:00.000Z`,
+        },
+        workspace,
+        workspaces: [workspace],
+        workspaceMemberships: [{
+          id: "membership_workspace_repair_claim_wangyuqiao",
+          workspaceId: workspace.id,
+          accountId: "account_wangyuqiao",
+          name: "王昱桥",
+          email: "wangyuqiao",
+          role: "member",
+          status: "active",
+          createdAt: `${todayKey()}T08:00:00.000Z`,
+          updatedAt: `${todayKey()}T08:00:00.000Z`,
+        }],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId: workspace.id })),
+      projectMembers: [],
+      tasks: [task],
+      dailyPlans: [{ ...todayPlan, workspaceId: workspace.id, committedTaskIds: [task.id] }],
+    });
+    const createdMember = repaired.projectMembers.find((member) => member.accountId === "account_wangyuqiao");
+
+    expect(createdMember).toMatchObject({
+      projectId: state.projects[0].id,
+      roles: ["executor"],
+    });
+    expect(repaired.tasks.find((item) => item.id === task.id)?.primaryExecutorMemberId).toBe(createdMember?.id);
+  });
+
   it("repairs a focus active timer that is missing its work session", () => {
     const state = createInitialState();
     const taskId = state.tasks[0].id;

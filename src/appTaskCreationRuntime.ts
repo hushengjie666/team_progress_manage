@@ -8,6 +8,7 @@ import {
   initialDraft,
   nowIso,
   removeTaskFromTodayInState,
+  today,
 } from "./appModel";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 import type { DailyPlan } from "./types";
@@ -75,6 +76,11 @@ export function createAppTaskCreationRuntime({
 
   const scheduleTaskForDate = (date: string, taskId: string) => {
     const timestamp = nowIso();
+    if (date === today()) {
+      updateState((value) => addTaskToTodayInState(value, taskId, timestamp));
+      setToast("已加入工作队列");
+      return;
+    }
     updateState((value) => {
       const existing = currentAccountDailyPlanForDate(value, date);
       const plan: DailyPlan = existing ?? {
