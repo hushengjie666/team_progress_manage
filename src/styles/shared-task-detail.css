@@ -4,14 +4,6 @@
   }
 }
 
-.daily-review-grid {
-  grid-template-columns: 1fr;
-}
-
-.review-panel {
-  grid-column: 1 / -1;
-}
-
 .task-detail {
   display: grid;
   gap: 16px;

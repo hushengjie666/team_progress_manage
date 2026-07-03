@@ -20,7 +20,7 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	defer db.Close()
 	api := newApp(defaultConfig(), db)
 
-	loginBody := bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_mysql"}`))
+	loginBody := defaultAdminLoginBody(t, "device_mysql")
 	loginRecorder := httptest.NewRecorder()
 	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
 	if loginRecorder.Code != http.StatusOK {

@@ -49,8 +49,8 @@ func mysqlWorkspaceMembershipSummaries(ctx context.Context, q sqlRunner, workspa
 		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at
 		 FROM workspace_memberships m
 		 JOIN accounts a ON a.id = m.account_id
-		 WHERE m.workspace_id = ?
-		 ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, a.name ASC`,
+		 WHERE m.workspace_id = ? AND m.status = 'active'
+		 ORDER BY m.created_at ASC, m.id ASC`,
 		workspaceID,
 	)
 	if err != nil {

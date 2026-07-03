@@ -1,6 +1,6 @@
 import type { Task } from "./types";
 
-export type Tab = "workspace" | "workspaces" | "project" | "member_status" | "focus" | "calendar" | "daily" | "reports" | "settings";
+export type Tab = "workspace" | "workspaces" | "project" | "member_status" | "focus" | "settings";
 
 export type DeletedTaskSnapshot = {
   task: Task;

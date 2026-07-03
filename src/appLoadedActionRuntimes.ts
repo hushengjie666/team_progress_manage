@@ -1,4 +1,3 @@
-import { createAppDailyReviewRuntime } from "./appDailyReviewRuntime";
 import { createAppFocusActionsRuntime } from "./appFocusActionsRuntime";
 import { createAppProjectActionsRuntime } from "./appProjectActionsRuntime";
 import { createAppSettingsActionsRuntime } from "./appSettingsActionsRuntime";
@@ -49,10 +48,6 @@ export function createAppLoadedActionRuntimes({
     setPreferredFocusTaskId: shell.setPreferredFocusTaskId,
     setPendingReset: shell.setPendingReset,
   });
-  const dailyActions = createAppDailyReviewRuntime({
-    updateState,
-    setToast: shell.setToast,
-  });
   const projectActions = createAppProjectActionsRuntime({
     updateState,
     setToast: shell.setToast,
@@ -65,7 +60,6 @@ export function createAppLoadedActionRuntimes({
   return {
     taskActions,
     focusActions,
-    dailyActions,
     projectActions,
     settingsActions,
   };

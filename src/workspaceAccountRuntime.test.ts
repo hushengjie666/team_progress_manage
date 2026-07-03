@@ -79,6 +79,8 @@ const createRuntimeHarness = (initial: AppState | null, initialPlatformAccounts:
   let platformAccounts: Account[] = initialPlatformAccounts;
   let invitationCount = 0;
   let projectInvitationCount = 0;
+  const workspaceInvitationUpdateCounts: number[] = [];
+  const projectInvitationUpdateCounts: number[] = [];
   const runtime = createWorkspaceAccountRuntime({
     getState: () => current,
     setState: (updater) => {
@@ -93,9 +95,11 @@ const createRuntimeHarness = (initial: AppState | null, initialPlatformAccounts:
     getPlatformAccounts: () => platformAccounts,
     setWorkspaceInvitations: (invitations) => {
       invitationCount = invitations.length;
+      workspaceInvitationUpdateCounts.push(invitations.length);
     },
     setProjectInvitations: (invitations) => {
       projectInvitationCount = invitations.length;
+      projectInvitationUpdateCounts.push(invitations.length);
     },
   });
   return {
@@ -104,6 +108,8 @@ const createRuntimeHarness = (initial: AppState | null, initialPlatformAccounts:
     getPlatformAccounts: () => platformAccounts,
     getInvitationCount: () => invitationCount,
     getProjectInvitationCount: () => projectInvitationCount,
+    getWorkspaceInvitationUpdateCounts: () => workspaceInvitationUpdateCounts,
+    getProjectInvitationUpdateCounts: () => projectInvitationUpdateCounts,
   };
 };
 
@@ -152,6 +158,46 @@ describe("workspace account runtime", () => {
     expect(metadata.projectInvitations[0]?.projectName).toBe("消毒中心");
   });
 
+  it("surfaces invitation metadata load failures instead of returning empty invitations", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/admin/accounts")) {
+        return new Response(JSON.stringify({ accounts: [serverAccount] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/workspace-invitations")) {
+        return new Response(JSON.stringify({ error: "workspace invitations unavailable" }), { status: 500, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/project-invitations")) {
+        return new Response(JSON.stringify({ invitations: [serverProjectInvitation] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 404, headers: { "content-type": "application/json" } });
+    }));
+
+    await expect(loadWorkspaceAccountMetadata(withAdminToken(createInitialState()))).rejects.toThrow("workspace invitations unavailable");
+  });
+
+  it("does not clear workspace invitations when refresh fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ error: "workspace invitations unavailable" }), { status: 500, headers: { "content-type": "application/json" } }),
+    ));
+    const { runtime, getWorkspaceInvitationUpdateCounts } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    await expect(runtime.refreshWorkspaceInvitations()).rejects.toThrow("workspace invitations unavailable");
+
+    expect(getWorkspaceInvitationUpdateCounts()).toEqual([]);
+  });
+
+  it("does not clear project invitations when refresh fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () =>
+      new Response(JSON.stringify({ error: "project invitations unavailable" }), { status: 500, headers: { "content-type": "application/json" } }),
+    ));
+    const { runtime, getProjectInvitationUpdateCounts } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    await expect(runtime.refreshProjectInvitations()).rejects.toThrow("project invitations unavailable");
+
+    expect(getProjectInvitationUpdateCounts()).toEqual([]);
+  });
+
   it("normalizes invitation email before sending", async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ invitation: { ...serverInvitation, invitee_email: "bob@example.com" } }), {
@@ -190,6 +236,38 @@ describe("workspace account runtime", () => {
       email: "bob@example.com",
       roles: ["executor"],
     });
+  });
+
+  it("does not report project invitation acceptance as failed when only state refresh fails", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/project-invitations/project_invitation_1/accept") && init?.method === "POST") {
+        return new Response(JSON.stringify({
+          invitation: {
+            ...serverProjectInvitation,
+            status: "accepted",
+            accepted_at: "2026-07-01T08:05:00.000Z",
+          },
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/workspaces")) {
+        return new Response(JSON.stringify({ error: "save failed" }), { status: 500, headers: { "content-type": "application/json" } });
+      }
+      if (url.endsWith("/project-invitations")) {
+        return new Response(JSON.stringify({ invitations: [] }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "unexpected request" }), { status: 404, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getToast } = createRuntimeHarness(withAdminToken(createInitialState()));
+
+    runtime.acceptPendingProjectInvitation("project_invitation_1");
+    await vi.waitFor(() => expect(getToast()).toBe("已加入项目 消毒中心，刷新项目数据失败，请刷新页面"));
+
+    expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
+      "http://127.0.0.1:8787/project-invitations/project_invitation_1/accept",
+      "http://127.0.0.1:8787/workspaces",
+    ]);
   });
 
   it("creates platform accounts through the runtime and refreshes the account list", async () => {

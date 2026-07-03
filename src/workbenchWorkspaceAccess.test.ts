@@ -9,7 +9,7 @@ import {
 } from "./test/workbenchFixtures";
 
 describe("workbench workspace access", () => {
-  it("shows workspace-accessible projects and their active tasks even without a project member binding", () => {
+  it("shows workspace-accessible projects and their unassigned pool tasks even without a project member binding", () => {
     const state = createInitialState();
     const workspaceId = "workspace_disinfection";
     const unassignedTask = {
@@ -86,7 +86,6 @@ describe("workbench workspace access", () => {
     expect(model.availableWorkbenchProjectIds).toEqual([state.projects[0].id]);
     expect(model.poolWorkbenchTasks.map((item) => item.id)).toEqual([
       "task_disinfection_unassigned",
-      "task_disinfection_assigned_other",
     ]);
   });
 

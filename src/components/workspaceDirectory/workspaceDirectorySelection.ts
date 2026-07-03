@@ -1,5 +1,5 @@
 import { visibleWorkspaceMembers } from "../../accessControl";
-import type { Account, WorkspaceMembership, WorkspaceUpdateInput } from "../../types";
+import type { Account, WorkspaceMembership } from "../../types";
 import { inferWorkspaceOwnerAccountId, type WorkspaceDirectoryCard, type WorkspaceModalState } from "./workspaceDirectoryModel";
 
 export type WorkspaceMemberDrafts = Record<string, { email: string }>;
@@ -9,14 +9,12 @@ export const buildWorkspaceDirectorySelection = ({
   directoryCards,
   workspaceMemberships,
   currentAccount,
-  workspaceEditDraft,
   workspaceMemberDrafts,
 }: {
   activeModal: WorkspaceModalState | null;
   directoryCards: WorkspaceDirectoryCard[];
   workspaceMemberships: WorkspaceMembership[];
   currentAccount?: Account;
-  workspaceEditDraft: WorkspaceUpdateInput;
   workspaceMemberDrafts: WorkspaceMemberDrafts;
 }) => {
   const selectedCard = directoryCards.find((card) => card.workspace.id === activeModal?.workspaceId);
@@ -27,9 +25,7 @@ export const buildWorkspaceDirectorySelection = ({
   const selectedWorkspaceType = selectedCard?.workspace.type ?? "shared";
   const selectedCurrentMembership = selectedAllMembers.find((membership) => membership.accountId === currentAccount?.id);
   const selectedCurrentMembershipIsActive = selectedCurrentMembership?.status === "active";
-  const canEditSelectedWorkspace = Boolean(
-    selectedCurrentMembershipIsActive && (selectedCurrentMembership?.role === "owner" || selectedCurrentMembership?.role === "admin"),
-  );
+  const canEditSelectedWorkspace = Boolean(selectedCurrentMembershipIsActive);
   const canChangeSelectedWorkspaceType = Boolean(
     selectedCurrentMembershipIsActive && selectedCurrentMembership?.role === "owner" && selectedWorkspaceType !== "private",
   );
@@ -39,7 +35,6 @@ export const buildWorkspaceDirectorySelection = ({
   const selectedOwnerAccountId = selectedCard
     ? inferWorkspaceOwnerAccountId(selectedCard.workspace, selectedAllMembers, currentAccount?.id)
     : "";
-  const editingOwnerAccountId = workspaceEditDraft.ownerAccountId || selectedOwnerAccountId;
   const selectedMemberDraft = selectedCard ? workspaceMemberDrafts[selectedCard.workspace.id] ?? { email: "" } : { email: "" };
 
   return {
@@ -47,7 +42,6 @@ export const buildWorkspaceDirectorySelection = ({
     selectedMembers,
     selectedWorkspaceType,
     selectedOwnerAccountId,
-    editingOwnerAccountId,
     selectedMemberDraft,
     canEditSelectedWorkspace,
     canChangeSelectedWorkspaceType,

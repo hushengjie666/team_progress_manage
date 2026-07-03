@@ -12,8 +12,8 @@ go build -trimpath -ldflags="-s -w" -o bin/timemanage-sync .
 ## Run Locally
 
 ```bash
-TM_SYNC_USER=demo \
-TM_SYNC_PASSWORD=demo \
+TM_SYNC_USER=admin \
+TM_SYNC_PASSWORD=hu626699 \
 TM_SYNC_ADDR=127.0.0.1:8787 \
 TM_SYNC_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/timemanage_sync?parseTime=true&charset=utf8mb4' \
 ./sync-server/bin/timemanage-sync serve
@@ -59,7 +59,7 @@ Windows 部署包包含：
 - `GET /team/revision`
 - `POST /team/changes`
 
-The React app defaults to `http://127.0.0.1:8787`, username `demo`, password `demo`.
+The React app defaults to `http://127.0.0.1:8787`, username `admin`, password `hu626699`.
 
 ## Small Backend Deployment
 

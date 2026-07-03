@@ -9,7 +9,7 @@ import {
 } from "./test/workbenchFixtures";
 
 describe("workbench member identity", () => {
-  it("uses the authenticated account while keeping accessible project tasks visible", () => {
+  it("uses the authenticated account and hides teammate work queue tasks", () => {
     const state = createInitialState();
     const owner = state.projectMembers[0];
     const teammate: ProjectMember = {
@@ -55,7 +55,7 @@ describe("workbench member identity", () => {
     );
 
     expect(currentMemberForState(loggedInState)?.id).toBe(owner.id);
-    expect(model.committedWorkbenchTasks.map((item) => item.id)).toEqual(["task_owner", "task_teammate"]);
+    expect(model.committedWorkbenchTasks.map((item) => item.id)).toEqual(["task_owner"]);
   });
 
   it("does not fall back to another person when the authenticated account has no project member", () => {

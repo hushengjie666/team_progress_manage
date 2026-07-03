@@ -84,7 +84,8 @@ describe("project detail controller model", () => {
 
     expect(projectWorkspaceOptions([shared, privateWorkspace], undefined, "workspace_shared").map((item) => item.id)).toEqual(["workspace_shared"]);
     expect(projectWorkspaceTagLabel(privateWorkspace)).toBe("私人工作区 · 工作区 A");
-    expect(canShowProjectMemberManagementFor({ canManageProjectMembers: true, workspace: privateWorkspace })).toBe(false);
+    expect(canShowProjectMemberManagementFor({ workspace: shared })).toBe(true);
+    expect(canShowProjectMemberManagementFor({ workspace: privateWorkspace })).toBe(true);
     expect(projectDetailActiveTabFor("members", false)).toBe("overview");
   });
 

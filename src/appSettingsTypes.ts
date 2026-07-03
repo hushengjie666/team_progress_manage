@@ -1,5 +1,3 @@
-import type { CalendarViewMode, ReportFilter } from "./planningTypes";
-
 export type PermissionState = "unknown" | "granted" | "denied" | "unavailable";
 export type TimerEndSound = "soft" | "bell" | "digital";
 export type WhiteNoise = "off" | "rain" | "brown" | "cafe";
@@ -23,7 +21,5 @@ export interface Settings {
   timerEndSound: TimerEndSound;
   notificationSettings: NotificationSettings;
   advancedSyncVisible?: boolean;
-  reportFilter?: ReportFilter;
-  calendarViewMode?: CalendarViewMode;
   commandPaletteHintDismissed?: boolean;
 }

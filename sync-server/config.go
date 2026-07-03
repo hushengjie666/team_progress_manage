@@ -26,8 +26,8 @@ type fileConfig struct {
 func defaultConfig() config {
 	cfg := config{
 		addr:     "127.0.0.1:8787",
-		username: "demo",
-		password: "demo",
+		username: "admin",
+		password: "hu626699",
 	}
 	cfg.secret = cfg.password + "-local-secret"
 	return cfg

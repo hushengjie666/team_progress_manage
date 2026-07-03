@@ -65,17 +65,5 @@ func mysqlRestrictWorkspaceToOwner(ctx context.Context, tx *sql.Tx, workspaceID 
 }
 
 func mysqlSetWorkspaceOwner(ctx context.Context, tx *sql.Tx, workspaceID string, ownerAccountID string, now string) error {
-	if err := mysqlEnsureWorkspaceMembership(ctx, tx, workspaceID, ownerAccountID, "owner", "active", now); err != nil {
-		return err
-	}
-	_, err := tx.ExecContext(
-		ctx,
-		`UPDATE workspace_memberships
-		 SET role = 'member', updated_at = ?
-		 WHERE workspace_id = ? AND account_id <> ? AND role = 'owner'`,
-		now,
-		workspaceID,
-		ownerAccountID,
-	)
-	return err
+	return mysqlEnsureWorkspaceMembership(ctx, tx, workspaceID, ownerAccountID, "owner", "active", now)
 }

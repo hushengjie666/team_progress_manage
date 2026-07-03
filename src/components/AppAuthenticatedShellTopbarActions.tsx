@@ -21,13 +21,15 @@ export function AppAuthenticatedShellTopbarActions({
         projectInvitations={chrome.projectInvitations}
         acceptWorkspaceInvitation={workspaceAccountActions.acceptPendingWorkspaceInvitation}
         acceptProjectInvitation={workspaceAccountActions.acceptPendingProjectInvitation}
-        refreshInvitations={() => {
-          void workspaceAccountActions.refreshWorkspaceInvitations();
-          void workspaceAccountActions.refreshProjectInvitations();
+        refreshInvitations={async () => {
+          await Promise.all([
+            workspaceAccountActions.refreshWorkspaceInvitations(),
+            workspaceAccountActions.refreshProjectInvitations(),
+          ]);
         }}
       />
       <button className="secondary-button" onClick={authActions.logout}>
-        账号：{view.state.auth.account?.name ?? "退出"}
+        退出登录：{view.state.auth.account?.name ?? "当前账号"}
       </button>
       <button className="icon-button" title="命令面板" onClick={() => shellState.setCommandPaletteOpen(true)}>
         <Search size={18} />

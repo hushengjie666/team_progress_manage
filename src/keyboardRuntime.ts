@@ -14,7 +14,6 @@ export type KeyboardRuntimeOptions = {
   setTab: (tab: Tab) => void;
   setPendingReset: (pending: boolean) => void;
   setSelectedTaskId: (taskId: string) => void;
-  completeReview: () => void;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   toggleTimer: () => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;

@@ -21,7 +21,7 @@ export type AppTaskActionsRuntimeOptions = {
   setPendingDeleteTask: AppTaskActionSetter<Task | null>;
   setDeletedTaskSnapshot: AppTaskActionSetter<DeletedTaskSnapshot | null>;
   setPendingSplit: AppTaskActionSetter<SplitDraft | null>;
-  setTab: (tab: "workspace" | "workspaces" | "focus" | "daily" | "calendar" | "reports" | "settings" | "project") => void;
+  setTab: (tab: "workspace" | "workspaces" | "focus" | "settings" | "project") => void;
   undoTimerRef: { current: number | null };
 };
 

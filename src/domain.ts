@@ -30,12 +30,6 @@ export {
   computeStreak,
   deriveRewardState,
 } from "./rewardDomain";
-export {
-  buildInsights,
-  focusQuality,
-  interruptionHotspots,
-  nextActions,
-} from "./insightDomain";
 
 export { buildProgressBoard, expectedStartForTask, stalledTaskRisks } from "./progressBoard";
 export type { ProgressBoard, ProgressBoardActiveSession, ProgressBoardSection, ProgressBoardSectionKind, ProgressBoardTask, StalledTaskRisk, StalledTaskRiskKind } from "./progressBoard";

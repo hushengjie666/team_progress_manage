@@ -1,8 +1,8 @@
 import { todayKey } from "../../src/seed.js";
-import { dailySummaryView, todayPlanView, todayWorkbenchView, updateDailyReviewMutation } from "./coreDailyViews.js";
+import { todayPlanView, todayWorkbenchView } from "./coreDailyViews.js";
 import { TimeManageMcpMemberClient } from "./coreMembers.js";
 import { activeWorkView, listTaskViews, projectOverviewView, riskTasksView, taskDetailView } from "./coreProjectViews.js";
-import type { DailyReviewPatch, TaskListFilter } from "./coreTypes.js";
+import type { TaskListFilter } from "./coreTypes.js";
 
 export class TimeManageMcpViewClient extends TimeManageMcpMemberClient {
   async listTasks(filter: TaskListFilter) {
@@ -42,14 +42,5 @@ export class TimeManageMcpViewClient extends TimeManageMcpMemberClient {
   async listRiskTasks(projectId?: string) {
     const state = await this.readState(projectId);
     return riskTasksView(state, projectId);
-  }
-
-  async getDailySummary(date = todayKey()) {
-    const state = await this.readState();
-    return dailySummaryView(state, date);
-  }
-
-  async updateDailyReview(date: string, patch: DailyReviewPatch) {
-    return this.mutate(undefined, (state, timestamp) => updateDailyReviewMutation(state, date, patch, timestamp));
   }
 }

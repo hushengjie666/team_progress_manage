@@ -31,7 +31,7 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	if err != nil {
 		return workspaceData{}, memberWriteFailure{status: http.StatusInternalServerError, message: "load workspace membership failed"}
 	}
-	if !found || (membership.Role != "owner" && membership.Role != "admin") {
+	if !found {
 		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "workspace access denied"}
 	}
 	currentOwnerAccountID := workspace.OwnerAccountID
@@ -41,6 +41,9 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	ownerAccountID := strings.TrimSpace(input.ownerID)
 	if ownerAccountID == "" {
 		ownerAccountID = currentOwnerAccountID
+	}
+	if workspaceType != workspace.Type && membership.Role != "owner" && membership.Role != "admin" {
+		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "only workspace owner or admin can change workspace type"}
 	}
 	if failure := validateWorkspaceOwnerUpdate(ctx, tx, auth, input.workspaceID, workspace, membership, workspaceType, currentOwnerAccountID, ownerAccountID); failure.status != 0 {
 		return workspaceData{}, failure

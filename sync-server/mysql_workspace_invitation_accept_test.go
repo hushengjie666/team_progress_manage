@@ -20,7 +20,7 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	api := newApp(defaultConfig(), db)
 
 	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", defaultAdminLoginBody(t, "device_admin")))
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
@@ -155,8 +155,15 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	if !hasSharedWorkspace {
 		t.Fatalf("invitee workspaces missing shared workspace: %#v", workspacesPayload.Workspaces)
 	}
-	if len(sharedMemberships) != 1 || sharedMemberships[0].AccountID != inviteeLogin.Account.ID {
-		t.Fatalf("invitee shared memberships should only include self: %#v", sharedMemberships)
+	if len(sharedMemberships) != 2 {
+		t.Fatalf("invitee shared memberships should include workspace members: %#v", sharedMemberships)
+	}
+	sharedMembershipAccounts := map[string]bool{}
+	for _, membership := range sharedMemberships {
+		sharedMembershipAccounts[membership.AccountID] = true
+	}
+	if !sharedMembershipAccounts[adminLogin.Account.ID] || !sharedMembershipAccounts[inviteeLogin.Account.ID] {
+		t.Fatalf("invitee shared memberships missing owner or self: %#v", sharedMemberships)
 	}
 
 	inviteeStateRecorder := httptest.NewRecorder()

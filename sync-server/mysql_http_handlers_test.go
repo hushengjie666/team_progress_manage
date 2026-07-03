@@ -37,7 +37,7 @@ func TestMySQLHTTPHandlersSmoke(t *testing.T) {
 		t.Fatalf("health status = %d", healthRecorder.StatusCode)
 	}
 
-	loginBody := bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_http"}`))
+	loginBody := defaultAdminLoginBody(t, "device_http")
 	loginHTTPResponse, err := http.Post(server.URL+"/auth/login", "application/json", loginBody)
 	if err != nil {
 		t.Fatal(err)

@@ -14,7 +14,7 @@
 
 .project-binding-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(96px, auto) minmax(130px, auto) minmax(110px, auto) auto;
+  grid-template-columns: minmax(260px, 1fr) 132px 124px 96px 104px;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -59,6 +59,17 @@
   color: #23685f;
   font-size: 12px;
   font-weight: 700;
+}
+
+.project-binding-row > .inline-toggle {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+.project-binding-row > .secondary-button,
+.project-binding-row > .project-binding-muted {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .member-source-pill.project {

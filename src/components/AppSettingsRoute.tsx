@@ -7,7 +7,6 @@ type AppSettingsRouteProps = Pick<
   | "shellState"
   | "chrome"
   | "settingsActions"
-  | "dataPortability"
   | "syncActions"
   | "workspaceAccountActions"
   | "loadDemoData"
@@ -18,7 +17,6 @@ export function AppSettingsRoute({
   shellState,
   chrome,
   settingsActions,
-  dataPortability,
   syncActions,
   workspaceAccountActions,
   loadDemoData,
@@ -27,7 +25,6 @@ export function AppSettingsRoute({
   const {
     syncPassword,
     setSyncPassword,
-    importSummary,
     syncDiagnostic,
     settingsSection,
     setSettingsSection,
@@ -40,7 +37,6 @@ export function AppSettingsRoute({
       settings={state.settings}
       dailyGoal={state.rewardState.dailyGoal}
       sync={state.sync}
-      backupSnapshots={state.backupSnapshots}
       dataSummary={chrome.settingsDataSummary}
       activeSection={settingsSection}
       setActiveSection={setSettingsSection}
@@ -59,12 +55,6 @@ export function AppSettingsRoute({
       handleSyncNow={syncActions.handleSyncNow}
       runSyncDiagnostics={syncActions.runSyncDiagnostics}
       syncDiagnostic={syncDiagnostic}
-      exportJson={dataPortability.exportJson}
-      exportCsv={dataPortability.exportCsv}
-      previewImportFile={dataPortability.previewImportFile}
-      importSummary={importSummary}
-      confirmImport={dataPortability.confirmImport}
-      restoreBackup={dataPortability.restoreBackup}
       loadDemoData={loadDemoData}
     />
   );

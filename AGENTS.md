@@ -51,10 +51,10 @@ Start with the smallest module that owns the product concept before opening app-
 - Project Overview cards and my project filters: `src/projectOverview.ts`, `src/components/workspace/ProjectOverviewCardsPanel.tsx`, `src/components/workspace/MyProjectTaskFilterPanel.tsx`, and `src/projectOverview.test.ts`.
 - Progress Board: `src/progressBoard.ts` and `src/progressBoard.test.ts`.
 - Recurring tasks: `src/recurrence.ts` and `src/recurrence.test.ts`.
-- App boot and app shell wiring: `src/appBootRuntime.ts`, `src/keyboardRuntime.ts`, and `src/dataPortabilityRuntime.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
+- App boot and app shell wiring: `src/appBootRuntime.ts` and `src/keyboardRuntime.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
 - Workspace accounts and invitations: `src/workspaceAccountRuntime.ts` before touching login/session, platform accounts, workspace invitations, or workspace update flows.
 - Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/teamApi.ts`, and `src/timerRuntime.ts`.
-- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsSyncPanel.tsx`, `SettingsDataPanel.tsx`, or `SettingsDemoPanel.tsx`.
+- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsSyncPanel.tsx`, or `SettingsDemoPanel.tsx`.
 - Test setup data: use `src/test/fixtures.ts` instead of copying full `AppState` literals.
 
 ## Frontend Scope

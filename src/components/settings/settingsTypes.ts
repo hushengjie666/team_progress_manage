@@ -1,4 +1,4 @@
-export type SettingsSection = "members" | "timer" | "sync" | "data" | "demo";
+export type SettingsSection = "members" | "timer" | "sync" | "demo";
 
 export type SettingsDataSummary = {
   projectCount: number;

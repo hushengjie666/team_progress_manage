@@ -38,31 +38,6 @@ export interface SyncServerConfig {
   secret: string;
 }
 
-export interface BackupSnapshot {
-  id: string;
-  createdAt: string;
-  reason: "manual_export" | "before_import" | "auto";
-  taskCount: number;
-  sessionCount: number;
-  planCount: number;
-  sourceVersion: number;
-  payload?: string;
-}
-
-export interface ImportSummary {
-  valid: boolean;
-  message: string;
-  taskCount: number;
-  sessionCount: number;
-  planCount: number;
-  interruptionCount: number;
-  taskDelta: number;
-  sessionDelta: number;
-  planDelta: number;
-  version?: number;
-  warnings: string[];
-}
-
 export interface SyncDiagnosticStep {
   id: "health" | "login" | "push" | "pull";
   label: string;
@@ -125,7 +100,6 @@ export interface AppState {
   interruptions: Interruption[];
   rewardState: RewardState;
   sync: SyncState;
-  backupSnapshots: BackupSnapshot[];
   taskTemplates: TaskTemplate[];
   templateInstances: TemplateInstance[];
   activeTimer?: ActiveTimer;

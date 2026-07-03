@@ -2,7 +2,6 @@ import { useState } from "react";
 import type {
   Account,
   AppState,
-  ImportSummary,
   ProjectInvitation,
   SyncDiagnosticResult,
   WorkspaceInvitation,
@@ -13,7 +12,6 @@ export function useAppShellDataState() {
   const [loaded, setLoaded] = useState(false);
   const [syncPassword, setSyncPassword] = useState("");
   const [suppressAutoLogin, setSuppressAutoLogin] = useState(false);
-  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [syncDiagnostic, setSyncDiagnostic] = useState<SyncDiagnosticResult | null>(null);
   const [platformAccounts, setPlatformAccounts] = useState<Account[]>([]);
   const [workspaceInvitations, setWorkspaceInvitations] = useState<WorkspaceInvitation[]>([]);
@@ -28,8 +26,6 @@ export function useAppShellDataState() {
     setSyncPassword,
     suppressAutoLogin,
     setSuppressAutoLogin,
-    importSummary,
-    setImportSummary,
     syncDiagnostic,
     setSyncDiagnostic,
     platformAccounts,

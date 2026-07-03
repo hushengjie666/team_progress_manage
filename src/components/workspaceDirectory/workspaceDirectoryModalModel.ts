@@ -2,7 +2,6 @@ import type { Account, Workspace, WorkspaceMembership, WorkspaceUpdateInput } fr
 import {
   inferWorkspaceOwnerAccountId,
   workspaceTypeForEditSave,
-  type WorkspaceDirectoryCard,
 } from "./workspaceDirectoryModel";
 import type { WorkspaceMemberDrafts } from "./workspaceDirectorySelection";
 
@@ -37,7 +36,6 @@ export const workspaceEditSaveInput = ({
   if (!name) return { warning: { name: "工作区名称不能为空" } };
 
   const ownerAccountId = draft.ownerAccountId?.trim() || selectedOwnerAccountId;
-  if (!ownerAccountId) return { warning: { owner: "请选择工作区负责人" } };
 
   return {
     input: {
@@ -47,39 +45,6 @@ export const workspaceEditSaveInput = ({
     },
   };
 };
-
-export const workspaceOwnerSelectionDraft = ({
-  draft,
-  selectedCard,
-  selectedWorkspaceType,
-  ownerAccountId,
-}: {
-  draft: WorkspaceUpdateInput;
-  selectedCard: WorkspaceDirectoryCard;
-  selectedWorkspaceType: WorkspaceUpdateInput["type"];
-  ownerAccountId: string;
-}): WorkspaceUpdateInput => ({
-  ...draft,
-  name: draft.name || selectedCard.workspace.name,
-  type: draft.type || selectedWorkspaceType,
-  ownerAccountId,
-});
-
-export const workspaceOwnerSelectionInput = ({
-  draft,
-  selectedCard,
-  selectedWorkspaceType,
-  ownerAccountId,
-}: {
-  draft: WorkspaceUpdateInput;
-  selectedCard: WorkspaceDirectoryCard;
-  selectedWorkspaceType: WorkspaceUpdateInput["type"];
-  ownerAccountId: string;
-}): WorkspaceUpdateInput => ({
-  name: draft.name || selectedCard.workspace.name,
-  type: workspaceTypeForEditSave(selectedWorkspaceType, draft.type),
-  ownerAccountId,
-});
 
 export const canUnbindWorkspaceMember = ({
   member,
@@ -95,9 +60,10 @@ export const canUnbindWorkspaceMember = ({
   selectedWorkspaceType: WorkspaceUpdateInput["type"];
 }) => {
   if (!canEditSelectedWorkspace || selectedWorkspaceType === "private") return false;
-  const isOwner = member.accountId === selectedOwnerAccountId || member.role === "owner";
+  const isCreator = member.accountId === selectedOwnerAccountId;
+  const isOwner = member.role === "owner";
   const isCurrentAccount = member.accountId === currentAccount?.id;
-  return !isOwner && !isCurrentAccount;
+  return !isCreator && !isOwner && !isCurrentAccount;
 };
 
 export const updateWorkspaceMemberDrafts = (

@@ -3,9 +3,17 @@
 }
 
 .workspace-member-modal-body {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(420px, 1fr);
-  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px 22px;
+}
+
+.workspace-edit-modal {
+  width: min(760px, calc(100vw - 56px));
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.workspace-edit-modal-body {
   min-height: 0;
   overflow: auto;
   padding: 18px 22px 22px;

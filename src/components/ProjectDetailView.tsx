@@ -88,6 +88,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
       {detail.canShowProjectMemberManagement && detail.activeTab === "members" && (
         <ProjectDetailMembersTab
           project={detail.project}
+          isPrivateProject={detail.isPrivateProject}
           canManageProjectMembers={detail.canManageProjectMembers}
           memberOverviewStats={detail.memberOverviewStats}
           accessibleProjectMembers={detail.accessibleProjectMembers}

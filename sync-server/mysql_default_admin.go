@@ -20,6 +20,9 @@ func ensureDefaultAdminAccount(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	if count > 0 {
+		if err := ensureDefaultAdminAccountCredentials(ctx, tx); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 	hash, err := hashPassword(defaultAdminPassword)
@@ -56,4 +59,29 @@ func ensureDefaultAdminAccount(ctx context.Context, db *sql.DB) error {
 		return err
 	}
 	return tx.Commit()
+}
+
+func ensureDefaultAdminAccountCredentials(ctx context.Context, tx *sql.Tx) error {
+	account, found, err := mysqlAccountByID(ctx, tx, defaultAdminAccountID)
+	if err != nil || !found {
+		return err
+	}
+	if normalizeEmail(account.Email) != previousDefaultAdminUsername {
+		return nil
+	}
+	hash, err := hashPassword(defaultAdminPassword)
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE accounts SET name = ?, email = ?, password_hash = ?, disabled_at = NULL, updated_at = ? WHERE id = ?`,
+		defaultAdminName,
+		defaultAdminUsername,
+		hash,
+		now,
+		defaultAdminAccountID,
+	)
+	return err
 }

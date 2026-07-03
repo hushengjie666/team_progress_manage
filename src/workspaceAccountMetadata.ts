@@ -21,8 +21,8 @@ export async function loadWorkspaceAccountMetadata(state: AppState, token = toke
     isSuperAdminAccount(state.auth.account)
       ? fetchPlatformAccounts(state.sync, token).catch(() => [])
       : Promise.resolve([]),
-    fetchWorkspaceInvitations(state.sync, token).catch(() => []),
-    fetchProjectInvitations(state.sync, token).catch(() => []),
+    fetchWorkspaceInvitations(state.sync, token),
+    fetchProjectInvitations(state.sync, token),
   ]);
 
   return { platformAccounts, workspaceInvitations, projectInvitations };

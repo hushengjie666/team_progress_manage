@@ -6,6 +6,7 @@ import type {
   TaskStageMode,
   Workspace,
   WorkspaceMembership,
+  WorkspaceMembershipUpdateInput,
   WorkspaceUpdateInput,
 } from "../../types";
 import { buildWorkspaceDirectoryCards, type WorkspaceModalState } from "./workspaceDirectoryModel";
@@ -20,10 +21,9 @@ export type WorkspaceDirectoryViewProps = {
   projectCards: ProjectOverviewCard[];
   createWorkspace: (name: string) => void;
   updateWorkspace: (workspaceId: string, input: WorkspaceUpdateInput) => Promise<boolean>;
-  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: { status: WorkspaceMembership["status"] }) => Promise<boolean>;
+  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: WorkspaceMembershipUpdateInput) => Promise<boolean>;
   inviteWorkspaceMember: (workspaceId: string, email: string) => void;
   createProject: (name: string, description: string, workspaceId?: string, taskStageMode?: TaskStageMode) => void;
-  updateProject: (project: Project) => void;
   openProjectDetail: (projectId: string) => void;
 };
 
@@ -37,7 +37,6 @@ export function useWorkspaceDirectoryController({
   updateWorkspace,
   updateWorkspaceMembership,
   createProject,
-  updateProject,
 }: WorkspaceDirectoryViewProps) {
   const [workspaceDraft, setWorkspaceDraft] = useState("");
 
@@ -54,7 +53,7 @@ export function useWorkspaceDirectoryController({
     updateWorkspace,
     updateWorkspaceMembership,
   });
-  const projectDrafts = useWorkspaceProjectDrafts({ selectedCard: modal.selectedCard, createProject, updateProject });
+  const projectDrafts = useWorkspaceProjectDrafts({ selectedCard: modal.selectedCard, createProject });
 
   const submitWorkspace = () => {
     const name = workspaceDraft.trim();
@@ -71,7 +70,6 @@ export function useWorkspaceDirectoryController({
   const closeModal = () => {
     modal.closeModal();
     projectDrafts.setProjectDraftWarning("");
-    projectDrafts.resetProjectEditState();
   };
 
   return {
@@ -91,7 +89,6 @@ export function useWorkspaceDirectoryController({
     selectedMembers: modal.selectedMembers,
     selectedWorkspaceType: modal.selectedWorkspaceType,
     selectedOwnerAccountId: modal.selectedOwnerAccountId,
-    editingOwnerAccountId: modal.editingOwnerAccountId,
     selectedMemberDraft: modal.selectedMemberDraft,
     activeModal: modal.activeModal,
     canEditSelectedWorkspace: modal.canEditSelectedWorkspace,
@@ -103,12 +100,8 @@ export function useWorkspaceDirectoryController({
     submitProject: projectDrafts.submitProject,
     startWorkspaceEdit: modal.startWorkspaceEdit,
     saveWorkspaceEdit: modal.saveWorkspaceEdit,
-    selectWorkspaceOwner: modal.selectWorkspaceOwner,
+    updateWorkspaceMemberRole: modal.updateWorkspaceMemberRole,
     unbindWorkspaceMember: modal.unbindWorkspaceMember,
     updateWorkspaceMemberDraft: modal.updateWorkspaceMemberDraft,
-    projectEditDraftFor: projectDrafts.projectEditDraftFor,
-    updateProjectEditDraft: projectDrafts.updateProjectEditDraft,
-    projectEditWarnings: projectDrafts.projectEditWarnings,
-    saveProjectEdit: projectDrafts.saveProjectEdit,
   };
 }

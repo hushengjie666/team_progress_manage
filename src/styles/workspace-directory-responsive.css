@@ -6,9 +6,7 @@
   .workspace-project-create,
   .quick-project-create-form,
   .workspace-project-card,
-  .workspace-project-edit-grid,
   .workspace-project-management-head,
-  .workspace-member-modal-body,
   .workspace-member-invite {
     grid-template-columns: 1fr;
   }

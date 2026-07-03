@@ -13,7 +13,6 @@ type AppLoadedRuntimesOptions = {
   viewModel: ReturnType<typeof useAppViewModelHooks>;
   updateState: UpdateState;
   persistTeamChanges: TeamStateRuntime["persistTeamChanges"];
-  commitTeamState: TeamStateRuntime["commitTeamState"];
 };
 
 export function createAppLoadedRuntimes({
@@ -22,13 +21,11 @@ export function createAppLoadedRuntimes({
   viewModel,
   updateState,
   persistTeamChanges,
-  commitTeamState,
 }: AppLoadedRuntimesOptions) {
   const currentProjectId = state.projects[0]?.id ?? "project_starter";
   const {
     taskActions,
     focusActions,
-    dailyActions,
     projectActions,
     settingsActions,
   } = createAppLoadedActionRuntimes({
@@ -38,7 +35,6 @@ export function createAppLoadedRuntimes({
     currentProjectId,
   });
   const {
-    dataPortability,
     loadDemoData,
     navigation,
     runCommand,
@@ -49,7 +45,6 @@ export function createAppLoadedRuntimes({
     viewModel,
     updateState,
     persistTeamChanges,
-    commitTeamState,
     currentProjectId,
     focusActions,
     projectActions,
@@ -58,10 +53,8 @@ export function createAppLoadedRuntimes({
   return {
     taskActions,
     focusActions,
-    dailyActions,
     projectActions,
     settingsActions,
-    dataPortability,
     loadDemoData,
     navigation,
     runCommand,

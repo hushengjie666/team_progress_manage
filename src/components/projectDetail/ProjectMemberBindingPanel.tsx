@@ -4,11 +4,13 @@ import type { ProjectMember, ProjectMemberRole } from "../../types";
 export function ProjectMemberBindingPanel({
   accessibleMembers,
   canManage,
+  isPrivateProject = false,
   updateMemberRole,
   updateProjectMember,
 }: {
   accessibleMembers: ProjectAccessibleMember[];
   canManage: boolean;
+  isPrivateProject?: boolean;
   updateMemberRole: (member: ProjectAccessibleMember, role: ProjectMemberRole, checked: boolean) => void;
   updateProjectMember: (member: ProjectMember) => void;
 }) {
@@ -16,7 +18,11 @@ export function ProjectMemberBindingPanel({
     <section className="project-binding-panel inline-project-binding">
       <div className="member-section-title">
         <strong>项目成员管理</strong>
-        <span>这里显示所有有当前项目权限的成员；工作区成员默认可访问当前工作区项目，项目级成员只访问当前项目。</span>
+        <span>
+          {isPrivateProject
+            ? "私人项目不允许邀请其他人员。"
+            : "这里显示所有有当前项目权限的成员；工作区成员默认可访问当前工作区项目，项目级成员只访问当前项目。"}
+        </span>
       </div>
       <div className="project-binding-list">
         {accessibleMembers.map((member) => {
@@ -62,7 +68,11 @@ export function ProjectMemberBindingPanel({
             </article>
           );
         })}
-        {!accessibleMembers.length && <p className="empty">当前项目还没有可访问成员，请点击“添加成员”邀请项目成员。</p>}
+        {!accessibleMembers.length && (
+          <p className="empty">
+            {isPrivateProject ? "私人项目暂无可展示成员。" : "当前项目还没有可访问成员，请点击“添加成员”邀请项目成员。"}
+          </p>
+        )}
       </div>
     </section>
   );

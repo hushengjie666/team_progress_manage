@@ -19,7 +19,7 @@ export function App() {
     suppressAutoLogin,
     selectedTaskId, preferredFocusTaskId, setPreferredFocusTaskId,
     selectedWorkbenchProjectIds, setSelectedWorkbenchProjectIds,
-    setPlatformAccounts, setWorkspaceInvitations, setProjectInvitations,
+    platformAccounts, setPlatformAccounts, setWorkspaceInvitations, setProjectInvitations,
     stateRef, reminderSentRef, stopNoiseRef, undoTimerRef, tabRef, selectedTaskIdRef,
   } = appShell;
   const {
@@ -56,7 +56,6 @@ export function App() {
 
   useAppKeyboardShortcuts({
     shell: appShell,
-    completeReview: () => loadedRuntimesRef.current?.dailyActions.completeReview(),
     beginTimer: (mode, taskId) => loadedRuntimesRef.current?.focusActions.beginTimer(mode, taskId) ?? Promise.resolve(),
     toggleTimer: () => loadedRuntimesRef.current?.focusActions.toggleTimer(),
     moveCommittedTask: (taskId, direction) => loadedRuntimesRef.current?.taskActions.moveCommittedTask(taskId, direction),
@@ -64,6 +63,7 @@ export function App() {
 
   const appViewModel = useAppViewModelHooks({
     state,
+    platformAccounts,
     taskFilters,
     selectedWorkbenchProjectIds,
     setSelectedWorkbenchProjectIds,
@@ -86,7 +86,6 @@ export function App() {
     viewModel: appViewModel,
     updateState,
     persistTeamChanges,
-    commitTeamState,
   });
   loadedRuntimesRef.current = loadedRuntimes;
   if (state.auth.status !== "authenticated" || !state.auth.token) {
@@ -117,10 +116,8 @@ export function App() {
       workspaceAccountRuntime={workspaceAccountRuntime}
       taskActions={loadedRuntimes.taskActions}
       focusActions={loadedRuntimes.focusActions}
-      dailyActions={loadedRuntimes.dailyActions}
       projectActions={loadedRuntimes.projectActions}
       settingsActions={loadedRuntimes.settingsActions}
-      dataPortability={loadedRuntimes.dataPortability}
       syncActions={syncActions}
       authActions={authActions}
       loadDemoData={loadedRuntimes.loadDemoData}

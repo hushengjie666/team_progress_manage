@@ -28,8 +28,8 @@ export function ProjectDetailHero({
           ["overview", "概览"],
           ["schedule", "排期日历"],
           ["tasks", "任务"],
+          ["members", "成员管理"],
           ["settings", "设置"],
-          ["members", "项目成员管理"],
         ] as const).filter(([tab]) => canShowProjectMemberManagement || tab !== "members").map(([tab, label]) => (
           <button className={activeTab === tab ? "active" : ""} key={tab} onClick={() => setActiveTab(tab)}>
             {label}

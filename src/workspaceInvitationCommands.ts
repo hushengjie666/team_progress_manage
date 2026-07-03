@@ -4,7 +4,7 @@ import {
   inviteProjectMember as sendProjectInvitation,
   inviteWorkspaceMember as sendWorkspaceInvitation,
 } from "./sync";
-import type { ProjectMemberRole } from "./types";
+import type { ProjectInvitation, ProjectMemberRole, WorkspaceInvitation } from "./types";
 import { tokenForState } from "./workspaceAccountMetadata";
 import type { WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
 import { loadStateWithFreshWorkspaces } from "./workspaceRuntimeState";
@@ -24,6 +24,8 @@ export function createWorkspaceInvitationCommands({
   refreshWorkspaceInvitations,
   refreshProjectInvitations,
 }: WorkspaceInvitationCommandOptions) {
+  const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
+
   const inviteWorkspaceMember = (workspaceId: string, email: string) => {
     const source = getState();
     const token = tokenForState(source);
@@ -41,7 +43,7 @@ export function createWorkspaceInvitationCommands({
         setToast(`已向 ${invitation.inviteeEmail} 发送工作区邀请`);
       })
       .catch((error) => {
-        setToast(error instanceof Error ? error.message : "工作区邀请发送失败");
+        setToast(errorMessage(error, "工作区邀请发送失败"));
       });
   };
 
@@ -67,7 +69,7 @@ export function createWorkspaceInvitationCommands({
         setToast(`已向 ${invitation.inviteeEmail} 发送项目邀请`);
       })
       .catch((error) => {
-        setToast(error instanceof Error ? error.message : "项目邀请发送失败");
+        setToast(errorMessage(error, "项目邀请发送失败"));
       });
   };
 
@@ -78,17 +80,24 @@ export function createWorkspaceInvitationCommands({
       setToast("请先登录后台后再处理邀请");
       return;
     }
-    void acceptWorkspaceInvitation(source.sync, token, invitationId)
-      .then(async (invitation) => {
+    void (async () => {
+      let invitation: WorkspaceInvitation;
+      try {
+        invitation = await acceptWorkspaceInvitation(source.sync, token, invitationId);
+      } catch (error) {
+        setToast(errorMessage(error, "工作区邀请处理失败"));
+        return;
+      }
+      try {
         const loaded = await loadStateWithFreshWorkspaces(source, token);
         setState(loaded);
         await refreshWorkspaceInvitations(loaded);
         await refreshProjectInvitations(loaded);
         setToast(`已加入 ${invitation.workspaceName}`);
-      })
-      .catch((error) => {
-        setToast(error instanceof Error ? error.message : "工作区邀请处理失败");
-      });
+      } catch {
+        setToast(`已加入 ${invitation.workspaceName}，刷新工作区数据失败，请刷新页面`);
+      }
+    })();
   };
 
   const acceptPendingProjectInvitation = (invitationId: string) => {
@@ -98,16 +107,23 @@ export function createWorkspaceInvitationCommands({
       setToast("请先登录后台后再处理邀请");
       return;
     }
-    void acceptProjectInvitation(source.sync, token, invitationId)
-      .then(async (invitation) => {
+    void (async () => {
+      let invitation: ProjectInvitation;
+      try {
+        invitation = await acceptProjectInvitation(source.sync, token, invitationId);
+      } catch (error) {
+        setToast(errorMessage(error, "项目邀请处理失败"));
+        return;
+      }
+      try {
         const loaded = await loadStateWithFreshWorkspaces(source, token);
         setState(loaded);
         await refreshProjectInvitations(loaded);
         setToast(`已加入项目 ${invitation.projectName}`);
-      })
-      .catch((error) => {
-        setToast(error instanceof Error ? error.message : "项目邀请处理失败");
-      });
+      } catch {
+        setToast(`已加入项目 ${invitation.projectName}，刷新项目数据失败，请刷新页面`);
+      }
+    })();
   };
 
   return {

@@ -20,7 +20,7 @@ func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
 	api := newApp(defaultConfig(), db)
 
 	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", defaultAdminLoginBody(t, "device_admin")))
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("admin login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
@@ -152,7 +152,7 @@ func TestMySQLWorkspaceUpdateRejectsPrivateWorkspaceTypeChange(t *testing.T) {
 	api := newApp(defaultConfig(), db)
 
 	loginRecorder := httptest.NewRecorder()
-	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))))
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", defaultAdminLoginBody(t, "device_admin")))
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}

@@ -1,16 +1,3 @@
-.day-task-list,
-.template-list,
-.backup-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.settings-panel > .backup-list {
-  gap: 22px;
-  margin-top: 20px;
-}
-
 .project-management-item {
   display: grid;
   gap: 14px;

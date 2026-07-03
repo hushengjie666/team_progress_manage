@@ -2,12 +2,13 @@ import type { TaskFilters } from "./appModel";
 import { useAppProjectDetailViewModelHooks } from "./appProjectDetailViewModelHooks";
 import { useAppWorkspaceViewModelHooks } from "./appWorkspaceViewModelHooks";
 import type { ProjectTaskFilters } from "./projectDetail";
-import type { AppState } from "./types";
+import type { Account, AppState } from "./types";
 
 type Setter<T> = (value: T | ((current: T) => T)) => void;
 
 export type AppViewModelHooksOptions = {
   state: AppState | null;
+  platformAccounts: Account[];
   taskFilters: TaskFilters;
   selectedWorkbenchProjectIds: string[];
   setSelectedWorkbenchProjectIds: Setter<string[]>;
@@ -20,6 +21,7 @@ export type AppViewModelHooksOptions = {
 
 export function useAppViewModelHooks({
   state,
+  platformAccounts,
   taskFilters,
   selectedWorkbenchProjectIds,
   setSelectedWorkbenchProjectIds,
@@ -39,6 +41,7 @@ export function useAppViewModelHooks({
   });
   const projectDetailViewModel = useAppProjectDetailViewModelHooks({
     state,
+    platformAccounts,
     selectedTaskId,
     selectedProjectId,
     projectTaskFilters,

@@ -12,7 +12,8 @@ export type WorkspaceUpdateInput = {
 };
 
 export type WorkspaceMembershipUpdateInput = {
-  status: WorkspaceMemberStatus;
+  status?: WorkspaceMemberStatus;
+  role?: WorkspaceMemberRole;
 };
 
 export interface Workspace {

@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Clock3, Focus, FolderKanban, Keyboard, LayoutDashboard, ListChecks, Plus, Search, Settings, UserCheck, X } from "lucide-react";
+import { Clock3, Focus, FolderKanban, Keyboard, LayoutDashboard, ListChecks, Plus, Search, Settings, UserCheck, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CommandAction, ParsedQuickInput, Task } from "../types";
 import { commandPaletteEnterTarget, commandPaletteMatches } from "./commandPaletteModel";
@@ -97,9 +97,6 @@ function CommandIcon({ action }: { action: CommandAction }) {
   if (action === "open_task") return <ListChecks size={17} />;
   if (action === "navigate_focus") return <UserCheck size={17} />;
   if (action === "start_focus" || action === "toggle_timer") return <Focus size={17} />;
-  if (action === "navigate_calendar") return <CalendarDays size={17} />;
-  if (action === "navigate_daily") return <ListChecks size={17} />;
-  if (action === "navigate_reports") return <BarChart3 size={17} />;
   if (action === "navigate_settings") return <FolderKanban size={17} />;
   if (action === "open_sync_settings") return <Settings size={17} />;
   if (action === "open_shortcut_help") return <Keyboard size={17} />;

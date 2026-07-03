@@ -7,7 +7,7 @@ import {
 } from "./accessControl";
 import { resolveMemberForProject } from "./memberIdentity";
 import { buildProgressBoard } from "./progressBoard";
-import type { AppState, TaskStatus } from "./types";
+import type { Account, AppState, TaskStatus } from "./types";
 import { filterProjectTasks, projectTasksForProject } from "./projectDetailTaskFilters";
 import type { ProjectAccess, ProjectTaskFilters } from "./projectDetailTypes";
 
@@ -27,7 +27,13 @@ export const projectAccessForCurrentMember = (state: AppState, projectId: string
   };
 };
 
-export const deriveProjectDetailModel = (state: AppState, projectId: string, filters: ProjectTaskFilters, date = nowIso().slice(0, 10)) => {
+export const deriveProjectDetailModel = (
+  state: AppState,
+  projectId: string,
+  filters: ProjectTaskFilters,
+  date = nowIso().slice(0, 10),
+  accounts: Account[] = [],
+) => {
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) return undefined;
 
@@ -37,7 +43,7 @@ export const deriveProjectDetailModel = (state: AppState, projectId: string, fil
   const workspace = projectWorkspaceId
     ? state.auth.workspaces?.find((item) => item.id === projectWorkspaceId) ?? (state.auth.workspace?.id === projectWorkspaceId ? state.auth.workspace : undefined)
     : undefined;
-  const accessibleProjectMembers = buildAccessibleProjectMembers(state, projectMembers, projectWorkspaceId);
+  const accessibleProjectMembers = buildAccessibleProjectMembers(state, projectMembers, projectWorkspaceId, accounts);
   const accessibleMemberCount = accessibleProjectMembers.length;
   const accessibleExecutorCount = accessibleProjectMembers.filter((member) => member.roles.includes("executor")).length;
   const executors = projectMembers.filter((member) => member.roles.includes("executor"));

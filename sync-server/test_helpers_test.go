@@ -66,6 +66,22 @@ func seededStore() store {
 func ownerAuth() authContext {
 	return authContext{AccountID: "account_owner", WorkspaceID: "workspace_test"}
 }
+func defaultAdminLoginPayload(t *testing.T, deviceID string) []byte {
+	t.Helper()
+	body, err := json.Marshal(map[string]string{
+		"email":     defaultAdminUsername,
+		"password":  defaultAdminPassword,
+		"device_id": deviceID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+func defaultAdminLoginBody(t *testing.T, deviceID string) *bytes.Reader {
+	t.Helper()
+	return bytes.NewReader(defaultAdminLoginPayload(t, deviceID))
+}
 func pushRows(t *testing.T, api *app, auth authContext, deviceID string, changes []syncRow) pushResponse {
 	t.Helper()
 	body, err := json.Marshal(pushRequest{DeviceID: deviceID, Changes: changes})

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Account, Workspace, WorkspaceMembership, WorkspaceUpdateInput } from "../../types";
+import type { Account, Workspace, WorkspaceMembership, WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "../../types";
 import {
   type WorkspaceDirectoryCard,
   type WorkspaceModalState,
@@ -25,7 +25,7 @@ export function useWorkspaceDirectoryModalState({
   currentAccount?: Account;
   directoryCards: WorkspaceDirectoryCard[];
   updateWorkspace: (workspaceId: string, input: WorkspaceUpdateInput) => Promise<boolean>;
-  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: { status: WorkspaceMembership["status"] }) => Promise<boolean>;
+  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: WorkspaceMembershipUpdateInput) => Promise<boolean>;
 }) {
   const [activeModal, setActiveModal] = useState<WorkspaceModalState | null>(null);
   const [workspaceEditDraft, setWorkspaceEditDraft] = useState<WorkspaceUpdateInput>(emptyWorkspaceEditDraft);
@@ -38,10 +38,9 @@ export function useWorkspaceDirectoryModalState({
       directoryCards,
       workspaceMemberships,
       currentAccount,
-      workspaceEditDraft,
       workspaceMemberDrafts,
     }),
-    [activeModal, directoryCards, workspaceMemberships, currentAccount, workspaceEditDraft, workspaceMemberDrafts],
+    [activeModal, directoryCards, workspaceMemberships, currentAccount, workspaceMemberDrafts],
   );
   const {
     selectedCard,

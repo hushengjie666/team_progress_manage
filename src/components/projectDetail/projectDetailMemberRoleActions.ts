@@ -44,7 +44,7 @@ export const updateProjectMemberRole = ({
     return;
   }
   bindAccessibleMemberToProject(project.id, {
-    accountId: member.workspaceMembership?.accountId,
+    accountId: member.workspaceMembership?.accountId ?? member.accountId,
     name: member.name,
     email: member.email,
     workspaceId: project.workspaceId ?? workspace?.id,

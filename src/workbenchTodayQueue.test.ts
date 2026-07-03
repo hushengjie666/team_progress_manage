@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createInitialState, todayKey } from "./seed";
 import { workbenchTask, workbenchTodayPlan } from "./test/workbenchFixtures";
 import { deriveWorkspaceModel } from "./workbenchModel";
-import type { AppState, Task } from "./types";
+import type { AppState, ProjectMember, Task } from "./types";
 
 const starterTask = (
   state: AppState,
@@ -137,8 +137,16 @@ describe("workbench today queue", () => {
     ]);
   });
 
-  it("keeps unassigned pool tasks available for the unassigned visibility toggle", () => {
+  it("keeps unassigned and current member pool tasks available for the unassigned visibility toggle", () => {
     const state = createInitialState();
+    const otherMember: ProjectMember = {
+      ...state.projectMembers[0],
+      id: "member_other",
+      accountId: "account_other",
+      name: "胡圣杰",
+      email: "hushengjie@example.com",
+      roles: ["executor"],
+    };
     const unassignedTask = starterTask(state, "task_unassigned", "pool", 10, {
       primaryExecutorMemberId: undefined,
       collaboratorMemberIds: [],
@@ -146,12 +154,15 @@ describe("workbench today queue", () => {
     const assignedTask = starterTask(state, "task_assigned", "pool", 20, {
       primaryExecutorMemberId: state.projectMembers[0].id,
     });
+    const otherAssignedTask = starterTask(state, "task_assigned_other", "pool", 30, {
+      primaryExecutorMemberId: otherMember.id,
+    });
     const model = deriveWorkspaceModel(
-      { ...state, tasks: [unassignedTask, assignedTask] },
+      { ...state, projectMembers: [...state.projectMembers, otherMember], tasks: [unassignedTask, assignedTask, otherAssignedTask] },
       workbenchTodayPlan(),
       0,
       [],
-      [unassignedTask, assignedTask],
+      [unassignedTask, assignedTask, otherAssignedTask],
       [],
     );
 

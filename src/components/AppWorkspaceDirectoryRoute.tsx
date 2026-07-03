@@ -27,7 +27,6 @@ export function AppWorkspaceDirectoryRoute({
       updateWorkspaceMembership={workspaceAccountActions.updateWorkspaceMembership}
       inviteWorkspaceMember={workspaceAccountActions.inviteWorkspaceMember}
       createProject={projectActions.createProject}
-      updateProject={projectActions.updateProject}
       openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
     />
   );

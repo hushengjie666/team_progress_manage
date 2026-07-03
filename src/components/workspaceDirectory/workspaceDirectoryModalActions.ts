@@ -1,12 +1,10 @@
-import type { Account, WorkspaceMembership, WorkspaceType, WorkspaceUpdateInput } from "../../types";
+import type { Account, WorkspaceMembership, WorkspaceMembershipUpdateInput, WorkspaceType, WorkspaceUpdateInput } from "../../types";
 import type { WorkspaceDirectoryCard } from "./workspaceDirectoryModel";
 import {
   canUnbindWorkspaceMember,
   updateWorkspaceMemberDrafts,
   workspaceEditDraftFor,
   workspaceEditSaveInput,
-  workspaceOwnerSelectionDraft,
-  workspaceOwnerSelectionInput,
   type WorkspaceEditWarning,
 } from "./workspaceDirectoryModalModel";
 import type { WorkspaceMemberDrafts } from "./workspaceDirectorySelection";
@@ -26,7 +24,7 @@ type WorkspaceDirectoryModalActionOptions = {
   setWorkspaceEditWarning: Setter<WorkspaceEditWarning>;
   setWorkspaceMemberDrafts: Setter<WorkspaceMemberDrafts>;
   updateWorkspace: (workspaceId: string, input: WorkspaceUpdateInput) => Promise<boolean>;
-  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: { status: WorkspaceMembership["status"] }) => Promise<boolean>;
+  updateWorkspaceMembership: (workspaceId: string, membershipId: string, input: WorkspaceMembershipUpdateInput) => Promise<boolean>;
 };
 
 export function createWorkspaceDirectoryModalActions({
@@ -65,20 +63,11 @@ export function createWorkspaceDirectoryModalActions({
     if (saved) setWorkspaceEditWarning({});
   };
 
-  const selectWorkspaceOwner = async (accountId: string, checked: boolean) => {
-    if (!selectedCard || !checked || accountId === selectedOwnerAccountId || !canChangeSelectedWorkspaceOwner) return;
-    setWorkspaceEditDraft(workspaceOwnerSelectionDraft({
-      draft: workspaceEditDraft,
-      selectedCard,
-      selectedWorkspaceType,
-      ownerAccountId: accountId,
-    }));
-    await updateWorkspace(selectedCard.workspace.id, workspaceOwnerSelectionInput({
-      draft: workspaceEditDraft,
-      selectedCard,
-      selectedWorkspaceType,
-      ownerAccountId: accountId,
-    }));
+  const updateWorkspaceMemberRole = async (member: WorkspaceMembership, checked: boolean) => {
+    if (!selectedCard || !canChangeSelectedWorkspaceOwner || selectedWorkspaceType === "private") return;
+    const role = checked ? "owner" : "member";
+    if (member.role === role) return;
+    await updateWorkspaceMembership(selectedCard.workspace.id, member.id, { role });
   };
 
   const unbindWorkspaceMember = async (member: WorkspaceMembership) => {
@@ -101,7 +90,7 @@ export function createWorkspaceDirectoryModalActions({
   return {
     startWorkspaceEdit,
     saveWorkspaceEdit,
-    selectWorkspaceOwner,
+    updateWorkspaceMemberRole,
     unbindWorkspaceMember,
     updateWorkspaceMemberDraft,
   };

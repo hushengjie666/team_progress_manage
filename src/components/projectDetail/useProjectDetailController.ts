@@ -62,8 +62,9 @@ export function useProjectDetailController(props: ProjectDetailViewProps) {
   const workspaceTagLabel = projectWorkspaceTagLabel(workspace);
   const editableProjectSettings = projectSettings.editableProjectSettings!;
   const workspaceOptions = projectSettings.workspaceOptions;
-  const canManageProjectMembers = props.canManageProjectMembers ?? access.canReviewTasks;
-  const canShowProjectMemberManagement = canShowProjectMemberManagementFor({ canManageProjectMembers, workspace });
+  const isPrivateProject = (workspace?.type ?? "shared") === "private";
+  const canManageProjectMembers = !isPrivateProject && (props.canManageProjectMembers ?? access.canReviewTasks);
+  const canShowProjectMemberManagement = canShowProjectMemberManagementFor({ workspace });
   const activeTab = projectDetailActiveTabFor(props.activeTab, canShowProjectMemberManagement);
 
   const updateStatus = (taskId: string, status: TaskStatus) => {
@@ -88,6 +89,7 @@ export function useProjectDetailController(props: ProjectDetailViewProps) {
     model,
     project,
     workspaceTagLabel,
+    isPrivateProject,
     projectStageMode,
     activeTab,
     filters,

@@ -1,5 +1,5 @@
 import { BellRing, Check, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProjectInvitation, WorkspaceInvitation } from "../types";
 
 export function WorkspaceInvitationMenu({
@@ -13,12 +13,32 @@ export function WorkspaceInvitationMenu({
   projectInvitations: ProjectInvitation[];
   acceptWorkspaceInvitation: (invitationId: string) => void;
   acceptProjectInvitation: (invitationId: string) => void;
-  refreshInvitations: () => void;
+  refreshInvitations: () => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const pendingWorkspaceInvitations = workspaceInvitations.filter((invitation) => invitation.status === "pending");
-  const pendingProjectInvitations = projectInvitations.filter((invitation) => invitation.status === "pending");
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshInvitationsRef = useRef(refreshInvitations);
+  const pendingWorkspaceInvitations = workspaceInvitations.filter(
+    (invitation) => invitation.status === "pending",
+  );
+  const pendingProjectInvitations = projectInvitations.filter(
+    (invitation) => invitation.status === "pending",
+  );
   const pendingCount = pendingWorkspaceInvitations.length + pendingProjectInvitations.length;
+  const runRefresh = () => {
+    setRefreshing(true);
+    void Promise.resolve(refreshInvitationsRef.current())
+      .catch(() => undefined)
+      .finally(() => setRefreshing(false));
+  };
+
+  useEffect(() => {
+    refreshInvitationsRef.current = refreshInvitations;
+  }, [refreshInvitations]);
+
+  useEffect(() => {
+    if (open) runRefresh();
+  }, [open]);
 
   return (
     <div className="invitation-menu">
@@ -34,13 +54,14 @@ export function WorkspaceInvitationMenu({
               <p className="eyebrow">待处理邀请</p>
               <h3>邀请处理</h3>
             </div>
-            <button className="icon-button small" onClick={refreshInvitations} title="刷新邀请" type="button">
+            <button className="icon-button small" onClick={runRefresh} title="刷新邀请" type="button">
               <RefreshCw size={15} />
             </button>
           </div>
           <div className="invitation-list">
-            {pendingCount === 0 && <p className="empty">暂无待处理邀请。</p>}
-            {pendingWorkspaceInvitations.map((invitation) => (
+            {refreshing && <p className="empty">正在刷新邀请...</p>}
+            {!refreshing && pendingCount === 0 && <p className="empty">暂无待处理邀请。</p>}
+            {!refreshing && pendingWorkspaceInvitations.map((invitation) => (
               <article className="invitation-item" key={invitation.id}>
                 <div>
                   <span className="workspace-source-badge">
@@ -55,7 +76,7 @@ export function WorkspaceInvitationMenu({
                 </button>
               </article>
             ))}
-            {pendingProjectInvitations.map((invitation) => (
+            {!refreshing && pendingProjectInvitations.map((invitation) => (
               <article className="invitation-item" key={invitation.id}>
                 <div>
                   <span className="workspace-source-badge">项目 · {invitation.workspaceName}</span>

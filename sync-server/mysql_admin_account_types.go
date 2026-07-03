@@ -7,6 +7,7 @@ import (
 
 const defaultAdminAccountID = "account_admin"
 const defaultAdminUsername = "admin"
+const previousDefaultAdminUsername = "demo"
 const defaultAdminName = "超级管理员"
 const defaultAdminPassword = "hu626699"
 

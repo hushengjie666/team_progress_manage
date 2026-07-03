@@ -1,4 +1,4 @@
-import { getTodayPlan, type Tab } from "./appModel";
+import { type Tab } from "./appModel";
 import type { AppState } from "./types";
 import type { KeyboardRuntimeOptions } from "./keyboardRuntime";
 
@@ -10,8 +10,8 @@ export const isEditingTarget = (target: EventTarget | null) => {
 export function handleGlobalKeyboardShortcut(
   event: KeyboardEvent,
   options: KeyboardRuntimeOptions,
-  current: AppState | null,
-  currentTab: Tab,
+  _current: AppState | null,
+  _currentTab: Tab,
   editing: boolean,
 ) {
   const isSlash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
@@ -40,21 +40,6 @@ export function handleGlobalKeyboardShortcut(
       options.setTab("workspace");
       return true;
     }
-    if (event.key === "4") {
-      event.preventDefault();
-      options.setTab("calendar");
-      return true;
-    }
-    if (event.key === "5") {
-      event.preventDefault();
-      options.setTab("daily");
-      return true;
-    }
-    if (event.key === "6") {
-      event.preventDefault();
-      options.setTab("reports");
-      return true;
-    }
   }
   if (event.key === "Escape") {
     options.setCommandPaletteOpen(false);
@@ -66,14 +51,5 @@ export function handleGlobalKeyboardShortcut(
     options.setCommandPaletteOpen(true);
     return true;
   }
-  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-    event.preventDefault();
-    const plan = current ? getTodayPlan(current) : null;
-    if (current && plan && !plan.reviewedAt && currentTab === "daily") {
-      options.completeReview();
-    }
-    return true;
-  }
-
   return false;
 }

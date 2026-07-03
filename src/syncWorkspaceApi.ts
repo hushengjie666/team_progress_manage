@@ -59,6 +59,7 @@ export async function updateWorkspaceMembership(
       headers: authHeaders(token),
       body: JSON.stringify({
         status: input.status,
+        role: input.role,
       }),
     },
   );

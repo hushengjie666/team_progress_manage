@@ -2,7 +2,6 @@ import { createAppCommandRuntime } from "./appCommandRuntime";
 import { createAppDemoDataRuntime } from "./appDemoDataRuntime";
 import { createAppNavigationRuntime } from "./appNavigationRuntime";
 import { createAppQuickProjectRuntime } from "./appQuickProjectRuntime";
-import { createDataPortabilityRuntime } from "./dataPortabilityRuntime";
 import type { createAppFocusActionsRuntime } from "./appFocusActionsRuntime";
 import type { createAppProjectActionsRuntime } from "./appProjectActionsRuntime";
 import type { useAppShellState } from "./appShellState";
@@ -18,7 +17,6 @@ type AppLoadedSupportRuntimesOptions = {
   viewModel: ReturnType<typeof useAppViewModelHooks>;
   updateState: UpdateState;
   persistTeamChanges: TeamStateRuntime["persistTeamChanges"];
-  commitTeamState: TeamStateRuntime["commitTeamState"];
   currentProjectId: string;
   focusActions: ReturnType<typeof createAppFocusActionsRuntime>;
   projectActions: ReturnType<typeof createAppProjectActionsRuntime>;
@@ -30,18 +28,10 @@ export function createAppLoadedSupportRuntimes({
   viewModel,
   updateState,
   persistTeamChanges,
-  commitTeamState,
   currentProjectId,
   focusActions,
   projectActions,
 }: AppLoadedSupportRuntimesOptions) {
-  const dataPortability = createDataPortabilityRuntime({
-    getState: () => shell.stateRef.current,
-    pendingImportPayloadRef: shell.pendingImportPayloadRef,
-    setImportSummary: shell.setImportSummary,
-    setToast: shell.setToast,
-    commitTeamState,
-  });
   const { loadDemoData } = createAppDemoDataRuntime({
     getState: () => shell.stateRef.current,
     getSelectedProjectId: () => shell.selectedProjectId,
@@ -93,7 +83,6 @@ export function createAppLoadedSupportRuntimes({
   });
 
   return {
-    dataPortability,
     loadDemoData,
     navigation,
     runCommand,

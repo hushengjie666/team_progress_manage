@@ -4,7 +4,6 @@ const settingsSections: { key: SettingsSection; label: string }[] = [
   { key: "members", label: "成员管理" },
   { key: "timer", label: "计时偏好" },
   { key: "sync", label: "团队后台" },
-  { key: "data", label: "备份恢复" },
   { key: "demo", label: "演示数据" },
 ];
 

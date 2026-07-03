@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import type { Project } from "../../types";
-import type { ProjectEditDraft, WorkspaceDirectoryCard } from "./workspaceDirectoryModel";
+import type { WorkspaceDirectoryCard } from "./workspaceDirectoryModel";
 import { workspaceTypeLabel } from "./workspaceDirectoryModel";
 import type { ProjectDraft } from "./useWorkspaceProjectDrafts";
 import { WorkspaceProjectCreateForm } from "./WorkspaceProjectCreateForm";
@@ -14,10 +14,6 @@ export function WorkspaceProjectsModal({
   projectDraftWarning,
   setProjectDraftWarning,
   submitProject,
-  projectEditDraftFor,
-  updateProjectEditDraft,
-  projectEditWarnings,
-  saveProjectEdit,
   openProjectDetail,
   closeModal,
 }: {
@@ -28,10 +24,6 @@ export function WorkspaceProjectsModal({
   projectDraftWarning: string;
   setProjectDraftWarning: (warning: string) => void;
   submitProject: () => void;
-  projectEditDraftFor: (project: Project) => ProjectEditDraft;
-  updateProjectEditDraft: (project: Project, patch: Partial<ProjectEditDraft>) => void;
-  projectEditWarnings: Record<string, string>;
-  saveProjectEdit: (project: Project) => void;
   openProjectDetail: (projectId: string) => void;
   closeModal: () => void;
 }) {
@@ -48,7 +40,7 @@ export function WorkspaceProjectsModal({
           <div>
             <p className="eyebrow">{workspaceTypeLabel(selectedCard.workspace)}</p>
             <h2>{selectedCard.workspace.name}</h2>
-            <span>这里只展示当前账号有权限访问的项目，可在此新增项目或维护项目基础资料。</span>
+            <span>这里只展示当前账号有权限访问的项目，可在此新增项目；已有项目请进入项目页面维护。</span>
           </div>
           <button className="icon-button" onClick={closeModal} aria-label="关闭">
             <X size={18} />
@@ -66,10 +58,6 @@ export function WorkspaceProjectsModal({
         <WorkspaceProjectManagementList
           selectedCard={selectedCard}
           projectsById={projectsById}
-          projectEditDraftFor={projectEditDraftFor}
-          updateProjectEditDraft={updateProjectEditDraft}
-          projectEditWarnings={projectEditWarnings}
-          saveProjectEdit={saveProjectEdit}
           openProjectDetail={openProjectDetail}
         />
       </section>

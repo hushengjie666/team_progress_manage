@@ -26,10 +26,8 @@ type AppAuthenticatedShellContainerProps = Pick<
   AppAuthenticatedShellProps,
   | "taskActions"
   | "focusActions"
-  | "dailyActions"
   | "projectActions"
   | "settingsActions"
-  | "dataPortability"
   | "syncActions"
   | "authActions"
   | "loadDemoData"
@@ -52,10 +50,8 @@ export function AppAuthenticatedShellContainer({
   workspaceAccountRuntime,
   taskActions,
   focusActions,
-  dailyActions,
   projectActions,
   settingsActions,
-  dataPortability,
   syncActions,
   authActions,
   loadDemoData,
@@ -95,10 +91,8 @@ export function AppAuthenticatedShellContainer({
       })}
       taskActions={taskActions}
       focusActions={focusActions}
-      dailyActions={dailyActions}
       projectActions={projectActions}
       settingsActions={settingsActions}
-      dataPortability={dataPortability}
       syncActions={syncActions}
       authActions={authActions}
       workspaceAccountActions={buildWorkspaceAccountShellActions(workspaceAccountRuntime)}

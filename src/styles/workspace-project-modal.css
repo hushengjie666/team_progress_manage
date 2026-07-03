@@ -9,9 +9,17 @@
 }
 
 .workspace-project-modal .modal-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  align-items: start;
+  gap: 16px;
   padding: 20px 22px 16px;
   border-bottom: 1px solid #e3dacd;
   background: #fffdfa;
+}
+
+.workspace-project-modal .modal-heading > .icon-button {
+  justify-self: end;
 }
 
 .workspace-project-create {
@@ -76,15 +84,7 @@
   line-height: 1.35;
 }
 
-.workspace-project-edit-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(160px, 0.5fr) minmax(320px, 1.2fr) 128px;
-  align-items: end;
-  gap: 12px;
-}
-
-.workspace-project-management-head .secondary-button,
-.workspace-project-edit-grid > .secondary-button {
+.workspace-project-management-head .secondary-button {
   width: 100%;
   height: 40px;
   min-height: 40px;

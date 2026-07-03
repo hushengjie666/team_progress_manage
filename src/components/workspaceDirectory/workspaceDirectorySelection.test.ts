@@ -55,7 +55,6 @@ describe("workspace directory selection", () => {
         member({ id: "membership_member", accountId: "account_member", role: "member" }),
       ],
       currentAccount,
-      workspaceEditDraft: { name: "", type: "shared", ownerAccountId: "" },
       workspaceMemberDrafts: {},
     });
 
@@ -80,7 +79,6 @@ describe("workspace directory selection", () => {
         createdAt: now,
         updatedAt: now,
       },
-      workspaceEditDraft: { name: "", type: "private", ownerAccountId: "" },
       workspaceMemberDrafts: {},
     });
 

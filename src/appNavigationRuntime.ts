@@ -50,9 +50,6 @@ export function createAppNavigationRuntime({
     setWorkspaceMode("workbench");
     setTab("workspace");
   };
-  const openDailyReview = () => {
-    setTab("daily");
-  };
 
   const { topbarNavItems } = createAppNavigation({
     openBoard,
@@ -60,9 +57,6 @@ export function createAppNavigationRuntime({
     openMemberStatus: () => setTab("member_status"),
     openWorkbench,
     openFocus: () => setTab("focus"),
-    openDailyReview,
-    openReports: () => setTab("reports"),
-    openCalendar: () => setTab("calendar"),
     openAdmin: () => openAdmin(),
   });
 
@@ -74,6 +68,5 @@ export function createAppNavigationRuntime({
     openBoard,
     openWorkspaces,
     openWorkbench,
-    openDailyReview,
   };
 }

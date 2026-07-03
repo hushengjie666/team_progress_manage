@@ -7,13 +7,11 @@ type AppShellSource = ReturnType<typeof useAppShellState>;
 
 export function useAppKeyboardShortcuts({
   shell,
-  completeReview,
   beginTimer,
   toggleTimer,
   moveCommittedTask,
 }: {
   shell: AppShellSource;
-  completeReview: () => void;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   toggleTimer: () => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
@@ -29,7 +27,6 @@ export function useAppKeyboardShortcuts({
     setTab: shell.setTab,
     setPendingReset: shell.setPendingReset,
     setSelectedTaskId: shell.setSelectedTaskId,
-    completeReview,
     beginTimer,
     toggleTimer,
     moveCommittedTask,

@@ -19,7 +19,7 @@ func TestMySQLWorkspaceMemberCreationDoesNotWriteTeamRows(t *testing.T) {
 	defer db.Close()
 	api := newApp(defaultConfig(), db)
 
-	loginBody := []byte(`{"email":"admin","password":"hu626699","device_id":"device_mysql"}`)
+	loginBody := defaultAdminLoginPayload(t, "device_mysql")
 	loginRecorder := httptest.NewRecorder()
 	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", bytes.NewReader(loginBody)))
 	if loginRecorder.Code != http.StatusOK {
@@ -86,7 +86,7 @@ func TestMySQLStoreSeedsDefaultAdminAccount(t *testing.T) {
 		t.Fatalf("auth status = %#v", status)
 	}
 
-	loginBody := bytes.NewReader([]byte(`{"email":"admin","password":"hu626699","device_id":"device_admin"}`))
+	loginBody := defaultAdminLoginBody(t, "device_admin")
 	loginRecorder := httptest.NewRecorder()
 	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", loginBody))
 	if loginRecorder.Code != http.StatusOK {
@@ -96,7 +96,46 @@ func TestMySQLStoreSeedsDefaultAdminAccount(t *testing.T) {
 	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
 		t.Fatal(err)
 	}
-	if login.Account.Email != "admin" || login.Account.Name != "超级管理员" || login.Workspace.Type != "private" {
+	if login.Account.Email != defaultAdminUsername || login.Account.Name != "超级管理员" || login.Workspace.Type != "private" {
 		t.Fatalf("login = %#v", login)
+	}
+}
+
+func TestMySQLStoreUpdatesPreviousDefaultAdminAccount(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	oldHash, err := hashPassword(previousDefaultAdminUsername)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(
+		context.Background(),
+		`UPDATE accounts SET email = ?, password_hash = ? WHERE id = ?`,
+		previousDefaultAdminUsername,
+		oldHash,
+		defaultAdminAccountID,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureDefaultAdminAccount(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
+	api := newApp(defaultConfig(), db)
+	loginRecorder := httptest.NewRecorder()
+	api.handleLogin(loginRecorder, httptest.NewRequest(http.MethodPost, "/auth/login", defaultAdminLoginBody(t, "device_admin_updated")))
+	if loginRecorder.Code != http.StatusOK {
+		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
+	}
+	var login loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &login); err != nil {
+		t.Fatal(err)
+	}
+	if login.Account.Email != defaultAdminUsername {
+		t.Fatalf("login account = %#v", login.Account)
 	}
 }

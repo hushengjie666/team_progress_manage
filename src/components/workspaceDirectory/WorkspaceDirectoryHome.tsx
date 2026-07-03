@@ -1,4 +1,4 @@
-import { Building2, Plus } from "lucide-react";
+import { Building2, Pencil, Plus } from "lucide-react";
 import type { WorkspaceDirectoryCard, WorkspaceModalState } from "./workspaceDirectoryModel";
 import { workspaceTypeLabel } from "./workspaceDirectoryModel";
 
@@ -50,7 +50,17 @@ export function WorkspaceDirectoryHome({
             <div className="workspace-directory-card-head">
               <div>
                 <span className="workspace-source-badge">{workspaceTypeLabel(card.workspace)}</span>
-                <h2>{card.workspace.name}</h2>
+                <div className="workspace-directory-title-row">
+                  <h2>{card.workspace.name}</h2>
+                  <button
+                    className="icon-button small workspace-card-edit-button"
+                    onClick={() => openWorkspaceModal(card.workspace.id, "edit")}
+                    title="编辑工作区资料"
+                    type="button"
+                  >
+                    <Pencil size={15} />
+                  </button>
+                </div>
               </div>
               <div className="project-overview-progress-inline">
                 <strong>{card.progressPercent}%</strong>

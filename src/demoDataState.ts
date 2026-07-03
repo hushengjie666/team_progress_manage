@@ -22,7 +22,7 @@ export const createDemoState = (): AppState => {
     rewardState: {
       streak: 11,
       dailyGoal: 5,
-      badges: ["首个承诺", "连续 3 天", "连续 7 天", "复盘入门", "估算校准"],
+      badges: ["首个承诺", "连续 3 天", "连续 7 天", "估算校准"],
       focusGarden: 56,
       visualProgress: 84,
       lastRewardedAt: now,

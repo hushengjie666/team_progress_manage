@@ -35,6 +35,7 @@ type workspaceUpdateRequest struct {
 
 type workspaceMembershipUpdateRequest struct {
 	Status string `json:"status"`
+	Role   string `json:"role"`
 }
 
 type workspaceMembershipResponse struct {

@@ -1,6 +1,5 @@
 import type { ProjectTaskInput } from "../../src/projectDetail.js";
 import type {
-  DailyReview,
   Priority,
   ProjectMemberRole,
   RepeatRule,
@@ -67,8 +66,3 @@ export type UpdateMemberInput = Partial<{
   email: string;
   status: "active" | "disabled";
 }>;
-
-export type DailyReviewPatch = Partial<DailyReview> & {
-  reflection?: string;
-  reviewed?: boolean;
-};

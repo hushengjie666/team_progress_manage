@@ -74,13 +74,9 @@ export const projectWorkspaceOptions = (
   ((item.type ?? "shared") !== "private" || item.id === currentProjectWorkspaceId),
 );
 
-export const canShowProjectMemberManagementFor = ({
-  canManageProjectMembers,
-  workspace,
-}: {
-  canManageProjectMembers: boolean;
+export const canShowProjectMemberManagementFor = (_: {
   workspace?: Workspace;
-}) => canManageProjectMembers && (workspace?.type ?? "shared") !== "private";
+}) => true;
 
 export const projectDetailActiveTabFor = (
   activeTab: ProjectDetailTab,

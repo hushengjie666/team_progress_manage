@@ -32,7 +32,6 @@
 
   .settings-layout > .settings-hub,
   .settings-layout > .settings-panel,
-  .settings-layout > .data-management,
   .settings-layout > .settings-panel:last-child {
     grid-column: auto;
   }
@@ -46,9 +45,6 @@
     justify-content: flex-start;
   }
 
-  .capability-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 820px) {

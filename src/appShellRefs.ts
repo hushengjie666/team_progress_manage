@@ -4,7 +4,6 @@ import type { AppState } from "./types";
 
 export function useAppShellRefs() {
   const stateRef = useRef<AppState | null>(null);
-  const pendingImportPayloadRef = useRef<unknown>(null);
   const reminderSentRef = useRef<Set<string>>(new Set());
   const stopNoiseRef = useRef<(() => void) | null>(null);
   const undoTimerRef = useRef<number | null>(null);
@@ -13,7 +12,6 @@ export function useAppShellRefs() {
 
   return {
     stateRef,
-    pendingImportPayloadRef,
     reminderSentRef,
     stopNoiseRef,
     undoTimerRef,

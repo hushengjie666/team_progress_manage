@@ -9,6 +9,7 @@ import type { ProjectMember, ProjectMemberRole, WorkspaceMembership } from "./ty
 export type ProjectAccessibleMember = {
   id: string;
   identityKey: string;
+  accountId?: string;
   name: string;
   email?: string;
   source: "project" | "workspace";
@@ -53,6 +54,7 @@ export function createProjectAccessibleMemberCollector() {
     rows.set(identityKey, {
       id: `workspace:${identityKey}`,
       identityKey,
+      accountId: identity.accountId,
       name: value.name,
       email: value.email,
       source: "workspace",
@@ -68,6 +70,7 @@ export function createProjectAccessibleMemberCollector() {
     rows.set(identityKey, {
       id: member.id,
       identityKey,
+      accountId: member.accountId ?? existing?.accountId,
       name: member.name ?? existing?.name ?? "项目成员",
       email: member.email ?? existing?.email,
       source: "project",

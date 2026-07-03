@@ -61,6 +61,22 @@
   background: #fbfaf6;
 }
 
+.workspace-edit-form .settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+}
+
+.workspace-edit-form .settings-grid > label {
+  min-width: 0;
+}
+
+.workspace-edit-form .settings-grid input,
+.workspace-edit-form .settings-grid select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+}
+
 .workspace-edit-actions {
   margin: 0;
   justify-content: flex-start;
@@ -77,7 +93,7 @@
 
 .workspace-member-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(96px, auto) minmax(96px, auto) auto minmax(94px, auto);
+  grid-template-columns: auto minmax(0, 1fr) minmax(96px, auto) minmax(96px, auto) minmax(94px, auto);
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
@@ -103,13 +119,6 @@
 .workspace-member-row .inline-toggle {
   min-height: 30px;
   justify-self: start;
-}
-
-.workspace-member-status-pill {
-  justify-self: end;
-  min-width: 44px;
-  text-align: right;
-  font-weight: 700;
 }
 
 .workspace-member-unbind {

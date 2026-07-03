@@ -7,7 +7,15 @@ describe("current app state payload", () => {
     const state = createInitialState();
 
     expect(isCurrentAppStatePayload(state)).toBe(true);
-    expect(parseCurrentAppStatePayload(state)).toBe(state);
+    expect(parseCurrentAppStatePayload(state)).toEqual(state);
+  });
+
+  it("returns only the complete current state fields", () => {
+    const state = createInitialState();
+    const parsed = parseCurrentAppStatePayload({ ...state, obsoleteFeatureData: [{ id: "old" }] });
+
+    expect(parsed).toEqual(state);
+    expect("obsoleteFeatureData" in parsed).toBe(false);
   });
 
   it("rejects unsupported schema versions instead of normalizing them", () => {

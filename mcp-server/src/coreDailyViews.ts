@@ -1,10 +1,7 @@
-import { buildInsights, defaultReview } from "../../src/domain.js";
 import { todayKey } from "../../src/seed.js";
-import type { AppState, DailyPlan } from "../../src/types.js";
-import { ensurePlanInState } from "../../src/workSessionTransitions.js";
+import type { AppState } from "../../src/types.js";
 import { memberLabel } from "./coreProjectModel.js";
 import { activeWorkSessionsForTasks, compactTask } from "./coreTaskModel.js";
-import type { DailyReviewPatch } from "./coreTypes.js";
 
 export const todayPlanView = (state: AppState, date = todayKey()) => {
   const plan = state.dailyPlans.find((item) => item.date === date);
@@ -46,48 +43,5 @@ export const todayWorkbenchView = (state: AppState, projectId?: string, date = t
     totalTaskCount: todayTasks.length,
     activeSessions,
     groups,
-  };
-};
-
-export const dailySummaryView = (state: AppState, date = todayKey()) => {
-  const plan = state.dailyPlans.find((item) => item.date === date);
-  const taskIds = new Set(plan?.committedTaskIds ?? []);
-  const tasks = state.tasks.filter((task) => taskIds.has(task.id)).map((task) => compactTask(state, task));
-  const focusSessions = state.focusSessions.filter((session) => session.startedAt.slice(0, 10) === date);
-  const workSessions = state.workSessions.filter((session) => session.startedAt.slice(0, 10) === date);
-  return {
-    date,
-    plan,
-    tasks,
-    focusSessions,
-    workSessions,
-    insights: buildInsights(state, date),
-  };
-};
-
-export const updateDailyReviewMutation = (
-  state: AppState,
-  date: string,
-  patch: DailyReviewPatch,
-  timestamp: string,
-) => {
-  const { state: withPlan, plan } = ensurePlanInState(state, date, timestamp);
-  const nextReview = { ...defaultReview(), ...plan.review, ...patch };
-  delete (nextReview as DailyReviewPatch).reflection;
-  delete (nextReview as DailyReviewPatch).reviewed;
-  const nextPlan: DailyPlan = {
-    ...plan,
-    reflection: patch.reflection ?? plan.reflection,
-    review: nextReview,
-    reviewedAt: patch.reviewed === false ? undefined : patch.reviewed ? timestamp : plan.reviewedAt,
-    updatedAt: timestamp,
-  };
-  return {
-    state: {
-      ...withPlan,
-      dailyPlans: withPlan.dailyPlans.map((item) => (item.id === plan.id ? nextPlan : item)),
-      updatedAt: timestamp,
-    },
-    result: nextPlan,
   };
 };

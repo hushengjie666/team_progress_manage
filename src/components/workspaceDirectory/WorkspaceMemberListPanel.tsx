@@ -7,11 +7,11 @@ type WorkspaceMemberListPanelProps = {
   currentAccount?: Account;
   selectedMembers: WorkspaceMembership[];
   selectedWorkspaceType: WorkspaceType;
-  editingOwnerAccountId: string;
+  selectedOwnerAccountId: string;
   selectedMemberDraft: { email: string };
   canEditSelectedWorkspace: boolean;
   canChangeSelectedWorkspaceOwner: boolean;
-  selectWorkspaceOwner: (accountId: string, checked: boolean) => Promise<void>;
+  updateWorkspaceMemberRole: (member: WorkspaceMembership, checked: boolean) => Promise<void>;
   updateWorkspaceMemberDraft: (workspaceId: string, patch: Partial<{ email: string }>) => void;
   inviteWorkspaceMember: (workspaceId: string, email: string) => void;
   unbindWorkspaceMember: (member: WorkspaceMembership) => Promise<void>;
@@ -22,15 +22,16 @@ export function WorkspaceMemberListPanel({
   currentAccount,
   selectedMembers,
   selectedWorkspaceType,
-  editingOwnerAccountId,
+  selectedOwnerAccountId,
   selectedMemberDraft,
   canEditSelectedWorkspace,
   canChangeSelectedWorkspaceOwner,
-  selectWorkspaceOwner,
+  updateWorkspaceMemberRole,
   updateWorkspaceMemberDraft,
   inviteWorkspaceMember,
   unbindWorkspaceMember,
 }: WorkspaceMemberListPanelProps) {
+  const activeOwnerCount = selectedMembers.filter((member) => member.role === "owner" && member.status === "active").length;
   return (
     <section className="workspace-member-panel">
       <div className="member-section-title">
@@ -65,16 +66,20 @@ export function WorkspaceMemberListPanel({
       )}
       <div className="workspace-member-list">
         {selectedMembers.map((member) => {
-          const isOwner = member.accountId === editingOwnerAccountId || member.role === "owner";
+          const isOwner = member.role === "owner";
+          const isCreator = member.accountId === selectedOwnerAccountId;
           const isCurrentAccount = member.accountId === currentAccount?.id;
+          const cannotUnsetOnlyOwner = isOwner && activeOwnerCount <= 1;
           const unbindDisabledReason =
             !canEditSelectedWorkspace
               ? "当前账号没有成员管理权限"
               : selectedWorkspaceType === "private"
                 ? "私人工作区不支持成员解除绑定"
-                : isOwner
-                  ? "负责人不能解除绑定，请先更换负责人"
-                  : isCurrentAccount
+                : isCreator
+                  ? "创建人不能解除绑定"
+                  : isOwner
+                    ? "负责人不能解除绑定，请先取消负责人角色"
+                    : isCurrentAccount
                     ? "不能解除当前登录账号"
                     : "";
           return (
@@ -91,9 +96,9 @@ export function WorkspaceMemberListPanel({
                   disabled={
                     !canChangeSelectedWorkspaceOwner ||
                     selectedWorkspaceType === "private" ||
-                    isOwner
+                    cannotUnsetOnlyOwner
                   }
-                  onChange={(event) => void selectWorkspaceOwner(member.accountId, event.target.checked)}
+                  onChange={(event) => void updateWorkspaceMemberRole(member, event.target.checked)}
                 />
                 负责人
               </label>
@@ -101,9 +106,6 @@ export function WorkspaceMemberListPanel({
                 <input type="checkbox" checked disabled readOnly />
                 执行者
               </label>
-              <span className="workspace-member-status-pill">
-                {member.status === "active" ? "正常" : "停用"}
-              </span>
               <button
                 className="small-button workspace-member-unbind"
                 disabled={Boolean(unbindDisabledReason)}

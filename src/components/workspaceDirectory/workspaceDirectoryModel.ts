@@ -1,6 +1,6 @@
 import { countActiveWorkspaceMembers as countActiveWorkspaceMembersFromAccess } from "../../accessControl";
 import type { ProjectOverviewCard } from "../../projectOverview";
-import type { Account, Project, Workspace, WorkspaceMembership, WorkspaceType } from "../../types";
+import type { Account, Workspace, WorkspaceMembership, WorkspaceType } from "../../types";
 
 export type WorkspaceDirectoryCard = {
   workspace: Workspace;
@@ -14,10 +14,8 @@ export type WorkspaceDirectoryCard = {
 
 export type WorkspaceModalState = {
   workspaceId: string;
-  kind: "projects" | "members";
+  kind: "projects" | "members" | "edit";
 };
-
-export type ProjectEditDraft = Pick<Project, "name" | "description" | "taskStageMode">;
 
 export const workspaceTypeLabel = (workspace: Workspace) =>
   (workspace.type ?? "shared") === "private" ? "私人工作区" : "协作工作区";

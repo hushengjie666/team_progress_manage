@@ -6,6 +6,7 @@ import { ProjectMemberBindingPanel } from "./ProjectMemberBindingPanel";
 
 type ProjectDetailMembersTabProps = {
   project: Project;
+  isPrivateProject: boolean;
   canManageProjectMembers: boolean;
   memberOverviewStats: ProjectDetailModel["memberOverviewStats"];
   accessibleProjectMembers: ProjectDetailModel["accessibleProjectMembers"];
@@ -19,6 +20,7 @@ type ProjectDetailMembersTabProps = {
 
 export function ProjectDetailMembersTab({
   project,
+  isPrivateProject,
   canManageProjectMembers,
   memberOverviewStats,
   accessibleProjectMembers,
@@ -29,6 +31,7 @@ export function ProjectDetailMembersTab({
   updateMemberRole,
   updateProjectMember,
 }: ProjectDetailMembersTabProps) {
+  const canManageMembers = canManageProjectMembers && !isPrivateProject;
   return (
     <section className="band project-members-panel">
       <div className="section-title">
@@ -36,11 +39,14 @@ export function ProjectDetailMembersTab({
           <p className="eyebrow">项目成员</p>
           <h2>项目成员管理</h2>
         </div>
-        <button className="secondary-button" disabled={!canManageProjectMembers} onClick={openAddMemberDialog}>
+        <button className="secondary-button" disabled={!canManageMembers} onClick={openAddMemberDialog}>
           <UserPlus size={16} />
           添加成员
         </button>
       </div>
+      {isPrivateProject && (
+        <p className="muted compact-copy">私人项目不允许邀请其他人员；这里仅展示当前项目成员。</p>
+      )}
       <div className="project-member-summary-grid">
         {memberOverviewStats.map((item) => (
           <article className={item.label === "待验收" && item.value > 0 ? "project-member-summary-card attention" : "project-member-summary-card"} key={item.label}>
@@ -52,14 +58,15 @@ export function ProjectDetailMembersTab({
       </div>
       <ProjectMemberBindingPanel
         accessibleMembers={accessibleProjectMembers}
-        canManage={canManageProjectMembers}
+        canManage={canManageMembers}
+        isPrivateProject={isPrivateProject}
         updateMemberRole={updateMemberRole}
         updateProjectMember={updateProjectMember}
       />
-      {showAddMemberDialog && (
+      {showAddMemberDialog && canManageMembers && (
         <AddProjectMemberModal
           project={project}
-          canManage={canManageProjectMembers}
+          canManage={canManageMembers}
           inviteMember={(input) => inviteProjectMember({
             workspaceId: project.workspaceId,
             projectId: project.id,

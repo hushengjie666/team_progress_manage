@@ -88,9 +88,6 @@ export function createAppCommandRuntime({
   const runCommand = (action: CommandAction, parsed?: ParsedQuickInput, taskId?: string) => {
     if (action === "navigate_workspace") openBoard();
     if (action === "navigate_focus") openWorkbench();
-    if (action === "navigate_calendar") setTab("calendar");
-    if (action === "navigate_daily") setTab("daily");
-    if (action === "navigate_reports") setTab("reports");
     if (action === "navigate_settings") {
       setSettingsSection("members");
       setTab("settings");

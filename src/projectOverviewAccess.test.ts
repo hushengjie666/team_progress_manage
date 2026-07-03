@@ -199,4 +199,67 @@ describe("project overview access inheritance", () => {
     expect(model?.accessibleMemberCount).toBe(2);
     expect(model?.accessibleProjectMembers.map((member) => member.name)).toEqual(["负责人", "王硕"]);
   });
+
+  it("uses platform account details for inherited workspace owners without membership rows", () => {
+    const state = createInitialState();
+    const workspaceId = "workspace_owner_account_only";
+    const projectId = state.projects[0].id;
+    const workspace = workspaceFixture({
+      id: workspaceId,
+      name: "负责人账号协作区",
+      ownerAccountId: "account_wangshuo",
+    });
+    const hushingjie = accountFixture("workspace_private_hushengjie", "account_hushengjie", "胡圣杰", "hushengjie");
+    const wangshuo = accountFixture("workspace_private_wangshuo", "account_wangshuo", "王硕", "wangshuo");
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        account: hushingjie,
+        workspace,
+        workspaces: [workspace],
+        membership: workspaceMembershipFixture({
+          id: "membership_hushengjie_owner_account_only",
+          workspaceId,
+          accountId: hushingjie.id,
+          name: hushingjie.name,
+          email: hushingjie.email,
+        }),
+        workspaceMemberships: [
+          workspaceMembershipFixture({
+            id: "membership_hushengjie_owner_account_only",
+            workspaceId,
+            accountId: hushingjie.id,
+            name: hushingjie.name,
+            email: hushingjie.email,
+          }),
+        ],
+      },
+      projects: state.projects.map((project) => ({ ...project, workspaceId })),
+      projectMembers: [{
+        id: "member_hushengjie",
+        workspaceId,
+        projectId,
+        accountId: hushingjie.id,
+        name: hushingjie.name,
+        email: hushingjie.email,
+        roles: ["project_owner", "executor"],
+        status: "active",
+        createdAt: projectOverviewAccessNow,
+        updatedAt: projectOverviewAccessNow,
+      }],
+    };
+
+    const model = deriveProjectDetailModel(next, projectId, projectDetailFilters, projectOverviewAccessNow, [wangshuo]);
+
+    expect(model?.accessibleProjectMembers.map((member) => ({
+      name: member.name,
+      email: member.email,
+      accountId: member.accountId,
+      label: member.sourceLabel,
+    }))).toEqual([
+      { name: "胡圣杰", email: "hushengjie", accountId: "account_hushengjie", label: "项目成员" },
+      { name: "王硕", email: "wangshuo", accountId: "account_wangshuo", label: "创建人" },
+    ]);
+  });
 });

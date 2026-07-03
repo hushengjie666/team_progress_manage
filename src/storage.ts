@@ -28,7 +28,6 @@ export const isCurrentAppStatePayload = (payload: unknown): payload is AppState 
     isRecord(payload.rewardState) &&
     isRecord(sync) &&
     Array.isArray(sync.tombstones) &&
-    Array.isArray(payload.backupSnapshots) &&
     Array.isArray(payload.taskTemplates) &&
     Array.isArray(payload.templateInstances) &&
     typeof payload.updatedAt === "string" &&
@@ -41,7 +40,25 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
     throw new Error("不是当前版本的完整 TimeManage 数据。");
   }
 
-  return payload;
+  return {
+    version: payload.version,
+    settings: payload.settings,
+    auth: payload.auth,
+    projects: payload.projects,
+    projectMembers: payload.projectMembers,
+    tasks: payload.tasks,
+    dailyPlans: payload.dailyPlans,
+    focusSessions: payload.focusSessions,
+    workSessions: payload.workSessions,
+    executionSignals: payload.executionSignals,
+    interruptions: payload.interruptions,
+    rewardState: payload.rewardState,
+    sync: payload.sync,
+    taskTemplates: payload.taskTemplates,
+    templateInstances: payload.templateInstances,
+    updatedAt: payload.updatedAt,
+    ...(payload.activeTimer ? { activeTimer: payload.activeTimer } : {}),
+  };
 };
 
 const readStoredState = (payload: string): AppState => parseCurrentAppStatePayload(JSON.parse(payload));

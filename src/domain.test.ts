@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildInsights,
   deriveRewardState,
   estimateDeltaLabel,
-  focusQuality,
-  interruptionHotspots,
-  nextActions,
   planPressure,
   suggestedCapacity,
   taskSuggestions,
@@ -55,7 +51,7 @@ describe("planning and rewards", () => {
     expect(suggestedCapacity(next, today)).toBeLessThanOrEqual(5);
   });
 
-  it("earns focus, review and streak badges from state", () => {
+  it("earns focus and streak badges from state", () => {
     const state = createInitialState();
     const session: FocusSession = {
       id: "session_done",
@@ -75,14 +71,6 @@ describe("planning and rewards", () => {
     const reward = deriveRewardState(next);
     expect(reward.streak).toBeGreaterThanOrEqual(1);
     expect(reward.badges).toContain("首个番茄");
-    expect(reward.badges).toContain("完成日终回顾");
-  });
-
-  it("builds actionable insights", () => {
-    const state = createInitialState();
-    const insights = buildInsights(state);
-    expect(insights.some((item) => item.kind === "capacity")).toBe(true);
-    expect(insights.some((item) => item.kind === "commitment")).toBe(true);
   });
 
   it("scores plan pressure and task suggestions", () => {
@@ -113,18 +101,4 @@ describe("planning and rewards", () => {
     expect(computeStreak(next)).toBe(1);
   });
 
-  it("summarizes focus quality, interruption hotspots, and next actions", () => {
-    const state = createInitialState();
-    const today = todayKey();
-    const next: AppState = {
-      ...state,
-      interruptions: [
-        { id: "i1", type: "internal", action: "defer", note: "想刷消息", createdAt: `${today}T10:05:00.000+08:00` },
-        { id: "i2", type: "external", action: "inbox", note: "临时会议", createdAt: `${today}T10:25:00.000+08:00` },
-      ],
-    };
-    expect(focusQuality(next, today).score).toBeLessThan(100);
-    expect(interruptionHotspots(next)[0]).toMatchObject({ hour: 10, count: 2, internal: 1, external: 1 });
-    expect(nextActions(next, today).some((item) => item.id === "clear_inbox")).toBe(true);
-  });
 });

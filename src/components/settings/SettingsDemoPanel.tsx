@@ -23,7 +23,7 @@ export function SettingsDemoPanel({
         <DatabaseBackup size={20} />
       </div>
       <p className="muted section-helper">
-        用一套内置样例快速体验项目总览、成员状况、工作队列、专注计时和复盘页面。加载演示数据会添加到当前项目，不会退出登录或替换现有数据。
+        用一套内置样例快速体验项目总览、成员状况、工作队列和专注计时。加载演示数据会添加到当前项目，不会退出登录或替换现有数据。
       </p>
       <div className="sync-summary-grid">
         <div>

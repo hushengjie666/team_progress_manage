@@ -35,20 +35,12 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 			memberships = append(memberships, item)
 		}
 		for _, workspace := range workspaces {
-			canManage, err := teamAccountCanManageWorkspace(ctx, a.db, auth, workspace.ID)
+			requestMembership, foundMembership, err := mysqlMembershipSummaryByAccountAndWorkspace(ctx, a.db, auth.AccountID, workspace.ID)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "load workspace members failed")
 				return
 			}
-			if !canManage {
-				item, found, err := mysqlMembershipSummaryByAccountAndWorkspace(ctx, a.db, auth.AccountID, workspace.ID)
-				if err != nil {
-					writeError(w, http.StatusInternalServerError, "load workspace members failed")
-					return
-				}
-				if found {
-					appendMembership(item)
-				}
+			if !foundMembership || requestMembership.Status != "active" {
 				continue
 			}
 			items, err := mysqlWorkspaceMembershipSummaries(ctx, a.db, workspace.ID)

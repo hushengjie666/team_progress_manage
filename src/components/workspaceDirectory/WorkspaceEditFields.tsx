@@ -6,19 +6,23 @@ export function WorkspaceEditFields({
   selectedMembers,
   selectedWorkspaceType,
   selectedOwnerAccountId,
-  editingOwnerAccountId,
   workspaceEditDraft,
   setWorkspaceEditDraft,
   workspaceEditWarning,
   setWorkspaceEditWarning,
   canEditSelectedWorkspace,
   canChangeSelectedWorkspaceType,
-  canChangeSelectedWorkspaceOwner,
   startWorkspaceEdit,
 }: WorkspaceEditFieldsProps) {
   const ensureDraftStarted = () => {
     if (!workspaceEditDraft.name) startWorkspaceEdit();
   };
+  const creator = selectedMembers.find((member) => member.accountId === selectedOwnerAccountId);
+  const creatorLabel = creator
+    ? `${creator.name} · ${creator.email}`
+    : selectedOwnerAccountId
+      ? `账号 ${selectedOwnerAccountId}`
+      : "未记录创建人";
 
   return (
     <div className="settings-grid">
@@ -51,7 +55,7 @@ export function WorkspaceEditFields({
                 ...workspaceEditDraft,
                 name: workspaceEditDraft.name || selectedCard.workspace.name,
                 type: nextType,
-                ownerAccountId: nextType === "private" ? selectedOwnerAccountId : editingOwnerAccountId,
+                ownerAccountId: selectedOwnerAccountId,
               });
             }}
           >
@@ -61,31 +65,8 @@ export function WorkspaceEditFields({
         )}
       </label>
       <label>
-        工作区负责人
-        <select
-          aria-invalid={Boolean(workspaceEditWarning.owner)}
-          disabled={!canChangeSelectedWorkspaceOwner || (workspaceEditDraft.type || selectedWorkspaceType) === "private"}
-          value={editingOwnerAccountId}
-          onFocus={ensureDraftStarted}
-          onChange={(event) => {
-            setWorkspaceEditDraft({
-              ...workspaceEditDraft,
-              name: workspaceEditDraft.name || selectedCard.workspace.name,
-              type: workspaceEditDraft.type || selectedWorkspaceType,
-              ownerAccountId: event.target.value,
-            });
-            if (workspaceEditWarning.owner) setWorkspaceEditWarning({ ...workspaceEditWarning, owner: undefined });
-          }}
-        >
-          {selectedMembers.map((member) => (
-            <option key={member.accountId} value={member.accountId}>
-              {member.name} · {member.email}
-            </option>
-          ))}
-          {!selectedMembers.length && selectedOwnerAccountId && (
-            <option value={selectedOwnerAccountId}>当前负责人</option>
-          )}
-        </select>
+        创建人
+        <input disabled value={creatorLabel} readOnly />
         {workspaceEditWarning.owner && <span className="field-error">{workspaceEditWarning.owner}</span>}
       </label>
     </div>

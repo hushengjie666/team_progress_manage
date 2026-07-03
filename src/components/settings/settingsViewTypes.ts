@@ -1,7 +1,5 @@
 import type {
   Account,
-  BackupSnapshot,
-  ImportSummary,
   ProjectMember,
   Settings,
   SyncDiagnosticResult,
@@ -15,7 +13,6 @@ export type SettingsViewProps = {
   settings: Settings;
   dailyGoal: number;
   sync: SyncState;
-  backupSnapshots: BackupSnapshot[];
   dataSummary: SettingsDataSummary;
   activeSection: SettingsSection;
   setActiveSection: (section: SettingsSection) => void;
@@ -34,11 +31,5 @@ export type SettingsViewProps = {
   handleSyncNow: () => Promise<void>;
   runSyncDiagnostics: () => Promise<void>;
   syncDiagnostic: SyncDiagnosticResult | null;
-  exportJson: () => void;
-  exportCsv: () => void;
-  previewImportFile: (file: File) => Promise<void>;
-  importSummary: ImportSummary | null;
-  confirmImport: () => void;
-  restoreBackup: (backupId: string) => void;
   loadDemoData: () => void;
 };

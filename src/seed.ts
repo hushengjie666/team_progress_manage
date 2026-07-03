@@ -43,13 +43,6 @@ export const createInitialState = (): AppState => ({
       permissionState: "unknown",
     },
     advancedSyncVisible: false,
-    reportFilter: {
-      range: "30d",
-      project: "all",
-      tag: "all",
-      taskId: "all",
-    },
-    calendarViewMode: "week",
     commandPaletteHintDismissed: false,
   },
   auth: {
@@ -81,7 +74,6 @@ export const createInitialState = (): AppState => ({
     message: "本地团队后台未连接",
     tombstones: [],
   },
-  backupSnapshots: [],
   taskTemplates: defaultTaskTemplates,
   templateInstances: [],
   updatedAt: now(),

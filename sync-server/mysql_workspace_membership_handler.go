@@ -22,8 +22,17 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 		return
 	}
 	status := strings.TrimSpace(req.Status)
-	if status != "active" && status != "disabled" {
+	role := strings.TrimSpace(req.Role)
+	if status != "" && !isWorkspaceMembershipStatus(status) {
 		writeError(w, http.StatusBadRequest, "workspace member status must be active or disabled")
+		return
+	}
+	if role != "" && !isWorkspaceMembershipRole(role) {
+		writeError(w, http.StatusBadRequest, "workspace member role must be owner, admin, or member")
+		return
+	}
+	if status == "" && role == "" {
+		writeError(w, http.StatusBadRequest, "workspace member status or role is required")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -62,21 +71,53 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusNotFound, "workspace member not found")
 		return
 	}
+	nextStatus := targetMembership.Status
+	if status != "" {
+		nextStatus = status
+	}
+	nextRole := targetMembership.Role
+	if role != "" {
+		nextRole = role
+	}
 	if status == "disabled" {
 		if targetMembership.AccountID == auth.AccountID {
 			writeError(w, http.StatusBadRequest, "cannot remove current account from workspace")
 			return
 		}
-		if targetMembership.Role == "owner" || targetMembership.AccountID == workspace.OwnerAccountID {
+		if targetMembership.AccountID == workspace.OwnerAccountID {
+			writeError(w, http.StatusBadRequest, "workspace creator cannot be removed")
+			return
+		}
+		if targetMembership.Role == "owner" {
 			writeError(w, http.StatusBadRequest, "workspace owner cannot be removed")
 			return
 		}
 	}
+	if role != "" && workspace.Type == "private" {
+		writeError(w, http.StatusBadRequest, "private workspace member role cannot be changed")
+		return
+	}
+	if role != "" && targetMembership.Role == "owner" && nextRole != "owner" && targetMembership.Status == "active" {
+		ownerCount, err := mysqlActiveWorkspaceOwnerCount(ctx, tx, workspaceID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "load workspace membership failed")
+			return
+		}
+		if ownerCount <= 1 {
+			writeError(w, http.StatusBadRequest, "workspace must keep at least one active owner")
+			return
+		}
+	}
+	if nextRole == "owner" && nextStatus != "active" {
+		writeError(w, http.StatusBadRequest, "workspace owner must be active")
+		return
+	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	if _, err := tx.ExecContext(
 		ctx,
-		`UPDATE workspace_memberships SET status = ?, updated_at = ? WHERE workspace_id = ? AND id = ?`,
-		status,
+		`UPDATE workspace_memberships SET role = ?, status = ?, updated_at = ? WHERE workspace_id = ? AND id = ?`,
+		nextRole,
+		nextStatus,
 		now,
 		workspaceID,
 		membershipID,
@@ -102,4 +143,14 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 		return
 	}
 	writeJSON(w, http.StatusOK, workspaceMembershipResponse{Membership: updatedMembership})
+}
+
+func mysqlActiveWorkspaceOwnerCount(ctx context.Context, q sqlRunner, workspaceID string) (int, error) {
+	var count int
+	err := q.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*) FROM workspace_memberships WHERE workspace_id = ? AND role = 'owner' AND status = 'active'`,
+		workspaceID,
+	).Scan(&count)
+	return count, err
 }

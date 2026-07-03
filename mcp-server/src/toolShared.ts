@@ -7,7 +7,6 @@ export const severitySchema = z.enum(["low", "medium", "high", "very_high"]);
 export const stageSchema = z.enum(["sales", "requirements", "design", "development", "testing", "deployment", "acceptance"]);
 export const repeatRuleSchema = z.enum(["none", "daily", "weekly", "interval", "weekdays", "monthly", "after_completion"]);
 export const projectMemberRoleSchema = z.enum(["project_owner", "executor"]);
-export const moodSchema = z.enum(["low", "normal", "good", "great"]);
 
 export const taskInputSchema = {
   title: z.string(),

@@ -2,11 +2,12 @@ import { useMemo } from "react";
 import { today } from "./appModel";
 import { resolveMemberIdForProject } from "./memberIdentity";
 import { deriveProjectDetailModel, type ProjectTaskFilters } from "./projectDetail";
-import type { AppState } from "./types";
+import type { Account, AppState } from "./types";
 import { taskById } from "./workbenchModel";
 
 export type AppProjectDetailViewModelHooksOptions = {
   state: AppState | null;
+  platformAccounts: Account[];
   selectedTaskId: string | null;
   selectedProjectId: string | null;
   projectTaskFilters: ProjectTaskFilters;
@@ -14,6 +15,7 @@ export type AppProjectDetailViewModelHooksOptions = {
 
 export function useAppProjectDetailViewModelHooks({
   state,
+  platformAccounts,
   selectedTaskId,
   selectedProjectId,
   projectTaskFilters,
@@ -30,8 +32,8 @@ export function useAppProjectDetailViewModelHooks({
   const projectDetailDate = today();
   const projectDetailModel = useMemo(() => {
     if (!state || !activeProjectId) return undefined;
-    return deriveProjectDetailModel(state, activeProjectId, projectTaskFilters, projectDetailDate);
-  }, [state, activeProjectId, projectTaskFilters, projectDetailDate]);
+    return deriveProjectDetailModel(state, activeProjectId, projectTaskFilters, projectDetailDate, platformAccounts);
+  }, [state, activeProjectId, projectTaskFilters, projectDetailDate, platformAccounts]);
   const currentProjectMemberId = useMemo(() => {
     if (!state || !activeProjectId) return undefined;
     return resolveMemberIdForProject(state, activeProjectId);

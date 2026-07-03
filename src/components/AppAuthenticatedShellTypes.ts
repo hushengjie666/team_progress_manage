@@ -1,10 +1,8 @@
-import type { AppDailyReviewRuntime } from "../appDailyReviewRuntime";
 import type { AppFocusActionsRuntime } from "../appFocusActionsRuntime";
 import type { AppProjectActionsRuntime } from "../appProjectActionsRuntime";
 import type { AppSettingsActionsRuntime } from "../appSettingsActionsRuntime";
 import type { AppTaskActionsRuntime } from "../appTaskActionsRuntime";
 import type { AuthSessionRuntime } from "../authSessionRuntime";
-import type { DataPortabilityRuntime } from "../dataPortabilityRuntime";
 import type { DeletedTaskSnapshot, SplitDraft, Tab, TaskDraft } from "../appModel";
 import type { ProjectDetailModel, ProjectTaskFilters } from "../projectDetail";
 import type { SyncCommandRuntime } from "../syncCommandRuntime";
@@ -13,7 +11,6 @@ import type {
   AppState,
   CommandAction,
   DailyPlan,
-  ImportSummary,
   ParsedQuickInput,
   ProjectInvitation,
   SyncDiagnosticResult,
@@ -76,7 +73,6 @@ export type AppShellState = {
   setShowShortcutHelp: Setter<boolean>;
   syncPassword: string;
   setSyncPassword: Setter<string>;
-  importSummary: ImportSummary | null;
   syncDiagnostic: SyncDiagnosticResult | null;
   settingsSection: SettingsSection;
   setSettingsSection: Setter<SettingsSection>;
@@ -112,10 +108,8 @@ export type AppAuthenticatedShellProps = {
   chrome: AppShellChrome;
   taskActions: AppTaskActionsRuntime;
   focusActions: AppFocusActionsRuntime;
-  dailyActions: AppDailyReviewRuntime;
   projectActions: AppProjectActionsRuntime;
   settingsActions: AppSettingsActionsRuntime;
-  dataPortability: DataPortabilityRuntime;
   syncActions: SyncCommandRuntime;
   authActions: Pick<AuthSessionRuntime, "handleCreateWorkspace" | "logout">;
   workspaceAccountActions: Pick<

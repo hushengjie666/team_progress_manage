@@ -1,11 +1,8 @@
 import {
-  BarChart3,
   Building2,
-  CalendarDays,
   Focus,
   FolderKanban,
   LayoutDashboard,
-  ListChecks,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -17,9 +14,6 @@ export type AppNavigationHandlers = {
   openMemberStatus: () => void;
   openWorkbench: () => void;
   openFocus: () => void;
-  openDailyReview: () => void;
-  openReports: () => void;
-  openCalendar: () => void;
   openAdmin: () => void;
   showMemberStatus?: boolean;
 };
@@ -30,9 +24,6 @@ export const createAppNavigation = ({
   openMemberStatus,
   openWorkbench,
   openFocus,
-  openDailyReview,
-  openReports,
-  openCalendar,
   openAdmin,
   showMemberStatus = true,
 }: AppNavigationHandlers) => {
@@ -57,9 +48,6 @@ export const createAppNavigation = ({
 
   const secondaryNavItems: AppTopbarNavItem[] = [
     { key: "focus", label: "开始工作", icon: <Focus size={18} />, onClick: openFocus },
-    { key: "daily", label: "每日总结", icon: <ListChecks size={18} />, onClick: openDailyReview },
-    { key: "reports", label: "复盘洞察", icon: <BarChart3 size={18} />, onClick: openReports },
-    { key: "calendar", label: "历史日报", icon: <CalendarDays size={18} />, onClick: openCalendar },
     adminNavItem,
   ];
 

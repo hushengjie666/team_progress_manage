@@ -26,19 +26,13 @@ test("opens current navigation and primary work surfaces", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "今日任务" })).toBeVisible();
 });
 
-test("opens calendar, daily review, reports and command palette", async ({ page }) => {
+test("keeps retired review/report surfaces out of navigation and opens command palette", async ({ page }) => {
   await openApp(page);
 
   const nav = page.getByLabel("页面导航");
-  await nav.getByRole("button", { name: "历史日报" }).click();
-  await expect(page.getByRole("heading", { name: "历史日报" })).toBeVisible();
-
-  await nav.getByRole("button", { name: "每日总结" }).click();
-  await expect(page.getByRole("heading", { name: "日终回顾" })).toBeVisible();
-
-  await nav.getByRole("button", { name: "复盘洞察" }).click();
-  await expect(page.getByRole("heading", { name: "近 30 天复盘" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "自律激励" })).toBeVisible();
+  await expect(nav.getByRole("button", { name: "历史日报" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "每日总结" })).toHaveCount(0);
+  await expect(nav.getByRole("button", { name: "复盘洞察" })).toHaveCount(0);
 
   await page.keyboard.press("/");
   await expect(page.getByRole("dialog", { name: "命令面板" })).toBeVisible();

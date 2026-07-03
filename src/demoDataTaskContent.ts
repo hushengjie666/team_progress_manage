@@ -35,7 +35,7 @@ export const fallbackDemoTaskNotes = (task: Task, projectName: string) =>
   `围绕${projectName}推进「${task.title}」，补齐背景、执行口径和验收要点，确保演示数据可以直接用于功能体验。`;
 
 export const fallbackDemoTaskProgressNote = (task: Task) => {
-  if (task.status === "completed") return "演示任务已完成，用于展示历史完成记录和复盘效果。";
+  if (task.status === "completed") return "演示任务已完成，用于展示历史完成记录。";
   if (task.status === "in_progress") return "演示任务正在推进中，用于展示当前工作状态和进度变化。";
   if (task.status === "committed") return "演示任务已进入今日队列，用于展示待执行任务。";
   if (task.status === "pending_review") return "演示任务等待负责人验收。";
@@ -62,7 +62,7 @@ export const targetProjectDemoTaskPatch = (task: Task, projectName: string): Par
     demo_task_today_report: {
       title: `整理${projectLabel}验收报告`,
       notes: `汇总今日测试结论、风险点和下一步处理项，方便团队对齐项目状态。`,
-      tags: ["报告", "复盘"],
+      tags: ["报告", "验收"],
       stage: "acceptance",
     },
     demo_task_pool_calendar: {
@@ -72,9 +72,9 @@ export const targetProjectDemoTaskPatch = (task: Task, projectName: string): Par
       stage: "testing",
     },
     demo_task_pool_import: {
-      title: `准备${projectLabel}导入前备份`,
-      notes: `导入新样例或配置前创建恢复点，并记录新增数据的影响范围。`,
-      tags: ["数据", "备份"],
+      title: `完善${projectLabel}后台诊断提示`,
+      notes: `把服务健康、登录状态和同步结果展示得更清楚，方便团队快速定位问题。`,
+      tags: ["同步", "诊断"],
       stage: "requirements",
     },
     demo_task_pool_shortcuts: {
@@ -84,9 +84,9 @@ export const targetProjectDemoTaskPatch = (task: Task, projectName: string): Par
       stage: "requirements",
     },
     demo_task_pool_weekly: {
-      title: `准备${projectLabel}周复盘模板`,
-      notes: `固定回顾本周验收结论、遗留问题、风险变化和下周计划。`,
-      tags: ["周复盘", "模板"],
+      title: `准备${projectLabel}周计划模板`,
+      notes: `固定整理本周验收结论、遗留问题、风险变化和下周计划。`,
+      tags: ["周会", "模板"],
       stage: "acceptance",
     },
     demo_task_done_prd: {
@@ -105,8 +105,8 @@ export const targetProjectDemoTaskPatch = (task: Task, projectName: string): Par
       stage: "testing",
     },
     demo_task_done_review: {
-      title: `设计${projectLabel}回顾字段`,
-      tags: ["复盘", "验收"],
+      title: `设计${projectLabel}验收说明字段`,
+      tags: ["验收", "字段"],
       stage: "acceptance",
     },
   };

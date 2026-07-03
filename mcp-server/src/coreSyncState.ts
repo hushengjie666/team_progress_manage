@@ -19,7 +19,6 @@ export const createEmptySyncState = (config: TimeManageMcpConfig, session: AuthS
     workSessions: [],
     executionSignals: [],
     interruptions: [],
-    backupSnapshots: [],
     taskTemplates: [],
     templateInstances: [],
     auth: {

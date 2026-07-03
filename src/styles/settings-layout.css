@@ -1,11 +1,9 @@
-.permission-checklist,
 .sync-steps {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.permission-checklist span,
 .sync-steps span {
   min-height: 30px;
   display: inline-flex;
@@ -18,26 +16,20 @@
   font-weight: 700;
 }
 
-.permission-checklist .ok,
 .sync-steps .active {
   color: #12423d;
   background: #d8ece6;
 }
 
-.reports-layout,
 .settings-layout {
   display: grid;
-  gap: 18px;
-}
-
-.settings-layout {
   grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
   align-items: start;
 }
 
 .settings-layout > .settings-hub,
 .settings-layout > .settings-panel,
-.settings-layout > .data-management,
 .settings-layout > .settings-panel:last-child {
   grid-column: 1 / -1;
 }

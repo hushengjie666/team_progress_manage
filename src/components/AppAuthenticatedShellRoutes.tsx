@@ -1,10 +1,7 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
-import { AppCalendarRoute } from "./AppCalendarRoute";
-import { AppDailyReviewRoute } from "./AppDailyReviewRoute";
 import { AppFocusRoute } from "./AppFocusRoute";
 import { AppMemberStatusRoute } from "./AppMemberStatusRoute";
 import { AppProjectDetailRoute } from "./AppProjectDetailRoute";
-import { AppReportsRoute } from "./AppReportsRoute";
 import { AppSettingsRoute } from "./AppSettingsRoute";
 import { AppWorkspaceDirectoryRoute } from "./AppWorkspaceDirectoryRoute";
 import { AppWorkspaceRoute } from "./AppWorkspaceRoute";
@@ -16,10 +13,8 @@ type AppAuthenticatedShellRoutesProps = Pick<
   | "chrome"
   | "taskActions"
   | "focusActions"
-  | "dailyActions"
   | "projectActions"
   | "settingsActions"
-  | "dataPortability"
   | "syncActions"
   | "authActions"
   | "workspaceAccountActions"
@@ -36,10 +31,8 @@ export function AppAuthenticatedShellRoutes({
   chrome,
   taskActions,
   focusActions,
-  dailyActions,
   projectActions,
   settingsActions,
-  dataPortability,
   syncActions,
   authActions,
   workspaceAccountActions,
@@ -116,36 +109,6 @@ export function AppAuthenticatedShellRoutes({
     );
   }
 
-  if (tab === "calendar") {
-    return (
-      <AppCalendarRoute
-        view={view}
-        shellState={shellState}
-        settingsActions={settingsActions}
-        taskActions={taskActions}
-      />
-    );
-  }
-
-  if (tab === "daily") {
-    return (
-      <AppDailyReviewRoute
-        view={view}
-        dailyActions={dailyActions}
-      />
-    );
-  }
-
-  if (tab === "reports") {
-    return (
-      <AppReportsRoute
-        view={view}
-        shellState={shellState}
-        settingsActions={settingsActions}
-      />
-    );
-  }
-
   if (tab === "settings") {
     return (
       <AppSettingsRoute
@@ -153,7 +116,6 @@ export function AppAuthenticatedShellRoutes({
         shellState={shellState}
         chrome={chrome}
         settingsActions={settingsActions}
-        dataPortability={dataPortability}
         syncActions={syncActions}
         workspaceAccountActions={workspaceAccountActions}
         loadDemoData={loadDemoData}

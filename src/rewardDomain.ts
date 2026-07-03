@@ -14,7 +14,6 @@ const dayBefore = (date: Date, offset: number) => {
 
 export const badgeRules = (state: AppState): BadgeRule[] => {
   const completed = completedFocusSessions(state).length;
-  const reviewed = state.dailyPlans.some((plan) => Boolean(plan.reviewedAt));
   const lowInterruptionDay = state.dailyPlans.some((plan) => plan.completedPomodoros >= state.rewardState.dailyGoal && interruptionsOnDate(state, plan.date).length <= 1);
   const accurateEstimate = state.tasks.some((task) =>
     task.estimateHistory.some((entry) => Math.abs(entry.actualPomodoros - entry.estimatedPomodoros) <= 1),
@@ -27,7 +26,6 @@ export const badgeRules = (state: AppState): BadgeRule[] => {
     { id: "streak_14", label: "连续 14 天", earned: streak >= 14 },
     { id: "low_interruption", label: "低中断日", earned: lowInterruptionDay },
     { id: "accurate_estimate", label: "估算准确日", earned: accurateEstimate },
-    { id: "daily_review", label: "完成日终回顾", earned: reviewed },
   ];
 };
 

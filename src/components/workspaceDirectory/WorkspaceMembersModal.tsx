@@ -1,11 +1,8 @@
-import type { Dispatch, SetStateAction } from "react";
 import { X } from "lucide-react";
-import type { Account, WorkspaceMembership, WorkspaceType, WorkspaceUpdateInput } from "../../types";
+import type { Account, WorkspaceMembership, WorkspaceType } from "../../types";
 import type { WorkspaceDirectoryCard } from "./workspaceDirectoryModel";
 import { workspaceTypeLabel } from "./workspaceDirectoryModel";
-import { WorkspaceEditForm } from "./WorkspaceEditForm";
 import { WorkspaceMemberListPanel } from "./WorkspaceMemberListPanel";
-import type { WorkspaceEditWarning } from "./workspaceDirectoryModalModel";
 
 type WorkspaceMembersModalProps = {
   selectedCard: WorkspaceDirectoryCard;
@@ -13,18 +10,10 @@ type WorkspaceMembersModalProps = {
   selectedMembers: WorkspaceMembership[];
   selectedWorkspaceType: WorkspaceType;
   selectedOwnerAccountId: string;
-  editingOwnerAccountId: string;
   selectedMemberDraft: { email: string };
-  workspaceEditDraft: WorkspaceUpdateInput;
-  setWorkspaceEditDraft: Dispatch<SetStateAction<WorkspaceUpdateInput>>;
-  workspaceEditWarning: WorkspaceEditWarning;
-  setWorkspaceEditWarning: Dispatch<SetStateAction<WorkspaceEditWarning>>;
   canEditSelectedWorkspace: boolean;
-  canChangeSelectedWorkspaceType: boolean;
   canChangeSelectedWorkspaceOwner: boolean;
-  startWorkspaceEdit: () => void;
-  saveWorkspaceEdit: () => Promise<void>;
-  selectWorkspaceOwner: (accountId: string, checked: boolean) => Promise<void>;
+  updateWorkspaceMemberRole: (member: WorkspaceMembership, checked: boolean) => Promise<void>;
   updateWorkspaceMemberDraft: (workspaceId: string, patch: Partial<{ email: string }>) => void;
   inviteWorkspaceMember: (workspaceId: string, email: string) => void;
   unbindWorkspaceMember: (member: WorkspaceMembership) => Promise<void>;
@@ -37,18 +26,10 @@ export function WorkspaceMembersModal({
   selectedMembers,
   selectedWorkspaceType,
   selectedOwnerAccountId,
-  editingOwnerAccountId,
   selectedMemberDraft,
-  workspaceEditDraft,
-  setWorkspaceEditDraft,
-  workspaceEditWarning,
-  setWorkspaceEditWarning,
   canEditSelectedWorkspace,
-  canChangeSelectedWorkspaceType,
   canChangeSelectedWorkspaceOwner,
-  startWorkspaceEdit,
-  saveWorkspaceEdit,
-  selectWorkspaceOwner,
+  updateWorkspaceMemberRole,
   updateWorkspaceMemberDraft,
   inviteWorkspaceMember,
   unbindWorkspaceMember,
@@ -75,32 +56,16 @@ export function WorkspaceMembersModal({
         </div>
 
         <div className="workspace-member-modal-body">
-          <WorkspaceEditForm
-            selectedCard={selectedCard}
-            selectedMembers={selectedMembers}
-            selectedWorkspaceType={selectedWorkspaceType}
-            selectedOwnerAccountId={selectedOwnerAccountId}
-            editingOwnerAccountId={editingOwnerAccountId}
-            workspaceEditDraft={workspaceEditDraft}
-            setWorkspaceEditDraft={setWorkspaceEditDraft}
-            workspaceEditWarning={workspaceEditWarning}
-            setWorkspaceEditWarning={setWorkspaceEditWarning}
-            canEditSelectedWorkspace={canEditSelectedWorkspace}
-            canChangeSelectedWorkspaceType={canChangeSelectedWorkspaceType}
-            canChangeSelectedWorkspaceOwner={canChangeSelectedWorkspaceOwner}
-            startWorkspaceEdit={startWorkspaceEdit}
-            saveWorkspaceEdit={saveWorkspaceEdit}
-          />
           <WorkspaceMemberListPanel
             selectedCard={selectedCard}
             currentAccount={currentAccount}
             selectedMembers={selectedMembers}
             selectedWorkspaceType={selectedWorkspaceType}
-            editingOwnerAccountId={editingOwnerAccountId}
+            selectedOwnerAccountId={selectedOwnerAccountId}
             selectedMemberDraft={selectedMemberDraft}
             canEditSelectedWorkspace={canEditSelectedWorkspace}
             canChangeSelectedWorkspaceOwner={canChangeSelectedWorkspaceOwner}
-            selectWorkspaceOwner={selectWorkspaceOwner}
+            updateWorkspaceMemberRole={updateWorkspaceMemberRole}
             updateWorkspaceMemberDraft={updateWorkspaceMemberDraft}
             inviteWorkspaceMember={inviteWorkspaceMember}
             unbindWorkspaceMember={unbindWorkspaceMember}

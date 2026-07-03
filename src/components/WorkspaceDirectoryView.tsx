@@ -1,4 +1,5 @@
 import { WorkspaceDirectoryHome } from "./workspaceDirectory/WorkspaceDirectoryHome";
+import { WorkspaceEditModal } from "./workspaceDirectory/WorkspaceEditModal";
 import { WorkspaceMembersModal } from "./workspaceDirectory/WorkspaceMembersModal";
 import { WorkspaceProjectsModal } from "./workspaceDirectory/WorkspaceProjectsModal";
 import {
@@ -35,10 +36,6 @@ export function WorkspaceDirectoryView(props: WorkspaceDirectoryViewProps) {
           projectDraftWarning={directory.projectDraftWarning}
           setProjectDraftWarning={directory.setProjectDraftWarning}
           submitProject={directory.submitProject}
-          projectEditDraftFor={directory.projectEditDraftFor}
-          updateProjectEditDraft={directory.updateProjectEditDraft}
-          projectEditWarnings={directory.projectEditWarnings}
-          saveProjectEdit={directory.saveProjectEdit}
           openProjectDetail={openProjectDetail}
           closeModal={directory.closeModal}
         />
@@ -51,21 +48,31 @@ export function WorkspaceDirectoryView(props: WorkspaceDirectoryViewProps) {
           selectedMembers={directory.selectedMembers}
           selectedWorkspaceType={directory.selectedWorkspaceType}
           selectedOwnerAccountId={directory.selectedOwnerAccountId}
-          editingOwnerAccountId={directory.editingOwnerAccountId}
           selectedMemberDraft={directory.selectedMemberDraft}
+          canEditSelectedWorkspace={directory.canEditSelectedWorkspace}
+          canChangeSelectedWorkspaceOwner={directory.canChangeSelectedWorkspaceOwner}
+          updateWorkspaceMemberRole={directory.updateWorkspaceMemberRole}
+          updateWorkspaceMemberDraft={directory.updateWorkspaceMemberDraft}
+          inviteWorkspaceMember={inviteWorkspaceMember}
+          unbindWorkspaceMember={directory.unbindWorkspaceMember}
+          closeModal={directory.closeModal}
+        />
+      )}
+
+      {directory.selectedCard && directory.activeModal?.kind === "edit" && (
+        <WorkspaceEditModal
+          selectedCard={directory.selectedCard}
+          selectedMembers={directory.selectedMembers}
+          selectedWorkspaceType={directory.selectedWorkspaceType}
+          selectedOwnerAccountId={directory.selectedOwnerAccountId}
           workspaceEditDraft={directory.workspaceEditDraft}
           setWorkspaceEditDraft={directory.setWorkspaceEditDraft}
           workspaceEditWarning={directory.workspaceEditWarning}
           setWorkspaceEditWarning={directory.setWorkspaceEditWarning}
           canEditSelectedWorkspace={directory.canEditSelectedWorkspace}
           canChangeSelectedWorkspaceType={directory.canChangeSelectedWorkspaceType}
-          canChangeSelectedWorkspaceOwner={directory.canChangeSelectedWorkspaceOwner}
           startWorkspaceEdit={directory.startWorkspaceEdit}
           saveWorkspaceEdit={directory.saveWorkspaceEdit}
-          selectWorkspaceOwner={directory.selectWorkspaceOwner}
-          updateWorkspaceMemberDraft={directory.updateWorkspaceMemberDraft}
-          inviteWorkspaceMember={inviteWorkspaceMember}
-          unbindWorkspaceMember={directory.unbindWorkspaceMember}
           closeModal={directory.closeModal}
         />
       )}

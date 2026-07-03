@@ -43,11 +43,35 @@
   gap: 12px;
 }
 
+.workspace-directory-card-head > div {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
 .workspace-directory-card-head h2 {
-  margin: 8px 0 0;
+  margin: 0;
   color: #263236;
   font-size: 20px;
   line-height: 1.18;
+}
+
+.workspace-directory-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, auto) 30px;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.workspace-card-edit-button {
+  opacity: 0.72;
+}
+
+.workspace-card-edit-button:hover,
+.workspace-card-edit-button:focus-visible {
+  opacity: 1;
 }
 
 .workspace-directory-actions {

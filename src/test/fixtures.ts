@@ -60,9 +60,9 @@ export const createInitialState = (): AppState => {
     },
     {
       id: "task_report_model",
-      title: "设计番茄报表指标",
+      title: "设计项目验收指标",
       notes: "测试任务备注。",
-      tags: ["报表", "复盘"],
+      tags: ["验收", "指标"],
       projectId: "project_starter",
       project: "TimeManage",
       creatorMemberId: "member_owner",

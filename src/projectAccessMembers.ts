@@ -5,6 +5,7 @@ import {
   workspacesForState,
 } from "./workspaceAccess";
 import type {
+  Account,
   AppState,
   ProjectMember,
 } from "./types";
@@ -16,8 +17,14 @@ export const buildAccessibleProjectMembers = (
   state: AppState,
   projectMembers: ProjectMember[],
   workspaceId?: string,
+  accounts: Account[] = [],
 ) => {
   const collector = createProjectAccessibleMemberCollector();
+  const accountById = new Map(
+    [state.auth.account, ...accounts]
+      .filter((account): account is Account => Boolean(account?.id))
+      .map((account) => [account.id, account]),
+  );
   const activeWorkspaceMemberships = workspaceId
     ? workspaceMembershipsForState(state).filter((membership) => membership.workspaceId === workspaceId && membership.status === "active")
     : [];
@@ -28,18 +35,18 @@ export const buildAccessibleProjectMembers = (
 
   if (workspaceId) {
     const workspace = workspacesForState(state).find((item) => item.id === workspaceId);
-    if (workspace?.ownerAccountId) {
+    if (workspace?.ownerAccountId && !activeWorkspaceMemberships.some((membership) => membership.accountId === workspace.ownerAccountId)) {
       const ownerMembership = activeWorkspaceMemberships.find((membership) => membership.accountId === workspace.ownerAccountId);
-      const ownerAccount = state.auth.account?.id === workspace.ownerAccountId ? state.auth.account : undefined;
+      const ownerAccount = accountById.get(workspace.ownerAccountId);
       collector.addWorkspaceMember(
         {
           accountId: workspace.ownerAccountId,
           email: ownerMembership?.email ?? ownerAccount?.email,
         },
         {
-          name: ownerMembership?.name ?? ownerAccount?.name ?? "工作区负责人",
+          name: ownerMembership?.name ?? ownerAccount?.name ?? "创建人",
           email: ownerMembership?.email ?? ownerAccount?.email,
-          sourceLabel: "工作区负责人",
+          sourceLabel: "创建人",
           workspaceMembership: ownerMembership,
         },
       );
@@ -55,7 +62,7 @@ export const buildAccessibleProjectMembers = (
           {
             name: currentMembership?.name ?? state.auth.account.name,
             email: currentMembership?.email ?? state.auth.account.email,
-            sourceLabel: currentMembership?.role === "owner" || workspace?.ownerAccountId === state.auth.account.id ? "工作区负责人" : "工作区成员",
+            sourceLabel: currentMembership?.role === "owner" ? "工作区负责人" : "工作区成员",
             workspaceMembership: currentMembership,
           },
         );
