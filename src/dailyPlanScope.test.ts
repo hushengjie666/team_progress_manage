@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTodayPlan } from "./appModel";
+import { alignDailyPlanIdentity, currentAccountDailyPlanForDate } from "./dailyPlanScope";
 import { todayKey } from "./seed";
 import { createInitialState } from "./test/fixtures";
 import type { DailyPlan } from "./types";
@@ -74,6 +75,43 @@ describe("daily plan account scope", () => {
       id: `plan_account_wangyuqiao_${todayKey()}`,
       ownerAccountId: "account_wangyuqiao",
       committedTaskIds: [],
+    });
+  });
+
+  it("prefers the account scoped daily plan when another plan has the same owner and date", () => {
+    const state = {
+      ...createInitialState(),
+      auth: {
+        ...createInitialState().auth,
+        status: "authenticated" as const,
+        account: {
+          id: "account_wangyuqiao",
+          workspaceId: "workspace_team",
+          name: "王昱桥",
+          email: "wangyuqiao",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      },
+      dailyPlans: [
+        {
+          ...plan("account_wangyuqiao", ["task_shared_id"]),
+          id: `plan_${todayKey()}`,
+        },
+        plan("account_wangyuqiao", ["task_account_id"]),
+      ],
+    };
+
+    expect(currentAccountDailyPlanForDate(state, todayKey())?.committedTaskIds).toEqual(["task_account_id"]);
+  });
+
+  it("aligns daily plan ids to the owner and date", () => {
+    expect(alignDailyPlanIdentity({
+      ...plan("account_wangyuqiao", ["task_today"]),
+      id: `plan_${todayKey()}`,
+    })).toMatchObject({
+      id: `plan_account_wangyuqiao_${todayKey()}`,
+      ownerAccountId: "account_wangyuqiao",
     });
   });
 });

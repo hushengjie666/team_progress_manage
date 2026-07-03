@@ -178,9 +178,72 @@ describe("team progress sync flattening", () => {
       workspace_id: workspace.id,
       account_id: "account_owner",
       payload: {
+        id: "plan_account_owner_2026-07-04",
         ownerAccountId: "account_owner",
         committedTaskIds: ["task_owner_today"],
       },
     });
+  });
+
+  it("pushes current account daily plans with account scoped ids", () => {
+    const state = teamState();
+    const workspace = {
+      id: "workspace_shared",
+      name: "协作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: state.updatedAt,
+      updatedAt: state.updatedAt,
+    };
+    const changes = flattenStateToChanges({
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        token: "token_owner",
+        account: {
+          id: "account_owner",
+          workspaceId: workspace.id,
+          name: "负责人",
+          email: "owner@example.com",
+          createdAt: state.updatedAt,
+          updatedAt: state.updatedAt,
+        },
+        workspace,
+      },
+      dailyPlans: [
+        {
+          id: "plan_2026-07-04",
+          workspaceId: workspace.id,
+          ownerAccountId: "account_owner",
+          date: "2026-07-04",
+          capacityPomodoros: 8,
+          committedTaskIds: ["task_owner_today"],
+          completedPomodoros: 0,
+          suggestedTaskIds: [],
+          reflection: "",
+          review: {
+            mood: "normal" as const,
+            wins: "",
+            blockers: "",
+            interruptionPattern: "",
+            tomorrowFocus: "",
+          },
+          createdAt: iso("2026-07-04T08:00:00Z"),
+          updatedAt: iso("2026-07-04T09:00:00Z"),
+        },
+      ],
+    }, { changedAfter: iso("2026-07-04T10:00:00Z") });
+
+    expect(changes).toContainEqual(expect.objectContaining({
+      entity: "daily_plan",
+      id: "plan_account_owner_2026-07-04",
+      account_id: "account_owner",
+      payload: expect.objectContaining({
+        id: "plan_account_owner_2026-07-04",
+        ownerAccountId: "account_owner",
+        committedTaskIds: ["task_owner_today"],
+      }),
+    }));
   });
 });

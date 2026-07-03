@@ -1,5 +1,6 @@
 import { isObject, shouldAcceptRemote, timestampFor, upsert } from "./syncEntityMergeHelpers";
 import { singletonEntities, type SyncMergeOptions, type SyncMergeRow } from "./syncEntityMergeTypes";
+import { alignDailyPlanIdentity, dailyPlanIdentityKey } from "./dailyPlanScope";
 import type {
   AppState,
   DailyPlan,
@@ -77,14 +78,21 @@ export const applyUpsertSyncRow = (state: AppState, row: SyncMergeRow, options: 
   }
   if (row.entity === "daily_plan") {
     const incomingPayload = payload as unknown as DailyPlan;
-    const incoming: DailyPlan = row.account_id && !incomingPayload.ownerAccountId
+    const incomingWithOwner: DailyPlan = row.account_id && !incomingPayload.ownerAccountId
       ? { ...incomingPayload, ownerAccountId: row.account_id }
       : incomingPayload;
-    const existing = state.dailyPlans.find((plan) => plan.id === row.id);
+    const incoming = alignDailyPlanIdentity(incomingWithOwner);
+    const incomingKey = dailyPlanIdentityKey(incoming);
+    const existing = state.dailyPlans.find((plan) => plan.id === incoming.id || dailyPlanIdentityKey(plan) === incomingKey);
     if (existing) {
+      const merged = mergeDailyPlan(alignDailyPlanIdentity(existing), incoming, row.updated_at, state.updatedAt, forceRemote);
       return {
         ...state,
-        dailyPlans: state.dailyPlans.map((plan) => (plan.id === row.id ? mergeDailyPlan(plan, incoming, row.updated_at, state.updatedAt, forceRemote) : plan)),
+        dailyPlans: state.dailyPlans.flatMap((plan) => {
+          if (plan.id === existing.id) return [merged];
+          if (dailyPlanIdentityKey(plan) === incomingKey) return [];
+          return [plan];
+        }),
       };
     }
     return shouldAcceptRemote(row, existing, state.updatedAt, forceRemote) ? { ...state, dailyPlans: [incoming, ...state.dailyPlans] } : state;

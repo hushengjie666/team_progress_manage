@@ -2,11 +2,14 @@ import type { AppState, WorkSession } from "./types";
 import type { SyncChange, SyncEntity } from "./syncPayloadTypes";
 import { buildSyncStateFlattenWorkspace } from "./syncStateFlattenWorkspace";
 import {
+  alignDailyPlanIdentity,
   currentDailyPlanOwnerAccountId,
   dailyPlanBelongsToCurrentAccount,
 } from "./dailyPlanScope";
 
 const isAfter = (value: string, baseline?: string) => !baseline || value > baseline;
+
+type SyncChangeDraft = SyncChange & { pushRequired?: boolean };
 
 const activeWorkSessionTaskIds = (state: AppState) =>
   new Set(
@@ -21,7 +24,22 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
   const activeTaskIds = activeWorkSessionTaskIds(state);
   const workspace = buildSyncStateFlattenWorkspace(state);
   const ownerAccountId = currentDailyPlanOwnerAccountId(state);
-  const changes: SyncChange[] = [
+  const currentAccountDailyPlanChanges: SyncChangeDraft[] = state.dailyPlans
+    .filter((plan) => dailyPlanBelongsToCurrentAccount(state, plan))
+    .map((plan) => {
+      const payload = alignDailyPlanIdentity(ownerAccountId && !plan.ownerAccountId ? { ...plan, ownerAccountId } : plan);
+      return {
+        workspace_id: workspace.workspaceIdForPayload(payload, workspace.currentWorkspaceId),
+        account_id: ownerAccountId,
+        entity: "daily_plan" as const,
+        id: payload.id,
+        device_id: deviceID,
+        updated_at: payload.updatedAt,
+        payload,
+        pushRequired: payload.id !== plan.id,
+      };
+    });
+  const changes: SyncChangeDraft[] = [
     {
       workspace_id: workspace.currentWorkspaceId,
       entity: "settings",
@@ -78,15 +96,7 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
       updated_at: signal.createdAt,
       payload: signal,
     })),
-    ...state.dailyPlans.filter((plan) => dailyPlanBelongsToCurrentAccount(state, plan)).map((plan) => ({
-      workspace_id: workspace.workspaceIdForPayload(plan, workspace.currentWorkspaceId),
-      account_id: ownerAccountId,
-      entity: "daily_plan" as const,
-      id: plan.id,
-      device_id: deviceID,
-      updated_at: plan.updatedAt,
-      payload: ownerAccountId && !plan.ownerAccountId ? { ...plan, ownerAccountId } : plan,
-    })),
+    ...currentAccountDailyPlanChanges,
     ...state.focusSessions.map((session) => ({
       workspace_id: workspace.workspaceIdForPayload(
         session,
@@ -125,9 +135,14 @@ export function flattenStateToChanges(state: AppState, options: { changedAfter?:
   }
 
   return changes.filter((change) => {
+    if (change.pushRequired) return true;
     if (isAfter(change.updated_at, changedAfter)) return true;
     if (change.entity === "work_session" && (change.payload as WorkSession).status !== "ended") return true;
     if (change.entity === "task" && activeTaskIds.has(change.id)) return true;
     return false;
+  }).map((change) => {
+    const syncChange = { ...change };
+    delete syncChange.pushRequired;
+    return syncChange;
   });
 }
