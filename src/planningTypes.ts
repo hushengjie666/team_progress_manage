@@ -11,7 +11,7 @@ export type CommandAction =
   | "record_internal_interruption"
   | "record_external_interruption"
   | "open_task"
-  | "open_sync_settings"
+  | "open_backend_settings"
   | "open_shortcut_help";
 
 export interface DailyPlan {

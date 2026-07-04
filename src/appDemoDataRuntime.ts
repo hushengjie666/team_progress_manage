@@ -3,7 +3,7 @@ import { ensureTodayPlan, initialFilters, nowIso, type Tab, type TaskFilters } f
 import { demoTaskIdForProject, mergeDemoDataIntoState } from "./demoData";
 import type { AppState } from "./types";
 
-type PersistBusinessChanges = (
+type PersistTeamData = (
   current: AppState,
   next: AppState,
   options?: { refreshAfterSave?: boolean },
@@ -13,7 +13,7 @@ type Setter<T> = (value: T | ((current: T) => T)) => void;
 export type AppDemoDataRuntimeOptions = {
   getState: () => AppState | null;
   getSelectedProjectId: () => string | null;
-  persistBusinessChanges: PersistBusinessChanges;
+  persistTeamData: PersistTeamData;
   setState: Setter<AppState | null>;
   setToast: (message: string) => void;
   setSelectedProjectId: Setter<string | null>;
@@ -30,7 +30,7 @@ export type AppDemoDataRuntime = {
 export function createAppDemoDataRuntime({
   getState,
   getSelectedProjectId,
-  persistBusinessChanges,
+  persistTeamData,
   setState,
   setToast,
   setSelectedProjectId,
@@ -50,7 +50,7 @@ export function createAppDemoDataRuntime({
       setToast("没有可加载演示数据的项目");
       return;
     }
-    const token = current.auth.token ?? current.sync.token;
+    const token = current.auth.token ?? current.backend.token;
     if (!token) {
       setToast("请先登录团队后台后再加载演示数据");
       return;
@@ -58,7 +58,7 @@ export function createAppDemoDataRuntime({
     setToast("正在写入团队后台...");
     try {
       const next = ensureTodayPlan(mergeDemoDataIntoState(current, targetProjectId, nowIso()));
-      const saved = await persistBusinessChanges(current, next, { refreshAfterSave: true });
+      const saved = await persistTeamData(current, next, { refreshAfterSave: true });
       if (!saved) return;
       setSelectedProjectId(targetProjectId);
       setProjectDetailTab("overview");

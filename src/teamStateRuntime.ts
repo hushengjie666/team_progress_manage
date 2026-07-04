@@ -1,14 +1,14 @@
 import { applyTeamStateLoadFailure } from "./appBoot";
-import { loadTeamBusinessState, saveTeamBusinessChanges } from "./teamBusinessApi";
+import { loadTeamData, saveTeamDataSnapshot } from "./teamBusinessApi";
 import type { AppState } from "./types";
 
-export type TeamBusinessRuntimeOptions = {
+export type TeamDataRuntimeOptions = {
   getState: () => AppState | null;
   setState: (updater: AppState | null | ((current: AppState | null) => AppState | null)) => void;
   setToast: (message: string) => void;
 };
 
-export type PersistBusinessChangesOptions = {
+export type PersistTeamDataOptions = {
   showFailureToast?: boolean;
   refreshAfterSave?: boolean;
   applySuccessState?: boolean;
@@ -16,65 +16,65 @@ export type PersistBusinessChangesOptions = {
   canApplyState?: () => boolean;
 };
 
-export type TeamBusinessRuntime = {
-  persistBusinessChanges: (
-    before: AppState,
-    after: AppState,
-    options?: PersistBusinessChangesOptions,
+export type TeamDataRuntime = {
+  persistTeamData: (
+    current: AppState,
+    next: AppState,
+    options?: PersistTeamDataOptions,
   ) => Promise<AppState | undefined>;
-  commitBusinessState: (before: AppState, after: AppState) => void;
+  commitTeamData: (current: AppState, next: AppState) => void;
 };
 
-export const createTeamBusinessRuntime = ({ setState, setToast }: TeamBusinessRuntimeOptions): TeamBusinessRuntime => {
+export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOptions): TeamDataRuntime => {
   let commitSequence = 0;
 
-  const persistBusinessChanges = async (
-    before: AppState,
-    after: AppState,
-    options: PersistBusinessChangesOptions = {},
+  const persistTeamData = async (
+    current: AppState,
+    next: AppState,
+    options: PersistTeamDataOptions = {},
   ) => {
-    const token = before.auth.token ?? before.sync.token;
+    const token = current.auth.token ?? current.backend.token;
     if (!token) {
-      if (options.applySuccessState ?? false) setState(after);
-      return after;
+      if (options.applySuccessState ?? false) setState(next);
+      return next;
     }
     const showFailureToast = options.showFailureToast ?? true;
     const applySuccessState = options.applySuccessState ?? true;
     const applyFailureState = options.applyFailureState ?? true;
     const canApplyState = options.canApplyState ?? (() => true);
     try {
-      const saved = await saveTeamBusinessChanges(before.sync, token, before, after);
-      const finalState = options.refreshAfterSave && saved ? await loadTeamBusinessState(saved) : saved;
+      const saved = await saveTeamDataSnapshot(current.backend, token, next);
+      const finalState = options.refreshAfterSave && saved ? await loadTeamData(saved) : saved;
       if (finalState && applySuccessState && canApplyState()) setState(finalState);
       return finalState;
     } catch (error) {
-      const failed = applyTeamStateLoadFailure(after, error);
+      const failed = applyTeamStateLoadFailure(next, error);
       if (applyFailureState && canApplyState()) setState(failed);
       if (showFailureToast && canApplyState()) setToast(failed.auth.message);
       return undefined;
     }
   };
 
-  const commitBusinessState = (before: AppState, after: AppState) => {
-    const token = before.auth.token ?? before.sync.token;
+  const commitTeamData = (current: AppState, next: AppState) => {
+    const token = current.auth.token ?? current.backend.token;
     if (!token) {
-      setState(after);
+      setState(next);
       return;
     }
     const sequence = ++commitSequence;
     setState({
-      ...after,
-      sync: {
-        ...after.sync,
-        status: "syncing",
+      ...next,
+      backend: {
+        ...next.backend,
+        status: "saving",
         message: "正在写入团队后台",
       },
     });
-    void persistBusinessChanges(before, after, {
+    void persistTeamData(current, next, {
       refreshAfterSave: true,
       canApplyState: () => sequence === commitSequence,
     });
   };
 
-  return { persistBusinessChanges, commitBusinessState };
+  return { persistTeamData, commitTeamData };
 };

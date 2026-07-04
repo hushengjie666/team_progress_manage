@@ -66,8 +66,8 @@ const withAdminToken = (state: AppState): AppState => ({
     },
     message: "已登录",
   },
-  sync: {
-    ...state.sync,
+  backend: {
+    ...state.backend,
     serverUrl: "http://127.0.0.1:8787",
     token: "token_admin",
   },

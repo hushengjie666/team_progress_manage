@@ -2,9 +2,9 @@ import { ensureTodayPlan } from "./appModel";
 import {
   fetchWorkspaces,
   type AuthSession,
-} from "./sync";
+} from "./teamBackend";
 import { bindAccountToMembers } from "./authModel";
-import { loadTeamBusinessState } from "./teamBusinessApi";
+import { loadTeamData } from "./teamBusinessApi";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountMetadata";
 import { createWorkspaceInvitationRuntime } from "./workspaceInvitationRuntime";
 import { createWorkspaceMutationRuntime } from "./workspaceMutationRuntime";
@@ -25,7 +25,7 @@ export async function loadAuthenticatedWorkspaceSession(
   let managedWorkspaces = session.workspaces;
   let workspaceMemberships = source.auth.workspaceMemberships ?? [];
   try {
-    const payload = await fetchWorkspaces(source.sync, token);
+    const payload = await fetchWorkspaces(source.backend, token);
     managedWorkspaces = payload.workspaces;
     workspaceMemberships = payload.memberships;
   } catch {
@@ -51,7 +51,7 @@ export async function loadAuthenticatedWorkspaceSession(
   });
   const metadata = await loadWorkspaceAccountMetadata(bound, token);
   return {
-    state: ensureTodayPlan(await loadTeamBusinessState(bound)),
+    state: ensureTodayPlan(await loadTeamData(bound)),
     platformAccounts: metadata.platformAccounts,
     workspaceInvitations: metadata.workspaceInvitations,
     projectInvitations: metadata.projectInvitations,

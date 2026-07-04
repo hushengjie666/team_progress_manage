@@ -12,7 +12,7 @@ import {
   announceTimerEnd,
   runDueTaskReminders,
   stopWhiteNoise,
-  syncWhiteNoise,
+  updateWhiteNoisePlayback,
   updateActiveTimerPresence,
 } from "./timerRuntime";
 
@@ -21,14 +21,14 @@ export function useRunningTimerInterval({
   stateRef,
   setState,
   setToast,
-  commitBusinessState,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitBusinessState">) {
+  commitTeamData,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitTeamData">) {
   useEffect(() => {
     if (!state?.activeTimer?.isRunning) return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current?.activeTimer?.isRunning) return;
-      if (current.sync.status === "syncing") return;
+      if (current.backend.status === "saving") return;
       const nextRemaining = calculateRemaining(current.activeTimer);
       if (nextRemaining > 0) {
         setState({
@@ -46,7 +46,7 @@ export function useRunningTimerInterval({
           : "休息结束，可以回到当下清单。";
       setToast(title);
       announceTimerEnd(current.settings, title, body);
-      commitBusinessState(current, finishExpiredTimerInState(current, timestamp));
+      commitTeamData(current, finishExpiredTimerInState(current, timestamp));
     }, 1000);
     return () => window.clearInterval(handle);
   }, [state?.activeTimer?.isRunning]);
@@ -56,20 +56,20 @@ export function useTimerRestoreListeners({
   stateRef,
   setState,
   setToast,
-  commitBusinessState,
-}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "commitBusinessState">) {
+  commitTeamData,
+}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "commitTeamData">) {
   useEffect(() => {
     const handle = () => {
       const current = stateRef.current;
       if (!current?.activeTimer) return;
-      if (current.sync.status === "syncing") return;
+      if (current.backend.status === "saving") return;
       const timestamp = nowIso();
       const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
       const next = restoreTimerInState(current, timestamp);
       if (shouldFinish) {
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         setToast(`${title}，已自动记录`);
-        commitBusinessState(current, next);
+        commitTeamData(current, next);
         return;
       }
       setState(next);
@@ -88,7 +88,7 @@ export function useTimerRuntimeEffects({
   stopNoiseRef,
 }: Pick<AppLifecycleHooksOptions, "state" | "stopNoiseRef">) {
   useEffect(() => {
-    syncWhiteNoise(state, stopNoiseRef);
+    updateWhiteNoisePlayback(state, stopNoiseRef);
     return () => stopWhiteNoise(stopNoiseRef);
   }, [
     state,
@@ -108,14 +108,14 @@ export function useTaskReminderInterval({
   state,
   stateRef,
   reminderSentRef,
-  commitBusinessState,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "commitBusinessState">) {
+  commitTeamData,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "commitTeamData">) {
   useEffect(() => {
     if (!state?.settings.notificationsEnabled) return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current) return;
-      runDueTaskReminders(current, reminderSentRef.current, commitBusinessState);
+      runDueTaskReminders(current, reminderSentRef.current, commitTeamData);
     }, 30_000);
     return () => window.clearInterval(handle);
   }, [state?.settings.notificationsEnabled]);

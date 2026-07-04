@@ -29,7 +29,7 @@ describe("commandPaletteEnterTarget", () => {
   it("runs the first matched command before quick creating", () => {
     const target = commandPaletteEnterTarget(commandPaletteMatches("团队后台", []));
 
-    expect(target).toEqual({ action: "open_sync_settings" });
+    expect(target).toEqual({ action: "open_backend_settings" });
   });
 
   it("opens the first matched task when no command matches", () => {

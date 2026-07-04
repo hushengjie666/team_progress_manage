@@ -3,16 +3,16 @@ import type {
   Account,
   AppState,
   ProjectInvitation,
-  SyncDiagnosticResult,
+  BackendDiagnosticResult,
   WorkspaceInvitation,
 } from "./types";
 
 export function useAppShellDataState() {
   const [state, setState] = useState<AppState | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [syncPassword, setSyncPassword] = useState("");
+  const [backendPassword, setBackendPassword] = useState("");
   const [suppressAutoLogin, setSuppressAutoLogin] = useState(false);
-  const [syncDiagnostic, setSyncDiagnostic] = useState<SyncDiagnosticResult | null>(null);
+  const [backendDiagnostic, setBackendDiagnostic] = useState<BackendDiagnosticResult | null>(null);
   const [platformAccounts, setPlatformAccounts] = useState<Account[]>([]);
   const [workspaceInvitations, setWorkspaceInvitations] = useState<WorkspaceInvitation[]>([]);
   const [projectInvitations, setProjectInvitations] = useState<ProjectInvitation[]>([]);
@@ -22,12 +22,12 @@ export function useAppShellDataState() {
     setState,
     loaded,
     setLoaded,
-    syncPassword,
-    setSyncPassword,
+    backendPassword,
+    setBackendPassword,
     suppressAutoLogin,
     setSuppressAutoLogin,
-    syncDiagnostic,
-    setSyncDiagnostic,
+    backendDiagnostic,
+    setBackendDiagnostic,
     platformAccounts,
     setPlatformAccounts,
     workspaceInvitations,

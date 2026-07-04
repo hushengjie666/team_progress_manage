@@ -15,7 +15,7 @@ type AppAuthenticatedShellRoutesProps = Pick<
   | "focusActions"
   | "projectActions"
   | "settingsActions"
-  | "syncActions"
+  | "backendActions"
   | "authActions"
   | "workspaceAccountActions"
   | "inviteProjectMember"
@@ -33,7 +33,7 @@ export function AppAuthenticatedShellRoutes({
   focusActions,
   projectActions,
   settingsActions,
-  syncActions,
+  backendActions,
   authActions,
   workspaceAccountActions,
   inviteProjectMember,
@@ -116,7 +116,7 @@ export function AppAuthenticatedShellRoutes({
         shellState={shellState}
         chrome={chrome}
         settingsActions={settingsActions}
-        syncActions={syncActions}
+        backendActions={backendActions}
         workspaceAccountActions={workspaceAccountActions}
         loadDemoData={loadDemoData}
       />

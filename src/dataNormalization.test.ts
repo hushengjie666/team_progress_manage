@@ -6,14 +6,14 @@ describe("current app state payload", () => {
   it("accepts the runtime cache shape without business data", () => {
     const state = createInitialState();
     const payload = {
-      version: 3,
+      version: 4,
       settings: state.settings,
       auth: state.auth,
-      sync: {
-        serverUrl: state.sync.serverUrl,
-        username: state.sync.username,
-        deviceId: state.sync.deviceId,
-        token: state.sync.token,
+      backend: {
+        serverUrl: state.backend.serverUrl,
+        username: state.backend.username,
+        deviceId: state.backend.deviceId,
+        token: state.backend.token,
       },
       updatedAt: state.updatedAt,
     };
@@ -31,13 +31,13 @@ describe("current app state payload", () => {
   it("does not restore business arrays from cached payloads", () => {
     const state = createInitialState();
     const parsed = parseCurrentAppStatePayload({
-      version: 3,
+      version: 4,
       settings: state.settings,
       auth: state.auth,
-      sync: {
-        serverUrl: state.sync.serverUrl,
-        username: state.sync.username,
-        deviceId: state.sync.deviceId,
+      backend: {
+        serverUrl: state.backend.serverUrl,
+        username: state.backend.username,
+        deviceId: state.backend.deviceId,
       },
       projects: [{ id: "cached_project" }],
       tasks: [{ id: "cached_task" }],
@@ -61,12 +61,12 @@ describe("current app state payload", () => {
   it("rejects runtime caches missing required auth", () => {
     const state = createInitialState();
     const incomplete = {
-      version: 3,
+      version: 4,
       settings: state.settings,
-      sync: {
-        serverUrl: state.sync.serverUrl,
-        username: state.sync.username,
-        deviceId: state.sync.deviceId,
+      backend: {
+        serverUrl: state.backend.serverUrl,
+        username: state.backend.username,
+        deviceId: state.backend.deviceId,
       },
       updatedAt: state.updatedAt,
     };

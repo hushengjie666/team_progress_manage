@@ -6,7 +6,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 
 const scanRoots = [
   "src",
-  "sync-server",
+  "team-server",
   "mcp-server/src",
   "tests/e2e",
 ];
@@ -28,6 +28,22 @@ const checkedExtensions = new Set([".ts", ".tsx", ".go", ".css", ".mjs"]);
 
 const staleCodePattern = /\b(?:legacy|deprecated)\b|\bcompat(?:ible|ibility)?\b|兼容|旧|临时|以后删除/i;
 const unfinishedPattern = /\b(?:TODO|FIXME)\b/;
+const oldBusinessDataPatterns = [
+  "Sy" + "nc" + "State",
+  "sy" + "nc" + "-server",
+  "timemanage" + "-sy" + "nc",
+  "TM_" + "SY" + "NC",
+  "business" + "-changes",
+  "business" + "-state",
+  "tomb" + "stone",
+  "revi" + "sion",
+  "last" + "SyncedAt",
+  "lastPulled" + "Revi" + "sion",
+  "deleted" + "_at",
+  "state" + "\\." + "sy" + "nc",
+  "同" + "步",
+];
+const oldBusinessDataPattern = new RegExp(`(?:${oldBusinessDataPatterns.join("|")})`, "i");
 
 const isTestFile = (relativePath) =>
   relativePath.startsWith("tests/") ||
@@ -115,6 +131,13 @@ for (const file of allFiles) {
         path: relativePath,
         line: index + 1,
         message: "stale-code marker found; delete it or add a narrow allowlist with a reason",
+      });
+    }
+    if (oldBusinessDataPattern.test(line) && !isRiskAllowed(relativePath, line, "old-business-data")) {
+      failures.push({
+        path: relativePath,
+        line: index + 1,
+        message: "old business data marker found; use direct team backend API concepts instead",
       });
     }
   });

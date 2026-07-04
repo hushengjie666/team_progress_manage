@@ -1,12 +1,10 @@
-import { getTeamRevision } from "../../src/teamApi.js";
 import { TimeManageMcpTaskClient } from "./coreTasks.js";
 import { uniqueProjectMembers } from "./coreProjectModel.js";
 
 export class TimeManageMcpDiagnosticsClient extends TimeManageMcpTaskClient {
-  async getSyncDiagnostics() {
+  async getBackendDiagnostics() {
     const session = await this.ensureSession();
     const state = await this.readState();
-    const revision = await getTeamRevision(state.sync, session.token);
     return {
       serverUrl: this.config.serverUrl,
       deviceId: this.config.deviceId,
@@ -15,15 +13,11 @@ export class TimeManageMcpDiagnosticsClient extends TimeManageMcpTaskClient {
         email: session.account.email,
         name: session.account.name,
       },
-      local: {
-        lastPulledRevision: state.sync.lastPulledRevision,
-        lastSyncedAt: state.sync.lastSyncedAt,
-        status: state.sync.status,
-        message: state.sync.message,
-        tombstoneCount: state.sync.tombstones?.length ?? 0,
-      },
-      remote: {
-        currentRevision: revision,
+      backend: {
+        lastLoadedAt: state.backend.lastLoadedAt,
+        lastSavedAt: state.backend.lastSavedAt,
+        status: state.backend.status,
+        message: state.backend.message,
       },
       counts: {
         projects: state.projects.length,

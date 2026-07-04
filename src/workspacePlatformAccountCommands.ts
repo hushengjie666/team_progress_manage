@@ -1,7 +1,7 @@
 import {
   createPlatformAccount as createPlatformAccountRequest,
   updatePlatformAccount as updatePlatformAccountRequest,
-} from "./sync";
+} from "./teamBackend";
 import type { Account } from "./types";
 import { platformAccountAdminToken, requirePlatformAccountAdminSource } from "./workspacePlatformAccountAccess";
 import type { WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
@@ -33,7 +33,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请填写账号姓名、登录邮箱或手机号和初始密码");
       return;
     }
-    void createPlatformAccountRequest(source.sync, token, {
+    void createPlatformAccountRequest(source.backend, token, {
       name: name.trim(),
       email: normalizedEmail,
       password,
@@ -68,7 +68,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请先登录后台后再修改平台账号");
       return;
     }
-    void updatePlatformAccountRequest(source.sync, token, account.id, { name: normalizedName, email: normalizedEmail })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { name: normalizedName, email: normalizedEmail })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号资料已保存"))
       .catch((error) => {
@@ -92,7 +92,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请先登录后台后再停用平台账号");
       return;
     }
-    void updatePlatformAccountRequest(source.sync, token, account.id, { status: "disabled" })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { status: "disabled" })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号已停用"))
       .catch((error) => {
@@ -112,7 +112,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请输入新密码");
       return;
     }
-    void updatePlatformAccountRequest(source.sync, token, account.id, { password })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { password })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号密码已更新"))
       .catch((error) => {

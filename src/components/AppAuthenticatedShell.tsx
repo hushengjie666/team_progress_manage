@@ -12,7 +12,7 @@ export function AppAuthenticatedShell({
   focusActions,
   projectActions,
   settingsActions,
-  syncActions,
+  backendActions,
   authActions,
   workspaceAccountActions,
   inviteProjectMember,
@@ -54,7 +54,7 @@ export function AppAuthenticatedShell({
           focusActions={focusActions}
           projectActions={projectActions}
           settingsActions={settingsActions}
-          syncActions={syncActions}
+          backendActions={backendActions}
           authActions={authActions}
           workspaceAccountActions={workspaceAccountActions}
           inviteProjectMember={inviteProjectMember}

@@ -3,14 +3,14 @@ import type { SettingsSection } from "./settingsTypes";
 const settingsSections: { key: SettingsSection; label: string }[] = [
   { key: "members", label: "成员管理" },
   { key: "timer", label: "计时偏好" },
-  { key: "sync", label: "团队后台" },
+  { key: "backend", label: "团队后台" },
   { key: "demo", label: "演示数据" },
 ];
 
 export const effectiveSettingsSection = (
   activeSection: SettingsSection,
   canManageMembers: boolean,
-) => !canManageMembers && activeSection === "members" ? "sync" : activeSection;
+) => !canManageMembers && activeSection === "members" ? "backend" : activeSection;
 
 export function SettingsSectionTabs({
   activeSection,

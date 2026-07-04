@@ -17,10 +17,10 @@ test("saves project settings only after clicking save", async ({ page }) => {
   const settingsPanel = page.locator(".project-settings-panel");
   await expect(settingsPanel.getByLabel("默认预计开始（小时）")).toHaveCount(0);
 
-  const businessChangeRequests: string[] = [];
+  const teamDataRequests: string[] = [];
   page.on("request", (request) => {
-    if (request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST") {
-      businessChangeRequests.push(request.postData() ?? "");
+    if (request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT") {
+      teamDataRequests.push(request.postData() ?? "");
     }
   });
 
@@ -29,14 +29,14 @@ test("saves project settings only after clicking save", async ({ page }) => {
   await settingsPanel.getByLabel("项目说明").fill("设置页点击保存后才写入。");
   await page.waitForTimeout(350);
 
-  expect(businessChangeRequests).toHaveLength(0);
+  expect(teamDataRequests).toHaveLength(0);
 
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
-  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
-  expect(requestBody.changes).toEqual(
+  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
+  expect(requestBody.rows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "project",
@@ -68,26 +68,29 @@ test("moves a project to another shared workspace from project settings", async 
   await expect(settingsPanel.getByLabel("所属工作区")).toBeEnabled();
   await settingsPanel.getByLabel("所属工作区").selectOption("workspace_e2e_target");
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("E2E 目标工作区");
     await dialog.accept();
   });
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
-  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
-  expect(requestBody.changes).toEqual(
+  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
+  expect(requestBody.rows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         workspace_id: "workspace_e2e_target",
         entity: "project",
         id: "project_starter",
       }),
+    ]),
+  );
+  expect(requestBody.rows).not.toEqual(
+    expect.arrayContaining([
       expect.objectContaining({
         workspace_id: "workspace_e2e",
         entity: "project",
         id: "project_starter",
-        deleted_at: expect.any(String),
       }),
     ]),
   );

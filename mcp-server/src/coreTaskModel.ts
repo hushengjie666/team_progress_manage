@@ -48,8 +48,6 @@ export const taskMatchesFilter = (task: Task, filter: TaskListFilter) => {
 export const removeTaskReferences = (state: AppState, taskId: string, timestamp: string) => {
   const relatedWorkSessions = state.workSessions.filter((session) => session.taskId === taskId);
   const relatedWorkSessionIds = new Set(relatedWorkSessions.map((session) => session.id));
-  const relatedFocusSessions = state.focusSessions.filter((session) => session.taskId === taskId);
-  const relatedSignals = state.executionSignals.filter((signal) => signal.taskId === taskId || relatedWorkSessionIds.has(signal.workSessionId));
   return {
     ...state,
     tasks: state.tasks.filter((task) => task.id !== taskId),
@@ -65,16 +63,6 @@ export const removeTaskReferences = (state: AppState, taskId: string, timestamp:
           ? timestamp
           : plan.updatedAt,
     })),
-    sync: {
-      ...state.sync,
-      tombstones: [
-        ...(state.sync.tombstones ?? []),
-        { entity: "task", id: taskId, deletedAt: timestamp },
-        ...relatedWorkSessions.map((session) => ({ entity: "work_session" as const, id: session.id, deletedAt: timestamp })),
-        ...relatedFocusSessions.map((session) => ({ entity: "focus_session" as const, id: session.id, deletedAt: timestamp })),
-        ...relatedSignals.map((signal) => ({ entity: "execution_signal" as const, id: signal.id, deletedAt: timestamp })),
-      ],
-    },
     updatedAt: timestamp,
   };
 };

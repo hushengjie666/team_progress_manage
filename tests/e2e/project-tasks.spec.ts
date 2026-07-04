@@ -26,14 +26,14 @@ test("opens a project and creates a task with the unified task form", async ({ p
   await dialog.getByRole("radio", { name: "开发" }).click();
   await dialog.getByLabel("估算时长（小时）").fill("2");
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   await dialog.getByRole("button", { name: "创建任务" }).click();
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("E2E 项目弹窗任务").first()).toBeVisible();
-  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
-  expect(requestBody.changes).toEqual(
+  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
+  expect(requestBody.rows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "task",
@@ -57,13 +57,13 @@ test("edits task detail and persists progress fields", async ({ page }) => {
   await expect(dialog).toBeVisible();
   await dialog.getByRole("spinbutton", { name: "进度百分比" }).fill("45");
   const progressRequest = page.waitForRequest((request) => {
-    if (request.url() !== `${MOCK_SERVER}/team/business-changes` || request.method() !== "POST") return false;
-    const body = request.postDataJSON() as { changes?: BusinessRow[] };
-    return Boolean(body.changes?.some((row) => row.entity === "task" && "progressNote" in row.payload && row.payload.progressNote === "E2E 进度已持久化。"));
+    if (request.url() !== `${MOCK_SERVER}/team/data` || request.method() !== "PUT") return false;
+    const body = request.postDataJSON() as { rows?: BusinessRow[] };
+    return Boolean(body.rows?.some((row) => row.entity === "task" && "progressNote" in row.payload && row.payload.progressNote === "E2E 进度已持久化。"));
   });
   await dialog.getByLabel("进展说明").fill("E2E 进度已持久化。");
-  const requestBody = (await progressRequest).postDataJSON() as { changes: BusinessRow[] };
-  expect(requestBody.changes).toEqual(
+  const requestBody = (await progressRequest).postDataJSON() as { rows: BusinessRow[] };
+  expect(requestBody.rows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "task",

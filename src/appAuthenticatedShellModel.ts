@@ -89,9 +89,9 @@ export function buildAppShellState(shell: AppShellSource): AppShellState {
     setCommandPaletteOpen: shell.setCommandPaletteOpen,
     showShortcutHelp: shell.showShortcutHelp,
     setShowShortcutHelp: shell.setShowShortcutHelp,
-    syncPassword: shell.syncPassword,
-    setSyncPassword: shell.setSyncPassword,
-    syncDiagnostic: shell.syncDiagnostic,
+    backendPassword: shell.backendPassword,
+    setBackendPassword: shell.setBackendPassword,
+    backendDiagnostic: shell.backendDiagnostic,
     settingsSection: shell.settingsSection,
     setSettingsSection: shell.setSettingsSection,
   };

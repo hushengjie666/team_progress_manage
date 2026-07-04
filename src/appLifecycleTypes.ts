@@ -1,5 +1,5 @@
 import type { Tab } from "./appModel";
-import type { TeamBusinessRuntime } from "./teamStateRuntime";
+import type { TeamDataRuntime } from "./teamStateRuntime";
 import type { Account, AppState, ProjectInvitation, WorkspaceInvitation } from "./types";
 
 export type Ref<T> = { current: T };
@@ -17,8 +17,8 @@ export type AppLifecycleHooksOptions = {
   undoTimerRef: Ref<number | null>;
   stopNoiseRef: Ref<(() => void) | null>;
   reminderSentRef: Ref<Set<string>>;
-  persistBusinessChanges: TeamBusinessRuntime["persistBusinessChanges"];
-  commitBusinessState: TeamBusinessRuntime["commitBusinessState"];
+  persistTeamData: TeamDataRuntime["persistTeamData"];
+  commitTeamData: TeamDataRuntime["commitTeamData"];
   setState: Setter<AppState | null>;
   setToast: (message: string) => void;
   setToastVisible: Setter<boolean>;

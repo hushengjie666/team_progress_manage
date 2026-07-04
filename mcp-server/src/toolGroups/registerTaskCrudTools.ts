@@ -82,7 +82,7 @@ export function registerTaskCrudTools(server: McpServer, client: TimeManageMcpCl
     "delete_task",
     {
       title: "Delete Task",
-      description: "删除任务并同步清理今日队列、工作会话和执行信号引用。高风险，必须确认。",
+      description: "删除任务并一并清理今日队列、工作会话和执行信号引用。高风险，必须确认。",
       inputSchema: {
         taskId: z.string(),
         confirmed: z.boolean().optional().describe("仅在用户明确确认删除后传 true。"),

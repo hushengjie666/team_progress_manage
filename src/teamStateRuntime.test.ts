@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { createTeamBusinessRuntime } from "./teamStateRuntime";
+import { createTeamDataRuntime } from "./teamStateRuntime";
 import { businessRowsFromState } from "./teamBusinessRows";
 import type { AppState } from "./types";
 
@@ -12,8 +12,8 @@ const withToken = (state: AppState): AppState => ({
     token: "token_runtime",
     message: "已登录",
   },
-  sync: {
-    ...state.sync,
+  backend: {
+    ...state.backend,
     token: "token_runtime",
     serverUrl: "http://127.0.0.1:8787",
   },
@@ -32,7 +32,7 @@ const changedState = (state: AppState): AppState => ({
 const createRuntimeHarness = (initial: AppState) => {
   let current: AppState | null = initial;
   let toast = "";
-  const runtime = createTeamBusinessRuntime({
+  const runtime = createTeamDataRuntime({
     getState: () => current,
     setState: (updater) => {
       current = typeof updater === "function" ? updater(current) : updater;
@@ -77,7 +77,7 @@ describe("team state runtime", () => {
     const after = changedState(before);
     const { runtime, getCurrent } = createRuntimeHarness(before);
 
-    runtime.commitBusinessState(before, after);
+    runtime.commitTeamData(before, after);
 
     expect(getCurrent()).toEqual(after);
   });
@@ -89,11 +89,11 @@ describe("team state runtime", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { runtime, getCurrent } = createRuntimeHarness(before);
 
-    const saved = await runtime.persistBusinessChanges(before, after);
+    const saved = await runtime.persistTeamData(before, after);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(saved?.sync.status).toBe("synced");
-    expect(saved?.sync.message).toBe("团队在线数据已加载");
+    expect(saved?.backend.status).toBe("ready");
+    expect(saved?.backend.message).toBe("团队在线数据已加载");
     expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
     expect(getCurrent()).toEqual(saved);
   });
@@ -103,7 +103,7 @@ describe("team state runtime", () => {
     const after = changedState(before);
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.endsWith("/team/business-changes")) {
+      if (url.endsWith("/team/data")) {
         return teamStateResponse(after);
       }
       return teamStateResponse(after);
@@ -111,11 +111,11 @@ describe("team state runtime", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { runtime, getCurrent } = createRuntimeHarness(before);
 
-    const saved = await runtime.persistBusinessChanges(before, after, { refreshAfterSave: true });
+    const saved = await runtime.persistTeamData(before, after, { refreshAfterSave: true });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(saved?.sync.status).toBe("synced");
-    expect(saved?.sync.message).toBe("团队在线数据已加载");
+    expect(saved?.backend.status).toBe("ready");
+    expect(saved?.backend.message).toBe("团队在线数据已加载");
     expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
     expect(getCurrent()).toEqual(saved);
   });
@@ -134,20 +134,20 @@ describe("team state runtime", () => {
     };
     const stateResponses = [deferredResponse(), deferredResponse()];
     let stateResponseIndex = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/team/business-changes")) {
-        return teamStateResponse(stateResponseIndex === 0 ? first : second);
+      if (url.endsWith("/team/data") && init?.method === "PUT") {
+        return stateResponses[stateResponseIndex++].promise;
       }
-      return stateResponses[stateResponseIndex++].promise;
+      return teamStateResponse(second);
     });
     vi.stubGlobal("fetch", fetchMock);
     const { runtime, getCurrent } = createRuntimeHarness(before);
 
-    runtime.commitBusinessState(before, first);
+    runtime.commitTeamData(before, first);
     expect(getCurrent()?.projects[0]?.name).toBe(first.projects[0]?.name);
 
-    runtime.commitBusinessState(first, second);
+    runtime.commitTeamData(first, second);
     expect(getCurrent()?.projects[0]?.name).toBe(second.projects[0]?.name);
 
     await flushPromises();
@@ -168,11 +168,11 @@ describe("team state runtime", () => {
     }), { status: 500, headers: { "content-type": "application/json" } })));
     const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
 
-    const saved = await runtime.persistBusinessChanges(before, after);
+    const saved = await runtime.persistTeamData(before, after);
 
     expect(saved).toBeUndefined();
     expect(getCurrent()?.auth.status).toBe("error");
-    expect(getCurrent()?.sync.status).toBe("error");
+    expect(getCurrent()?.backend.status).toBe("error");
     expect(getToast()).toContain("backend down");
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { loadTeamBusinessState } from "./teamApi";
-import type { ActiveTimer, FocusSession, SyncState, Task, WorkSession } from "./types";
+import { loadTeamData } from "./teamApi";
+import type { ActiveTimer, FocusSession, BackendConnectionState, Task, WorkSession } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
@@ -99,11 +99,11 @@ describe("team backend active timer state loading", () => {
         bootstrapped: true,
         message: "已登录",
       },
-      sync: {
-        ...base.sync,
+      backend: {
+        ...base.backend,
         serverUrl: "http://127.0.0.1:8787",
         token: "token",
-      } satisfies SyncState,
+      } satisfies BackendConnectionState,
       tasks: [localStartedTask],
       focusSessions: [focusSession],
       workSessions: [workSession],
@@ -123,7 +123,7 @@ describe("team backend active timer state loading", () => {
       ],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamBusinessState(local);
+    const loaded = await loadTeamData(local);
 
     expect(loaded.activeTimer?.sessionId).toBe(activeTimer.sessionId);
     expect(loaded.workSessions.find((session) => session.id === workSession.id)?.status).toBe("active");

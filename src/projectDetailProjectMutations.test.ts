@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState } from "./test/fixtures";
 import { createProjectInState, updateProjectInState } from "./teamProgress";
-import { businessChangesBetween } from "./teamBusinessRows";
 import type { Task } from "./types";
 
 describe("project detail project mutations", () => {
@@ -121,43 +120,5 @@ describe("project detail project mutations", () => {
     expect(next.tasks[0]).toMatchObject({ workspaceId: "workspace_b", project: "迁移后项目", updatedAt: timestamp });
     expect(next.workSessions[0]).toMatchObject({ workspaceId: "workspace_b", updatedAt: timestamp });
     expect(next.executionSignals[0]).toMatchObject({ workspaceId: "workspace_b" });
-    const changes = businessChangesBetween({
-      ...state,
-      projects: [project],
-      projectMembers: [sourceProjectMember],
-      tasks: [movingTask],
-      workSessions: [
-        {
-          id: "work_session_move",
-          workspaceId: "workspace_a",
-          taskId: "task_move",
-          focusSessionId: "focus_session_move",
-          status: "active",
-          totalPausedSeconds: 0,
-          startedAt: "2026-05-10T09:10:00.000Z",
-          createdAt: "2026-05-10T09:10:00.000Z",
-          updatedAt: "2026-05-10T09:10:00.000Z",
-        },
-      ],
-      executionSignals: [
-        {
-          id: "signal_move",
-          workspaceId: "workspace_a",
-          workSessionId: "work_session_move",
-          taskId: "task_move",
-          type: "work_started",
-          createdAt: "2026-05-10T09:20:00.000Z",
-        },
-      ],
-    }, next);
-    expect(changes).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ entity: "project", id: "project_move", workspace_id: "workspace_a", deleted_at: timestamp }),
-        expect.objectContaining({ entity: "project_member", id: "member_move_owner", workspace_id: "workspace_a", deleted_at: timestamp }),
-        expect.objectContaining({ entity: "task", id: "task_move", workspace_id: "workspace_a", deleted_at: timestamp }),
-        expect.objectContaining({ entity: "work_session", id: "work_session_move", workspace_id: "workspace_a", deleted_at: timestamp }),
-        expect.objectContaining({ entity: "execution_signal", id: "signal_move", workspace_id: "workspace_a", deleted_at: timestamp }),
-      ]),
-    );
   });
 });

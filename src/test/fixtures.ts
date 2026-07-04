@@ -35,9 +35,9 @@ export const createInitialState = (): AppState => {
     },
     {
       id: "task_sync_config",
-      title: "配置团队同步设置",
+      title: "配置团队后台设置",
       notes: "测试任务备注。",
-      tags: ["同步", "团队"],
+      tags: ["后台", "团队"],
       projectId: "project_starter",
       project: "自律系统",
       creatorMemberId: "member_owner",

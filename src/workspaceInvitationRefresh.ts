@@ -1,7 +1,7 @@
 import {
   fetchProjectInvitations,
   fetchWorkspaceInvitations,
-} from "./sync";
+} from "./teamBackend";
 import { tokenForState } from "./workspaceAccountMetadata";
 import type { WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
 
@@ -21,7 +21,7 @@ export function createWorkspaceInvitationRefreshers({
       setWorkspaceInvitations([]);
       return [];
     }
-    const invitations = await fetchWorkspaceInvitations(source.sync, token);
+    const invitations = await fetchWorkspaceInvitations(source.backend, token);
     setWorkspaceInvitations(invitations);
     return invitations;
   };
@@ -32,7 +32,7 @@ export function createWorkspaceInvitationRefreshers({
       setProjectInvitations([]);
       return [];
     }
-    const invitations = await fetchProjectInvitations(source.sync, token);
+    const invitations = await fetchProjectInvitations(source.backend, token);
     setProjectInvitations(invitations);
     return invitations;
   };

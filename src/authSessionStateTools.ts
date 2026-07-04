@@ -1,5 +1,5 @@
 import { nowIso } from "./appModel";
-import type { AuthSession } from "./sync";
+import type { AuthSession } from "./teamBackend";
 import { loadAuthenticatedWorkspaceSession } from "./workspaceAccountRuntime";
 import type { Account, AppState, AuthState, ProjectInvitation, WorkspaceInvitation } from "./types";
 

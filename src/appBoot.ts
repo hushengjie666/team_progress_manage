@@ -39,15 +39,15 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
         bootstrapped: true,
         message: authAccessDeniedMessage,
       },
-      sync: {
-        ...state.sync,
+      backend: {
+        ...state.backend,
         token: undefined,
         status: "idle",
         message: authAccessDeniedMessage,
       },
     };
   }
-  const message = backendUnavailableMessage(state.sync.serverUrl, error);
+  const message = backendUnavailableMessage(state.backend.serverUrl, error);
   return {
     ...state,
     auth: {
@@ -55,8 +55,8 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
       status: "error",
       message,
     },
-    sync: {
-      ...state.sync,
+    backend: {
+      ...state.backend,
       status: "error",
       message,
     },

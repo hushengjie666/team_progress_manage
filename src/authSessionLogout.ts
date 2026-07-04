@@ -31,8 +31,8 @@ export function createAuthLogoutAction({
         bootstrapped: true,
         message: "已退出登录",
       },
-      sync: {
-        ...value.sync,
+      backend: {
+        ...value.backend,
         token: undefined,
         message: "已退出团队工作区",
       },

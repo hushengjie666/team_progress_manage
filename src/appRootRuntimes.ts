@@ -1,8 +1,8 @@
 import { ensureTodayPlan } from "./appModel";
 import type { useAppShellState } from "./appShellState";
 import { createAuthSessionRuntime } from "./authSessionRuntime";
-import { createSyncCommandRuntime } from "./syncCommandRuntime";
-import { createTeamBusinessRuntime } from "./teamStateRuntime";
+import { createBackendCommandRuntime } from "./teamBackendCommandRuntime";
+import { createTeamDataRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 import { createWorkspaceAccountRuntime } from "./workspaceAccountRuntime";
 
@@ -13,7 +13,7 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     state,
     setState,
     setToast,
-    syncPassword,
+    backendPassword,
     platformAccounts,
     setPlatformAccounts,
     setWorkspaceInvitations,
@@ -23,10 +23,10 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     setPreferredFocusTaskId,
     setWorkspaceMode,
     setTab,
-    setSyncDiagnostic,
+    setBackendDiagnostic,
     stateRef,
   } = shell;
-  const { persistBusinessChanges, commitBusinessState } = createTeamBusinessRuntime({
+  const { persistTeamData, commitTeamData } = createTeamDataRuntime({
     getState: () => stateRef.current,
     setState,
     setToast,
@@ -46,15 +46,15 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     if (!current) return;
     const next = ensureTodayPlan(updater(current));
     stateRef.current = next;
-    commitBusinessState(current, next);
+    commitTeamData(current, next);
   };
-  const syncActions = createSyncCommandRuntime({
+  const backendActions = createBackendCommandRuntime({
     getState: () => stateRef.current,
-    getSyncPassword: () => syncPassword,
+    getBackendPassword: () => backendPassword,
     setState,
     updateState,
     setToast,
-    setSyncDiagnostic,
+    setBackendDiagnostic,
   });
   const authActions = createAuthSessionRuntime({
     getState: () => stateRef.current ?? state,
@@ -72,11 +72,11 @@ export function createAppRootRuntimes(shell: AppShellSource) {
   });
 
   return {
-    persistBusinessChanges,
-    commitBusinessState,
+    persistTeamData,
+    commitTeamData,
     workspaceAccountRuntime,
     updateState,
-    syncActions,
+    backendActions,
     authActions,
   };
 }

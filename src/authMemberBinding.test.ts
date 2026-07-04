@@ -147,13 +147,13 @@ describe("authenticated account member binding", () => {
     expect(loggedIn.projectMembers).toEqual([]);
   });
 
-  it("sets sync status when binding an authenticated account", () => {
+  it("sets backend status when binding an authenticated account", () => {
     const state = createInitialState();
     const loggedIn = bindAccountToMembers(
       {
         ...state,
-        sync: {
-          ...state.sync,
+        backend: {
+          ...state.backend,
           status: "error",
         },
       },
@@ -174,7 +174,7 @@ describe("authenticated account member binding", () => {
       "2026-05-10T09:10:00.000Z",
     );
 
-    expect(loggedIn.sync).toMatchObject({
+    expect(loggedIn.backend).toMatchObject({
       status: "idle",
     });
   });

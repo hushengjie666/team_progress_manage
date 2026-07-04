@@ -28,7 +28,7 @@ type AppAuthenticatedShellContainerProps = Pick<
   | "focusActions"
   | "projectActions"
   | "settingsActions"
-  | "syncActions"
+  | "backendActions"
   | "authActions"
   | "loadDemoData"
   | "runCommand"
@@ -52,7 +52,7 @@ export function AppAuthenticatedShellContainer({
   focusActions,
   projectActions,
   settingsActions,
-  syncActions,
+  backendActions,
   authActions,
   loadDemoData,
   runCommand,
@@ -93,7 +93,7 @@ export function AppAuthenticatedShellContainer({
       focusActions={focusActions}
       projectActions={projectActions}
       settingsActions={settingsActions}
-      syncActions={syncActions}
+      backendActions={backendActions}
       authActions={authActions}
       workspaceAccountActions={buildWorkspaceAccountShellActions(workspaceAccountRuntime)}
       inviteProjectMember={inviteProjectMember}

@@ -11,7 +11,7 @@ export const clearStoredApp = async (page: Page) => {
 };
 
 const storedRuntimeForState = (state: AppState) => ({
-  version: 3,
+  version: 4,
   settings: state.settings,
   auth: {
     status: state.auth.status,
@@ -23,11 +23,11 @@ const storedRuntimeForState = (state: AppState) => ({
     bootstrapped: state.auth.bootstrapped,
     message: state.auth.message,
   },
-  sync: {
-    serverUrl: state.sync.serverUrl,
-    username: state.sync.username,
-    deviceId: state.sync.deviceId,
-    token: state.sync.token,
+  backend: {
+    serverUrl: state.backend.serverUrl,
+    username: state.backend.username,
+    deviceId: state.backend.deviceId,
+    token: state.backend.token,
   },
   updatedAt: state.updatedAt,
 });

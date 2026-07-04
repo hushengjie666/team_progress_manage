@@ -1,6 +1,6 @@
 import type { Tab } from "./appModel";
 import { clearRememberedAuth, saveRememberedAuth } from "./rememberedAuth";
-import { createWorkspace, loginToWorkspace, type AuthSession } from "./sync";
+import { createWorkspace, loginToWorkspace, type AuthSession } from "./teamBackend";
 import type { AppState, AuthState } from "./types";
 
 export function createAuthWorkspaceActions({
@@ -32,7 +32,7 @@ export function createAuthWorkspaceActions({
     if (!name.trim()) return;
     setAuthPatch({ status: "checking", message: "正在创建协作工作区" });
     try {
-      const session = await createWorkspace(source.sync, token, name.trim());
+      const session = await createWorkspace(source.backend, token, name.trim());
       setSelectedTaskId(null);
       setPreferredFocusTaskId(null);
       setWorkspaceMode("board");
@@ -57,9 +57,9 @@ export function createAuthWorkspaceActions({
     try {
       const source = getState();
       if (!source) throw new Error("应用状态尚未加载");
-      const session = await loginToWorkspace(source.sync, email, password);
-      if (remember) saveRememberedAuth(source.sync.serverUrl, session.account.email, password);
-      else clearRememberedAuth(source.sync.serverUrl);
+      const session = await loginToWorkspace(source.backend, email, password);
+      if (remember) saveRememberedAuth(source.backend.serverUrl, session.account.email, password);
+      else clearRememberedAuth(source.backend.serverUrl);
       setSuppressAutoLogin(false);
       await applySession(session, `已登录 ${session.workspace.name}`);
       setToast("账号已登录");

@@ -4,9 +4,9 @@
 
 TimeManage is a Vite + React + TypeScript web app with a Go team backend service.
 
-- `src/`: React UI, domain logic, storage, sync, notifications, and styles.
+- `src/`: React UI, domain logic, storage, backend, notifications, and styles.
 - `src/components/`: feature views and shared UI components.
-- `sync-server/`: Go HTTP team backend service, service installers, and example config.
+- `team-server/`: Go HTTP team backend service, service installers, and example config.
 - `tests/e2e/`: Playwright end-to-end tests.
 - `dist/`: generated frontend output.
 - `参考资料/`: product research and reference materials.
@@ -17,7 +17,7 @@ Keep routine changes scoped so Codex does not exhaust context on generated outpu
 
 - Use CodeGraph first when locating code or planning edits in this indexed repo.
 - Do not read all of `src/App.tsx` unless the task is explicitly changing the app shell or migrating logic out of it; ask CodeGraph for the relevant symbol or line range first.
-- Do not use `sync-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
+- Do not use `team-server/data/store.json`, `test-results`, or `playwright-report` as routine context. Inspect them only for a specific failure artifact.
 - When a test fails, summarize the failing test name, assertion, and relevant stack line instead of pasting full traces or large logs.
 
 ## Codex Fast Path
@@ -27,7 +27,7 @@ Optimize for narrow context and narrow verification on small tasks.
 - For a small bug fix or UI adjustment, inspect only the owning module, its direct callers, and its nearest tests/styles. Avoid broad `git diff`, all-file line counts, or whole-app reads unless the task crosses ownership boundaries.
 - Review only touched paths with commands such as `git diff -- <path>` or `git diff --stat -- <path>`. Use full-worktree status only to detect unrelated dirty state, not as routine review context.
 - Prefer targeted checks first: run the nearest Vitest file, `npm run typecheck`, or the relevant backend package test before escalating to full verification.
-- Run `npm run verify:fast` when TypeScript contracts, shared state, imports, or frontend build output may be affected. Run `npm run verify:e2e` only for navigation, storage flows, timers, settings, sync UI, or browser workflow changes.
+- Run `npm run verify:fast` when TypeScript contracts, shared state, imports, or frontend build output may be affected. Run `npm run verify:e2e` only for navigation, storage flows, timers, settings, backend UI, or browser workflow changes.
 - If the worktree is already large or dirty, do not re-audit unrelated changes. State the touched files explicitly and keep all exploration, edits, and validation scoped to the requested task.
 - Do not continue splitting files only to reduce line count once files are under roughly 250 lines and have a single clear reason to change.
 
@@ -53,8 +53,8 @@ Start with the smallest module that owns the product concept before opening app-
 - Recurring tasks: `src/recurrence.ts` and `src/recurrence.test.ts`.
 - App boot and app shell wiring: `src/appBootRuntime.ts` and `src/keyboardRuntime.ts`; only open `src/App.tsx` for top-level React state, page composition, or wiring changes.
 - Workspace accounts and invitations: `src/workspaceAccountRuntime.ts` before touching login/session, platform accounts, workspace invitations, or workspace update flows.
-- Team save, sync, and timer side effects: `src/teamStateRuntime.ts`, `src/teamApi.ts`, and `src/timerRuntime.ts`.
-- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsSyncPanel.tsx`, or `SettingsDemoPanel.tsx`.
+- Team data save, backend, and timer side effects: `src/teamStateRuntime.ts`, `src/teamApi.ts`, and `src/timerRuntime.ts`.
+- Settings sections: `src/components/SettingsView.tsx` only routes sections; edit concrete panels in `src/components/settings/SettingsMembersSection.tsx`, `SettingsTimerPanel.tsx`, `SettingsTeamBackendPanel.tsx`, or `SettingsDemoPanel.tsx`.
 - Test setup data: use `src/test/fixtures.ts` instead of copying full `AppState` literals.
 
 ## Frontend Scope
@@ -76,8 +76,8 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm run verify:backend`: run the Go backend tests.
 - `npm test`: run Vitest unit tests.
 - `npm run test:e2e`: run Playwright tests.
-- `npm run backend:build`: build the Go backend binary into `sync-server/bin/`.
-- `npm run backend:build:windows`: build the Windows Go backend binary into `sync-server/bin/`.
+- `npm run backend:build`: build the Go backend binary into `team-server/bin/`.
+- `npm run backend:build:windows`: build the Windows Go backend binary into `team-server/bin/`.
 - `npm run backend:server`: start the local backend service.
 - `npm run deploy:team`: build the `/timemanage-team/` frontend, build a Windows Server 2008 compatible backend, and create `deploy/timemanageTeam-no-root.zip`.
 
@@ -103,17 +103,17 @@ Prefer modular development with high cohesion, low coupling, and clear ownership
 
 Vitest is used for unit tests; Playwright is used for browser workflows. Place unit tests next to the module under test using `*.test.ts`, for example `src/domain.test.ts`. Place end-to-end scenarios in `tests/e2e/*.spec.ts`.
 
-For small changes, run the nearest target test first, for example `npm test -- progressBoard.test.ts`, then add `npm run typecheck` when shared TypeScript contracts are involved. Run `npm test` or `npm run verify:fast` before committing broader logic changes. Run `npm run test:e2e` when changing navigation, storage flows, timers, settings, or sync UI.
+For small changes, run the nearest target test first, for example `npm test -- progressBoard.test.ts`, then add `npm run typecheck` when shared TypeScript contracts are involved. Run `npm test` or `npm run verify:fast` before committing broader logic changes. Run `npm run test:e2e` when changing navigation, storage flows, timers, settings, or team backend UI.
 
 ## Commit & Pull Request Guidelines
 
-This checkout does not include Git metadata, so no repository-specific commit history is available. Use concise imperative commit messages, for example `Add sync conflict diagnostics` or `Fix focus timer reset`.
+This checkout does not include Git metadata, so no repository-specific commit history is available. Use concise imperative commit messages, for example `Add backend diagnostics` or `Fix focus timer reset`.
 
-Pull requests should include a short summary, test results, and screenshots for visible UI changes. Mention any sync-server or local-storage migration impact.
+Pull requests should include a short summary, test results, and screenshots for visible UI changes. Mention any team-server or local-storage migration impact.
 
 ## Security & Configuration Tips
 
-The default local backend endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production sync data, or machine-specific paths. Use environment variables such as `TM_SYNC_USER`, `TM_SYNC_PASSWORD`, `TM_SYNC_ADDR`, and `TM_SYNC_MYSQL_DSN` for backend service configuration.
+The default local backend endpoint is `http://127.0.0.1:8787` with demo credentials documented in `README.md`. Do not commit private credentials, production backend data, or machine-specific paths. Use environment variables such as `TM_BACKEND_USER`, `TM_BACKEND_PASSWORD`, `TM_BACKEND_ADDR`, and `TM_BACKEND_MYSQL_DSN` for backend service configuration.
 
 Production TimeManage Team deployment details are recorded in `docs/deployment-timemanage-team.md`. Use that file before changing deployment packaging, Nginx rules, server paths, or Windows backend build settings.
 

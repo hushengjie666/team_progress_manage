@@ -11,38 +11,20 @@ const upsertById = <T extends { id: string }>(items: T[], item: T) =>
     ? items.map((value) => (value.id === item.id ? item : value))
     : [item, ...items];
 
-export const applyRemoteChange = (state: AppState, change: BusinessRow): AppState => {
-  if (change.deleted_at) {
-    if (change.entity === "project") return { ...state, projects: state.projects.filter((item) => item.id !== change.id) };
-    if (change.entity === "project_member") return { ...state, projectMembers: state.projectMembers.filter((item) => item.id !== change.id) };
-    if (change.entity === "task") return { ...state, tasks: state.tasks.filter((item) => item.id !== change.id) };
-    if (change.entity === "daily_plan") return { ...state, dailyPlans: state.dailyPlans.filter((item) => item.id !== change.id) };
-    if (change.entity === "focus_session") return { ...state, focusSessions: state.focusSessions.filter((item) => item.id !== change.id) };
-    if (change.entity === "work_session") return { ...state, workSessions: state.workSessions.filter((item) => item.id !== change.id) };
-    if (change.entity === "execution_signal") return { ...state, executionSignals: state.executionSignals.filter((item) => item.id !== change.id) };
-    if (change.entity === "interruption") return { ...state, interruptions: state.interruptions.filter((item) => item.id !== change.id) };
-    if (change.entity === "task_template") return { ...state, taskTemplates: state.taskTemplates.filter((item) => item.id !== change.id) };
-    if (change.entity === "template_instance") {
-      return {
-        ...state,
-        templateInstances: state.templateInstances.filter((item) => `${item.templateId}_${item.taskId}` !== change.id),
-      };
-    }
-    return state;
-  }
-  const payload = change.payload as never;
-  if (change.entity === "reward_state") return { ...state, rewardState: payload };
-  if (change.entity === "project") return { ...state, projects: upsertById(state.projects, payload) };
-  if (change.entity === "project_member") return { ...state, projectMembers: upsertById(state.projectMembers, payload) };
-  if (change.entity === "task") return { ...state, tasks: upsertById(state.tasks, payload) };
-  if (change.entity === "daily_plan") return { ...state, dailyPlans: upsertById(state.dailyPlans, payload) };
-  if (change.entity === "focus_session") return { ...state, focusSessions: upsertById(state.focusSessions, payload) };
-  if (change.entity === "work_session") return { ...state, workSessions: upsertById(state.workSessions, payload) };
-  if (change.entity === "execution_signal") return { ...state, executionSignals: upsertById(state.executionSignals, payload) };
-  if (change.entity === "interruption") return { ...state, interruptions: upsertById(state.interruptions, payload) };
-  if (change.entity === "task_template") return { ...state, taskTemplates: upsertById(state.taskTemplates, payload) };
-  if (change.entity === "template_instance") {
-    const instance = change.payload as AppState["templateInstances"][number];
+export const applyBusinessRow = (state: AppState, row: BusinessRow): AppState => {
+  const payload = row.payload as never;
+  if (row.entity === "reward_state") return { ...state, rewardState: payload };
+  if (row.entity === "project") return { ...state, projects: upsertById(state.projects, payload) };
+  if (row.entity === "project_member") return { ...state, projectMembers: upsertById(state.projectMembers, payload) };
+  if (row.entity === "task") return { ...state, tasks: upsertById(state.tasks, payload) };
+  if (row.entity === "daily_plan") return { ...state, dailyPlans: upsertById(state.dailyPlans, payload) };
+  if (row.entity === "focus_session") return { ...state, focusSessions: upsertById(state.focusSessions, payload) };
+  if (row.entity === "work_session") return { ...state, workSessions: upsertById(state.workSessions, payload) };
+  if (row.entity === "execution_signal") return { ...state, executionSignals: upsertById(state.executionSignals, payload) };
+  if (row.entity === "interruption") return { ...state, interruptions: upsertById(state.interruptions, payload) };
+  if (row.entity === "task_template") return { ...state, taskTemplates: upsertById(state.taskTemplates, payload) };
+  if (row.entity === "template_instance") {
+    const instance = row.payload as AppState["templateInstances"][number];
     return {
       ...state,
       templateInstances: state.templateInstances.some((item) => item.templateId === instance.templateId && item.taskId === instance.taskId)

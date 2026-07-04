@@ -22,7 +22,7 @@ type CommandPaletteRunTarget = {
 };
 
 const baseCommands: CommandItem[] = [
-  { action: "open_sync_settings", label: "打开团队后台", hint: "检查服务器、登录、诊断和立即同步" },
+  { action: "open_backend_settings", label: "打开团队后台", hint: "检查服务器、登录、诊断和立即刷新" },
   { action: "navigate_settings", label: "打开管理中心", hint: "管理项目成员、计时偏好、团队后台和演示数据" },
   { action: "navigate_workspace", label: "打开项目总览", hint: "查看项目进度、执行中任务和风险" },
   { action: "navigate_focus", label: "打开我的任务", hint: "查看分配给我的任务并开始工作" },

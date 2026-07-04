@@ -5,7 +5,7 @@ import type { AppTaskActionsRuntime } from "../appTaskActionsRuntime";
 import type { AuthSessionRuntime } from "../authSessionRuntime";
 import type { DeletedTaskSnapshot, SplitDraft, Tab, TaskDraft } from "../appModel";
 import type { ProjectDetailModel, ProjectTaskFilters } from "../projectDetail";
-import type { SyncCommandRuntime } from "../syncCommandRuntime";
+import type { BackendCommandRuntime } from "../teamBackendCommandRuntime";
 import type {
   Account,
   AppState,
@@ -13,7 +13,7 @@ import type {
   DailyPlan,
   ParsedQuickInput,
   ProjectInvitation,
-  SyncDiagnosticResult,
+  BackendDiagnosticResult,
   Task,
   Workspace,
   WorkspaceInvitation,
@@ -71,9 +71,9 @@ export type AppShellState = {
   setCommandPaletteOpen: Setter<boolean>;
   showShortcutHelp: boolean;
   setShowShortcutHelp: Setter<boolean>;
-  syncPassword: string;
-  setSyncPassword: Setter<string>;
-  syncDiagnostic: SyncDiagnosticResult | null;
+  backendPassword: string;
+  setBackendPassword: Setter<string>;
+  backendDiagnostic: BackendDiagnosticResult | null;
   settingsSection: SettingsSection;
   setSettingsSection: Setter<SettingsSection>;
 };
@@ -110,7 +110,7 @@ export type AppAuthenticatedShellProps = {
   focusActions: AppFocusActionsRuntime;
   projectActions: AppProjectActionsRuntime;
   settingsActions: AppSettingsActionsRuntime;
-  syncActions: SyncCommandRuntime;
+  backendActions: BackendCommandRuntime;
   authActions: Pick<AuthSessionRuntime, "handleCreateWorkspace" | "logout">;
   workspaceAccountActions: Pick<
     WorkspaceAccountRuntime,

@@ -1,9 +1,9 @@
 import { createInitialState } from "../../src/seed.js";
-import { loginToWorkspace, type AuthSession } from "../../src/sync.js";
-import { loadTeamState, pushTeamChanges } from "../../src/teamApi.js";
+import { loginToWorkspace, type AuthSession } from "../../src/teamBackend.js";
+import { loadTeamData, saveTeamDataSnapshot } from "../../src/teamApi.js";
 import type { AppState } from "../../src/types.js";
 import type { TimeManageMcpConfig } from "./config.js";
-import { createEmptySyncState, hydrateCurrentMember, nowIso } from "./coreSyncState.js";
+import { createEmptyBackendConnectionState, hydrateCurrentMember, nowIso } from "./coreBackendConnectionState.js";
 
 export class TimeManageMcpBaseClient {
   protected session?: AuthSession;
@@ -14,7 +14,7 @@ export class TimeManageMcpBaseClient {
     if (this.session && new Date(this.session.expiresAt).getTime() > Date.now() + 60_000) return this.session;
     const seed = createInitialState();
     this.session = await loginToWorkspace(
-      { ...seed.sync, serverUrl: this.config.serverUrl, deviceId: this.config.deviceId },
+      { ...seed.backend, serverUrl: this.config.serverUrl, deviceId: this.config.deviceId },
       this.config.email,
       this.config.password,
     );
@@ -23,37 +23,30 @@ export class TimeManageMcpBaseClient {
 
   async readState(preferredProjectId?: string) {
     const session = await this.ensureSession();
-    const baseState = createEmptySyncState(this.config, session);
-    const loaded = await loadTeamState(baseState);
+    const baseState = createEmptyBackendConnectionState(this.config, session);
+    const loaded = await loadTeamData(baseState);
     return hydrateCurrentMember(loaded, session, preferredProjectId);
   }
 
-  async writeState(beforeState: AppState, nextState: AppState, preferredProjectId?: string) {
+  async writeState(_beforeState: AppState, nextState: AppState, preferredProjectId?: string) {
     const session = await this.ensureSession();
-    const before = {
-      ...beforeState,
-      auth: { ...beforeState.auth, status: "authenticated" as const, token: session.token, account: session.account, workspace: session.workspace, expiresAt: session.expiresAt },
-      sync: { ...beforeState.sync, serverUrl: this.config.serverUrl, token: session.token, username: session.account.email, deviceId: this.config.deviceId },
-    };
     const next = {
       ...nextState,
       auth: { ...nextState.auth, status: "authenticated" as const, token: session.token, account: session.account, workspace: session.workspace, expiresAt: session.expiresAt },
-      sync: { ...nextState.sync, serverUrl: this.config.serverUrl, token: session.token, username: session.account.email, deviceId: this.config.deviceId },
+      backend: { ...nextState.backend, serverUrl: this.config.serverUrl, token: session.token, username: session.account.email, deviceId: this.config.deviceId },
     };
-    const revision = await pushTeamChanges(next.sync, session.token, before, next);
     const savedAt = nowIso();
-    const saved = {
+    const saved = await saveTeamDataSnapshot(next.backend, session.token, {
       ...next,
-      sync: {
-        ...next.sync,
-        lastPulledRevision: Math.max(next.sync.lastPulledRevision, revision ?? next.sync.lastPulledRevision),
-        lastSyncedAt: savedAt,
-        status: "synced" as const,
-        message: revision === undefined ? "MCP 没有团队变更需要写入" : "MCP 已写入团队后台",
+      backend: {
+        ...next.backend,
+        lastSavedAt: savedAt,
+        status: "ready" as const,
+        message: "MCP 已写入团队后台",
       },
       updatedAt: savedAt,
-    };
-    return hydrateCurrentMember(await loadTeamState(saved), session, preferredProjectId);
+    });
+    return hydrateCurrentMember(await loadTeamData(saved), session, preferredProjectId);
   }
 
   async mutate<T>(preferredProjectId: string | undefined, fn: (state: AppState, timestamp: string) => { state: AppState; result: T } | AppState) {
@@ -61,7 +54,7 @@ export class TimeManageMcpBaseClient {
     const state = await this.readState(preferredProjectId);
     const output = fn(state, timestamp);
     const nextState = "state" in output ? output.state : output;
-    const synced = await this.writeState(state, nextState, preferredProjectId);
-    return "state" in output ? output.result : { syncedAt: synced.sync.lastSyncedAt };
+    const saved = await this.writeState(state, nextState, preferredProjectId);
+    return "state" in output ? output.result : { savedAt: saved.backend.lastSavedAt };
   }
 }

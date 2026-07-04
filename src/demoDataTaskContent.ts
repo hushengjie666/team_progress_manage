@@ -73,8 +73,8 @@ export const targetProjectDemoTaskPatch = (task: Task, projectName: string): Par
     },
     demo_task_pool_import: {
       title: `完善${projectLabel}后台诊断提示`,
-      notes: `把服务健康、登录状态和同步结果展示得更清楚，方便团队快速定位问题。`,
-      tags: ["同步", "诊断"],
+      notes: `把服务健康、登录状态和后台结果展示得更清楚，方便团队快速定位问题。`,
+      tags: ["后台", "诊断"],
       stage: "requirements",
     },
     demo_task_pool_shortcuts: {

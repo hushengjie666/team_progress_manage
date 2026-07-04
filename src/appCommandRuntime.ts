@@ -22,7 +22,7 @@ export type AppCommandRuntimeOptions = {
   updateState: UpdateState;
   setSelectedTaskId: (taskId: string) => void;
   setWorkspaceMode: (mode: "board" | "workbench") => void;
-  setSettingsSection: (section: "members" | "sync") => void;
+  setSettingsSection: (section: "members" | "backend") => void;
   setCommandPaletteOpen: (open: boolean) => void;
   setShowShortcutHelp: (open: boolean) => void;
   setTab: (tab: Tab) => void;
@@ -92,8 +92,8 @@ export function createAppCommandRuntime({
       setSettingsSection("members");
       setTab("settings");
     }
-    if (action === "open_sync_settings") {
-      setSettingsSection("sync");
+    if (action === "open_backend_settings") {
+      setSettingsSection("backend");
       setTab("settings");
     }
     if (action === "add_quick_task") addParsedQuickTask(parsed ?? parseQuickInput(""));

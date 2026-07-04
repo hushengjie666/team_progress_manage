@@ -59,13 +59,6 @@ export const unbindProjectMemberInState = (state: AppState, projectMemberId: str
           }
         : task;
     }),
-    sync: {
-      ...state.sync,
-      tombstones: [
-        ...(state.sync.tombstones ?? []).filter((item) => !(item.entity === "project_member" && item.id === projectMemberId)),
-        { entity: "project_member", id: projectMemberId, deletedAt: timestamp },
-      ],
-    },
     updatedAt: timestamp,
   };
 };

@@ -30,8 +30,8 @@ export function useAppLifecycleHooks({
   undoTimerRef,
   stopNoiseRef,
   reminderSentRef,
-  persistBusinessChanges,
-  commitBusinessState,
+  persistTeamData,
+  commitTeamData,
   setState,
   setToast,
   setToastVisible,
@@ -45,7 +45,7 @@ export function useAppLifecycleHooks({
   useUndoTimerCleanup({ undoTimerRef });
   useNavigationRefs({ tab, selectedTaskId, tabRef, selectedTaskIdRef });
   useInitialAppLoad({
-    persistBusinessChanges,
+    persistTeamData,
     setState,
     setToast,
     setLoaded,
@@ -56,9 +56,9 @@ export function useAppLifecycleHooks({
   useDebouncedStatePersistence({ state, loaded, setToast });
   useTeamBusinessRefresh({ state, loaded, stateRef, setState });
   usePageLifecycleStateFlush({ stateRef });
-  useRunningTimerInterval({ state, stateRef, setState, setToast, commitBusinessState });
-  useTimerRestoreListeners({ stateRef, setState, setToast, commitBusinessState });
-  useTodayPlanRepair({ state, commitBusinessState });
+  useRunningTimerInterval({ state, stateRef, setState, setToast, commitTeamData });
+  useTimerRestoreListeners({ stateRef, setState, setToast, commitTeamData });
+  useTodayPlanRepair({ state, commitTeamData });
   useTimerRuntimeEffects({ state, stopNoiseRef });
-  useTaskReminderInterval({ state, stateRef, reminderSentRef, commitBusinessState });
+  useTaskReminderInterval({ state, stateRef, reminderSentRef, commitTeamData });
 }

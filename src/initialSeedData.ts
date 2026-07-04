@@ -40,7 +40,7 @@ export const defaultTaskTemplates: TaskTemplate[] = [
   },
   {
     id: "template_weekly_sync",
-    name: "周计划同步",
+    name: "周计划协作",
     description: "整理本周进展、风险和下周安排。",
     project: "协作",
     tags: ["周会", "计划"],

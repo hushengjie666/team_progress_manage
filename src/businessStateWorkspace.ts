@@ -3,7 +3,7 @@ import type { AppState } from "./types";
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export function buildBusinessStateWorkspace(state: AppState) {
+export function buildTeamDataWorkspace(state: AppState) {
   const currentWorkspaceId = state.auth.workspace?.id;
   const projectWorkspaceIds = new Map(state.projects.map((project) => [project.id, project.workspaceId ?? currentWorkspaceId]));
   const taskWorkspaceIds = new Map(

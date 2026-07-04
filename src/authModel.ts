@@ -47,8 +47,8 @@ export const bindAccountToMembers = (
     ...value,
     auth,
     projectMembers,
-    sync: {
-      ...value.sync,
+    backend: {
+      ...value.backend,
       token: auth.token,
       username: account.email,
       message: auth.message,

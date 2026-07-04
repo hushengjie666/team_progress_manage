@@ -70,10 +70,9 @@ export type {
 export type {
   AppState,
   AuthState,
-  SyncDiagnosticResult,
-  SyncDiagnosticStep,
-  SyncServerConfig,
-  SyncState,
-  SyncStatus,
-  SyncTombstone,
+  BackendDiagnosticResult,
+  BackendDiagnosticStep,
+  BackendServerConfig,
+  BackendConnectionState,
+  BackendConnectionStatus,
 } from "./appStateTypes";

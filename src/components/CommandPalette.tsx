@@ -98,7 +98,7 @@ function CommandIcon({ action }: { action: CommandAction }) {
   if (action === "navigate_focus") return <UserCheck size={17} />;
   if (action === "start_focus" || action === "toggle_timer") return <Focus size={17} />;
   if (action === "navigate_settings") return <FolderKanban size={17} />;
-  if (action === "open_sync_settings") return <Settings size={17} />;
+  if (action === "open_backend_settings") return <Settings size={17} />;
   if (action === "open_shortcut_help") return <Keyboard size={17} />;
   return <Clock3 size={17} />;
 }

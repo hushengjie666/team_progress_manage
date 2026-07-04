@@ -1,5 +1,5 @@
 import type { AppState } from "./types";
-import { defaultSyncServerUrl } from "./defaultSyncServerUrl";
+import { defaultBackendServerUrl } from "./defaultBackendServerUrl";
 import {
   defaultTaskTemplates,
   starterProject,
@@ -18,7 +18,7 @@ export const uid = (prefix: string) => {
 
 const now = () => new Date().toISOString();
 
-export { defaultSyncServerUrl } from "./defaultSyncServerUrl";
+export { defaultBackendServerUrl } from "./defaultBackendServerUrl";
 export {
   defaultTaskTemplates,
   starterProject,
@@ -42,7 +42,7 @@ export const createInitialState = (): AppState => ({
     notificationSettings: {
       permissionState: "unknown",
     },
-    advancedSyncVisible: false,
+    advancedBackendVisible: false,
     commandPaletteHintDismissed: false,
   },
   auth: {
@@ -65,14 +65,12 @@ export const createInitialState = (): AppState => ({
     focusGarden: 0,
     visualProgress: 0,
   },
-  sync: {
-    serverUrl: defaultSyncServerUrl(),
+  backend: {
+    serverUrl: defaultBackendServerUrl(),
     username: "admin",
     deviceId: uid("device"),
-    lastPulledRevision: 0,
     status: "idle",
     message: "本地团队后台未连接",
-    tombstones: [],
   },
   taskTemplates: defaultTaskTemplates,
   templateInstances: [],

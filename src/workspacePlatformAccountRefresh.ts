@@ -1,4 +1,4 @@
-import { fetchPlatformAccounts } from "./sync";
+import { fetchPlatformAccounts } from "./teamBackend";
 import { platformAccountAdminToken } from "./workspacePlatformAccountAccess";
 import type { WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
 
@@ -17,7 +17,7 @@ export function createWorkspacePlatformAccountRefresh({
       setPlatformAccounts([]);
       return [];
     }
-    const accounts = await fetchPlatformAccounts(source.sync, token);
+    const accounts = await fetchPlatformAccounts(source.backend, token);
     setPlatformAccounts(accounts);
     return accounts;
   };

@@ -54,8 +54,8 @@ C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/
 
 ```text
 C:/Users/Administrator/Desktop/timemanageTeam/web/
-C:/Users/Administrator/Desktop/timemanageTeam/sync/sync.json
-C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe
+C:/Users/Administrator/Desktop/timemanageTeam/server/backend.json
+C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe
 ```
 
 推荐把新版本包解压为正式运行目录 `timemanageTeam`，不要再保留旧的升级/回滚脚本链路。
@@ -65,12 +65,12 @@ C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe
 ```text
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/RELEASE.txt
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/web/index.html
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/timemanage-sync.exe
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/sync.example.json
-C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/sync/start-backend.bat
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/server/timemanage-team.exe
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/server/backend.example.json
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/server/start-backend.bat
 ```
 
-正式运行目录仍然是 `C:/Users/Administrator/Desktop/timemanageTeam/web/` 和 `C:/Users/Administrator/Desktop/timemanageTeam/sync/timemanage-sync.exe`。首次部署时从 `sync/sync.example.json` 创建 `sync/sync.json` 并编辑数据库、端口和密钥。
+正式运行目录仍然是 `C:/Users/Administrator/Desktop/timemanageTeam/web/` 和 `C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe`。首次部署时从 `server/backend.example.json` 创建 `server/backend.json` 并编辑数据库、端口和密钥。
 
 ## 当前线上路径
 
@@ -112,7 +112,7 @@ tag 打包会把 Git tag、commit 和工作区状态写入发布包的 `RELEASE.
 golang:1.20-bookworm
 ```
 
-打包脚本会在临时目录里构建，不会改动仓库里的 `sync-server/go.mod`。兼容构建时临时使用：
+打包脚本会在临时目录里构建，不会改动仓库里的 `team-server/go.mod`。兼容构建时临时使用：
 
 ```text
 github.com/go-sql-driver/mysql v1.8.1
@@ -124,7 +124,7 @@ go 1.20
 最终产物会复制到：
 
 ```text
-deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/timemanage-sync.exe
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/server/timemanage-team.exe
 ```
 
 ## 后端配置
@@ -132,24 +132,24 @@ deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/timemanage-sync.exe
 服务器配置文件固定放在：
 
 ```text
-C:/Users/Administrator/Desktop/timemanageTeam/sync/sync.json
+C:/Users/Administrator/Desktop/timemanageTeam/server/backend.json
 ```
 
 本地打包目录里对应：
 
 ```text
-deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/sync/sync.example.json
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/server/backend.example.json
 ```
 
-服务器上的 `sync.json` 包含数据库账号和服务密钥，不能提交到仓库。打包文件只包含 `sync.example.json`，不会生成正式 `sync.json`。当前 `.gitignore` 已忽略 `deploy/**/sync.json`、部署 zip 和后端 exe。
+服务器上的 `backend.json` 包含数据库账号和服务密钥，不能提交到仓库。打包文件只包含 `backend.example.json`，不会生成正式 `backend.json`。当前 `.gitignore` 已忽略 `deploy/**/backend.json`、部署 zip 和后端 exe。
 
 MySQL 数据库名：
 
 ```text
-timemanage_sync
+timemanage_team
 ```
 
-如果线上数据库已经初始化过账号，`sync.json` 里的 `username/password` 不会覆盖数据库账号；登录账号以数据库里的账号表为准。需要重置管理员账号时，应单独处理数据库或重新初始化库。
+如果线上数据库已经初始化过账号，`backend.json` 里的 `username/password` 不会覆盖数据库账号；登录账号以数据库里的账号表为准。需要重置管理员账号时，应单独处理数据库或重新初始化库。
 
 ## Nginx 配置
 
@@ -193,8 +193,8 @@ location ^~ /timemanage-team/ {
 1. 本地运行 `npm run deploy:team`。
 2. 上传 `deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip` 到服务器的 `C:/Users/Administrator/Desktop/`。
 3. 在 Desktop 下解压，确认出现同名版本目录，例如 `timemanageTeam-v0.1.0-20260701-153000/`。
-4. 如果正式目录还没有 `timemanageTeam/sync/sync.json`，复制 `sync/sync.example.json` 为 `sync/sync.json` 并编辑数据库、端口或密钥。
-5. 运行 `timemanageTeam/sync/start-backend.bat`，或用 `install-windows-service.ps1` 安装 Windows Service。
+4. 如果正式目录还没有 `timemanageTeam/server/backend.json`，复制 `server/backend.example.json` 为 `server/backend.json` 并编辑数据库、端口或密钥。
+5. 运行 `timemanageTeam/server/start-backend.bat`，或用 `install-windows-service.ps1` 安装 Windows Service。
 6. 重载 Nginx。
 
 ## 数据库初始化

@@ -1,6 +1,6 @@
 import { createInitialState } from "./seed";
 import { dedupeProjectMembersByIdentity } from "./projectMemberDeduplication";
-import { buildBusinessStateWorkspace } from "./businessStateWorkspace";
+import { buildTeamDataWorkspace } from "./businessStateWorkspace";
 import type {
   AppState,
   DailyPlan,
@@ -48,12 +48,8 @@ export type BusinessRow = {
   entity: BusinessEntity;
   id: string;
   updated_at: string;
-  deleted_at?: string;
-  payload: BusinessPayload | Record<string, never>;
+  payload: BusinessPayload;
 };
-
-const rowKey = (row: Pick<BusinessRow, "workspace_id" | "entity" | "id">) =>
-  `${row.workspace_id ?? ""}:${row.entity}:${row.id}`;
 
 const templateInstanceId = (instance: TemplateInstance) =>
   `${instance.templateId}_${instance.taskId}`;
@@ -62,7 +58,7 @@ const rewardStateId = (state: AppState) =>
   `reward_state_${state.auth.account?.id ?? "local"}`;
 
 export function businessRowsFromState(state: AppState): BusinessRow[] {
-  const workspace = buildBusinessStateWorkspace(state);
+  const workspace = buildTeamDataWorkspace(state);
   const currentWorkspaceId = workspace.currentWorkspaceId;
   const ownerAccountId = state.auth.account?.id;
   return [
@@ -154,31 +150,18 @@ export function businessRowsFromState(state: AppState): BusinessRow[] {
   ];
 }
 
-export function businessChangesBetween(before: AppState, after: AppState): BusinessRow[] {
-  const beforeRows = new Map(businessRowsFromState(before).map((row) => [rowKey(row), row]));
-  const afterRows = new Map(businessRowsFromState(after).map((row) => [rowKey(row), row]));
-  const changed = Array.from(afterRows.values()).filter((row) => JSON.stringify(beforeRows.get(rowKey(row))) !== JSON.stringify(row));
-  const deleted = Array.from(beforeRows.values())
-    .filter((row) => !afterRows.has(rowKey(row)))
-    .map((row) => ({
-      ...row,
-      deleted_at: after.updatedAt,
-      payload: {},
-    }));
-  return [...changed, ...deleted];
-}
-
 export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[]): AppState {
+  const loadedAt = new Date().toISOString();
   const base = createInitialState();
   const next: AppState = {
     ...base,
     auth: local.auth,
     settings: local.settings,
-    sync: {
-      ...local.sync,
-      status: "synced",
+    backend: {
+      ...local.backend,
+      status: "ready",
       message: "团队在线数据已加载",
-      tombstones: [],
+      lastLoadedAt: loadedAt,
     },
     projects: [],
     projectMembers: [],
@@ -191,11 +174,10 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
     taskTemplates: [],
     templateInstances: [],
     rewardState: local.rewardState,
-    updatedAt: new Date().toISOString(),
+    updatedAt: loadedAt,
   };
 
   for (const row of rows) {
-    if (row.deleted_at) continue;
     if (row.entity === "project") next.projects.push(row.payload as Project);
     if (row.entity === "project_member") next.projectMembers.push(row.payload as ProjectMember);
     if (row.entity === "task") next.tasks.push(row.payload as Task);

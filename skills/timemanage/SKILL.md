@@ -7,7 +7,7 @@ description: Use TimeManage through its MCP tools to query and manage projects, 
 
 Use this skill when the user wants to operate TimeManage through AI: querying projects, members, tasks, today's prepared work queue, active work, risk/review state, daily summaries, or when they want to create, edit, split, assign, start, pause, finish, submit, approve, or return work.
 
-TimeManage MCP is an additional AI operation channel. It does not replace the browser or Tauri app. Both channels read and write the same sync-server data, so browser changes can be read by MCP after pull, and MCP writes should appear in the front-end through the existing realtime sync path.
+TimeManage MCP is an additional AI operation channel. It does not replace the browser or Tauri app. Both channels read and write the same team-server data, so browser changes can be read by MCP after backend refresh, and MCP writes should appear in the front-end through the existing backend refresh path.
 
 ## Configuration
 
@@ -19,7 +19,7 @@ npm run mcp:server
 
 Required configuration comes from environment variables or `TM_MCP_CONFIG`:
 
-- `TM_MCP_SERVER_URL`: sync-server URL, default `http://127.0.0.1:8787`
+- `TM_MCP_SERVER_URL`: team-server URL, default `http://127.0.0.1:8787`
 - `TM_MCP_EMAIL`: TimeManage login email or phone value
 - `TM_MCP_PASSWORD`: TimeManage login password
 - `TM_MCP_DEVICE_ID`: optional stable device id, default host-based id
@@ -49,7 +49,7 @@ Never commit real account passwords.
 - Use `start_task`, `pause_work_session`, `resume_work_session`, and `finish_work_session` for execution flow.
 - Use `submit_task_review`, `accept_task_review`, and `return_task_review` for review flow.
 - Use `get_daily_summary` and `update_daily_review` for daily review and work summary.
-- Use `get_sync_diagnostics` when the user asks whether MCP, browser, or sync-server data is current.
+- Use `get_sync_diagnostics` when the user asks whether MCP, browser, or team-server data is current.
 
 ## Status Flow
 
@@ -78,7 +78,7 @@ Ask the user for explicit confirmation before calling any high-risk tool with `c
 
 Good confirmation prompt:
 
-> 确认要删除任务「任务名」吗？删除后会同步清理今日队列和相关工作记录。
+> 确认要删除任务「任务名」吗？删除后会一并清理今日队列和相关工作记录。
 
 Only set `confirmed=true` after the user clearly agrees.
 
@@ -86,7 +86,7 @@ Only set `confirmed=true` after the user clearly agrees.
 
 - If a task/member/project name is ambiguous, query matching records and ask the user to choose.
 - If login fails, ask the user to check `TM_MCP_EMAIL` and `TM_MCP_PASSWORD`.
-- If sync-server cannot be reached, ask the user to start `npm run sync:server` or check `TM_MCP_SERVER_URL`.
+- If team-server cannot be reached, ask the user to start `npm run backend:server` or check `TM_MCP_SERVER_URL`.
 - If a status transition is refused by business rules, explain the current status and suggest the valid next action.
-- After mutating data, summarize the changed entity id, title/name, new status, and sync effect.
+- After mutating data, summarize the changed entity id, title/name, new status, and backend write result.
 - For "今日任务" ambiguity, distinguish `get_today_plan` (raw prepared queue) from `get_today_workbench` (member-grouped workbench with active markers).

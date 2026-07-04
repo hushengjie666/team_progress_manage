@@ -1,4 +1,4 @@
-import { getAuthStatus } from "./sync";
+import { getAuthStatus } from "./teamBackend";
 import type { AppState, AuthState } from "./types";
 
 export function createAuthStatusAction({
@@ -13,7 +13,7 @@ export function createAuthStatusAction({
     const source = getState();
     if (!source) return;
     try {
-      const status = await getAuthStatus(source.sync.serverUrl);
+      const status = await getAuthStatus(source.backend.serverUrl);
       setAuthPatch({
         status: source.auth.token ? "authenticated" : "signed_out",
         bootstrapped: status.bootstrapped,

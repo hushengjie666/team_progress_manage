@@ -1,10 +1,10 @@
-.sync-steps {
+.backend-steps {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.sync-steps span {
+.backend-steps span {
   min-height: 30px;
   display: inline-flex;
   align-items: center;
@@ -16,7 +16,7 @@
   font-weight: 700;
 }
 
-.sync-steps .active {
+.backend-steps .active {
   color: #12423d;
   background: #d8ece6;
 }

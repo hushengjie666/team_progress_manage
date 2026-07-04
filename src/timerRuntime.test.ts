@@ -3,7 +3,7 @@ import { createInitialState } from "./seed";
 import {
   announceTimerEnd,
   runDueTaskReminders,
-  syncWhiteNoise,
+  updateWhiteNoisePlayback,
   updateActiveTimerPresence,
 } from "./timerRuntime";
 import type { ActiveTimer, AppState } from "./types";
@@ -87,19 +87,19 @@ describe("timer runtime", () => {
   it("marks due task reminders and commits the updated state", () => {
     const state = stateWithDueTask();
     const sentIds = new Set<string>();
-    const commitBusinessState = vi.fn();
+    const commitTeamData = vi.fn();
 
     runDueTaskReminders(
       state,
       sentIds,
-      commitBusinessState,
+      commitTeamData,
       Date.parse("2026-07-01T08:00:00.000Z"),
       "2026-07-01T08:00:00.000Z",
     );
 
     expect(sentIds.has("task_due")).toBe(true);
     expect(mocks.sendTimerNotification).toHaveBeenCalledWith(state.settings, "任务提醒", "到期提醒任务");
-    expect(commitBusinessState).toHaveBeenCalledWith(state, expect.objectContaining({
+    expect(commitTeamData).toHaveBeenCalledWith(state, expect.objectContaining({
       tasks: [expect.objectContaining({
         id: "task_due",
         lastReminderSentAt: "2026-07-01T08:00:00.000Z",
@@ -122,7 +122,7 @@ describe("timer runtime", () => {
     };
     const ref = { current: stopPrevious };
 
-    syncWhiteNoise(state, ref);
+    updateWhiteNoisePlayback(state, ref);
 
     expect(stopPrevious).toHaveBeenCalled();
     expect(mocks.startWhiteNoise).toHaveBeenCalledWith("rain", state.settings.whiteNoiseVolume);

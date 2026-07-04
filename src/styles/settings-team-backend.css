@@ -1,0 +1,144 @@
+.settings-panel {
+  background: #fbfaf6;
+}
+
+.settings-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.notification-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: end;
+  margin-top: 16px;
+}
+
+.toggle-row {
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+
+.toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-row input {
+  width: auto;
+  min-height: auto;
+}
+
+.backend-table {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr auto);
+  gap: 12px;
+  align-items: center;
+  max-width: 620px;
+  margin-top: 14px;
+}
+
+.backend-table span {
+  color: #6b7478;
+}
+
+.backend-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1.4fr;
+  gap: 12px;
+}
+
+.backend-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.backend-summary-grid > div {
+  display: grid;
+  gap: 5px;
+  min-height: 64px;
+  padding: 10px 12px;
+  border: 1px solid #d7e7df;
+  border-radius: 8px;
+  background: #fffdfa;
+}
+
+.backend-summary-grid span {
+  color: #6b7478;
+  font-size: 12px;
+}
+
+.backend-summary-grid strong {
+  min-width: 0;
+  color: #244541;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backend-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.inline-toggle {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #48575d;
+  font-size: 13px;
+}
+
+.inline-toggle input {
+  width: auto;
+  min-height: auto;
+}
+
+.compact-input {
+  width: 116px;
+  display: grid;
+  grid-template-columns: auto 58px;
+  align-items: center;
+  gap: 7px;
+  color: #596368;
+  font-size: 13px;
+}
+
+.compact-input input {
+  min-height: 38px;
+  padding: 7px 8px;
+}
+
+.backend-status {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: #4f5960;
+  background: #ede6dc;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.backend-status-ready {
+  color: #12423d;
+  background: #d8ece6;
+}
+
+.backend-status-loading,
+.backend-status-saving,
+.backend-status-authenticating {
+  color: #59421d;
+  background: #faead2;
+}
+
+.backend-status-error {
+  color: #763139;
+  background: #f0c8ce;
+}

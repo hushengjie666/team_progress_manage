@@ -1,7 +1,7 @@
 import { SettingsMembersSection } from "./settings/SettingsMembersSection";
 import { SettingsDemoPanel } from "./settings/SettingsDemoPanel";
 import { effectiveSettingsSection, SettingsSectionTabs } from "./settings/SettingsSectionTabs";
-import { SettingsSyncPanel } from "./settings/SettingsSyncPanel";
+import { SettingsTeamBackendPanel } from "./settings/SettingsTeamBackendPanel";
 import { SettingsTimerPanel } from "./settings/SettingsTimerPanel";
 import type { SettingsViewProps } from "./settings/settingsViewTypes";
 
@@ -11,7 +11,7 @@ export function SettingsView(props: SettingsViewProps) {
     accounts,
     settings,
     dailyGoal,
-    sync,
+    backend,
     dataSummary,
     activeSection,
     setActiveSection,
@@ -22,14 +22,14 @@ export function SettingsView(props: SettingsViewProps) {
     disableAccount,
     canManageMembers = true,
     askNotificationPermissions,
-    syncPassword,
-    setSyncPassword,
-    updateSyncSetting,
-    checkSyncHealth,
-    handleSyncLogin,
-    handleSyncNow,
-    runSyncDiagnostics,
-    syncDiagnostic,
+    backendPassword,
+    setBackendPassword,
+    updateBackendSetting,
+    checkBackendHealth,
+    handleBackendLogin,
+    handleBackendRefresh,
+    runBackendDiagnostics,
+    backendDiagnostic,
     loadDemoData,
   } = props;
   const effectiveSection = effectiveSettingsSection(activeSection, canManageMembers);
@@ -69,19 +69,19 @@ export function SettingsView(props: SettingsViewProps) {
         />
       )}
 
-      {effectiveSection === "sync" && (
-        <SettingsSyncPanel
+      {effectiveSection === "backend" && (
+        <SettingsTeamBackendPanel
           settings={settings}
-          sync={sync}
-          syncPassword={syncPassword}
-          setSyncPassword={setSyncPassword}
+          backend={backend}
+          backendPassword={backendPassword}
+          setBackendPassword={setBackendPassword}
           updateSettings={updateSettings}
-          updateSyncSetting={updateSyncSetting}
-          checkSyncHealth={checkSyncHealth}
-          handleSyncLogin={handleSyncLogin}
-          handleSyncNow={handleSyncNow}
-          runSyncDiagnostics={runSyncDiagnostics}
-          syncDiagnostic={syncDiagnostic}
+          updateBackendSetting={updateBackendSetting}
+          checkBackendHealth={checkBackendHealth}
+          handleBackendLogin={handleBackendLogin}
+          handleBackendRefresh={handleBackendRefresh}
+          runBackendDiagnostics={runBackendDiagnostics}
+          backendDiagnostic={backendDiagnostic}
           dataSummary={dataSummary}
           projectCount={dataSummary.projectCount}
           projectMemberCount={projectMembers.length}

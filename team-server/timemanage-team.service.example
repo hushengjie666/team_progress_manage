@@ -1,0 +1,19 @@
+[Unit]
+Description=TimeManage Backend Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=timemanage
+Group=timemanage
+WorkingDirectory=/opt/timemanage-team
+ExecStart=/opt/timemanage-team/timemanage-team serve --config /etc/timemanage-team/backend.json
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

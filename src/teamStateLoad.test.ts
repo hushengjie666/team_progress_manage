@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { loadTeamBusinessState } from "./teamApi";
+import { loadTeamData } from "./teamApi";
 import type { BusinessRow } from "./teamBusinessRows";
-import type { SyncState } from "./types";
+import type { BackendConnectionState } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
 
@@ -39,18 +39,18 @@ describe("team backend state loading", () => {
         bootstrapped: true,
         message: "已登录",
       },
-      sync: {
-        ...base.sync,
+      backend: {
+        ...base.backend,
         serverUrl: "http://127.0.0.1:8787",
         token: "token",
-      } satisfies SyncState,
+      } satisfies BackendConnectionState,
     };
 
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
       rows: [],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamBusinessState(local);
+    const loaded = await loadTeamData(local);
 
     expect(loaded.projects).toEqual([]);
     expect(loaded.projectMembers).toEqual([]);
@@ -80,11 +80,11 @@ describe("team backend state loading", () => {
         bootstrapped: true,
         message: "已登录",
       },
-      sync: {
-        ...base.sync,
+      backend: {
+        ...base.backend,
         serverUrl: "http://127.0.0.1:8787",
         token: "token",
-      } satisfies SyncState,
+      } satisfies BackendConnectionState,
     };
     const canonicalProjectMember = {
       ...base.projectMembers[0],
@@ -125,7 +125,7 @@ describe("team backend state loading", () => {
       ],
     }), { status: 200, headers: { "content-type": "application/json" } })));
 
-    const loaded = await loadTeamBusinessState(local);
+    const loaded = await loadTeamData(local);
 
     expect(loaded.projectMembers.map((member) => member.id)).toEqual([canonicalProjectMember.id]);
   });

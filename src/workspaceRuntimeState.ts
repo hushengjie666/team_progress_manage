@@ -1,6 +1,6 @@
 import { ensureTodayPlan } from "./appModel";
-import { fetchWorkspaces } from "./sync";
-import { loadTeamBusinessState } from "./teamBusinessApi";
+import { fetchWorkspaces } from "./teamBackend";
+import { loadTeamData } from "./teamBusinessApi";
 import type { AppState, Workspace } from "./types";
 
 export async function loadStateWithFreshWorkspaces(
@@ -8,7 +8,7 @@ export async function loadStateWithFreshWorkspaces(
   token: string,
   updatedWorkspace?: Workspace,
 ): Promise<AppState> {
-  const workspacePayload = await fetchWorkspaces(source.sync, token);
+  const workspacePayload = await fetchWorkspaces(source.backend, token);
   const nextWithWorkspaces = {
     ...source,
     auth: {
@@ -21,5 +21,5 @@ export async function loadStateWithFreshWorkspaces(
       workspaceMemberships: workspacePayload.memberships,
     },
   };
-  return ensureTodayPlan(await loadTeamBusinessState(nextWithWorkspaces));
+  return ensureTodayPlan(await loadTeamData(nextWithWorkspaces));
 }

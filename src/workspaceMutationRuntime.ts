@@ -1,7 +1,7 @@
 import {
   updateWorkspace as updateWorkspaceDetails,
   updateWorkspaceMembership as updateWorkspaceMembershipDetails,
-} from "./sync";
+} from "./teamBackend";
 import { tokenForState } from "./workspaceAccountMetadata";
 import type { WorkspaceAccountRuntime, WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
 import { loadStateWithFreshWorkspaces } from "./workspaceRuntimeState";
@@ -35,7 +35,7 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
-      const updatedWorkspace = await updateWorkspaceDetails(source.sync, token, workspaceId, {
+      const updatedWorkspace = await updateWorkspaceDetails(source.backend, token, workspaceId, {
         name,
         type: input.type,
         ownerAccountId: input.ownerAccountId,
@@ -62,7 +62,7 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
-      await updateWorkspaceMembershipDetails(source.sync, token, workspaceId, membershipId, input);
+      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, input);
       const loaded = await loadStateWithFreshWorkspaces(source, token);
       setState(loaded);
       setToast(input.status === "disabled" ? "工作区成员已解除绑定" : "工作区成员已更新");

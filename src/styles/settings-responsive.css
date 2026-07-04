@@ -50,7 +50,7 @@
 @media (max-width: 820px) {
   .settings-grid,
   .notification-grid,
-  .sync-grid,
+  .backend-grid,
   .diagnostic-step {
     grid-template-columns: 1fr 1fr;
   }
@@ -59,7 +59,7 @@
     grid-template-columns: 1fr;
   }
 
-  .sync-table {
+  .backend-table {
     grid-template-columns: 1fr auto;
   }
 }
@@ -68,7 +68,7 @@
   .settings-grid,
   .notification-grid,
   .member-card-main,
-  .sync-grid {
+  .backend-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -22,8 +22,8 @@ const signedInState = () => {
       bootstrapped: true,
       message: "已登录",
     },
-    sync: {
-      ...state.sync,
+    backend: {
+      ...state.backend,
       token: "token_cached",
     },
   };
@@ -37,9 +37,9 @@ describe("app boot fallback", () => {
     expect(next.auth.status).toBe("error");
     expect(next.auth.token).toBe("token_cached");
     expect(next.auth.account).toEqual(state.auth.account);
-    expect(next.sync.status).toBe("error");
+    expect(next.backend.status).toBe("error");
     expect(next.auth.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
-    expect(next.sync.message).toBe(next.auth.message);
+    expect(next.backend.message).toBe(next.auth.message);
   });
 
   it("blocks the app when team state cannot be loaded from the backend", () => {
@@ -49,8 +49,8 @@ describe("app boot fallback", () => {
     expect(next.auth.status).toBe("error");
     expect(next.projects).toEqual(state.projects);
     expect(next.tasks).toEqual(state.tasks);
-    expect(next.sync.status).toBe("error");
-    expect(next.sync.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
+    expect(next.backend.status).toBe("error");
+    expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
   });
 
   it("clears cached sign-in when the current workspace can no longer be accessed", () => {
@@ -60,10 +60,10 @@ describe("app boot fallback", () => {
     expect(next.auth.status).toBe("signed_out");
     expect(next.auth.token).toBeUndefined();
     expect(next.auth.account).toBeUndefined();
-    expect(next.sync.token).toBeUndefined();
-    expect(next.sync.status).toBe("idle");
+    expect(next.backend.token).toBeUndefined();
+    expect(next.backend.status).toBe("idle");
     expect(next.auth.message).toBe("登录状态已失效或无权访问当前工作区，请重新登录账号");
-    expect(next.sync.message).toBe(next.auth.message);
+    expect(next.backend.message).toBe(next.auth.message);
   });
 
   it("normalizes stale persisted workspace access errors for login display", () => {

@@ -7,7 +7,7 @@ type AppSettingsRouteProps = Pick<
   | "shellState"
   | "chrome"
   | "settingsActions"
-  | "syncActions"
+  | "backendActions"
   | "workspaceAccountActions"
   | "loadDemoData"
 >;
@@ -17,15 +17,15 @@ export function AppSettingsRoute({
   shellState,
   chrome,
   settingsActions,
-  syncActions,
+  backendActions,
   workspaceAccountActions,
   loadDemoData,
 }: AppSettingsRouteProps) {
   const { state } = view;
   const {
-    syncPassword,
-    setSyncPassword,
-    syncDiagnostic,
+    backendPassword,
+    setBackendPassword,
+    backendDiagnostic,
     settingsSection,
     setSettingsSection,
   } = shellState;
@@ -36,7 +36,7 @@ export function AppSettingsRoute({
       accounts={chrome.platformAccounts}
       settings={state.settings}
       dailyGoal={state.rewardState.dailyGoal}
-      sync={state.sync}
+      backend={state.backend}
       dataSummary={chrome.settingsDataSummary}
       activeSection={settingsSection}
       setActiveSection={setSettingsSection}
@@ -47,14 +47,14 @@ export function AppSettingsRoute({
       disableAccount={workspaceAccountActions.disablePlatformAccount}
       canManageMembers={chrome.canManageMembers}
       askNotificationPermissions={settingsActions.askNotificationPermissions}
-      syncPassword={syncPassword}
-      setSyncPassword={setSyncPassword}
-      updateSyncSetting={syncActions.updateSyncSetting}
-      checkSyncHealth={syncActions.checkSyncHealth}
-      handleSyncLogin={syncActions.handleSyncLogin}
-      handleSyncNow={syncActions.handleSyncNow}
-      runSyncDiagnostics={syncActions.runSyncDiagnostics}
-      syncDiagnostic={syncDiagnostic}
+      backendPassword={backendPassword}
+      setBackendPassword={setBackendPassword}
+      updateBackendSetting={backendActions.updateBackendSetting}
+      checkBackendHealth={backendActions.checkBackendHealth}
+      handleBackendLogin={backendActions.handleBackendLogin}
+      handleBackendRefresh={backendActions.handleBackendRefresh}
+      runBackendDiagnostics={backendActions.runBackendDiagnostics}
+      backendDiagnostic={backendDiagnostic}
       loadDemoData={loadDemoData}
     />
   );

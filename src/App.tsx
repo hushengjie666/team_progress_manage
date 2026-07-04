@@ -23,11 +23,11 @@ export function App() {
     stateRef, reminderSentRef, stopNoiseRef, undoTimerRef, tabRef, selectedTaskIdRef,
   } = appShell;
   const {
-    persistBusinessChanges,
-    commitBusinessState,
+    persistTeamData,
+    commitTeamData,
     workspaceAccountRuntime,
     updateState,
-    syncActions,
+    backendActions,
     authActions,
   } = createAppRootRuntimes(appShell);
 
@@ -43,8 +43,8 @@ export function App() {
     undoTimerRef,
     stopNoiseRef,
     reminderSentRef,
-    persistBusinessChanges,
-    commitBusinessState,
+    persistTeamData,
+    commitTeamData,
     setState,
     setToast,
     setToastVisible,
@@ -85,17 +85,17 @@ export function App() {
     state,
     viewModel: appViewModel,
     updateState,
-    persistBusinessChanges,
+    persistTeamData,
   });
   loadedRuntimesRef.current = loadedRuntimes;
   if (state.auth.status !== "authenticated" || !state.auth.token) {
     return (
       <AppUnauthenticatedGate
         status={state.auth.status}
-        serverUrl={state.sync.serverUrl}
+        serverUrl={state.backend.serverUrl}
         message={state.auth.message}
         suppressAutoLogin={suppressAutoLogin}
-        updateServerUrl={(serverUrl) => syncActions.updateSyncSetting("serverUrl", serverUrl)}
+        updateServerUrl={(serverUrl) => backendActions.updateBackendSetting("serverUrl", serverUrl)}
         checkStatus={authActions.checkAuthStatus}
         login={authActions.handleWorkspaceLogin}
       />
@@ -118,7 +118,7 @@ export function App() {
       focusActions={loadedRuntimes.focusActions}
       projectActions={loadedRuntimes.projectActions}
       settingsActions={loadedRuntimes.settingsActions}
-      syncActions={syncActions}
+      backendActions={backendActions}
       authActions={authActions}
       loadDemoData={loadedRuntimes.loadDemoData}
       runCommand={loadedRuntimes.runCommand}

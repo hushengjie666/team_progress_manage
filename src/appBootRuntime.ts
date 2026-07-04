@@ -2,19 +2,19 @@ import { applyAuthStatusFailure, applyTeamStateLoadFailure } from "./appBoot";
 import { ensureTodayPlan, restoreTimerInState } from "./appModel";
 import { bindAccountToMembers } from "./authModel";
 import { mergeDemoDataIntoState } from "./demoData";
-import { defaultSyncServerUrl } from "./seed";
+import { defaultBackendServerUrl } from "./seed";
 import { loadState } from "./storage";
-import { fetchWorkspaces, getAuthStatus } from "./sync";
-import { shouldUseRemoteOriginForSync } from "./syncModel";
-import { loadTeamBusinessState } from "./teamBusinessApi";
-import type { PersistBusinessChangesOptions } from "./teamStateRuntime";
+import { fetchWorkspaces, getAuthStatus } from "./teamBackend";
+import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
+import { loadTeamData } from "./teamBusinessApi";
+import type { PersistTeamDataOptions } from "./teamStateRuntime";
 import type { Account, AppState, ProjectInvitation, WorkspaceInvitation } from "./types";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountRuntime";
 
-type PersistBusinessChanges = (
+type PersistTeamData = (
   before: AppState,
   after: AppState,
-  options?: PersistBusinessChangesOptions,
+  options?: PersistTeamDataOptions,
 ) => Promise<AppState | undefined>;
 
 export type AppBootResult = {
@@ -26,7 +26,7 @@ export type AppBootResult = {
 };
 
 export type AppBootRuntimeOptions = {
-  persistBusinessChanges: PersistBusinessChanges;
+  persistTeamData: PersistTeamData;
 };
 
 const shouldLoadDemoData = () => {
@@ -38,7 +38,7 @@ const shouldLoadDemoData = () => {
   return shouldLoadDemo;
 };
 
-export async function loadInitialAppState({ persistBusinessChanges }: AppBootRuntimeOptions): Promise<AppBootResult> {
+export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOptions): Promise<AppBootResult> {
   const value = await loadState();
   const shouldLoadDemo = shouldLoadDemoData();
   let next = ensureTodayPlan(restoreTimerInState(value));
@@ -46,18 +46,18 @@ export async function loadInitialAppState({ persistBusinessChanges }: AppBootRun
   let workspaceInvitations: WorkspaceInvitation[] = [];
   let projectInvitations: ProjectInvitation[] = [];
 
-  if (shouldUseRemoteOriginForSync(next.sync.serverUrl)) {
+  if (shouldUseRemoteOriginForBackend(next.backend.serverUrl)) {
     next = {
       ...next,
-      sync: {
-        ...next.sync,
-        serverUrl: defaultSyncServerUrl(),
+      backend: {
+        ...next.backend,
+        serverUrl: defaultBackendServerUrl(),
       },
     };
   }
 
   try {
-    const status = await getAuthStatus(next.sync.serverUrl);
+    const status = await getAuthStatus(next.backend.serverUrl);
     next = {
       ...next,
       auth: {
@@ -75,7 +75,7 @@ export async function loadInitialAppState({ persistBusinessChanges }: AppBootRun
     const token = next.auth.token;
     next = bindAccountToMembers(next, { ...next.auth, status: "authenticated" });
     try {
-      const workspacePayload = await fetchWorkspaces(next.sync, token);
+      const workspacePayload = await fetchWorkspaces(next.backend, token);
       next = {
         ...next,
         auth: {
@@ -88,7 +88,7 @@ export async function loadInitialAppState({ persistBusinessChanges }: AppBootRun
       // Cached workspace metadata is good enough for boot; team state loading is the critical path.
     }
     try {
-      next = await loadTeamBusinessState(next);
+      next = await loadTeamData(next);
     } catch (error) {
       next = applyTeamStateLoadFailure(next, error);
     }
@@ -100,7 +100,7 @@ export async function loadInitialAppState({ persistBusinessChanges }: AppBootRun
 
   if (shouldLoadDemo && next.auth.status === "authenticated" && next.auth.token) {
     const demoState = ensureTodayPlan(mergeDemoDataIntoState(next, next.projects[0]?.id));
-    const saved = await persistBusinessChanges(next, demoState, { applySuccessState: false, refreshAfterSave: true });
+    const saved = await persistTeamData(next, demoState, { applySuccessState: false, refreshAfterSave: true });
     if (!saved) {
       return { platformAccounts, workspaceInvitations, projectInvitations };
     }

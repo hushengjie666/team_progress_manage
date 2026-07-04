@@ -5,7 +5,7 @@ import {
   deleteWorkspaceInvitation,
   inviteProjectMember as sendProjectInvitation,
   inviteWorkspaceMember as sendWorkspaceInvitation,
-} from "./sync";
+} from "./teamBackend";
 import type { ProjectInvitation, ProjectMemberRole, WorkspaceInvitation } from "./types";
 import { tokenForState } from "./workspaceAccountMetadata";
 import type { WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
@@ -40,7 +40,7 @@ export function createWorkspaceInvitationCommands({
       setToast("请输入成员登录账号");
       return;
     }
-    void sendWorkspaceInvitation(source.sync, token, workspaceId, normalizedEmail)
+    void sendWorkspaceInvitation(source.backend, token, workspaceId, normalizedEmail)
       .then((invitation) => {
         setToast(`已向 ${invitation.inviteeEmail} 发送工作区邀请`);
       })
@@ -61,7 +61,7 @@ export function createWorkspaceInvitationCommands({
       setToast("请输入成员登录账号");
       return;
     }
-    void sendProjectInvitation(source.sync, token, {
+    void sendProjectInvitation(source.backend, token, {
       workspaceId: input.workspaceId,
       projectId: input.projectId,
       email: normalizedEmail,
@@ -85,7 +85,7 @@ export function createWorkspaceInvitationCommands({
     void (async () => {
       let invitation: WorkspaceInvitation;
       try {
-        invitation = await acceptWorkspaceInvitation(source.sync, token, invitationId);
+        invitation = await acceptWorkspaceInvitation(source.backend, token, invitationId);
       } catch (error) {
         setToast(errorMessage(error, "工作区邀请处理失败"));
         return;
@@ -112,7 +112,7 @@ export function createWorkspaceInvitationCommands({
     void (async () => {
       let invitation: ProjectInvitation;
       try {
-        invitation = await acceptProjectInvitation(source.sync, token, invitationId);
+        invitation = await acceptProjectInvitation(source.backend, token, invitationId);
       } catch (error) {
         setToast(errorMessage(error, "项目邀请处理失败"));
         return;
@@ -137,7 +137,7 @@ export function createWorkspaceInvitationCommands({
     }
     void (async () => {
       try {
-        await deleteWorkspaceInvitation(source.sync, token, invitationId);
+        await deleteWorkspaceInvitation(source.backend, token, invitationId);
       } catch (error) {
         setToast(errorMessage(error, "工作区邀请删除失败"));
         return;
@@ -160,7 +160,7 @@ export function createWorkspaceInvitationCommands({
     }
     void (async () => {
       try {
-        await deleteProjectInvitation(source.sync, token, invitationId);
+        await deleteProjectInvitation(source.backend, token, invitationId);
       } catch (error) {
         setToast(errorMessage(error, "项目邀请删除失败"));
         return;

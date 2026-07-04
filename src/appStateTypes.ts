@@ -28,9 +28,9 @@ import type {
   Settings,
 } from "./appSettingsTypes";
 
-export type SyncStatus = "idle" | "authenticating" | "syncing" | "synced" | "error";
+export type BackendConnectionStatus = "idle" | "authenticating" | "loading" | "saving" | "ready" | "error";
 
-export interface SyncServerConfig {
+export interface BackendServerConfig {
   addr: string;
   mysqlDsn: string;
   username: string;
@@ -38,39 +38,30 @@ export interface SyncServerConfig {
   secret: string;
 }
 
-export interface SyncDiagnosticStep {
-  id: "health" | "login" | "push" | "pull";
+export interface BackendDiagnosticStep {
+  id: "health" | "login" | "save" | "load";
   label: string;
   ok: boolean;
   latencyMs?: number;
   detail: string;
 }
 
-export interface SyncDiagnosticResult {
+export interface BackendDiagnosticResult {
   checkedAt: string;
   serverUrl: string;
-  remoteRevision?: number;
   lastError?: string;
-  steps: SyncDiagnosticStep[];
+  steps: BackendDiagnosticStep[];
 }
 
-export interface SyncTombstone {
-  entity: string;
-  id: string;
-  workspaceId?: string;
-  deletedAt: string;
-}
-
-export interface SyncState {
+export interface BackendConnectionState {
   serverUrl: string;
   username: string;
   deviceId: string;
   token?: string;
-  lastPulledRevision: number;
-  lastSyncedAt?: string;
-  status: SyncStatus;
+  lastLoadedAt?: string;
+  lastSavedAt?: string;
+  status: BackendConnectionStatus;
   message: string;
-  tombstones: SyncTombstone[];
 }
 
 export interface AuthState {
@@ -99,7 +90,7 @@ export interface AppState {
   executionSignals: ExecutionSignal[];
   interruptions: Interruption[];
   rewardState: RewardState;
-  sync: SyncState;
+  backend: BackendConnectionState;
   taskTemplates: TaskTemplate[];
   templateInstances: TemplateInstance[];
   activeTimer?: ActiveTimer;

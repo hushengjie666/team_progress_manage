@@ -2,8 +2,8 @@ import type {
   Account,
   ProjectMember,
   Settings,
-  SyncDiagnosticResult,
-  SyncState,
+  BackendDiagnosticResult,
+  BackendConnectionState,
 } from "../../types";
 import type { SettingsDataSummary, SettingsSection } from "./settingsTypes";
 
@@ -12,7 +12,7 @@ export type SettingsViewProps = {
   accounts: Account[];
   settings: Settings;
   dailyGoal: number;
-  sync: SyncState;
+  backend: BackendConnectionState;
   dataSummary: SettingsDataSummary;
   activeSection: SettingsSection;
   setActiveSection: (section: SettingsSection) => void;
@@ -23,13 +23,13 @@ export type SettingsViewProps = {
   disableAccount: (accountId: string) => void;
   canManageMembers?: boolean;
   askNotificationPermissions: () => Promise<void>;
-  syncPassword: string;
-  setSyncPassword: (value: string) => void;
-  updateSyncSetting: <K extends keyof SyncState>(key: K, value: SyncState[K]) => void;
-  checkSyncHealth: () => Promise<void>;
-  handleSyncLogin: () => Promise<void>;
-  handleSyncNow: () => Promise<void>;
-  runSyncDiagnostics: () => Promise<void>;
-  syncDiagnostic: SyncDiagnosticResult | null;
+  backendPassword: string;
+  setBackendPassword: (value: string) => void;
+  updateBackendSetting: <K extends keyof BackendConnectionState>(key: K, value: BackendConnectionState[K]) => void;
+  checkBackendHealth: () => Promise<void>;
+  handleBackendLogin: () => Promise<void>;
+  handleBackendRefresh: () => Promise<void>;
+  runBackendDiagnostics: () => Promise<void>;
+  backendDiagnostic: BackendDiagnosticResult | null;
   loadDemoData: () => void;
 };

@@ -87,8 +87,8 @@ export const authenticatedState = (): AppState => {
         updatedAt: now,
       },
     },
-    sync: {
-      ...base.sync,
+    backend: {
+      ...base.backend,
       token: "e2e-token",
       serverUrl: MOCK_SERVER,
       status: "idle",

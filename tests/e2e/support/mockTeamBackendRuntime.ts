@@ -27,7 +27,6 @@ export type MockTeamBackendRuntime = {
   projectInvitationAccepted: boolean;
   workspaceStates: Record<string, AppState>;
   activeWorkspaceId: string;
-  revision: number;
 };
 
 export const createMockTeamBackendRuntime = (
@@ -43,5 +42,4 @@ export const createMockTeamBackendRuntime = (
   projectInvitationAccepted: false,
   workspaceStates: createMockWorkspaceStates(initialState),
   activeWorkspaceId: initialState.auth.workspace?.id ?? "workspace_e2e",
-  revision: 1,
 });

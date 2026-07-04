@@ -14,7 +14,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 1421",
     "verify:fast": "npm test -- --run && npm run build",
     "verify:e2e": "npm run test:e2e",
-    "verify:backend": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go test ./...",
+    "verify:backend": "cd team-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go test ./...",
     "deploy:team": "bash scripts/package-timemanage-team.sh",
     "release:team:create-tag": "bash scripts/create-timemanage-release-tag.sh",
     "release:team:tag": "bash scripts/package-timemanage-team-from-tag.sh",
@@ -23,9 +23,9 @@
     "test:e2e": "playwright test",
     "mcp:build": "esbuild mcp-server/src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=mcp-server/dist/index.js",
     "mcp:server": "npm run mcp:build --silent && node mcp-server/dist/index.js",
-    "backend:build": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync .",
-    "backend:build:windows": "cd sync-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-sync.exe .",
-    "backend:server": "./sync-server/bin/timemanage-sync serve --config sync-server/config.local.json"
+    "backend:build": "cd team-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-team .",
+    "backend:build:windows": "cd team-server && PATH=/Volumes/MacSSD/env/Go/bin:$PATH GOOS=windows GOARCH=amd64 go build -trimpath -ldflags=\"-s -w\" -o bin/timemanage-team.exe .",
+    "backend:server": "./team-server/bin/timemanage-team serve --config team-server/backend.local.json"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

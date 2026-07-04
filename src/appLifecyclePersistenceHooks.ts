@@ -54,7 +54,7 @@ export function useUndoTimerCleanup({
 }
 
 export function useInitialAppLoad({
-  persistBusinessChanges,
+  persistTeamData,
   setState,
   setToast,
   setLoaded,
@@ -63,7 +63,7 @@ export function useInitialAppLoad({
   setProjectInvitations,
 }: Pick<
   AppLifecycleHooksOptions,
-  | "persistBusinessChanges"
+  | "persistTeamData"
   | "setState"
   | "setToast"
   | "setLoaded"
@@ -72,7 +72,7 @@ export function useInitialAppLoad({
   | "setProjectInvitations"
 >) {
   useEffect(() => {
-    loadInitialAppState({ persistBusinessChanges })
+    loadInitialAppState({ persistTeamData })
       .then((result) => {
         setPlatformAccounts(result.platformAccounts);
         setWorkspaceInvitations(result.workspaceInvitations);

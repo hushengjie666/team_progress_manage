@@ -2,7 +2,7 @@ import { createAppLoadedActionRuntimes } from "./appLoadedActionRuntimes";
 import { createAppLoadedSupportRuntimes } from "./appLoadedSupportRuntimes";
 import type { useAppShellState } from "./appShellState";
 import type { useAppViewModelHooks } from "./appViewModelHooks";
-import type { TeamBusinessRuntime } from "./teamStateRuntime";
+import type { TeamDataRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
@@ -12,7 +12,7 @@ type AppLoadedRuntimesOptions = {
   state: AppState;
   viewModel: ReturnType<typeof useAppViewModelHooks>;
   updateState: UpdateState;
-  persistBusinessChanges: TeamBusinessRuntime["persistBusinessChanges"];
+  persistTeamData: TeamDataRuntime["persistTeamData"];
 };
 
 export function createAppLoadedRuntimes({
@@ -20,7 +20,7 @@ export function createAppLoadedRuntimes({
   state,
   viewModel,
   updateState,
-  persistBusinessChanges,
+  persistTeamData,
 }: AppLoadedRuntimesOptions) {
   const currentProjectId = state.projects[0]?.id ?? "project_starter";
   const {
@@ -44,7 +44,7 @@ export function createAppLoadedRuntimes({
     state,
     viewModel,
     updateState,
-    persistBusinessChanges,
+    persistTeamData,
     currentProjectId,
     focusActions,
     projectActions,

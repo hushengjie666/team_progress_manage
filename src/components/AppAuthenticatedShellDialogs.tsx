@@ -83,7 +83,7 @@ export function AppAuthenticatedShellDialogs({
       <ConfirmDialog
         open={Boolean(pendingDeleteTask)}
         title="删除任务"
-        body={pendingDeleteTask ? `确认删除「${pendingDeleteTask.title}」吗？删除后会从工作队列和同步队列中移除。` : ""}
+        body={pendingDeleteTask ? `确认删除「${pendingDeleteTask.title}」吗？删除后会从工作队列和团队后台中移除。` : ""}
         confirmLabel="删除"
         danger
         onCancel={() => setPendingDeleteTask(null)}

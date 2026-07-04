@@ -1,4 +1,4 @@
 export {
-  loadTeamBusinessState,
-  saveTeamBusinessChanges,
+  loadTeamData,
+  saveTeamDataSnapshot,
 } from "./teamBusinessApi";

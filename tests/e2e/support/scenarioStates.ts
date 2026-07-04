@@ -158,8 +158,8 @@ export const workspaceMemberState = () => {
       workspace: sharedWorkspace,
       membership,
     },
-    sync: {
-      ...state.sync,
+    backend: {
+      ...state.backend,
       username: "wangshuo",
     },
   };

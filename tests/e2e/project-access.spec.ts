@@ -26,11 +26,11 @@ test("shows inherited workspace members in project member management", async ({ 
   await expect(wangshuoRow.getByLabel("项目负责人")).not.toBeChecked();
 
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/business-changes` && request.method() === "POST",
+    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   await wangshuoRow.getByLabel("项目负责人").check();
-  const requestBody = (await saveRequest).postDataJSON() as { changes: BusinessRow[] };
-  expect(requestBody.changes).toEqual(
+  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
+  expect(requestBody.rows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "project_member",

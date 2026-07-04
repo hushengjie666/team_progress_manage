@@ -1,29 +1,29 @@
 import { createInitialState } from "./seed";
-import type { AppState, AuthState, Settings, SyncState } from "./types";
+import type { AppState, AuthState, Settings, BackendConnectionState } from "./types";
 
-const STORAGE_KEY = "timemanage.app_state.v3";
+const STORAGE_KEY = "timemanage.app_state.v4";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === "object" && !Array.isArray(value));
 
 type StoredAppRuntime = {
-  version: 3;
+  version: 4;
   settings: Settings;
   auth: Partial<AuthState>;
-  sync: Pick<SyncState, "serverUrl" | "username" | "deviceId" | "token">;
+  backend: Pick<BackendConnectionState, "serverUrl" | "username" | "deviceId" | "token">;
   updatedAt: string;
 };
 
 export const isCurrentAppStatePayload = (payload: unknown): payload is StoredAppRuntime => {
   if (!isRecord(payload)) return false;
 
-  const sync = payload.sync;
+  const backend = payload.backend;
 
   return (
-    payload.version === 3 &&
+    payload.version === 4 &&
     isRecord(payload.settings) &&
     isRecord(payload.auth) &&
-    isRecord(sync) &&
+    isRecord(backend) &&
     typeof payload.updatedAt === "string"
   );
 };
@@ -43,13 +43,12 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
       workspaces: undefined,
       workspaceMemberships: undefined,
     },
-    sync: {
-      ...initial.sync,
-      serverUrl: payload.sync.serverUrl,
-      username: payload.sync.username,
-      deviceId: payload.sync.deviceId,
-      token: payload.sync.token,
-      tombstones: [],
+    backend: {
+      ...initial.backend,
+      serverUrl: payload.backend.serverUrl,
+      username: payload.backend.username,
+      deviceId: payload.backend.deviceId,
+      token: payload.backend.token,
     },
     updatedAt: payload.updatedAt,
   };
@@ -69,7 +68,7 @@ export async function loadState(): Promise<AppState> {
 
 export async function saveState(state: AppState): Promise<void> {
   const payload: StoredAppRuntime = {
-    version: 3,
+    version: 4,
     settings: state.settings,
     auth: {
       status: state.auth.status,
@@ -81,11 +80,11 @@ export async function saveState(state: AppState): Promise<void> {
       bootstrapped: state.auth.bootstrapped,
       message: state.auth.message,
     },
-    sync: {
-      serverUrl: state.sync.serverUrl,
-      username: state.sync.username,
-      deviceId: state.sync.deviceId,
-      token: state.sync.token,
+    backend: {
+      serverUrl: state.backend.serverUrl,
+      username: state.backend.username,
+      deviceId: state.backend.deviceId,
+      token: state.backend.token,
     },
     updatedAt: new Date().toISOString(),
   };
