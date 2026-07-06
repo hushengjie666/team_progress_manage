@@ -4,12 +4,12 @@ import { uid } from "./seed";
 import { createTaskFromDraft, moveCommittedTaskInState } from "./appTaskState";
 import {
   createDailyPlanForDate,
-  currentAccountDailyPlanForDate,
   initialDraft,
   nowIso,
   removeTaskFromTodayInState,
   today,
 } from "./appModel";
+import { currentAccountDailyPlanForWorkspaceDate, currentDailyPlanWorkspaceId, workspaceIdForTask } from "./dailyPlanScope";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 import type { DailyPlan } from "./types";
 
@@ -82,9 +82,11 @@ export function createAppTaskCreationRuntime({
       return;
     }
     updateState((value) => {
-      const existing = currentAccountDailyPlanForDate(value, date);
+      const task = value.tasks.find((item) => item.id === taskId);
+      const workspaceId = task ? workspaceIdForTask(value, task) : currentDailyPlanWorkspaceId(value);
+      const existing = currentAccountDailyPlanForWorkspaceDate(value, workspaceId, date);
       const plan: DailyPlan = existing ?? {
-        ...createDailyPlanForDate(value, date, timestamp),
+        ...createDailyPlanForDate(value, date, timestamp, workspaceId),
         capacityPomodoros: value.rewardState.dailyGoal,
         recommendedCapacityPomodoros: value.rewardState.dailyGoal,
         suggestedCapacityPomodoros: value.rewardState.dailyGoal,

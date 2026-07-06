@@ -3,17 +3,23 @@ import { todayKey, uid } from "./seed";
 import { addProjectMemberToState } from "./projectMemberState";
 import type { AppState, DailyPlan, Task } from "./types";
 import { createDailyPlanForDate } from "./appTodayPlan";
-import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
+import { currentAccountDailyPlanForWorkspaceDate, currentDailyPlanWorkspaceId, workspaceIdForTask } from "./dailyPlanScope";
 
-export const ensurePlanInState = (state: AppState, date: string, timestamp: string): { state: AppState; plan: DailyPlan } => {
-  const existing = currentAccountDailyPlanForDate(state, date);
+export const ensurePlanInState = (
+  state: AppState,
+  date: string,
+  timestamp: string,
+  workspaceId = currentDailyPlanWorkspaceId(state),
+): { state: AppState; plan: DailyPlan } => {
+  const existing = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date);
   if (existing) return { state, plan: existing };
 
-  const plan = createDailyPlanForDate(state, date, timestamp);
+  const plan = createDailyPlanForDate(state, date, timestamp, workspaceId);
   return { state: { ...state, dailyPlans: [plan, ...state.dailyPlans], updatedAt: timestamp }, plan };
 };
 
-export const ensureTodayPlanInState = (state: AppState, timestamp: string) => ensurePlanInState(state, todayKey(), timestamp);
+export const ensureTodayPlanInState = (state: AppState, timestamp: string, workspaceId = currentDailyPlanWorkspaceId(state)) =>
+  ensurePlanInState(state, todayKey(), timestamp, workspaceId);
 
 export const currentProjectMemberIdForTask = (state: AppState, task: Task) => {
   return resolveMemberIdForProject(state, task.projectId);
@@ -26,7 +32,7 @@ const currentWorkspaceMembershipForTask = (state: AppState, task: Task) => {
   const account = state.auth.account;
   if (!account) return undefined;
   const project = state.projects.find((item) => item.id === task.projectId);
-  const workspaceId = project?.workspaceId ?? task.workspaceId ?? state.auth.workspace?.id;
+  const workspaceId = project?.workspaceId ?? task.workspaceId ?? currentDailyPlanWorkspaceId(state);
   return state.auth.workspaceMemberships?.find(
     (membership) =>
       membership.status === "active" &&
@@ -75,7 +81,8 @@ export const addTaskToTodayInState = (state: AppState, taskId: string, timestamp
   const stateWithMember = taskHasAssignee(task)
     ? state
     : ensureCurrentProjectMemberForTask(state, task, timestamp).state;
-  const { state: withPlan, plan } = ensureTodayPlanInState(stateWithMember, timestamp);
+  const taskForPlan = stateWithMember.tasks.find((item) => item.id === taskId) ?? task;
+  const { state: withPlan, plan } = ensureTodayPlanInState(stateWithMember, timestamp, workspaceIdForTask(stateWithMember, taskForPlan));
   const committedTaskIds = Array.from(new Set([...plan.committedTaskIds, taskId]));
   return {
     ...withPlan,

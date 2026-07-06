@@ -94,6 +94,7 @@ func (a *app) handleTeamDataSave(w http.ResponseWriter, r *http.Request, auth au
 		if !json.Valid(row.Payload) || len(row.Payload) == 0 {
 			row.Payload = json.RawMessage(`{}`)
 		}
+		row.Payload = businessPayloadWithWorkspaceID(row.Entity, row.Payload, row.WorkspaceID)
 		nextRows = append(nextRows, row)
 		nextKeys[businessRowKey(row)] = true
 		if row.Entity == "task" {
@@ -178,6 +179,30 @@ func businessWorkspaceIDForRow(auth authContext, row businessRow) string {
 		return strings.TrimSpace(row.WorkspaceID)
 	}
 	return auth.WorkspaceID
+}
+
+func businessPayloadWithWorkspaceID(entity string, payload json.RawMessage, workspaceID string) json.RawMessage {
+	if strings.TrimSpace(workspaceID) == "" {
+		return payload
+	}
+	switch entity {
+	case "project", "project_member", "task", "daily_plan", "interruption":
+	default:
+		return payload
+	}
+	var value map[string]any
+	if err := json.Unmarshal(payload, &value); err != nil {
+		return payload
+	}
+	if current, ok := value["workspaceId"].(string); ok && strings.TrimSpace(current) == strings.TrimSpace(workspaceID) {
+		return payload
+	}
+	value["workspaceId"] = strings.TrimSpace(workspaceID)
+	next, err := json.Marshal(value)
+	if err != nil {
+		return payload
+	}
+	return next
 }
 
 func businessRowKey(row businessRow) string {

@@ -2,10 +2,11 @@ import { resolveMemberIdForProject } from "./memberIdentity";
 import type { AppState, Task } from "./types";
 import {
   emptyTaskDefaults,
-  getTodayPlan,
   parseDateTimeLocal,
+  today,
   type TaskDraft,
 } from "./appModel";
+import { currentAccountDailyPlansForDate } from "./dailyPlanScope";
 
 export function createTaskFromDraft({
   state,
@@ -74,7 +75,8 @@ export function updateTaskInState(
 }
 
 export function moveCommittedTaskInState(state: AppState, taskId: string, direction: -1 | 1, timestamp: string): AppState {
-  const plan = getTodayPlan(state);
+  const plan = currentAccountDailyPlansForDate(state, today()).find((item) => item.committedTaskIds.includes(taskId));
+  if (!plan) return state;
   const index = plan.committedTaskIds.indexOf(taskId);
   const nextIndex = index + direction;
   if (index < 0 || nextIndex < 0 || nextIndex >= plan.committedTaskIds.length) return state;

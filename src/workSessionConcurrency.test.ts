@@ -78,4 +78,37 @@ describe("work session concurrency", () => {
       endedAt: "2026-05-10T08:05:00.000Z",
     });
   });
+
+  it("recovers when an active work session exists without an active timer", () => {
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-05-10T08:00:00.000Z",
+      "session_orphaned",
+    );
+    const orphaned = { ...started, activeTimer: undefined };
+
+    const recovered = startTimerInState(
+      orphaned,
+      "focus",
+      taskId,
+      "2026-05-10T08:05:00.000Z",
+      "session_recovered",
+    );
+
+    expect(recovered.activeTimer).toMatchObject({
+      sessionId: "session_recovered",
+      taskId,
+      mode: "focus",
+      isRunning: true,
+    });
+    expect(recovered.workSessions.filter((session) => session.status === "active")).toHaveLength(1);
+    expect(recovered.workSessions.find((session) => session.focusSessionId === "session_orphaned")).toMatchObject({
+      status: "ended",
+      endedAt: "2026-05-10T08:05:00.000Z",
+    });
+  });
 });

@@ -2,19 +2,17 @@ import { resolveMemberIdForProject } from "./memberIdentity";
 import { uid } from "./seed";
 import type { AppState, WorkSession } from "./types";
 import { createExecutionSignal } from "./workSessionTransitions";
-import { claimTodayPlanTasksForCurrentMemberInState } from "./workSessionTodayPlan";
+import { claimTodayPlanTasksForCurrentMemberInState, ensurePlanInState } from "./workSessionTodayPlan";
 import { nowIso, today } from "./appClock";
-import { getTodayPlan } from "./appTodayPlan";
-import { currentAccountDailyPlanForDate } from "./dailyPlanScope";
+import { currentAccountDailyPlansForDate, dailyPlanBelongsToCurrentAccount, workspaceIdForTask } from "./dailyPlanScope";
 import { endActiveWorkSessionsForTaskInState } from "./appTimerWorkSession";
 
 export const removeTaskFromTodayInState = (state: AppState, taskId: string, timestamp: string): AppState => {
-  const plan = getTodayPlan(state);
   const endedState = endActiveWorkSessionsForTaskInState(state, taskId, timestamp);
   return {
     ...endedState,
     dailyPlans: endedState.dailyPlans.map((item) =>
-      item.id === plan.id
+      item.date === today() && dailyPlanBelongsToCurrentAccount(endedState, item) && item.committedTaskIds.includes(taskId)
         ? {
             ...item,
             committedTaskIds: item.committedTaskIds.filter((id) => id !== taskId),
@@ -30,6 +28,12 @@ export const removeTaskFromTodayInState = (state: AppState, taskId: string, time
     updatedAt: timestamp,
   };
 };
+
+const claimCurrentAccountTodayPlans = (state: AppState, date: string, timestamp: string) =>
+  currentAccountDailyPlansForDate(state, date).reduce(
+    (current, plan) => claimTodayPlanTasksForCurrentMemberInState(current, plan, timestamp),
+    state,
+  );
 
 export const ensureTodayPlan = (state: AppState): AppState => {
   const todayDate = today();
@@ -83,39 +87,28 @@ export const ensureTodayPlan = (state: AppState): AppState => {
         (task) => task.id === taskId && task.status !== "completed" && task.status !== "split" && task.status !== "archived",
       ),
     );
-  const existing = currentAccountDailyPlanForDate(normalizedState, todayDate);
-  if (!existing) {
-    const plan = getTodayPlan(normalizedState);
-    const withPlan = {
-      ...normalizedState,
-      dailyPlans: [
-        ...normalizedState.dailyPlans,
-        {
-          ...plan,
-          committedTaskIds: Array.from(new Set([...plan.committedTaskIds, ...activeTaskIds])),
-        },
-      ],
-    };
-    const createdPlan = withPlan.dailyPlans.find((item) => item.id === plan.id);
-    return createdPlan ? claimTodayPlanTasksForCurrentMemberInState(withPlan, createdPlan, timestamp) : withPlan;
+  let withActiveTasks = normalizedState;
+  for (const taskId of activeTaskIds) {
+    const task = withActiveTasks.tasks.find((item) => item.id === taskId);
+    const { state: withPlan, plan } = ensurePlanInState(withActiveTasks, todayDate, timestamp, task ? workspaceIdForTask(withActiveTasks, task) : undefined);
+    withActiveTasks = plan.committedTaskIds.includes(taskId)
+      ? withPlan
+      : {
+          ...withPlan,
+          dailyPlans: withPlan.dailyPlans.map((item) =>
+            item.id === plan.id
+              ? {
+                  ...item,
+                  committedTaskIds: Array.from(new Set([...item.committedTaskIds, taskId])),
+                  updatedAt: timestamp,
+                }
+              : item,
+          ),
+          updatedAt: timestamp,
+        };
   }
-  const missingActiveTaskIds = activeTaskIds.filter((taskId) => !existing.committedTaskIds.includes(taskId));
-  if (missingActiveTaskIds.length === 0) {
-    return existing ? claimTodayPlanTasksForCurrentMemberInState(normalizedState, existing, timestamp) : normalizedState;
+  if (currentAccountDailyPlansForDate(withActiveTasks, todayDate).length === 0) {
+    withActiveTasks = ensurePlanInState(withActiveTasks, todayDate, timestamp).state;
   }
-  const withActiveTasks = {
-    ...normalizedState,
-    dailyPlans: normalizedState.dailyPlans.map((plan) =>
-      plan.id === existing.id
-        ? {
-            ...plan,
-            committedTaskIds: Array.from(new Set([...plan.committedTaskIds, ...missingActiveTaskIds])),
-            updatedAt: timestamp,
-          }
-        : plan,
-    ),
-    updatedAt: timestamp,
-  };
-  const repairedPlan = withActiveTasks.dailyPlans.find((plan) => plan.id === existing.id);
-  return repairedPlan ? claimTodayPlanTasksForCurrentMemberInState(withActiveTasks, repairedPlan, timestamp) : withActiveTasks;
+  return claimCurrentAccountTodayPlans(withActiveTasks, todayDate, timestamp);
 };

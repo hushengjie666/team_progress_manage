@@ -41,19 +41,37 @@ export const runLoginDiagnosticStep = async (
 
   try {
     const loginResult = await timed(() => loginToWorkspace(workingState.backend, workingState.backend.username, password));
+    const session = loginResult.result;
+    const workspaceMemberships = session.membership
+      ? [
+        session.membership,
+        ...(workingState.auth.workspaceMemberships ?? []).filter(
+          (membership) =>
+            membership.id !== session.membership?.id &&
+            (
+              membership.workspaceId !== session.membership?.workspaceId ||
+              membership.accountId !== session.membership?.accountId
+            ),
+        ),
+      ]
+      : workingState.auth.workspaceMemberships;
     return {
       state: {
         ...workingState,
         auth: {
+          ...workingState.auth,
           status: "authenticated",
-          token: loginResult.result.token,
-          expiresAt: loginResult.result.expiresAt,
-          account: loginResult.result.account,
-          workspace: loginResult.result.workspace,
+          token: session.token,
+          expiresAt: session.expiresAt,
+          account: session.account,
+          workspace: session.workspace,
+          membership: session.membership,
+          workspaces: session.workspaces,
+          workspaceMemberships,
           bootstrapped: true,
           message: "诊断登录成功",
         },
-        backend: { ...workingState.backend, token: loginResult.result.token, username: loginResult.result.account.email },
+        backend: { ...workingState.backend, token: session.token, username: session.account.email },
       },
       step: { id: "login", label: "登录", ok: true, latencyMs: loginResult.latencyMs, detail: "账号可登录，Token 已刷新。" },
     };

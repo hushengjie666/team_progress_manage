@@ -50,11 +50,17 @@ export {
   getTodayPlan,
 } from "./appTodayPlan";
 export {
+  combinedCurrentAccountDailyPlanForDate,
+  currentAccountDailyPlanForTaskDate,
   currentAccountDailyPlanForDate,
+  currentAccountDailyPlanForWorkspaceDate,
+  currentAccountDailyPlansForDate,
   currentDailyPlanOwnerAccountId,
+  currentDailyPlanWorkspaceId,
   dailyPlanBelongsToCurrentAccount,
   dailyPlanIdForDate,
   dailyPlansForCurrentAccount,
+  workspaceIdForTask,
 } from "./dailyPlanScope";
 export {
   ensureTodayPlan,

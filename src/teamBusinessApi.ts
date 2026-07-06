@@ -28,13 +28,13 @@ export async function saveTeamDataSnapshot(backend: BackendConnectionState, toke
     headers: authHeaders(token),
     body: JSON.stringify({ rows: businessRowsFromState(state) }),
   });
-  return mergeBusinessRowsIntoState({
+  return preserveLocalActiveRuntime(mergeBusinessRowsIntoState({
     ...state,
     backend: {
       ...state.backend,
       lastSavedAt: savedAt,
     },
-  }, payload.rows);
+  }, payload.rows), state);
 }
 
 export const applyTeamBusinessFailure = (state: AppState, error: unknown) =>

@@ -1,14 +1,15 @@
 import { completedFocusSessions } from "./domain";
 import { resolveCurrentMember } from "./memberIdentity";
-import { uid } from "./seed";
+import { todayKey, uid } from "./seed";
 import type { AppState, FocusSession, SessionMode, WorkSession } from "./types";
 import {
   activeWorkSessionForExecutor,
   claimTaskForCurrentMemberIfUnassigned,
   createExecutionSignal,
+  ensurePlanInState,
 } from "./workSessionTransitions";
-import { getTodayPlan } from "./appTodayPlan";
 import { activeWorkSession, endWorkSessionForSwitch } from "./appTimerWorkSession";
+import { workspaceIdForTask } from "./dailyPlanScope";
 
 export const startTimerInState = (
   state: AppState,
@@ -45,7 +46,7 @@ export const startTimerInState = (
     ? timerWorkSession
     : activeWorkSessionForExecutor(state, executorMemberId);
   if (mode === "focus" && taskId && currentWorkSession) {
-    if (currentWorkSession.taskId === taskId) return state;
+    if (currentWorkSession.taskId === taskId && state.activeTimer?.workSessionId === currentWorkSession.id) return state;
     return startTimerInState(
       endWorkSessionForSwitch(state, currentWorkSession, timestamp, taskId),
       mode,
@@ -67,27 +68,28 @@ export const startTimerInState = (
         updatedAt: timestamp,
       }
     : undefined;
+  const stateWithPlan = mode === "focus" && task
+    ? ensurePlanInState(state, todayKey(), timestamp, workspaceIdForTask(state, task)).state
+    : state;
   const nextDailyPlans = mode === "focus" && taskId
     ? (() => {
-        const plan = getTodayPlan(state);
+        const plan = ensurePlanInState(stateWithPlan, todayKey(), timestamp, task ? workspaceIdForTask(stateWithPlan, task) : undefined).plan;
         const nextPlan = {
           ...plan,
           committedTaskIds: Array.from(new Set([...plan.committedTaskIds, taskId])),
           updatedAt: timestamp,
         };
-        return state.dailyPlans.some((item) => item.id === nextPlan.id)
-          ? state.dailyPlans.map((item) => (item.id === nextPlan.id ? nextPlan : item))
-          : [...state.dailyPlans, nextPlan];
+        return stateWithPlan.dailyPlans.map((item) => (item.id === nextPlan.id ? nextPlan : item));
       })()
-    : state.dailyPlans;
+    : stateWithPlan.dailyPlans;
   return {
-    ...state,
+    ...stateWithPlan,
     dailyPlans: nextDailyPlans,
-    focusSessions: [session, ...state.focusSessions],
-    workSessions: workSession ? [workSession, ...state.workSessions] : state.workSessions,
+    focusSessions: [session, ...stateWithPlan.focusSessions],
+    workSessions: workSession ? [workSession, ...stateWithPlan.workSessions] : stateWithPlan.workSessions,
     executionSignals: workSession
-      ? [createExecutionSignal(workSession, "work_started", timestamp, { mode }), ...state.executionSignals]
-      : state.executionSignals,
+      ? [createExecutionSignal(workSession, "work_started", timestamp, { mode }), ...stateWithPlan.executionSignals]
+      : stateWithPlan.executionSignals,
     activeTimer: {
       sessionId: session.id,
       taskId,
@@ -99,20 +101,20 @@ export const startTimerInState = (
       startedAt: timestamp,
       plannedEndAt: new Date(new Date(timestamp).getTime() + session.duration * 1000).toISOString(),
       totalPausedSeconds: 0,
-      cycleIndex: completedFocusSessions(state).length + (mode === "focus" ? 1 : 0),
+      cycleIndex: completedFocusSessions(stateWithPlan).length + (mode === "focus" ? 1 : 0),
     },
     tasks: taskId
-      ? state.tasks.map((task) =>
+      ? stateWithPlan.tasks.map((task) =>
           task.id === taskId
             ? {
                 ...task,
-                primaryExecutorMemberId: claimTaskForCurrentMemberIfUnassigned(state, task),
+                primaryExecutorMemberId: claimTaskForCurrentMemberIfUnassigned(stateWithPlan, task),
                 status: "in_progress" as const,
                 updatedAt: timestamp,
               }
             : task,
         )
-      : state.tasks,
+      : stateWithPlan.tasks,
     updatedAt: timestamp,
   };
 };

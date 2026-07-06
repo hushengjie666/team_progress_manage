@@ -76,21 +76,27 @@ export function businessRowsFromState(state: AppState): BusinessRow[] {
       updated_at: member.updatedAt,
       payload: member,
     })),
-    ...state.tasks.map((task) => ({
-      workspace_id: workspace.workspaceIdForPayload(task, workspace.projectWorkspaceId(task.projectId) ?? currentWorkspaceId),
-      entity: "task" as const,
-      id: task.id,
-      updated_at: task.updatedAt,
-      payload: task,
-    })),
-    ...state.dailyPlans.map((plan) => ({
-      workspace_id: workspace.workspaceIdForPayload(plan, currentWorkspaceId),
-      account_id: plan.ownerAccountId ?? ownerAccountId,
-      entity: "daily_plan" as const,
-      id: plan.id,
-      updated_at: plan.updatedAt,
-      payload: plan,
-    })),
+    ...state.tasks.map((task) => {
+      const workspaceId = workspace.projectWorkspaceId(task.projectId) ?? workspace.workspaceIdForPayload(task, currentWorkspaceId);
+      return {
+        workspace_id: workspaceId,
+        entity: "task" as const,
+        id: task.id,
+        updated_at: task.updatedAt,
+        payload: workspaceId && task.workspaceId !== workspaceId ? { ...task, workspaceId } : task,
+      };
+    }),
+    ...state.dailyPlans.map((plan) => {
+      const workspaceId = workspace.workspaceIdForPayload(plan, currentWorkspaceId);
+      return {
+        workspace_id: workspaceId,
+        account_id: plan.ownerAccountId ?? ownerAccountId,
+        entity: "daily_plan" as const,
+        id: plan.id,
+        updated_at: plan.updatedAt,
+        payload: workspaceId && plan.workspaceId !== workspaceId ? { ...plan, workspaceId } : plan,
+      };
+    }),
     ...state.focusSessions.map((session) => ({
       workspace_id: workspace.workspaceIdForPayload(
         session,

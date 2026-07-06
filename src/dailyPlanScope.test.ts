@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { getTodayPlan } from "./appModel";
-import { alignDailyPlanIdentity, currentAccountDailyPlanForDate } from "./dailyPlanScope";
+import {
+  alignDailyPlanIdentity,
+  currentAccountDailyPlanForDate,
+  currentAccountDailyPlanForWorkspaceDate,
+} from "./dailyPlanScope";
 import { todayKey } from "./seed";
 import { createInitialState } from "./test/fixtures";
 import type { DailyPlan } from "./types";
 
 const timestamp = "2026-07-04T08:00:00.000Z";
 
-const plan = (ownerAccountId: string, committedTaskIds: string[]): DailyPlan => ({
-  id: `plan_${ownerAccountId}_${todayKey()}`,
-  workspaceId: "workspace_team",
+const plan = (ownerAccountId: string, committedTaskIds: string[], workspaceId = "workspace_team"): DailyPlan => ({
+  id: `plan_${ownerAccountId}_${workspaceId}_${todayKey()}`,
+  workspaceId,
   ownerAccountId,
   date: todayKey(),
   capacityPomodoros: 8,
@@ -72,7 +76,8 @@ describe("daily plan account scope", () => {
     };
 
     expect(getTodayPlan(state)).toMatchObject({
-      id: `plan_account_wangyuqiao_${todayKey()}`,
+      id: `plan_account_wangyuqiao_workspace_team_${todayKey()}`,
+      workspaceId: "workspace_team",
       ownerAccountId: "account_wangyuqiao",
       committedTaskIds: [],
     });
@@ -96,7 +101,7 @@ describe("daily plan account scope", () => {
       dailyPlans: [
         {
           ...plan("account_wangyuqiao", ["task_shared_id"]),
-          id: `plan_${todayKey()}`,
+          id: `plan_account_wangyuqiao_${todayKey()}`,
         },
         plan("account_wangyuqiao", ["task_account_id"]),
       ],
@@ -108,10 +113,46 @@ describe("daily plan account scope", () => {
   it("aligns daily plan ids to the owner and date", () => {
     expect(alignDailyPlanIdentity({
       ...plan("account_wangyuqiao", ["task_today"]),
-      id: `plan_${todayKey()}`,
-    })).toMatchObject({
       id: `plan_account_wangyuqiao_${todayKey()}`,
+    })).toMatchObject({
+      id: `plan_account_wangyuqiao_workspace_team_${todayKey()}`,
       ownerAccountId: "account_wangyuqiao",
+      workspaceId: "workspace_team",
     });
+  });
+
+  it("keeps current account plans separate by workspace while getTodayPlan returns the combined view", () => {
+    const state = {
+      ...createInitialState(),
+      auth: {
+        ...createInitialState().auth,
+        status: "authenticated" as const,
+        account: {
+          id: "account_wangyuqiao",
+          workspaceId: "workspace_private",
+          name: "王昱桥",
+          email: "wangyuqiao",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        workspace: {
+          id: "workspace_private",
+          name: "私人区",
+          type: "private" as const,
+          ownerAccountId: "account_wangyuqiao",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      },
+      dailyPlans: [
+        plan("account_wangyuqiao", ["task_private_today"], "workspace_private"),
+        plan("account_wangyuqiao", ["task_team_today"], "workspace_team"),
+      ],
+    };
+
+    expect(currentAccountDailyPlanForWorkspaceDate(state, "workspace_private", todayKey())?.committedTaskIds).toEqual(["task_private_today"]);
+    expect(currentAccountDailyPlanForWorkspaceDate(state, "workspace_team", todayKey())?.committedTaskIds).toEqual(["task_team_today"]);
+    expect(getTodayPlan(state).committedTaskIds).toEqual(["task_private_today", "task_team_today"]);
+    expect(currentAccountDailyPlanForDate(state, todayKey())?.committedTaskIds).toEqual(["task_private_today"]);
   });
 });

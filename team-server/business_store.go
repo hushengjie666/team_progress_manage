@@ -74,21 +74,56 @@ func businessLoadRowsByColumn(ctx context.Context, q sqlRunner, spec businessEnt
 	return scanBusinessRows(rows)
 }
 
+func businessLoadDailyPlanRowsForProjects(ctx context.Context, q sqlRunner, workspaceID string, taskIDs []string, accountID string) ([]businessRow, error) {
+	taskIDs = teamUniqueStrings(taskIDs)
+	taskIDSet := map[string]bool{}
+	for _, taskID := range taskIDs {
+		taskIDSet[taskID] = true
+	}
+	dailyPlanSpec, _ := businessTableForEntity("daily_plan")
+	query := fmt.Sprintf(
+		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
+		 FROM %s WHERE workspace_id = ? ORDER BY updated_at ASC`,
+		dailyPlanSpec.entity,
+		dailyPlanSpec.table,
+	)
+	rows, err := q.QueryContext(ctx, query, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items, err := scanBusinessRows(rows)
+	if err != nil {
+		return nil, err
+	}
+	result := []businessRow{}
+	seen := map[string]bool{}
+	for _, row := range items {
+		include := row.AccountID == accountID
+		for _, taskID := range businessReferencedTaskIDs(row) {
+			if taskIDSet[taskID] {
+				include = true
+				break
+			}
+		}
+		if include && !seen[businessRowKey(row)] {
+			result = append(result, row)
+			seen[businessRowKey(row)] = true
+		}
+	}
+	return result, nil
+}
+
 func businessLoadRowsForProjects(ctx context.Context, q sqlRunner, workspaceID string, projectIDs []string, accountID string) ([]businessRow, error) {
 	projectIDs = teamUniqueStrings(projectIDs)
-	dailyPlanSpec, _ := businessTableForEntity("daily_plan")
 	rewardStateSpec, _ := businessTableForEntity("reward_state")
 	personalRows := []businessRow{}
 	if accountID != "" {
-		dailyPlanRows, err := businessLoadRowsByColumn(ctx, q, dailyPlanSpec, workspaceID, "account_id", []string{accountID})
-		if err != nil {
-			return nil, err
-		}
 		rewardStateRows, err := businessLoadRowsByColumn(ctx, q, rewardStateSpec, workspaceID, "account_id", []string{accountID})
 		if err != nil {
 			return nil, err
 		}
-		personalRows = append(dailyPlanRows, rewardStateRows...)
+		personalRows = append(personalRows, rewardStateRows...)
 	}
 	if len(projectIDs) == 0 {
 		return personalRows, nil
@@ -117,6 +152,10 @@ func businessLoadRowsForProjects(ctx context.Context, q sqlRunner, workspaceID s
 	for _, row := range taskRows {
 		taskIDs = append(taskIDs, row.ID)
 	}
+	dailyPlanRows, err := businessLoadDailyPlanRowsForProjects(ctx, q, workspaceID, taskIDs, accountID)
+	if err != nil {
+		return nil, err
+	}
 	workSessionRows, err := businessLoadRowsByColumn(ctx, q, workSessionSpec, workspaceID, "task_id", taskIDs)
 	if err != nil {
 		return nil, err
@@ -133,7 +172,7 @@ func businessLoadRowsForProjects(ctx context.Context, q sqlRunner, workspaceID s
 	if err != nil {
 		return nil, err
 	}
-	return append(append(append(append(append(append(append(projectRows, projectMemberRows...), taskRows...), workSessionRows...), executionSignalRows...), focusSessionRows...), interruptionRows...), personalRows...), nil
+	return append(append(append(append(append(append(append(append(projectRows, projectMemberRows...), taskRows...), dailyPlanRows...), workSessionRows...), executionSignalRows...), focusSessionRows...), interruptionRows...), personalRows...), nil
 }
 
 func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {

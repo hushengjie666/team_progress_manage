@@ -1,6 +1,7 @@
 import { resolveMemberIdForProject } from "./memberIdentity";
 import type { AppState, Task } from "./types";
 import { emptyTaskDefaults, getTodayPlan } from "./appModel";
+import { workspaceIdForTask } from "./dailyPlanScope";
 
 export function buildSplitTaskText(task: Task) {
   const partCount = Math.min(Math.max(2, task.estimatePomodoros), 8);
@@ -16,10 +17,11 @@ export function splitTaskInState(
 ): { state: AppState; newTasks: Task[] } {
   const currentPlan = getTodayPlan(state);
   const committed = task.status === "committed" || currentPlan.committedTaskIds.includes(task.id);
+  const workspaceId = workspaceIdForTask(state, task);
   const estimatePerTask = Math.max(1, Math.ceil(task.estimatePomodoros / titles.length));
   const newTasks: Task[] = titles.map((title, index) => ({
     id: createTaskId(),
-    workspaceId: task.workspaceId,
+    workspaceId,
     title,
     notes: `由「${task.title}」拆分而来。`,
     tags: task.tags,

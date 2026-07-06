@@ -3,6 +3,7 @@ import type { AppState, SessionOutcome, WorkSession } from "./types";
 import { createExecutionSignal } from "./workSessionTransitions";
 import { nowIso, today } from "./appClock";
 import { activeWorkSession } from "./appTimerWorkSession";
+import { dailyPlanBelongsToCurrentAccount } from "./dailyPlanScope";
 
 export const endSessionInState = (state: AppState, outcome: SessionOutcome, timestamp = nowIso()): AppState => {
   const active = state.activeTimer;
@@ -32,7 +33,11 @@ export const endSessionInState = (state: AppState, outcome: SessionOutcome, time
   );
 
   const plans = state.dailyPlans.map((plan) =>
-    plan.date === today() && isFocusCompleted
+    plan.date === today() &&
+    isFocusCompleted &&
+    active.taskId &&
+    dailyPlanBelongsToCurrentAccount(state, plan) &&
+    plan.committedTaskIds.includes(active.taskId)
       ? { ...plan, completedPomodoros: plan.completedPomodoros + 1, updatedAt: endedAt }
       : plan,
   );

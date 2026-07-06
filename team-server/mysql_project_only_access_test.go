@@ -46,6 +46,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 		{WorkspaceID: workspaceID, Entity: "project", ID: "project_hidden", UpdatedAt: "2026-07-01T08:01:00Z", Payload: json.RawMessage(`{"id":"project_hidden","workspaceId":"` + workspaceID + `","name":"不可见项目","defaultExpectedStartHours":24,"createdAt":"2026-07-01T08:01:00Z","updatedAt":"2026-07-01T08:01:00Z"}`)},
 		{WorkspaceID: workspaceID, Entity: "task", ID: "task_visible", UpdatedAt: "2026-07-01T08:02:00Z", Payload: json.RawMessage(`{"id":"task_visible","workspaceId":"` + workspaceID + `","projectId":"project_visible","project":"可见项目","title":"可见任务","status":"pool","createdAt":"2026-07-01T08:02:00Z","updatedAt":"2026-07-01T08:02:00Z"}`)},
 		{WorkspaceID: workspaceID, Entity: "task", ID: "task_hidden", UpdatedAt: "2026-07-01T08:03:00Z", Payload: json.RawMessage(`{"id":"task_hidden","workspaceId":"` + workspaceID + `","projectId":"project_hidden","project":"不可见项目","title":"不可见任务","status":"pool","createdAt":"2026-07-01T08:03:00Z","updatedAt":"2026-07-01T08:03:00Z"}`)},
+		{WorkspaceID: workspaceID, AccountID: "account_teammate", Entity: "daily_plan", ID: "plan_account_teammate_" + workspaceID + "_2026-07-04", UpdatedAt: "2026-07-04T08:00:00Z", Payload: json.RawMessage(`{"id":"plan_account_teammate_` + workspaceID + `_2026-07-04","workspaceId":"` + workspaceID + `","ownerAccountId":"account_teammate","date":"2026-07-04","capacityPomodoros":3,"committedTaskIds":["task_visible"],"completedPomodoros":0,"suggestedTaskIds":[],"reflection":"","review":{"mood":"normal","wins":"","blockers":"","interruptionPattern":"","tomorrowFocus":""},"createdAt":"2026-07-04T08:00:00Z","updatedAt":"2026-07-04T08:00:00Z"}`)},
 	})
 
 	memberRecorder := httptest.NewRecorder()
@@ -92,6 +93,9 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	if !visible["project/project_visible"] || !visible["task/task_visible"] {
 		t.Fatalf("project-only state missing visible project rows: %#v", visible)
 	}
+	if !visible["daily_plan/plan_account_teammate_"+workspaceID+"_2026-07-04"] {
+		t.Fatalf("project-only state missing teammate daily plan for visible project task: %#v", visible)
+	}
 	if visible["project/project_hidden"] || visible["task/task_hidden"] {
 		t.Fatalf("project-only state leaked hidden project rows: %#v", visible)
 	}
@@ -99,9 +103,9 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 		WorkspaceID: workspaceID,
 		AccountID:   projectOnlyAuth.AccountID,
 		Entity:      "daily_plan",
-		ID:          "plan_" + projectOnlyAuth.AccountID + "_2026-07-04",
+		ID:          "plan_" + projectOnlyAuth.AccountID + "_" + workspaceID + "_2026-07-04",
 		UpdatedAt:   "2026-07-04T08:00:00Z",
-		Payload:     json.RawMessage(`{"id":"plan_` + projectOnlyAuth.AccountID + `_2026-07-04","workspaceId":"` + workspaceID + `","ownerAccountId":"` + projectOnlyAuth.AccountID + `","date":"2026-07-04","capacityPomodoros":3,"committedTaskIds":["task_visible"],"completedPomodoros":0,"suggestedTaskIds":[],"reflection":"","review":{"mood":"normal","wins":"","blockers":"","interruptionPattern":"","tomorrowFocus":""},"createdAt":"2026-07-04T08:00:00Z","updatedAt":"2026-07-04T08:00:00Z"}`),
+		Payload:     json.RawMessage(`{"id":"plan_` + projectOnlyAuth.AccountID + `_` + workspaceID + `_2026-07-04","workspaceId":"` + workspaceID + `","ownerAccountId":"` + projectOnlyAuth.AccountID + `","date":"2026-07-04","capacityPomodoros":3,"committedTaskIds":["task_visible"],"completedPomodoros":0,"suggestedTaskIds":[],"reflection":"","review":{"mood":"normal","wins":"","blockers":"","interruptionPattern":"","tomorrowFocus":""},"createdAt":"2026-07-04T08:00:00Z","updatedAt":"2026-07-04T08:00:00Z"}`),
 	}
 	saveRows(t, api, projectOnlyAuth, "device_member", append(stateResponse.Rows, dailyPlanRow))
 	reloadedRows := loadRows(t, api, projectOnlyAuth, 0)
@@ -113,7 +117,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 		t.Fatalf("project-only state missing account daily plan: %#v", reloaded)
 	}
 	hiddenPlanRow := dailyPlanRow
-	hiddenPlanRow.ID = "plan_" + projectOnlyAuth.AccountID + "_2026-07-05"
+	hiddenPlanRow.ID = "plan_" + projectOnlyAuth.AccountID + "_" + workspaceID + "_2026-07-05"
 	hiddenPlanRow.UpdatedAt = "2026-07-05T08:00:00Z"
 	hiddenPlanRow.Payload = json.RawMessage(`{"id":"` + hiddenPlanRow.ID + `","workspaceId":"` + workspaceID + `","ownerAccountId":"` + projectOnlyAuth.AccountID + `","date":"2026-07-05","capacityPomodoros":3,"committedTaskIds":["task_hidden"],"completedPomodoros":0,"suggestedTaskIds":[],"reflection":"","review":{"mood":"normal","wins":"","blockers":"","interruptionPattern":"","tomorrowFocus":""},"createdAt":"2026-07-05T08:00:00Z","updatedAt":"2026-07-05T08:00:00Z"}`)
 	hiddenBody, err := json.Marshal(teamDataSaveRequest{Rows: append(stateResponse.Rows, hiddenPlanRow)})

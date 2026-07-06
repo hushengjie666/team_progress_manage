@@ -4,6 +4,7 @@ import {
   removeTaskFromTodayInState,
   startTimerInState,
 } from "./appModel";
+import { currentAccountDailyPlanForWorkspaceDate } from "./dailyPlanScope";
 import { createInitialState } from "./test/fixtures";
 import {
   createProjectInState,
@@ -12,6 +13,124 @@ import type { AppState, Task } from "./types";
 import { addTaskToTodayInState } from "./workSessionTransitions";
 
 describe("timer today queue", () => {
+  it("adds a shared workspace project task to the task workspace daily plan", () => {
+    const state = createInitialState();
+    const privateWorkspace = {
+      id: "workspace_private_owner",
+      name: "私人工作区",
+      type: "private" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-05-10T08:00:00.000Z",
+      updatedAt: "2026-05-10T08:00:00.000Z",
+    };
+    const sharedWorkspace = {
+      id: "workspace_shared_delivery",
+      name: "协作工作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-05-10T08:00:00.000Z",
+      updatedAt: "2026-05-10T08:00:00.000Z",
+    };
+    const taskId = "task_shared_today_queue";
+    const task: Task = {
+      ...state.tasks[2],
+      id: taskId,
+      workspaceId: sharedWorkspace.id,
+      projectId: state.projects[0].id,
+      status: "pool",
+    };
+
+    const queued = addTaskToTodayInState(
+      {
+        ...state,
+        auth: {
+          ...state.auth,
+          status: "authenticated",
+          account: {
+            id: "account_owner",
+            workspaceId: privateWorkspace.id,
+            name: "项目负责人",
+            email: "owner@example.com",
+            createdAt: "2026-05-10T08:00:00.000Z",
+            updatedAt: "2026-05-10T08:00:00.000Z",
+          },
+          workspace: privateWorkspace,
+          workspaces: [privateWorkspace, sharedWorkspace],
+        },
+        projects: state.projects.map((project) => ({ ...project, workspaceId: sharedWorkspace.id })),
+        projectMembers: state.projectMembers.map((member) => ({ ...member, workspaceId: sharedWorkspace.id })),
+        tasks: [task],
+        dailyPlans: [],
+      },
+      taskId,
+      "2026-05-10T09:00:00.000Z",
+    );
+
+    expect(currentAccountDailyPlanForWorkspaceDate(queued, sharedWorkspace.id, getTodayPlan(queued).date)?.committedTaskIds).toEqual([taskId]);
+    expect(currentAccountDailyPlanForWorkspaceDate(queued, privateWorkspace.id, getTodayPlan(queued).date)).toBeUndefined();
+    expect(queued.tasks.find((item) => item.id === taskId)?.workspaceId).toBe(sharedWorkspace.id);
+  });
+
+  it("starts work on a shared workspace task without writing the private workspace plan", () => {
+    const state = createInitialState();
+    const privateWorkspace = {
+      id: "workspace_private_timer",
+      name: "私人工作区",
+      type: "private" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-05-10T08:00:00.000Z",
+      updatedAt: "2026-05-10T08:00:00.000Z",
+    };
+    const sharedWorkspace = {
+      id: "workspace_shared_timer",
+      name: "协作工作区",
+      type: "shared" as const,
+      ownerAccountId: "account_owner",
+      createdAt: "2026-05-10T08:00:00.000Z",
+      updatedAt: "2026-05-10T08:00:00.000Z",
+    };
+    const taskId = "task_shared_timer_start";
+    const task: Task = {
+      ...state.tasks[1],
+      id: taskId,
+      workspaceId: sharedWorkspace.id,
+      projectId: state.projects[0].id,
+      status: "pool",
+    };
+
+    const started = startTimerInState(
+      {
+        ...state,
+        auth: {
+          ...state.auth,
+          status: "authenticated",
+          account: {
+            id: "account_owner",
+            workspaceId: privateWorkspace.id,
+            name: "项目负责人",
+            email: "owner@example.com",
+            createdAt: "2026-05-10T08:00:00.000Z",
+            updatedAt: "2026-05-10T08:00:00.000Z",
+          },
+          workspace: privateWorkspace,
+          workspaces: [privateWorkspace, sharedWorkspace],
+        },
+        projects: state.projects.map((project) => ({ ...project, workspaceId: sharedWorkspace.id })),
+        projectMembers: state.projectMembers.map((member) => ({ ...member, workspaceId: sharedWorkspace.id })),
+        tasks: [task],
+        dailyPlans: [],
+      },
+      "focus",
+      taskId,
+      "2026-05-10T09:05:00.000Z",
+      "session_shared_timer_start",
+    );
+
+    expect(currentAccountDailyPlanForWorkspaceDate(started, sharedWorkspace.id, getTodayPlan(started).date)?.committedTaskIds).toEqual([taskId]);
+    expect(currentAccountDailyPlanForWorkspaceDate(started, privateWorkspace.id, getTodayPlan(started).date)).toBeUndefined();
+    expect(started.tasks.find((item) => item.id === taskId)?.workspaceId).toBe(sharedWorkspace.id);
+  });
+
   it("adds a focused task to today's queue when starting work", () => {
     const state = createInitialState();
     const taskId = state.tasks[1].id;
