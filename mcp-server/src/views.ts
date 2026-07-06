@@ -1,6 +1,7 @@
 import { getTodayPlan, today } from "../../src/appModel.js";
 import { currentAccountDailyPlansForDate } from "../../src/dailyPlanScope.js";
 import { buildMemberStatusColumns } from "../../src/memberStatusColumns.js";
+import { countProjectAccessibleMembers } from "../../src/projectAccessMemberCount.js";
 import { buildProgressBoard } from "../../src/progressBoard.js";
 import { sortedByUpdatedAt } from "../../src/workSessionTransitions.js";
 import type { AppState, DailyPlan, Project, ProjectMember, Task, TaskStatus, WorkSession } from "../../src/types.js";
@@ -33,7 +34,7 @@ export const compactProject = (state: AppState, project: Project) => ({
   taskStageMode: project.taskStageMode,
   archivedAt: project.archivedAt,
   taskCount: state.tasks.filter((task) => task.projectId === project.id && task.status !== "archived" && task.status !== "split").length,
-  memberCount: state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").length,
+  memberCount: countProjectAccessibleMembers(state, project, project.workspaceId),
   updatedAt: project.updatedAt,
 });
 

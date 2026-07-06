@@ -13,7 +13,7 @@ TimeManage Codex 插件让团队成员直接在 Codex 对话里操作 TimeManage
 Codex 会拉取 bootstrap 脚本并执行。等价命令是：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hushengjie666/team_progress_manage/v0.1.2/scripts/bootstrap-timemanage-codex.mjs \
+curl -fsSL https://raw.githubusercontent.com/hushengjie666/team_progress_manage/v0.1.3/scripts/bootstrap-timemanage-codex.mjs \
   -o /tmp/bootstrap-timemanage-codex.mjs
 node /tmp/bootstrap-timemanage-codex.mjs --email "<你的账号>"
 ```

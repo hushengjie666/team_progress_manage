@@ -3,6 +3,7 @@
     "timemanage": {
       "type": "stdio",
       "command": "node",
+      "cwd": ".",
       "args": [
         "./scripts/start-mcp.mjs"
       ],

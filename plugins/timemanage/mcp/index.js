@@ -32021,6 +32021,13 @@ var memberAccessIdentityAliases = (member) => {
   if (member.id) aliases.push(`member:${member.id}`);
   return Array.from(new Set(aliases.length ? aliases : [memberAccessIdentityKey(member)]));
 };
+var addMemberAccessIdentity = (identities, identityAliasToKey, member) => {
+  const aliases = memberAccessIdentityAliases(member);
+  const existingKey = aliases.map((alias) => identityAliasToKey.get(alias)).find((key) => Boolean(key && identities.has(key)));
+  const identityKey = existingKey ?? memberAccessIdentityKey(member);
+  aliases.forEach((alias) => identityAliasToKey.set(alias, identityKey));
+  identities.add(identityKey);
+};
 var memberIdentityForProjectMember = (member) => ({
   id: member.id,
   accountId: member.accountId,
@@ -32054,6 +32061,20 @@ var activeWorkspaceIdsForAccount = (state, account) => {
   return workspaceIds;
 };
 var activeWorkspaceIdsForCurrentAccount = (state) => activeWorkspaceIdsForAccount(state, state.auth.account);
+
+// src/projectAccessMemberCount.ts
+var countProjectAccessibleMembers = (state, project, workspaceId) => {
+  const identities = /* @__PURE__ */ new Set();
+  const identityAliasToKey = /* @__PURE__ */ new Map();
+  if (workspaceId) {
+    const workspace = workspacesForState(state).find((item) => item.id === workspaceId);
+    if (workspace?.ownerAccountId) addMemberAccessIdentity(identities, identityAliasToKey, { accountId: workspace.ownerAccountId });
+    const activeMemberships = workspaceMembershipsForState(state).filter((membership) => membership.workspaceId === workspaceId && membership.status === "active");
+    activeMemberships.forEach((membership) => addMemberAccessIdentity(identities, identityAliasToKey, membership));
+  }
+  state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").forEach((member) => addMemberAccessIdentity(identities, identityAliasToKey, member));
+  return identities.size;
+};
 
 // src/projectAccessIdentity.ts
 var projectMemberMatchesIdentity = (member, identity) => {
@@ -33699,7 +33720,7 @@ var compactProject = (state, project) => ({
   taskStageMode: project.taskStageMode,
   archivedAt: project.archivedAt,
   taskCount: state.tasks.filter((task) => task.projectId === project.id && task.status !== "archived" && task.status !== "split").length,
-  memberCount: state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").length,
+  memberCount: countProjectAccessibleMembers(state, project, project.workspaceId),
   updatedAt: project.updatedAt
 });
 var compactMember = (state, member) => ({
