@@ -1,17 +1,17 @@
 ---
 name: timemanage
-description: Use TimeManage through its MCP tools to query and manage projects, members, tasks, daily work queues, work sessions, and review flow while keeping the existing Web/Tauri front-end as the primary UI.
+description: Use TimeManage through its local MCP tools to query and manage workspaces, platform accounts, invitations, projects, project members, tasks, daily plans, work sessions, reviews, settings, and task templates against the existing TimeManage team backend. Use when Codex needs to operate or inspect TimeManage business data without replacing the Web/Tauri UI.
 ---
 
 # TimeManage MCP Skill
 
-Use this skill when the user wants to operate TimeManage through AI: querying projects, members, tasks, today's prepared work queue, active work, risk/review state, daily summaries, or when they want to create, edit, split, assign, start, pause, finish, submit, approve, or return work.
+Use this skill when the user asks Codex to inspect, create, update, or troubleshoot TimeManage business data: workspaces, accounts, invitations, members, projects, tasks, today plans, execution state, reviews, settings, templates, or backend connectivity.
 
-TimeManage MCP is an additional AI operation channel. It does not replace the browser or Tauri app. Both channels read and write the same team-server data, so browser changes can be read by MCP after backend refresh, and MCP writes should appear in the front-end through the existing backend refresh path.
+The MCP server is a local stdio sidecar for Codex. It calls the existing TimeManage team backend (`team-server`) over HTTP. The server-side deployment still needs one backend service plus its database; MCP is normally configured on the user's local machine or agent host.
 
 ## Configuration
 
-Start the server with:
+Start the MCP server from the TimeManage repo:
 
 ```bash
 npm run mcp:server
@@ -19,7 +19,7 @@ npm run mcp:server
 
 Required configuration comes from environment variables or `TM_MCP_CONFIG`:
 
-- `TM_MCP_SERVER_URL`: team-server URL, default `http://127.0.0.1:8787`
+- `TM_MCP_SERVER_URL`: team backend URL, default `http://127.0.0.1:8787`
 - `TM_MCP_EMAIL`: TimeManage login email or phone value
 - `TM_MCP_PASSWORD`: TimeManage login password
 - `TM_MCP_DEVICE_ID`: optional stable device id, default host-based id
@@ -27,45 +27,37 @@ Required configuration comes from environment variables or `TM_MCP_CONFIG`:
 
 Never commit real account passwords.
 
+## Operating Model
+
+- Prefer the Web/Tauri app for visual inspection, drag ordering, and user-facing workflows.
+- Use MCP for precise reads, bulk operations, repeatable maintenance, and debugging data relationships.
+- Treat all business data as backend-owned. Do not infer state from browser caches or local page-only data.
+- After a write, read the affected entity or view again when the user is asking about the final visible state.
+
 ## Tool Selection
 
-- Use `list_projects` before project-specific work when the user gives a project name instead of an id.
-- Use `search` when the user gives a fuzzy project/member/task name and you need candidate ids.
-- Use `create_project`, `update_project`, `archive_project`, and `restore_project` for project maintenance.
-- Use `list_members`, `create_member`, `update_member`, `delete_member`, `bind_member_to_project`, `update_project_member`, and `unbind_project_member` for member library and project membership work.
-- Use `list_tasks` for search, filtering, and resolving task ids from task names.
-- Use `get_task` before risky edits or when the user references an ambiguous task.
-- Use `get_today_plan` for today's prepared work queue.
-- Use `get_today_workbench` when the user asks who has what today, grouped by member, or asks why another user can/cannot see today's work.
-- Use `get_active_work` when the user asks who is currently working or whether a task is executing.
-- Use `get_project_overview` for project progress, risk, and active work context.
-- Use `list_pending_reviews` for acceptance/review queues.
-- Use `list_risk_tasks` for manager attention, stalled work, blocked work, and pending review risk.
-- Use `create_task` for new project tasks. It creates `pool` tasks by default.
-- Use `update_task`, `assign_task`, `set_task_status`, and `update_task_progress` for normal task maintenance.
-- Use `batch_create_tasks`, `batch_assign_tasks`, and `batch_add_tasks_to_today` for safe batch task operations.
-- Use `split_task` when the user wants to break a large task into several tasks.
-- Use `add_task_to_today` and `remove_task_from_today` for today's prepared work queue.
-- Use `start_task`, `pause_work_session`, `resume_work_session`, and `finish_work_session` for execution flow.
-- Use `submit_task_review`, `accept_task_review`, and `return_task_review` for review flow.
-- Use `get_daily_summary` and `update_daily_review` for daily review and work summary.
-- Use `get_sync_diagnostics` when the user asks whether MCP, browser, or team-server data is current.
+- Connectivity and identity: `health`, `get_backend_diagnostics`, `get_current_account`.
+- Workspaces: `list_workspaces`, `switch_workspace`, `create_workspace`, `update_workspace`, `update_workspace_membership`.
+- Platform accounts: `list_platform_accounts`, `create_platform_account`, `update_platform_account`, `disable_platform_account`, `update_platform_account_password`.
+- Invitations: `list_workspace_invitations`, `invite_workspace_member`, `accept_workspace_invitation`, `delete_workspace_invitation`, `list_project_invitations`, `invite_project_member`, `accept_project_invitation`, `delete_project_invitation`.
+- Members: `list_members`, `create_member`, `update_member`, `delete_member`, `bind_member_to_project`, `unbind_project_member`, `create_member_account`, `update_member_account`.
+- Projects and overview: `list_projects`, `search`, `get_project_overview`, `create_project`, `update_project`, `archive_project`, `restore_project`, `get_member_status`, `list_pending_reviews`, `list_risk_tasks`.
+- Tasks: `list_tasks`, `get_task`, `create_task`, `batch_create_tasks`, `update_task`, `delete_task`, `assign_task`, `batch_assign_tasks`, `set_task_status`, `update_task_progress`, `split_task`.
+- Today and execution: `get_today_plan`, `get_today_workbench`, `add_task_to_today`, `batch_add_tasks_to_today`, `remove_task_from_today`, `move_today_task`, `schedule_task_for_date`, `start_task`, `pause_work_session`, `resume_work_session`, `finish_work_session`, `get_active_work`, `record_interruption`.
+- Reviews, settings, templates: `submit_task_review`, `accept_task_review`, `return_task_review`, `get_daily_summary`, `update_daily_review`, `get_settings`, `update_settings`, `list_task_templates`, `save_task_template`, `delete_task_template`, `instantiate_task_template`.
 
-## Status Flow
+## Workflow Rules
 
-- Create task: `pool`
-- Add to today: `pool -> committed` when needed
-- Start task: `committed/pool/pending_review returned task -> in_progress`, and create focus/work session plus execution signal
-- Submit review: `committed/in_progress -> pending_review`
-- Accept review: `pending_review -> completed`
-- Return review: `pending_review -> in_progress`
-- Remove from today: removes task from `DailyPlan.committedTaskIds`; `committed` tasks return to `pool`
-
-Do not rely on a browser's local `activeTimer` for cross-user "正在执行" state. Use synced `workSessions` and `executionSignals`.
+- Resolve names to ids with `search`, `list_projects`, `list_members`, or `list_tasks` before mutating data.
+- Use `get_task` before risky task edits when the user gives an ambiguous task name.
+- Use `get_today_plan` for the current account's raw date plan. Use `get_today_workbench` or `get_member_status` when the question is about who sees which task today.
+- Use `get_active_work` for current execution state; do not rely on a browser timer display alone.
+- `add_task_to_today` and `schedule_task_for_date` must not be described as moving a task between workspaces. A task's workspace follows its project.
+- For workspace invites, remember project membership and workspace membership are separate permissions. If a user can see one project but not the workspace overview, check both project invitations and workspace invitations.
 
 ## Confirmation Policy
 
-Ask the user for explicit confirmation before calling any high-risk tool with `confirmed=true`:
+Ask the user for explicit confirmation before calling a tool with `confirmed=true` for:
 
 - `delete_task`
 - `delete_member`
@@ -74,19 +66,19 @@ Ask the user for explicit confirmation before calling any high-risk tool with `c
 - `split_task`
 - `accept_task_review`
 - `set_task_status` when status is `completed`, `split`, or `archived`
-- Any future batch operation that deletes, archives, completes, or approves data
+- `disable_platform_account`
+- `delete_task_template`
 
 Good confirmation prompt:
 
-> 确认要删除任务「任务名」吗？删除后会一并清理今日队列和相关工作记录。
+> 确认要删除任务「任务名」吗？删除后会清理它在日期计划中的引用。
 
 Only set `confirmed=true` after the user clearly agrees.
 
 ## Error Handling
 
-- If a task/member/project name is ambiguous, query matching records and ask the user to choose.
+- If a name is ambiguous, list candidates and ask the user to choose.
 - If login fails, ask the user to check `TM_MCP_EMAIL` and `TM_MCP_PASSWORD`.
-- If team-server cannot be reached, ask the user to start `npm run backend:server` or check `TM_MCP_SERVER_URL`.
+- If the backend cannot be reached, ask the user to start `npm run backend:server` or check `TM_MCP_SERVER_URL`.
 - If a status transition is refused by business rules, explain the current status and suggest the valid next action.
-- After mutating data, summarize the changed entity id, title/name, new status, and backend write result.
-- For "今日任务" ambiguity, distinguish `get_today_plan` (raw prepared queue) from `get_today_workbench` (member-grouped workbench with active markers).
+- After mutating data, summarize the changed entity id, title/name, and new status or membership.

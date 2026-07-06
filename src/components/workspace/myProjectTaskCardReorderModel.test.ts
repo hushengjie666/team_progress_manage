@@ -10,6 +10,7 @@ import {
 const card = (projectId: string): MyProjectTaskCard => ({
   projectId,
   name: projectId,
+  description: "",
   workspaceName: "工作区",
   progressPercent: 0,
   myTaskCount: 0,
