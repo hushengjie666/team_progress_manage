@@ -1,0 +1,39 @@
+{
+  "name": "timemanage",
+  "version": "0.1.2",
+  "description": "Use Codex to operate TimeManage team workspaces, projects, members, tasks, daily plans, reviews, settings, and templates.",
+  "author": {
+    "name": "TimeManage Team",
+    "email": "support@hudashuai.xyz",
+    "url": "https://www.hudashuai.xyz/timemanage-team/"
+  },
+  "homepage": "https://www.hudashuai.xyz/timemanage-team/",
+  "repository": "https://github.com/hushengjie666/team_progress_manage",
+  "license": "UNLICENSED",
+  "keywords": [
+    "timemanage",
+    "tasks",
+    "workspace",
+    "project-management"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "TimeManage",
+    "shortDescription": "Use Codex to operate TimeManage team data",
+    "longDescription": "Query and manage TimeManage workspaces, projects, members, tasks, today plans, work sessions, reviews, settings, and templates through Codex.",
+    "developerName": "TimeManage Team",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://www.hudashuai.xyz/timemanage-team/",
+    "defaultPrompt": [
+      "用 TimeManage 查一下我今天的任务",
+      "用 TimeManage 检查连接是否正常",
+      "用 TimeManage 创建一个项目"
+    ],
+    "brandColor": "#2D9C8C"
+  }
+}

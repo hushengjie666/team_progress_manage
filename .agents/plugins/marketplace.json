@@ -1,0 +1,20 @@
+{
+  "name": "timemanage-team",
+  "interface": {
+    "displayName": "TimeManage Team"
+  },
+  "plugins": [
+    {
+      "name": "timemanage",
+      "source": {
+        "source": "local",
+        "path": "./plugins/timemanage"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
