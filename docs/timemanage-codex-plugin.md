@@ -63,3 +63,22 @@ npm run plugin:validate
 ```bash
 npm run plugin:test
 ```
+
+## 发布规则
+
+日常开发放在 `fix/*` 或 `feature/*` 分支，稳定代码合并到 `main`。发布只从最新的 `main` 创建 tag：
+
+```bash
+git checkout main
+git pull origin main
+npm run plugin:test
+bash scripts/create-timemanage-release-tag.sh v0.1.4 "TimeManage Codex plugin v0.1.4"
+git push origin v0.1.4
+```
+
+`scripts/create-timemanage-release-tag.sh` 会拒绝以下情况：
+
+- 当前分支不是 `main`
+- 本地 `main` 和 `origin/main` 不一致
+- 工作区存在未提交改动
+- tag 已存在
