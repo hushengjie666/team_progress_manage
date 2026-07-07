@@ -16,6 +16,8 @@ const valueFor = (name) => {
   return args[index + 1];
 };
 
+const hasFlag = (name) => args.includes(name);
+
 const defaultConfigPath = () => {
   if (platform() === "win32") {
     const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
@@ -25,6 +27,28 @@ const defaultConfigPath = () => {
 };
 
 const normalizeServerUrl = (serverUrl) => serverUrl.trim().replace(/\/+$/, "");
+
+const defaultLauncherPath = () => {
+  if (platform() === "win32") {
+    const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
+    return join(appData, "TimeManage CLI", "timemanage.cmd");
+  }
+  return join(homedir(), ".local", "bin", "timemanage");
+};
+
+const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+
+const installCliLauncher = (launcherPath = defaultLauncherPath()) => {
+  const cliPath = join(scriptDir, "timemanage.mjs");
+  mkdirSync(dirname(launcherPath), { recursive: true });
+  if (platform() === "win32") {
+    writeFileSync(launcherPath, `@echo off\r\nnode \"${cliPath}\" %*\r\n`);
+    return launcherPath;
+  }
+  writeFileSync(launcherPath, `#!/usr/bin/env sh\nexec node ${shellQuote(cliPath)} \"$@\"\n`, { mode: 0o755 });
+  try { chmodSync(launcherPath, 0o755); } catch {}
+  return launcherPath;
+};
 
 const ask = async (question, fallback = "") => {
   if (!process.stdin.isTTY) return fallback;
@@ -103,8 +127,11 @@ const main = async () => {
     if (result.status !== 0) process.exit(result.status ?? 1);
   }
 
+  const launcherPath = hasFlag("--no-bin") ? undefined : installCliLauncher(valueFor("--bin"));
+
   console.log(`TimeManage Codex config written: ${configPath}`);
-  console.log("Restart Codex or start a new thread, then ask: 用 TimeManage 检查连接是否正常");
+  if (launcherPath) console.log(`TimeManage CLI installed: ${launcherPath}`);
+  console.log("Run: timemanage doctor");
 };
 
 main().catch((error) => {

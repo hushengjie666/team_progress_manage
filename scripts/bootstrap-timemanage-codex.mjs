@@ -5,9 +5,10 @@ import { spawnSync } from "node:child_process";
 import readline from "node:readline/promises";
 
 const defaultRepo = "hushengjie666/team_progress_manage";
-const defaultRef = "v0.1.3";
+const defaultRef = "main";
 const defaultMarketplace = "timemanage-team";
 const defaultServerUrl = "https://www.hudashuai.xyz/timemanage-team/api/";
+const defaultPluginVersion = "0.1.4";
 
 const args = process.argv.slice(2);
 
@@ -41,6 +42,31 @@ const defaultConfigPath = () => {
 };
 
 const normalizeServerUrl = (serverUrl) => serverUrl.trim().replace(/\/+$/, "");
+
+const defaultLauncherPath = () => {
+  if (platform() === "win32") {
+    const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
+    return join(appData, "TimeManage CLI", "timemanage.cmd");
+  }
+  return join(homedir(), ".local", "bin", "timemanage");
+};
+
+const shellQuote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
+
+const pluginCliPath = (marketplace, version) =>
+  join(homedir(), ".codex", "plugins", "cache", marketplace, "timemanage", version, "scripts", "timemanage.mjs");
+
+const installCliLauncher = (marketplace, version, launcherPath = defaultLauncherPath()) => {
+  const cliPath = pluginCliPath(marketplace, version);
+  mkdirSync(dirname(launcherPath), { recursive: true });
+  if (platform() === "win32") {
+    writeFileSync(launcherPath, `@echo off\r\nnode "${cliPath}" %*\r\n`);
+    return launcherPath;
+  }
+  writeFileSync(launcherPath, `#!/usr/bin/env sh\nexec node ${shellQuote(cliPath)} "$@"\n`, { mode: 0o755 });
+  try { chmodSync(launcherPath, 0o755); } catch {}
+  return launcherPath;
+};
 
 const endpoint = (serverUrl, path) => `${normalizeServerUrl(serverUrl)}${path}`;
 
@@ -121,14 +147,9 @@ const verifyConnection = async ({ serverUrl, email, password, deviceId }) => {
 };
 
 const pluginInstalled = (marketplace) => {
-  const result = run("codex", ["plugin", "list", "--json"], { capture: true, allowFailure: true });
+  const result = run("codex", ["plugin", "list"], { capture: true, allowFailure: true });
   if (result.status !== 0 || !result.stdout) return false;
-  try {
-    const payload = JSON.parse(result.stdout);
-    return payload.installed?.some((plugin) => plugin.name === "timemanage" && plugin.marketplaceName === marketplace && plugin.enabled !== false);
-  } catch {
-    return false;
-  }
+  return result.stdout.includes(`timemanage@${marketplace}`) && result.stdout.includes("installed, enabled");
 };
 
 const main = async () => {
@@ -147,6 +168,7 @@ const main = async () => {
   const email = valueFor("--email") || await ask("TimeManage account email");
   if (!email) throw new Error("TimeManage account email is required.");
   const password = await askHidden("TimeManage password");
+  if (!password) throw new Error("TimeManage password is required.");
   const deviceId = valueFor("--device-id") || `timemanage_cli_${hostname()}`;
 
   const config = { serverUrl, email: email.trim(), password, deviceId };
@@ -165,7 +187,7 @@ const main = async () => {
   }
 
   if (!pluginInstalled(marketplace)) {
-    const install = run("codex", ["plugin", "add", `timemanage@${marketplace}`, "--json"], {
+    const install = run("codex", ["plugin", "add", `timemanage@${marketplace}`], {
       capture: true,
       allowFailure: true,
     });
@@ -176,9 +198,12 @@ const main = async () => {
 
   await verifyConnection({ serverUrl, email: email.trim(), password, deviceId });
 
-  console.log("TimeManage Codex initialized.");
+  const launcherPath = hasFlag("--no-bin") ? undefined : installCliLauncher(marketplace, defaultPluginVersion, valueFor("--bin"));
+
+  console.log("TimeManage CLI initialized.");
   console.log(`Config: ${configPath}`);
-  console.log("Restart Codex or start a new thread, then ask: 用 TimeManage 检查连接是否正常");
+  if (launcherPath) console.log(`CLI: ${launcherPath}`);
+  console.log("Run: timemanage doctor");
 };
 
 main().catch((error) => {
