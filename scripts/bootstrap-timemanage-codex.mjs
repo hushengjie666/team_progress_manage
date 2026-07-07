@@ -53,9 +53,10 @@ const ask = async (question, fallback = "") => {
 };
 
 const askHidden = async (question) => {
+  if (process.env.TIMEMANAGE_CLI_PASSWORD) return process.env.TIMEMANAGE_CLI_PASSWORD;
   if (process.env.TIMEMANAGE_MCP_PASSWORD) return process.env.TIMEMANAGE_MCP_PASSWORD;
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-    throw new Error("Password requires an interactive terminal, or set TIMEMANAGE_MCP_PASSWORD for this run.");
+    throw new Error("Password requires an interactive terminal, or set TIMEMANAGE_CLI_PASSWORD for this run.");
   }
   return new Promise((resolve, reject) => {
     let value = "";
@@ -146,8 +147,7 @@ const main = async () => {
   const email = valueFor("--email") || await ask("TimeManage account email");
   if (!email) throw new Error("TimeManage account email is required.");
   const password = await askHidden("TimeManage password");
-  if (!password) throw new Error("TimeManage password is required.");
-  const deviceId = valueFor("--device-id") || `timemanage_mcp_${hostname()}`;
+  const deviceId = valueFor("--device-id") || `timemanage_cli_${hostname()}`;
 
   const config = { serverUrl, email: email.trim(), password, deviceId };
   mkdirSync(dirname(configPath), { recursive: true });

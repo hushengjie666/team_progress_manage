@@ -35,9 +35,10 @@ const ask = async (question, fallback = "") => {
 };
 
 const askHidden = async (question) => {
+  if (process.env.TIMEMANAGE_CLI_PASSWORD) return process.env.TIMEMANAGE_CLI_PASSWORD;
   if (process.env.TIMEMANAGE_MCP_PASSWORD) return process.env.TIMEMANAGE_MCP_PASSWORD;
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-    throw new Error("Password requires an interactive terminal, or set TIMEMANAGE_MCP_PASSWORD for this run.");
+    throw new Error("Password requires an interactive terminal, or set TIMEMANAGE_CLI_PASSWORD for this run.");
   }
   return new Promise((resolve, reject) => {
     let value = "";
@@ -85,7 +86,7 @@ const main = async () => {
     serverUrl,
     email: email.trim(),
     password,
-    deviceId: valueFor("--device-id") || `timemanage_mcp_${hostname()}`,
+    deviceId: valueFor("--device-id") || `timemanage_cli_${hostname()}`,
   };
   mkdirSync(dirname(configPath), { recursive: true });
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
@@ -97,7 +98,7 @@ const main = async () => {
   if (existsSync(doctorPath)) {
     const result = spawnSync(process.execPath, [doctorPath, "--config", configPath], {
       stdio: "inherit",
-      env: { ...process.env, TIMEMANAGE_MCP_PASSWORD: password },
+      env: { ...process.env, TIMEMANAGE_CLI_PASSWORD: password, TIMEMANAGE_MCP_PASSWORD: password },
     });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }

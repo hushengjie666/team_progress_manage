@@ -103,7 +103,7 @@ const taskStages = [
 ] as const satisfies readonly TaskStage[];
 const stageModes = ["regular", "software"] as const satisfies readonly TaskStageMode[];
 
-const helpText = `TimeManage CLI：一次命令一次连接，不启动常驻 MCP 服务。
+const helpText = `TimeManage CLI：一次命令一次连接，不启动常驻服务。
 
 用法：
   timemanage <命令> [参数] [选项]

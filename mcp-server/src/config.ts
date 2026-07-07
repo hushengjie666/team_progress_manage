@@ -21,7 +21,7 @@ const readJsonConfig = (path?: string): Partial<TimeManageMcpConfig> => {
   if (!path) return {};
   const resolved = resolve(path);
   if (!existsSync(resolved)) {
-    throw new Error(`MCP config file not found: ${resolved}`);
+    throw new Error(`TimeManage config file not found: ${resolved}`);
   }
   return JSON.parse(readFileSync(resolved, "utf8")) as Partial<TimeManageMcpConfig>;
 };
@@ -35,10 +35,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): TimeManageMcpC
   const serverUrl = firstValue(env.TM_MCP_SERVER_URL, fileConfig.serverUrl, "http://127.0.0.1:8787")!;
   const email = firstValue(env.TM_MCP_EMAIL, fileConfig.email);
   const password = firstValue(env.TM_MCP_PASSWORD, fileConfig.password);
-  const deviceId = firstValue(env.TM_MCP_DEVICE_ID, fileConfig.deviceId, `timemanage_mcp_${hostname()}`)!;
+  const deviceId = firstValue(env.TM_MCP_DEVICE_ID, fileConfig.deviceId, `timemanage_cli_${hostname()}`)!;
 
   if (!email || !password) {
-    throw new Error("TimeManage MCP requires TM_MCP_EMAIL and TM_MCP_PASSWORD, or TM_MCP_CONFIG with email/password.");
+    throw new Error("TimeManage CLI requires account and password via local config or environment.");
   }
 
   return { serverUrl, email, password, deviceId };

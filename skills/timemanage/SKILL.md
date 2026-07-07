@@ -1,6 +1,6 @@
 ---
 name: timemanage
-description: Use the one-shot TimeManage CLI to query and manage workspaces, projects, members, tasks, today plans, execution state, reviews, settings, and backend connectivity without starting a long-running MCP sidecar.
+description: Use the one-shot TimeManage CLI to query and manage workspaces, projects, members, tasks, today plans, execution state, reviews, settings, and backend connectivity without starting a long-running sidecar.
 ---
 
 # TimeManage CLI Skill
@@ -9,12 +9,12 @@ Use this skill when the user asks Codex to inspect, create, update, or troublesh
 
 ## Operating Model
 
-- Use the bundled CLI, not an MCP tool server. It runs one process per command, then exits, so it does not keep a long-lived MCP context open.
+- Use the bundled CLI. It runs one process per command, then exits, so it does not keep a long-lived tool context open.
 - The plugin CLI path is `plugins/timemanage/scripts/timemanage.mjs` inside the installed plugin root.
-- Configuration is read from `TM_MCP_CONFIG` or the default local config path:
+- Configuration is read from the default local config path:
   - macOS/Linux: `~/.config/timemanage-mcp/config.json`
   - Windows: `%APPDATA%/TimeManage MCP/config.json`
-- Environment overrides remain supported: `TM_MCP_SERVER_URL`, `TM_MCP_EMAIL`, `TM_MCP_PASSWORD`, `TM_MCP_DEVICE_ID`.
+- Environment overrides remain supported: `TM_MCP_CONFIG`, `TM_MCP_SERVER_URL`, `TM_MCP_EMAIL`, `TM_MCP_PASSWORD`, `TM_MCP_DEVICE_ID`.
 - Never print or commit real account passwords.
 
 ## Command Selection

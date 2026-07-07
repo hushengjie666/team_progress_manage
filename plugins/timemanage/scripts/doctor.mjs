@@ -28,7 +28,7 @@ const endpoint = (serverUrl, path) => `${normalizeServerUrl(serverUrl)}${path}`;
 
 const readConfig = (path) => {
   if (!existsSync(path)) {
-    throw new Error(`TimeManage MCP config not found: ${path}`);
+    throw new Error(`TimeManage config not found: ${path}`);
   }
   return JSON.parse(readFileSync(path, "utf8"));
 };
@@ -57,8 +57,8 @@ const main = async () => {
   const config = readConfig(configPath);
   const serverUrl = valueFor("--server-url") || config.serverUrl || defaultServerUrl;
   const email = valueFor("--email") || config.email;
-  const password = process.env.TIMEMANAGE_MCP_PASSWORD || config.password;
-  const deviceId = valueFor("--device-id") || config.deviceId || "timemanage_mcp_doctor";
+  const password = process.env.TIMEMANAGE_CLI_PASSWORD || process.env.TIMEMANAGE_MCP_PASSWORD || config.password;
+  const deviceId = valueFor("--device-id") || config.deviceId || "timemanage_cli_doctor";
 
   if (!email) throw new Error("TimeManage email is required.");
   if (!password) throw new Error("TimeManage password is required.");

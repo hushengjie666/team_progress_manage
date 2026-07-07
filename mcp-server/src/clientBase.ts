@@ -51,7 +51,7 @@ export class TimeManageMcpBaseClient {
             workspaces: session.workspaces,
             workspaceMemberships: [],
             bootstrapped: true,
-            message: "MCP 已登录团队后台",
+            message: "CLI 已登录团队后台",
           }
         : state.auth,
       backend: {
@@ -61,7 +61,7 @@ export class TimeManageMcpBaseClient {
         deviceId: this.config.deviceId,
         token: session?.token,
         status: session ? "ready" : "idle",
-        message: session ? "MCP 已连接团队后台" : "MCP 尚未登录团队后台",
+        message: session ? "CLI 已连接团队后台" : "CLI 尚未登录团队后台",
       },
     };
   }
@@ -87,7 +87,7 @@ export class TimeManageMcpBaseClient {
       workspaces: workspaces.workspaces,
       workspaceMemberships: workspaces.memberships,
       bootstrapped: true,
-      message: "MCP 已登录团队后台",
+      message: "CLI 已登录团队后台",
     };
     const local = bindAccountToMembers({ ...base, auth }, auth);
     return bindAccountToMembers(await loadTeamData(local), auth);
@@ -115,7 +115,7 @@ export class TimeManageMcpBaseClient {
         token: session.token,
         lastSavedAt: timestamp,
         status: "ready" as const,
-        message: "MCP 已写入团队后台",
+        message: "CLI 已写入团队后台",
       },
       updatedAt: timestamp,
     };

@@ -116,13 +116,13 @@ export const scheduleTaskForDateInState = (state: AppState, taskId: string, date
 };
 
 export const startTaskInTeamState = (state: AppState, taskId: string, timestamp: string) =>
-  startWorkSessionInState(state, taskId, timestamp, { source: "mcp", idFactory: uid });
+  startWorkSessionInState(state, taskId, timestamp, { source: "cli", idFactory: uid });
 
 export const pauseWorkSessionInTeamState = (state: AppState, input: WorkSessionInput, timestamp: string) =>
-  pauseWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "mcp", idFactory: uid });
+  pauseWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
 
 export const resumeWorkSessionInTeamState = (state: AppState, input: WorkSessionInput, timestamp: string) =>
-  resumeWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "mcp", idFactory: uid });
+  resumeWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
 
 export const finishWorkSessionInTeamState = (state: AppState, input: WorkSessionInput, timestamp: string) =>
-  finishWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { outcome: input.outcome, source: "mcp", idFactory: uid });
+  finishWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { outcome: input.outcome, source: "cli", idFactory: uid });

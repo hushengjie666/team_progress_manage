@@ -15,7 +15,7 @@ var readJsonConfig = (path) => {
   if (!path) return {};
   const resolved = resolve(path);
   if (!existsSync(resolved)) {
-    throw new Error(`MCP config file not found: ${resolved}`);
+    throw new Error(`TimeManage config file not found: ${resolved}`);
   }
   return JSON.parse(readFileSync(resolved, "utf8"));
 };
@@ -26,9 +26,9 @@ function loadConfig(env = process.env) {
   const serverUrl = firstValue(env.TM_MCP_SERVER_URL, fileConfig.serverUrl, "http://127.0.0.1:8787");
   const email = firstValue(env.TM_MCP_EMAIL, fileConfig.email);
   const password = firstValue(env.TM_MCP_PASSWORD, fileConfig.password);
-  const deviceId = firstValue(env.TM_MCP_DEVICE_ID, fileConfig.deviceId, `timemanage_mcp_${hostname()}`);
+  const deviceId = firstValue(env.TM_MCP_DEVICE_ID, fileConfig.deviceId, `timemanage_cli_${hostname()}`);
   if (!email || !password) {
-    throw new Error("TimeManage MCP requires TM_MCP_EMAIL and TM_MCP_PASSWORD, or TM_MCP_CONFIG with email/password.");
+    throw new Error("TimeManage CLI requires account and password via local config or environment.");
   }
   return { serverUrl, email, password, deviceId };
 }
@@ -1519,10 +1519,10 @@ var scheduleTaskForDateInState = (state, taskId, date, timestamp) => {
     updatedAt: timestamp
   };
 };
-var startTaskInTeamState = (state, taskId, timestamp) => startWorkSessionInState(state, taskId, timestamp, { source: "mcp", idFactory: uid });
-var pauseWorkSessionInTeamState = (state, input, timestamp) => pauseWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "mcp", idFactory: uid });
-var resumeWorkSessionInTeamState = (state, input, timestamp) => resumeWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "mcp", idFactory: uid });
-var finishWorkSessionInTeamState = (state, input, timestamp) => finishWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { outcome: input.outcome, source: "mcp", idFactory: uid });
+var startTaskInTeamState = (state, taskId, timestamp) => startWorkSessionInState(state, taskId, timestamp, { source: "cli", idFactory: uid });
+var pauseWorkSessionInTeamState = (state, input, timestamp) => pauseWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
+var resumeWorkSessionInTeamState = (state, input, timestamp) => resumeWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
+var finishWorkSessionInTeamState = (state, input, timestamp) => finishWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { outcome: input.outcome, source: "cli", idFactory: uid });
 
 // mcp-server/src/businessReviewSettingsOperations.ts
 var submitTaskReviewInTeamState = (state, taskId, timestamp) => {
@@ -2348,7 +2348,7 @@ var TimeManageMcpBaseClient = class {
         workspaces: session.workspaces,
         workspaceMemberships: [],
         bootstrapped: true,
-        message: "MCP \u5DF2\u767B\u5F55\u56E2\u961F\u540E\u53F0"
+        message: "CLI \u5DF2\u767B\u5F55\u56E2\u961F\u540E\u53F0"
       } : state.auth,
       backend: {
         ...state.backend,
@@ -2357,7 +2357,7 @@ var TimeManageMcpBaseClient = class {
         deviceId: this.config.deviceId,
         token: session?.token,
         status: session ? "ready" : "idle",
-        message: session ? "MCP \u5DF2\u8FDE\u63A5\u56E2\u961F\u540E\u53F0" : "MCP \u5C1A\u672A\u767B\u5F55\u56E2\u961F\u540E\u53F0"
+        message: session ? "CLI \u5DF2\u8FDE\u63A5\u56E2\u961F\u540E\u53F0" : "CLI \u5C1A\u672A\u767B\u5F55\u56E2\u961F\u540E\u53F0"
       }
     };
   }
@@ -2381,7 +2381,7 @@ var TimeManageMcpBaseClient = class {
       workspaces: workspaces.workspaces,
       workspaceMemberships: workspaces.memberships,
       bootstrapped: true,
-      message: "MCP \u5DF2\u767B\u5F55\u56E2\u961F\u540E\u53F0"
+      message: "CLI \u5DF2\u767B\u5F55\u56E2\u961F\u540E\u53F0"
     };
     const local = bindAccountToMembers({ ...base, auth }, auth);
     return bindAccountToMembers(await loadTeamData(local), auth);
@@ -2408,7 +2408,7 @@ var TimeManageMcpBaseClient = class {
         token: session.token,
         lastSavedAt: timestamp,
         status: "ready",
-        message: "MCP \u5DF2\u5199\u5165\u56E2\u961F\u540E\u53F0"
+        message: "CLI \u5DF2\u5199\u5165\u56E2\u961F\u540E\u53F0"
       },
       updatedAt: timestamp
     };
@@ -3295,7 +3295,7 @@ var taskStages = [
   "acceptance"
 ];
 var stageModes = ["regular", "software"];
-var helpText = `TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B MCP \u670D\u52A1\u3002
+var helpText = `TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002
 
 \u7528\u6CD5\uFF1A
   timemanage <\u547D\u4EE4> [\u53C2\u6570] [\u9009\u9879]

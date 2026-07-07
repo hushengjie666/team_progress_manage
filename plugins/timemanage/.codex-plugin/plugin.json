@@ -1,7 +1,7 @@
 {
   "name": "timemanage",
   "version": "0.1.3",
-  "description": "Use the TimeManage CLI to operate TimeManage team workspaces, projects, members, tasks, daily plans, reviews, settings, and templates without a long-running MCP sidecar.",
+  "description": "Use the TimeManage CLI to operate TimeManage team workspaces, projects, members, tasks, daily plans, reviews, settings, and templates without a long-running sidecar.",
   "author": {
     "name": "TimeManage Team",
     "email": "support@hudashuai.xyz",
@@ -20,7 +20,7 @@
   "interface": {
     "displayName": "TimeManage",
     "shortDescription": "Use the TimeManage CLI to operate team data",
-    "longDescription": "Query and manage TimeManage workspaces, projects, members, tasks, today plans, work sessions, reviews, settings, and templates through a one-shot local CLI instead of a long-running MCP server.",
+    "longDescription": "Query and manage TimeManage workspaces, projects, members, tasks, today plans, work sessions, reviews, settings, and templates through a one-shot local CLI instead of a long-running server.",
     "developerName": "TimeManage Team",
     "category": "Productivity",
     "capabilities": [

@@ -19,7 +19,7 @@ const copy = (from, to) => {
   copyFileSync(from, to);
 };
 
-run("npm", ["run", "mcp:build"]);
+run("npm", ["run", "cli:build"]);
 
 const pluginRoot = join(repoRoot, "plugins", "timemanage");
 copy(
