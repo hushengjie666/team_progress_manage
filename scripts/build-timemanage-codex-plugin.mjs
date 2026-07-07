@@ -27,8 +27,8 @@ copy(
   join(pluginRoot, "skills", "timemanage", "SKILL.md"),
 );
 copy(
-  join(repoRoot, "mcp-server", "dist", "index.js"),
-  join(pluginRoot, "mcp", "index.js"),
+  join(repoRoot, "mcp-server", "dist", "cli.js"),
+  join(pluginRoot, "scripts", "timemanage.mjs"),
 );
 
 const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));

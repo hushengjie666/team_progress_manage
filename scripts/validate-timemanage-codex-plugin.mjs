@@ -9,10 +9,8 @@ const pluginRoot = join(repoRoot, "plugins", "timemanage");
 
 const requiredFiles = [
   { root: pluginRoot, path: ".codex-plugin/plugin.json" },
-  { root: pluginRoot, path: ".mcp.json" },
   { root: pluginRoot, path: "skills/timemanage/SKILL.md" },
-  { root: pluginRoot, path: "mcp/index.js" },
-  { root: pluginRoot, path: "scripts/start-mcp.mjs" },
+  { root: pluginRoot, path: "scripts/timemanage.mjs" },
   { root: pluginRoot, path: "scripts/doctor.mjs" },
   { root: pluginRoot, path: "scripts/setup.mjs" },
   { root: repoRoot, path: ".agents/plugins/marketplace.json" },
@@ -34,24 +32,17 @@ for (const file of requiredFiles) {
 const manifest = readJson(join(pluginRoot, ".codex-plugin", "plugin.json"));
 if (manifest.name !== "timemanage") fail("Plugin manifest name must be timemanage.");
 if (manifest.skills !== "./skills/") fail("Plugin manifest must point skills to ./skills/.");
-if (manifest.mcpServers !== "./.mcp.json") fail("Plugin manifest must point mcpServers to ./.mcp.json.");
-if (!Array.isArray(manifest.interface?.defaultPrompt)) fail("Plugin defaultPrompt must be an array.");
-
-const mcp = readJson(join(pluginRoot, ".mcp.json"));
-const server = mcp.mcpServers?.timemanage;
-if (!server) fail("MCP config must contain mcpServers.timemanage.");
-if (server.command !== "node") fail("TimeManage MCP command must be node.");
-if (!server.args?.includes("./scripts/start-mcp.mjs")) fail("TimeManage MCP args must launch ./scripts/start-mcp.mjs.");
+if ("mcpServers" in manifest) fail("CLI plugin manifest must not register mcpServers.");
 
 const marketplace = readJson(join(repoRoot, ".agents", "plugins", "marketplace.json"));
 if (marketplace.name !== "timemanage-team") fail("Marketplace name must be timemanage-team.");
 if (!marketplace.plugins?.some((plugin) => plugin.name === "timemanage")) fail("Marketplace must include timemanage.");
 
 const skill = readFileSync(join(pluginRoot, "skills", "timemanage", "SKILL.md"), "utf8");
-if (!skill.includes("TimeManage MCP Skill")) fail("Plugin skill is not the TimeManage skill.");
+if (!skill.includes("TimeManage CLI Skill")) fail("Plugin skill is not the TimeManage CLI skill.");
 
 for (const script of [
-  join(pluginRoot, "scripts", "start-mcp.mjs"),
+  join(pluginRoot, "scripts", "timemanage.mjs"),
   join(pluginRoot, "scripts", "doctor.mjs"),
   join(pluginRoot, "scripts", "setup.mjs"),
   join(repoRoot, "scripts", "bootstrap-timemanage-codex.mjs"),

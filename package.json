@@ -21,7 +21,7 @@
     "remote:gateway": "node scripts/remote-gateway.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "mcp:build": "esbuild mcp-server/src/index.ts --bundle --platform=node --format=esm --target=node20 --outfile=mcp-server/dist/index.js",
+    "mcp:build": "esbuild mcp-server/src/index.ts mcp-server/src/cli.ts --bundle --platform=node --format=esm --target=node20 --outdir=mcp-server/dist",
     "mcp:server": "npm run mcp:build --silent && node mcp-server/dist/index.js",
     "plugin:build": "node scripts/build-timemanage-codex-plugin.mjs",
     "plugin:validate": "node scripts/validate-timemanage-codex-plugin.mjs",
