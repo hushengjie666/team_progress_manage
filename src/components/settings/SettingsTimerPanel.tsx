@@ -1,5 +1,42 @@
-import { AlarmClock, Bell, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlarmClock, Bell, Minus, Plus, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { normalizeTimerSoundRepeats, normalizeTimerSoundVolume, playTimerSound, startWhiteNoise } from "../../notifications";
 import type { Settings } from "../../types";
+
+function VolumeStepper({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const commit = (nextValue: number) => onChange(normalizeTimerSoundVolume(nextValue));
+
+  return (
+    <div className="volume-stepper-field">
+      <span>{label}</span>
+      <div className="volume-stepper" role="group" aria-label={label}>
+        <button type="button" className="icon-button small" title="降低音量" onClick={() => commit(value - 10)}>
+          <Minus size={14} />
+        </button>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="5"
+          value={value}
+          aria-label={label}
+          onChange={(event) => commit(Number(event.target.value))}
+        />
+        <button type="button" className="icon-button small" title="提高音量" onClick={() => commit(value + 10)}>
+          <Plus size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function SettingsTimerPanel({
   dailyGoal,
@@ -12,6 +49,40 @@ export function SettingsTimerPanel({
   updateSettings: <K extends keyof Settings>(key: K, value: Settings[K]) => void;
   askNotificationPermissions: () => Promise<void>;
 }) {
+  const stopWhiteNoisePreviewRef = useRef<(() => void) | null>(null);
+  const [whiteNoisePreviewing, setWhiteNoisePreviewing] = useState(false);
+
+  const stopWhiteNoisePreview = () => {
+    stopWhiteNoisePreviewRef.current?.();
+    stopWhiteNoisePreviewRef.current = null;
+    setWhiteNoisePreviewing(false);
+  };
+
+  const startWhiteNoisePreview = () => {
+    stopWhiteNoisePreviewRef.current?.();
+    stopWhiteNoisePreviewRef.current = startWhiteNoise(settings.whiteNoise, settings.whiteNoiseVolume);
+    setWhiteNoisePreviewing(true);
+  };
+
+  const toggleWhiteNoisePreview = () => {
+    if (whiteNoisePreviewing) {
+      stopWhiteNoisePreview();
+      return;
+    }
+    startWhiteNoisePreview();
+  };
+
+  useEffect(() => () => stopWhiteNoisePreview(), []);
+
+  useEffect(() => {
+    if (!whiteNoisePreviewing) return;
+    if (settings.whiteNoise === "off" || settings.whiteNoiseVolume <= 0) {
+      stopWhiteNoisePreview();
+      return;
+    }
+    startWhiteNoisePreview();
+  }, [settings.whiteNoise, settings.whiteNoiseVolume]);
+
   return (
     <>
       <section className="band settings-panel">
@@ -53,12 +124,6 @@ export function SettingsTimerPanel({
             <input type="number" min="2" max="8" value={settings.longBreakEvery} onChange={(event) => updateSettings("longBreakEvery", Number(event.target.value))} />
           </label>
         </div>
-        <div className="toggle-row">
-          <label>
-            <input type="checkbox" checked={settings.autoStartBreaks} onChange={(event) => updateSettings("autoStartBreaks", event.target.checked)} />
-            自动开始休息
-          </label>
-        </div>
         <div className="notification-grid">
           <label className="inline-toggle">
             <input type="checkbox" checked={settings.notificationsEnabled} onChange={(event) => updateSettings("notificationsEnabled", event.target.checked)} />
@@ -76,6 +141,35 @@ export function SettingsTimerPanel({
               <option value="digital">电子</option>
             </select>
           </label>
+          <VolumeStepper
+            label="结束音量"
+            value={settings.timerEndSoundVolume}
+            onChange={(value) => updateSettings("timerEndSoundVolume", value)}
+          />
+          <label>
+            音效次数
+            <input
+              type="number"
+              min="1"
+              max="5"
+              value={settings.timerEndSoundRepeats}
+              onChange={(event) => updateSettings("timerEndSoundRepeats", normalizeTimerSoundRepeats(Number(event.target.value)))}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            type="button"
+            title="试听结束音效"
+            onClick={() => playTimerSound({
+              soundEnabled: true,
+              timerEndSound: settings.timerEndSound,
+              timerEndSoundVolume: settings.timerEndSoundVolume,
+              timerEndSoundRepeats: settings.timerEndSoundRepeats,
+            })}
+          >
+            <Volume2 size={16} />
+            试听
+          </button>
           <label>
             白噪音
             <select value={settings.whiteNoise} onChange={(event) => updateSettings("whiteNoise", event.target.value as Settings["whiteNoise"])}>
@@ -85,10 +179,21 @@ export function SettingsTimerPanel({
               <option value="cafe">咖啡馆</option>
             </select>
           </label>
-          <label>
-            音量
-            <input type="range" min="0" max="100" value={settings.whiteNoiseVolume} onChange={(event) => updateSettings("whiteNoiseVolume", Number(event.target.value))} />
-          </label>
+          <VolumeStepper
+            label="白噪音音量"
+            value={settings.whiteNoiseVolume}
+            onChange={(value) => updateSettings("whiteNoiseVolume", value)}
+          />
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={settings.whiteNoise === "off" || settings.whiteNoiseVolume <= 0}
+            title={whiteNoisePreviewing ? "停止白噪音" : "试听白噪音"}
+            onClick={toggleWhiteNoisePreview}
+          >
+            {whiteNoisePreviewing ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            {whiteNoisePreviewing ? "停止白噪音" : "试听白噪音"}
+          </button>
           <button className="secondary-button" onClick={() => void askNotificationPermissions()}>
             <Bell size={16} />
             检查通知

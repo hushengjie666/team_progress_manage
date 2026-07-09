@@ -8,7 +8,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 type StoredAppRuntime = {
   version: 4;
-  settings: Settings;
+  settings: Partial<Settings>;
   auth: Partial<AuthState>;
   backend: Pick<BackendConnectionState, "serverUrl" | "username" | "deviceId" | "token">;
   updatedAt: string;
@@ -36,7 +36,10 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
   const initial = createInitialState();
   return {
     ...initial,
-    settings: payload.settings,
+    settings: {
+      ...initial.settings,
+      ...payload.settings,
+    },
     auth: {
       ...initial.auth,
       ...payload.auth,
@@ -57,9 +60,9 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
 const readStoredState = (payload: string): AppState => parseCurrentAppStatePayload(JSON.parse(payload));
 
 export async function loadState(): Promise<AppState> {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (!stored) return createInitialState();
   try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return createInitialState();
     return readStoredState(stored);
   } catch {
     return createInitialState();
@@ -88,5 +91,9 @@ export async function saveState(state: AppState): Promise<void> {
     },
     updatedAt: new Date().toISOString(),
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // Tauri/WebView privacy modes can make localStorage unavailable; runtime state still remains in memory.
+  }
 }

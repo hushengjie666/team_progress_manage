@@ -50,6 +50,30 @@ describe("current app state payload", () => {
     expect(parsed.dailyPlans).toEqual([]);
   });
 
+  it("fills new settings defaults for existing runtime caches", () => {
+    const state = createInitialState();
+    const {
+      timerEndSoundRepeats: _timerEndSoundRepeats,
+      timerEndSoundVolume: _timerEndSoundVolume,
+      ...settings
+    } = state.settings;
+
+    const parsed = parseCurrentAppStatePayload({
+      version: 4,
+      settings,
+      auth: state.auth,
+      backend: {
+        serverUrl: state.backend.serverUrl,
+        username: state.backend.username,
+        deviceId: state.backend.deviceId,
+      },
+      updatedAt: state.updatedAt,
+    });
+
+    expect(parsed.settings.timerEndSoundRepeats).toBe(1);
+    expect(parsed.settings.timerEndSoundVolume).toBe(100);
+  });
+
   it("rejects unsupported schema versions instead of normalizing them", () => {
     const state = createInitialState();
     const legacy = { ...state, version: 2 };

@@ -1,7 +1,7 @@
 export type RememberedAuth = {
   serverUrl: string;
   email: string;
-  password: string;
+  password?: string;
   savedAt: string;
 };
 
@@ -18,7 +18,7 @@ const readAllRememberedAuth = (): RememberedAuth[] => {
       (item): item is RememberedAuth =>
         typeof item?.serverUrl === "string" &&
         typeof item.email === "string" &&
-        typeof item.password === "string" &&
+        (item.password === undefined || typeof item.password === "string") &&
         typeof item.savedAt === "string",
     );
   } catch {
@@ -36,12 +36,11 @@ export const readRememberedAuth = (serverUrl: string): RememberedAuth | undefine
   return readAllRememberedAuth().find((item) => normalizeServerUrl(item.serverUrl) === normalized);
 };
 
-export const saveRememberedAuth = (serverUrl: string, email: string, password: string) => {
+export const saveRememberedAuth = (serverUrl: string, email: string) => {
   const normalized = normalizeServerUrl(serverUrl);
   const next: RememberedAuth = {
     serverUrl: normalized,
     email: email.trim(),
-    password,
     savedAt: new Date().toISOString(),
   };
   const others = readAllRememberedAuth().filter((item) => normalizeServerUrl(item.serverUrl) !== normalized);

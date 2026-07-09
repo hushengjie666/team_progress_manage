@@ -171,7 +171,9 @@ describe("team state runtime", () => {
     const saved = await runtime.persistTeamData(before, after);
 
     expect(saved).toBeUndefined();
-    expect(getCurrent()?.auth.status).toBe("error");
+    expect(getCurrent()?.auth.status).toBe("authenticated");
+    expect(getCurrent()?.auth.token).toBe(before.auth.token);
+    expect(getCurrent()?.auth.account).toEqual(before.auth.account);
     expect(getCurrent()?.backend.status).toBe("error");
     expect(getToast()).toContain("backend down");
   });

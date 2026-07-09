@@ -20,6 +20,28 @@ npm run backend:build
 npm run backend:server
 ```
 
+## 桌面端开发
+
+桌面端使用 Tauri v2 包装现有 React 前端。首版桌面壳继续连接现有团队后台，不内置 Go 后端服务。
+
+前置依赖：
+
+```bash
+npm install
+rustc --version
+cargo --version
+```
+
+常用命令：
+
+```bash
+npm run tauri:dev
+npm run tauri:build
+npm run tauri:info
+```
+
+桌面端默认团队后台地址仍是 `http://127.0.0.1:8787`。本地联调时先运行 `npm run backend:build` 和 `npm run backend:server`，再启动 `npm run tauri:dev`。
+
 ## 本地后台验证
 
 默认团队后台服务地址是 `http://127.0.0.1:8787`，账号/密码是 `admin/hu626699`。低内存服务器部署时只需要上传 `team-server/bin/timemanage-team` 这个二进制，并通过环境变量配置：

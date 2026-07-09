@@ -19,6 +19,8 @@ export interface Settings {
   whiteNoise: WhiteNoise;
   whiteNoiseVolume: number;
   timerEndSound: TimerEndSound;
+  timerEndSoundVolume: number;
+  timerEndSoundRepeats: number;
   notificationSettings: NotificationSettings;
   advancedBackendVisible?: boolean;
   commandPaletteHintDismissed?: boolean;

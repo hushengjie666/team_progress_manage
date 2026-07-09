@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 func (a *app) requireMySQL(w http.ResponseWriter) bool {
@@ -35,8 +39,46 @@ func withCORS(next http.Handler) http.Handler {
 }
 
 func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
+	payload := map[string]any{
 		"status": "ok",
 		"time":   time.Now().UTC().Format(time.RFC3339),
-	})
+	}
+	if storage := a.healthStorageSummary(r.Context()); storage != nil {
+		payload["storage"] = storage
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (a *app) healthStorageSummary(parent context.Context) map[string]any {
+	if a.db == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(parent, 2*time.Second)
+	defer cancel()
+	summary := map[string]any{
+		"driver": "mysql",
+	}
+	if cfg, err := mysql.ParseDSN(a.cfg.mysqlDSN); err == nil && cfg.DBName != "" {
+		summary["database"] = cfg.DBName
+	}
+	var total int
+	for _, spec := range businessEntityTables {
+		var count int
+		if err := a.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+spec.table).Scan(&count); err != nil {
+			if err == sql.ErrNoRows {
+				continue
+			}
+			summary["status"] = "error"
+			return summary
+		}
+		total += count
+		if spec.entity == "project" {
+			summary["business_projects"] = count
+		}
+		if spec.entity == "task" {
+			summary["business_tasks"] = count
+		}
+	}
+	summary["business_rows"] = total
+	return summary
 }

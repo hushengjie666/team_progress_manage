@@ -32,10 +32,38 @@ export type AppBootRuntimeOptions = {
 const shouldLoadDemoData = () => {
   if (typeof window === "undefined") return false;
   const params = new URLSearchParams(window.location.search);
-  const shouldLoadDemo = params.get("demo") === "1" || sessionStorage.getItem("timemanage.load_demo") === "1";
-  if (params.get("demo") === "1") sessionStorage.setItem("timemanage.load_demo", "1");
+  const shouldLoadDemoFromQuery = params.get("demo") === "1";
+  let shouldLoadDemoFromSession = false;
+  try {
+    shouldLoadDemoFromSession = sessionStorage.getItem("timemanage.load_demo") === "1";
+    if (shouldLoadDemoFromQuery) sessionStorage.setItem("timemanage.load_demo", "1");
+  } catch {
+    shouldLoadDemoFromSession = false;
+  }
+  const shouldLoadDemo = shouldLoadDemoFromQuery || shouldLoadDemoFromSession;
   if (shouldLoadDemo) window.history.replaceState(null, "", window.location.pathname);
   return shouldLoadDemo;
+};
+
+const normalizeServerUrl = (serverUrl: string) => serverUrl.trim().replace(/\/+$/, "");
+
+const testBackendServerUrl = () =>
+  import.meta.env.VITE_WDIO_TAURI === "1" ? import.meta.env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL : "";
+
+const isLocalBackendUrl = (serverUrl: string) => {
+  try {
+    const { hostname } = new URL(serverUrl);
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1";
+  } catch {
+    return false;
+  }
+};
+
+export const shouldResetSignedOutLocalBackendUrl = (state: AppState) => {
+  if (state.auth.token) return false;
+  const defaultUrl = defaultBackendServerUrl();
+  return isLocalBackendUrl(state.backend.serverUrl) &&
+    normalizeServerUrl(state.backend.serverUrl) !== normalizeServerUrl(defaultUrl);
 };
 
 export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOptions): Promise<AppBootResult> {
@@ -52,6 +80,38 @@ export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOpt
       backend: {
         ...next.backend,
         serverUrl: defaultBackendServerUrl(),
+      },
+    };
+  }
+
+  const wdioBackendUrl = testBackendServerUrl();
+  if (wdioBackendUrl) {
+    next = {
+      ...next,
+      auth: {
+        status: "signed_out",
+        bootstrapped: true,
+        message: "请使用管理员分配的账号登录",
+      },
+      backend: {
+        ...next.backend,
+        serverUrl: wdioBackendUrl,
+        token: undefined,
+        status: "idle",
+        message: "请使用管理员分配的账号登录",
+      },
+      activeTimer: undefined,
+    };
+  }
+
+  if (shouldResetSignedOutLocalBackendUrl(next)) {
+    next = {
+      ...next,
+      backend: {
+        ...next.backend,
+        serverUrl: defaultBackendServerUrl(),
+        status: "idle",
+        message: "请使用管理员分配的账号登录",
       },
     };
   }
@@ -92,10 +152,16 @@ export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOpt
     } catch (error) {
       next = applyTeamStateLoadFailure(next, error);
     }
-    const metadata = await loadWorkspaceAccountMetadata(next, token);
-    platformAccounts = metadata.platformAccounts;
-    workspaceInvitations = metadata.workspaceInvitations;
-    projectInvitations = metadata.projectInvitations;
+    try {
+      const metadata = await loadWorkspaceAccountMetadata(next, token);
+      platformAccounts = metadata.platformAccounts;
+      workspaceInvitations = metadata.workspaceInvitations;
+      projectInvitations = metadata.projectInvitations;
+    } catch {
+      platformAccounts = [];
+      workspaceInvitations = [];
+      projectInvitations = [];
+    }
   }
 
   if (shouldLoadDemo && next.auth.status === "authenticated" && next.auth.token) {
@@ -105,7 +171,11 @@ export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOpt
       return { platformAccounts, workspaceInvitations, projectInvitations };
     }
     next = saved;
-    sessionStorage.removeItem("timemanage.load_demo");
+    try {
+      sessionStorage.removeItem("timemanage.load_demo");
+    } catch {
+      // Demo loading remains one-shot when sessionStorage is available.
+    }
     return {
       state: next,
       platformAccounts,

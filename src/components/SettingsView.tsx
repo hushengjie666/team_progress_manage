@@ -28,7 +28,6 @@ export function SettingsView(props: SettingsViewProps) {
     checkBackendHealth,
     handleBackendLogin,
     handleBackendRefresh,
-    runBackendDiagnostics,
     backendDiagnostic,
     loadDemoData,
   } = props;
@@ -80,7 +79,6 @@ export function SettingsView(props: SettingsViewProps) {
           checkBackendHealth={checkBackendHealth}
           handleBackendLogin={handleBackendLogin}
           handleBackendRefresh={handleBackendRefresh}
-          runBackendDiagnostics={runBackendDiagnostics}
           backendDiagnostic={backendDiagnostic}
           dataSummary={dataSummary}
           projectCount={dataSummary.projectCount}

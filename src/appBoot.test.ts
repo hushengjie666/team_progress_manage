@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { applyAuthStatusFailure, applyTeamStateLoadFailure, normalizeAuthMessage } from "./appBoot";
+import { applyAuthStatusFailure, applyTeamStateLoadFailure, applyTeamStateSaveFailure, normalizeAuthMessage } from "./appBoot";
+import { shouldResetSignedOutLocalBackendUrl } from "./appBootRuntime";
 import { createInitialState } from "./seed";
 
 const signedInState = () => {
@@ -53,9 +54,9 @@ describe("app boot fallback", () => {
     expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
   });
 
-  it("clears cached sign-in when the current workspace can no longer be accessed", () => {
+  it("clears cached sign-in when auth status says the current workspace can no longer be accessed", () => {
     const state = signedInState();
-    const next = applyTeamStateLoadFailure(state, new Error("workspace access denied"));
+    const next = applyAuthStatusFailure(state, new Error("workspace access denied"));
 
     expect(next.auth.status).toBe("signed_out");
     expect(next.auth.token).toBeUndefined();
@@ -66,9 +67,49 @@ describe("app boot fallback", () => {
     expect(next.backend.message).toBe(next.auth.message);
   });
 
+  it("keeps the account signed in when team data saving is denied", () => {
+    const state = signedInState();
+    const next = applyTeamStateSaveFailure(state, new Error("workspace access denied"));
+
+    expect(next.auth.status).toBe("authenticated");
+    expect(next.auth.token).toBe("token_cached");
+    expect(next.auth.account).toEqual(state.auth.account);
+    expect(next.backend.token).toBe("token_cached");
+    expect(next.backend.status).toBe("error");
+    expect(next.backend.message).toContain("workspace access denied");
+  });
+
   it("normalizes stale persisted workspace access errors for login display", () => {
     expect(
       normalizeAuthMessage("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：workspace access denied"),
     ).toBe("登录状态已失效或无权访问当前工作区，请重新登录账号");
+  });
+
+  it("resets signed-out local test backend ports without touching remote or signed-in sessions", () => {
+    const signedOutLocalTestState = {
+      ...createInitialState(),
+      backend: {
+        ...createInitialState().backend,
+        serverUrl: "http://127.0.0.1:54635",
+      },
+    };
+    const signedOutRemoteState = {
+      ...createInitialState(),
+      backend: {
+        ...createInitialState().backend,
+        serverUrl: "https://team.example.com/api",
+      },
+    };
+    const signedInLocalTestState = {
+      ...signedOutLocalTestState,
+      auth: {
+        ...signedOutLocalTestState.auth,
+        token: "token_cached",
+      },
+    };
+
+    expect(shouldResetSignedOutLocalBackendUrl(signedOutLocalTestState)).toBe(true);
+    expect(shouldResetSignedOutLocalBackendUrl(signedOutRemoteState)).toBe(false);
+    expect(shouldResetSignedOutLocalBackendUrl(signedInLocalTestState)).toBe(false);
   });
 });

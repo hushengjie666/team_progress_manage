@@ -4,6 +4,7 @@ import type { ActiveTimer, AppState, Settings } from "./types";
 
 type StopNoiseRef = { current: (() => void) | null };
 type CommitTeamData = (before: AppState, after: AppState) => void;
+type AnnounceTimerEndOptions = { playSound?: boolean };
 
 export const stopWhiteNoise = (stopNoiseRef: StopNoiseRef) => {
   stopNoiseRef.current?.();
@@ -25,8 +26,13 @@ export const updateActiveTimerPresence = (active?: ActiveTimer) => {
   }
 };
 
-export const announceTimerEnd = (settings: Settings, title: string, body: string) => {
-  playTimerSound(settings);
+export const announceTimerEnd = (
+  settings: Settings,
+  title: string,
+  body: string,
+  options: AnnounceTimerEndOptions = {},
+) => {
+  if (options.playSound !== false) playTimerSound(settings);
   void sendTimerNotification(settings, title, body);
 };
 

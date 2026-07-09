@@ -11,6 +11,17 @@ type NotificationPermissionStatus = {
   message: string;
 };
 
+type TimerSoundSettings = Pick<Settings, "soundEnabled" | "timerEndSound"> &
+  Partial<Pick<Settings, "timerEndSoundRepeats" | "timerEndSoundVolume">>;
+
+export const normalizeTimerSoundRepeats = (value: unknown) =>
+  Number.isFinite(value) ? Math.min(5, Math.max(1, Math.round(Number(value)))) : 1;
+
+export const normalizeTimerSoundVolume = (value: unknown) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? Math.min(100, Math.max(0, Math.round(numeric))) : 100;
+};
+
 const makeStatus = (permissionState: PermissionState, message: string): NotificationPermissionStatus => ({
   permission_state: permissionState,
   message,
@@ -38,30 +49,49 @@ const audioContext = () => {
   return AudioCtor ? new AudioCtor() : null;
 };
 
-export function playTimerSound(settings: Settings): void {
+const resumeAudioContext = (context: AudioContext) => {
+  if (context.state === "suspended") {
+    void context.resume().catch(() => undefined);
+  }
+};
+
+export function playTimerSound(settings: TimerSoundSettings): void {
   if (!settings.soundEnabled) return;
+  const volume = normalizeTimerSoundVolume(settings.timerEndSoundVolume);
+  if (volume <= 0) return;
   const context = audioContext();
   if (!context) return;
+  resumeAudioContext(context);
 
-  const oscillator = context.createOscillator();
-  const gain = context.createGain();
   const profile = settings.timerEndSound;
-  oscillator.type = profile === "bell" ? "sine" : profile === "digital" ? "square" : "triangle";
-  oscillator.frequency.value = profile === "bell" ? 880 : profile === "digital" ? 520 : 660;
-  gain.gain.setValueAtTime(0.0001, context.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.18, context.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.75);
-  oscillator.connect(gain);
-  gain.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.8);
-  window.setTimeout(() => void context.close(), 1000);
+  const repeats = normalizeTimerSoundRepeats(settings.timerEndSoundRepeats);
+  const peakGain = 0.18 * (volume / 100);
+  const duration = 0.8;
+  const gap = 0.25;
+
+  for (let index = 0; index < repeats; index += 1) {
+    const startAt = context.currentTime + index * (duration + gap);
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = profile === "bell" ? "sine" : profile === "digital" ? "square" : "triangle";
+    oscillator.frequency.value = profile === "bell" ? 880 : profile === "digital" ? 520 : 660;
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.75);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + duration);
+  }
+
+  window.setTimeout(() => void context.close(), (duration + gap) * repeats * 1000 + 200);
 }
 
 export function startWhiteNoise(kind: WhiteNoise, volume: number): () => void {
   if (kind === "off") return () => undefined;
   const context = audioContext();
   if (!context) return () => undefined;
+  resumeAudioContext(context);
 
   const seconds = 2;
   const buffer = context.createBuffer(1, seconds * context.sampleRate, context.sampleRate);
@@ -83,7 +113,7 @@ export function startWhiteNoise(kind: WhiteNoise, volume: number): () => void {
   const gain = context.createGain();
   source.buffer = buffer;
   source.loop = true;
-  gain.gain.value = Math.min(1, Math.max(0, volume / 100)) * 0.22;
+  gain.gain.value = Math.min(1, Math.max(0, volume / 100)) * 0.36;
   source.connect(gain);
   gain.connect(context.destination);
   source.start();

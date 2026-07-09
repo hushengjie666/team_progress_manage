@@ -29,11 +29,37 @@ describe("timer app model", () => {
     const finishedSession = finished.focusSessions.find((session) => session.id === "session_expired_model");
     const workSession = finished.workSessions.find((session) => session.focusSessionId === "session_expired_model");
 
-    expect(finished.activeTimer).toBeUndefined();
+    expect(finished.activeTimer).toMatchObject({
+      mode: "short_break",
+      remaining: state.settings.shortBreakMinutes * 60,
+      isRunning: false,
+      pausedAt: timestamp,
+    });
     expect(finishedTask?.actualPomodoros).toBe(1);
     expect(finishedTask?.status).toBe("in_progress");
     expect(finishedSession?.outcome).toBe("completed");
     expect(workSession?.status).toBe("ended");
+  });
+
+  it("prepares the next focus timer after a break without starting it", () => {
+    const state = createInitialState();
+    const breakStarted = startTimerInState(
+      state,
+      "short_break",
+      undefined,
+      `${todayKey()}T09:00:00.000Z`,
+      "session_break_model",
+    );
+    const timestamp = `${todayKey()}T09:05:00.000Z`;
+
+    const finished = finishExpiredTimerInState(breakStarted, timestamp);
+
+    expect(finished.activeTimer).toMatchObject({
+      mode: "focus",
+      remaining: state.settings.focusMinutes * 60,
+      isRunning: false,
+      pausedAt: timestamp,
+    });
   });
 
   it("records work session execution signals around a focus timer", () => {

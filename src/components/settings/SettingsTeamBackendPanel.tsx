@@ -15,7 +15,6 @@ export function SettingsTeamBackendPanel({
   checkBackendHealth,
   handleBackendLogin,
   handleBackendRefresh,
-  runBackendDiagnostics,
   backendDiagnostic,
   dataSummary,
   projectCount,
@@ -30,7 +29,6 @@ export function SettingsTeamBackendPanel({
   checkBackendHealth: () => Promise<void>;
   handleBackendLogin: () => Promise<void>;
   handleBackendRefresh: () => Promise<void>;
-  runBackendDiagnostics: () => Promise<void>;
   backendDiagnostic: BackendDiagnosticResult | null;
   dataSummary: SettingsDataSummary;
   projectCount: number;
@@ -54,7 +52,6 @@ export function SettingsTeamBackendPanel({
         checkBackendHealth={checkBackendHealth}
         handleBackendLogin={handleBackendLogin}
         handleBackendRefresh={handleBackendRefresh}
-        runBackendDiagnostics={runBackendDiagnostics}
       />
       <p className="muted">{backend.message}</p>
       <SettingsTeamBackendAdvancedPanel

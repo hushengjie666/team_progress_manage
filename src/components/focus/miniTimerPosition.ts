@@ -48,3 +48,22 @@ export const clampMiniTimerPosition = (
     y: Math.min(Math.max(MINI_TIMER_EDGE_GAP, position.y), maxY),
   };
 };
+
+export const defaultMiniTimerPosition = (
+  width: number,
+  height: number,
+  viewportWidth = typeof window === "undefined" ? undefined : window.innerWidth,
+  viewportHeight = typeof window === "undefined" ? undefined : window.innerHeight,
+): MiniTimerPosition | null => {
+  if (!viewportWidth || !viewportHeight) return null;
+  return clampMiniTimerPosition(
+    {
+      x: viewportWidth - width - MINI_TIMER_EDGE_GAP,
+      y: viewportHeight - height - MINI_TIMER_EDGE_GAP,
+    },
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  );
+};

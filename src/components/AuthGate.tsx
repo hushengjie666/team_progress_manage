@@ -1,4 +1,4 @@
-import { LogIn, Server } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { normalizeAuthMessage } from "../appBoot";
 import type { AuthStatus } from "../types";
@@ -11,12 +11,11 @@ export function AuthGate(props: {
   initialPassword?: string;
   autoLogin?: boolean;
   updateServerUrl: (serverUrl: string) => void;
-  checkStatus: () => Promise<void>;
   login: (email: string, password: string, remember: boolean) => Promise<void>;
 }) {
   const [email, setEmail] = useState(props.initialEmail ?? "");
   const [password, setPassword] = useState(props.initialPassword ?? "");
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(Boolean(props.initialEmail));
   const autoLoginKeyRef = useRef("");
   const busy = props.status === "checking";
   const submitAuth = () => props.login(email, password, remember);
@@ -24,7 +23,7 @@ export function AuthGate(props: {
   useEffect(() => {
     setEmail(props.initialEmail ?? "");
     setPassword(props.initialPassword ?? "");
-    setRemember(true);
+    setRemember(Boolean(props.initialEmail));
   }, [props.serverUrl, props.initialEmail, props.initialPassword]);
 
   useEffect(() => {
@@ -56,12 +55,7 @@ export function AuthGate(props: {
         >
           <label>
             服务地址
-            <div className="auth-inline">
-              <input value={props.serverUrl} onChange={(event) => props.updateServerUrl(event.target.value)} />
-              <button type="button" className="icon-button" title="检查服务" disabled={busy} onClick={() => void props.checkStatus()}>
-                <Server size={18} />
-              </button>
-            </div>
+            <input value={props.serverUrl} onChange={(event) => props.updateServerUrl(event.target.value)} />
           </label>
 
           <label>
@@ -74,7 +68,7 @@ export function AuthGate(props: {
           </label>
           <label className="auth-remember">
             <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
-            记住账号密码
+            记住账号
           </label>
 
           <button type="submit" className="primary-button large" disabled={busy}>

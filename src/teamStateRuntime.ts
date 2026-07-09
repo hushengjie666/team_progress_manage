@@ -1,4 +1,4 @@
-import { applyTeamStateLoadFailure } from "./appBoot";
+import { applyTeamStateSaveFailure } from "./appBoot";
 import { loadTeamData, saveTeamDataSnapshot } from "./teamBusinessApi";
 import type { AppState } from "./types";
 
@@ -48,7 +48,7 @@ export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOpt
       if (finalState && applySuccessState && canApplyState()) setState(finalState);
       return finalState;
     } catch (error) {
-      const failed = applyTeamStateLoadFailure(next, error);
+      const failed = applyTeamStateSaveFailure(next, error);
       if (applyFailureState && canApplyState()) setState(failed);
       if (showFailureToast && canApplyState()) setToast(failed.auth.message);
       return undefined;

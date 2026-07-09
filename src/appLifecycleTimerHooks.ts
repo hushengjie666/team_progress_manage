@@ -8,6 +8,8 @@ import {
 } from "./appModel";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
 import { calculateRemaining } from "./domain";
+import { emitDesktopTimerEnded } from "./desktopTimerOverlay";
+import { isTauriRuntime } from "./tauriEnvironment";
 import {
   announceTimerEnd,
   runDueTaskReminders,
@@ -15,6 +17,28 @@ import {
   updateWhiteNoisePlayback,
   updateActiveTimerPresence,
 } from "./timerRuntime";
+import type { ActiveTimer, Settings } from "./types";
+
+const timerEndBody = (mode: ActiveTimer["mode"]) =>
+  mode === "focus"
+    ? "记录一个番茄，休息一下再继续。"
+    : "休息结束，可以回到当下清单。";
+
+const emitOverlayTimerEnd = (active: ActiveTimer, settings: Settings) => {
+  void emitDesktopTimerEnded({
+    sessionId: active.sessionId,
+    mode: active.mode,
+    soundEnabled: settings.soundEnabled,
+    timerEndSound: settings.timerEndSound,
+    timerEndSoundVolume: settings.timerEndSoundVolume,
+    timerEndSoundRepeats: settings.timerEndSoundRepeats,
+  }).catch((error) => console.error("Failed to emit desktop timer end", error));
+};
+
+const announceTimerEndForRuntime = (settings: Settings, active: ActiveTimer, title: string) => {
+  announceTimerEnd(settings, title, timerEndBody(active.mode), { playSound: !isTauriRuntime() });
+  emitOverlayTimerEnd(active, settings);
+};
 
 export function useRunningTimerInterval({
   state,
@@ -40,12 +64,8 @@ export function useRunningTimerInterval({
       }
       const timestamp = nowIso();
       const title = `${modeLabel[current.activeTimer.mode]}已结束`;
-      const body =
-        current.activeTimer.mode === "focus"
-          ? "记录一个番茄，休息一下再继续。"
-          : "休息结束，可以回到当下清单。";
       setToast(title);
-      announceTimerEnd(current.settings, title, body);
+      announceTimerEndForRuntime(current.settings, current.activeTimer, title);
       commitTeamData(current, finishExpiredTimerInState(current, timestamp));
     }, 1000);
     return () => window.clearInterval(handle);
@@ -68,6 +88,7 @@ export function useTimerRestoreListeners({
       const next = restoreTimerInState(current, timestamp);
       if (shouldFinish) {
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+        announceTimerEndForRuntime(current.settings, current.activeTimer, title);
         setToast(`${title}，已自动记录`);
         commitTeamData(current, next);
         return;

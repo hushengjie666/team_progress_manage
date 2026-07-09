@@ -58,6 +58,32 @@ func TestHealthHandler(t *testing.T) {
 	}
 }
 
+func TestHealthHandlerIncludesMySQLStorageSummary(t *testing.T) {
+	dsn, cleanup := mysqlTestDSN(t)
+	defer cleanup()
+	db, err := openMySQLStore(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	cfg := defaultConfig()
+	cfg.mysqlDSN = dsn
+	api := newApp(cfg, db)
+	recorder := httptest.NewRecorder()
+
+	api.handleHealth(recorder, httptest.NewRequest(http.MethodGet, "/health", nil))
+
+	body := recorder.Body.String()
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, body)
+	}
+	for _, expected := range []string{`"storage"`, `"driver":"mysql"`, `"database":"`, `"business_rows":`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("health response missing %s: %s", expected, body)
+		}
+	}
+}
+
 func TestCORSAllowsPutPreflight(t *testing.T) {
 	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("preflight should not call wrapped handler")

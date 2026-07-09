@@ -11,13 +11,19 @@ import {
 import { activeWorkSession, endWorkSessionForSwitch } from "./appTimerWorkSession";
 import { workspaceIdForTask } from "./dailyPlanScope";
 
+type StartTimerOptions = {
+  startPaused?: boolean;
+};
+
 export const startTimerInState = (
   state: AppState,
   mode: SessionMode,
   taskId: string | undefined,
   timestamp: string,
   sessionId = uid("session"),
+  options: StartTimerOptions = {},
 ): AppState => {
+  const startPaused = Boolean(options.startPaused);
   const durationMinutes =
     mode === "focus"
       ? state.settings.focusMinutes
@@ -53,6 +59,7 @@ export const startTimerInState = (
       taskId,
       timestamp,
       sessionId,
+      options,
     );
   }
   const workSession: WorkSession | undefined = mode === "focus" && taskId
@@ -61,8 +68,9 @@ export const startTimerInState = (
         taskId,
         executorMemberId,
         focusSessionId: session.id,
-        status: "active",
+        status: startPaused ? "paused" : "active",
         startedAt: timestamp,
+        pausedAt: startPaused ? timestamp : undefined,
         totalPausedSeconds: 0,
         createdAt: timestamp,
         updatedAt: timestamp,
@@ -88,7 +96,10 @@ export const startTimerInState = (
     focusSessions: [session, ...stateWithPlan.focusSessions],
     workSessions: workSession ? [workSession, ...stateWithPlan.workSessions] : stateWithPlan.workSessions,
     executionSignals: workSession
-      ? [createExecutionSignal(workSession, "work_started", timestamp, { mode }), ...stateWithPlan.executionSignals]
+      ? [
+          createExecutionSignal(workSession, startPaused ? "work_paused" : "work_started", timestamp, { mode }),
+          ...stateWithPlan.executionSignals,
+        ]
       : stateWithPlan.executionSignals,
     activeTimer: {
       sessionId: session.id,
@@ -97,9 +108,10 @@ export const startTimerInState = (
       mode,
       duration: session.duration,
       remaining: session.duration,
-      isRunning: true,
+      isRunning: !startPaused,
       startedAt: timestamp,
       plannedEndAt: new Date(new Date(timestamp).getTime() + session.duration * 1000).toISOString(),
+      pausedAt: startPaused ? timestamp : undefined,
       totalPausedSeconds: 0,
       cycleIndex: completedFocusSessions(stateWithPlan).length + (mode === "focus" ? 1 : 0),
     },

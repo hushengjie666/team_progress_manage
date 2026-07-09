@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ensureTodayPlan,
   getTodayPlan,
@@ -9,6 +9,10 @@ import { createInitialState } from "./test/fixtures";
 import type { AppState } from "./types";
 
 describe("timer today queue repair", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("repairs active work sessions that are missing from today's queue", () => {
     const state = createInitialState();
     const taskId = state.tasks[0].id;
@@ -138,11 +142,12 @@ describe("timer today queue repair", () => {
   });
 
   it("ends a cross-day active timer even when its work session is missing", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 8, 9, 0, 0));
     const state = createInitialState();
     const taskId = state.tasks[0].id;
-    const yesterday = new Date(`${todayKey()}T00:00:00.000Z`);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayKey = yesterday.toISOString().slice(0, 10);
+    const yesterdayStartedAt = new Date(2026, 6, 7, 23, 40, 0).toISOString();
+    const yesterdayPlannedEndAt = new Date(2026, 6, 7, 23, 55, 0).toISOString();
     const inconsistent: AppState = {
       ...state,
       tasks: state.tasks.map((task) => (task.id === taskId ? { ...task, status: "in_progress" as const } : task)),
@@ -155,8 +160,8 @@ describe("timer today queue repair", () => {
         duration: 1500,
         remaining: 600,
         isRunning: true,
-        startedAt: `${yesterdayKey}T23:40:00.000Z`,
-        plannedEndAt: `${yesterdayKey}T23:55:00.000Z`,
+        startedAt: yesterdayStartedAt,
+        plannedEndAt: yesterdayPlannedEndAt,
         totalPausedSeconds: 0,
         cycleIndex: 1,
       },
@@ -214,5 +219,33 @@ describe("timer today queue repair", () => {
       type: "work_ended",
       payload: expect.objectContaining({ reason: "stale_active_session" }),
     });
+  });
+
+  it("keeps active work sessions started today in local time after midnight", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-07T16:30:00.000Z"));
+    const todayDate = todayKey();
+    const state = createInitialState();
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(
+      state,
+      "focus",
+      taskId,
+      "2026-07-07T16:30:00.000Z",
+      "session_after_local_midnight",
+    );
+
+    const repaired = ensureTodayPlan(started);
+
+    expect(getTodayPlan(repaired).date).toBe(todayDate);
+    expect(repaired.activeTimer).toMatchObject({
+      sessionId: "session_after_local_midnight",
+      taskId,
+      isRunning: true,
+    });
+    expect(repaired.workSessions.find((session) => session.focusSessionId === "session_after_local_midnight")).toMatchObject({
+      status: "active",
+    });
+    expect(repaired.executionSignals.some((signal) => signal.payload?.reason === "stale_active_session")).toBe(false);
   });
 });

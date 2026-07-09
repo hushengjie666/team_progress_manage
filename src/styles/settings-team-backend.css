@@ -99,6 +99,26 @@
   min-height: auto;
 }
 
+.volume-stepper-field {
+  display: grid;
+  gap: 7px;
+  color: #596368;
+  font-size: 13px;
+}
+
+.volume-stepper {
+  display: grid;
+  grid-template-columns: 34px minmax(58px, 1fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-stepper input {
+  min-height: 34px;
+  padding: 7px 8px;
+  text-align: center;
+}
+
 .compact-input {
   width: 116px;
   display: grid;

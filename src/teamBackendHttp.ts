@@ -12,6 +12,8 @@ export const authHeaders = (token?: string) => ({
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
+const REQUEST_TIMEOUT_MS = 8_000;
+
 const readResponse = async <T>(response: Response): Promise<T> => {
   if (response.ok) return response.json() as Promise<T>;
   let message = `${response.status} ${response.statusText}`;
@@ -26,13 +28,20 @@ const readResponse = async <T>(response: Response): Promise<T> => {
 };
 
 export const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
+  const timeoutController = init?.signal ? undefined : new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
-    const response = await fetch(input, init);
+    if (timeoutController) {
+      timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+    }
+    const response = await fetch(input, timeoutController ? { ...init, signal: timeoutController.signal } : init);
     return readResponse<T>(response);
   } catch (error) {
-    if (error instanceof TypeError) {
+    if (error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError")) {
       throw new Error("无法连接团队后台，请检查服务地址是否正确，并确认后台服务已启动");
     }
     throw error;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
   }
 };

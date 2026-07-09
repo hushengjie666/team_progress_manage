@@ -7,7 +7,27 @@ import {
 import {
   buildProjectOverviewCards,
 } from "./projectOverview";
-import type { AppState } from "./types";
+import type { Account, AppState, Workspace } from "./types";
+
+const timestamp = "2026-05-10T09:00:00.000Z";
+
+const account: Account = {
+  id: "account_owner",
+  workspaceId: "workspace_private_owner",
+  name: "负责人",
+  email: "owner@example.com",
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+
+const privateWorkspace: Workspace = {
+  id: "workspace_private_owner",
+  name: "个人工作区",
+  type: "private",
+  ownerAccountId: account.id,
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
 
 describe("project overview cards", () => {
   it("builds project overview cards with project-scoped counts and archived tasks", () => {
@@ -105,5 +125,33 @@ describe("project overview cards", () => {
       "project_drag_order",
       state.projects[0].id,
     ]);
+  });
+
+  it("does not treat projects with unknown workspace ids as the current workspace", () => {
+    const state = createInitialState();
+    const projectTemplate = state.projects[0];
+    const next: AppState = {
+      ...state,
+      auth: {
+        ...state.auth,
+        status: "authenticated",
+        account,
+        workspace: privateWorkspace,
+        workspaces: [privateWorkspace],
+        message: "已登录",
+      },
+      projects: [
+        {
+          ...projectTemplate,
+          id: "project_unknown_workspace",
+          name: "未知工作区项目",
+          workspaceId: "workspace_missing",
+        },
+      ],
+      projectMembers: [],
+      tasks: [],
+    };
+
+    expect(buildProjectOverviewCards(next)).toEqual([]);
   });
 });

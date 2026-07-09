@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { createAppLoadedRuntimes } from "./appLoadedRuntimes";
 import { useAppLifecycleHooks } from "./appLifecycleHooks";
 import { useAppKeyboardShortcuts } from "./appKeyboardShortcuts";
@@ -8,6 +8,7 @@ import { AppAuthenticatedShellContainer } from "./AppAuthenticatedShellContainer
 import { BootScreen } from "./components/BootScreen";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
+import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
 
 export function App() {
   const appShell = useAppShellState();
@@ -74,6 +75,18 @@ export function App() {
     projectTaskFilters,
   });
   const { todayPlan, workspaceModel } = appViewModel;
+  const toggleDesktopTimer = useCallback(() => {
+    loadedRuntimesRef.current?.focusActions.toggleTimer();
+  }, []);
+  const abortDesktopTimer = useCallback(() => {
+    void loadedRuntimesRef.current?.focusActions.finishTimer("aborted");
+  }, []);
+  useDesktopTimerOverlay({
+    state,
+    currentTask: appViewModel.currentTask,
+    toggleTimer: toggleDesktopTimer,
+    abortTimer: abortDesktopTimer,
+  });
 
   if (!state || !todayPlan || !workspaceModel) {
     loadedRuntimesRef.current = null;
@@ -96,7 +109,6 @@ export function App() {
         message={state.auth.message}
         suppressAutoLogin={suppressAutoLogin}
         updateServerUrl={(serverUrl) => backendActions.updateBackendSetting("serverUrl", serverUrl)}
-        checkStatus={authActions.checkAuthStatus}
         login={authActions.handleWorkspaceLogin}
       />
     );

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInitialState } from "./seed";
-import { loadTeamData } from "./teamApi";
+import { loadTeamData, saveTeamDataSnapshot } from "./teamApi";
 import type { BusinessRow } from "./teamBusinessRows";
 import type { BackendConnectionState } from "./types";
 
@@ -10,11 +10,68 @@ const businessRow = (row: BusinessRow): BusinessRow => ({
   ...row,
 });
 
+const authenticatedState = () => {
+  const base = createInitialState();
+  return {
+    ...base,
+    auth: {
+      status: "authenticated" as const,
+      token: "token",
+      account: {
+        id: "account_owner",
+        workspaceId: "workspace_test",
+        name: "负责人",
+        email: "owner@example.com",
+        createdAt: iso("2026-06-30T06:00:00Z"),
+        updatedAt: iso("2026-06-30T06:00:00Z"),
+      },
+      workspace: {
+        id: "workspace_test",
+        name: "测试团队",
+        createdAt: iso("2026-06-30T06:00:00Z"),
+        updatedAt: iso("2026-06-30T06:00:00Z"),
+      },
+      bootstrapped: true,
+      message: "已登录",
+    },
+    backend: {
+      ...base.backend,
+      serverUrl: "http://127.0.0.1:8787",
+      token: "token",
+    } satisfies BackendConnectionState,
+  };
+};
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe("team backend state loading", () => {
+  it("loads team data from the unscoped endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      rows: [],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await loadTeamData(authenticatedState());
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:8787/team/data");
+  });
+
+  it("saves team data to the unscoped endpoint", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      rows: [],
+    }), { status: 200, headers: { "content-type": "application/json" } }));
+    const local = authenticatedState();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveTeamDataSnapshot(local.backend, "token", local);
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:8787/team/data");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("PUT");
+  });
+
   it("does not resurrect starter members when the remote team has no member rows", async () => {
     const base = createInitialState();
     const local = {

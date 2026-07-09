@@ -1,4 +1,4 @@
-import { Cloud, LogIn, RefreshCw, Server } from "lucide-react";
+import { Cloud, LogIn, RefreshCw } from "lucide-react";
 import type { BackendConnectionState } from "../../types";
 
 const backendActionStatusLabel = (status: BackendConnectionState["status"]) => (
@@ -23,7 +23,6 @@ export function SettingsTeamBackendConnectionPanel({
   checkBackendHealth,
   handleBackendLogin,
   handleBackendRefresh,
-  runBackendDiagnostics,
 }: {
   backend: BackendConnectionState;
   backendPassword: string;
@@ -32,7 +31,6 @@ export function SettingsTeamBackendConnectionPanel({
   checkBackendHealth: () => Promise<void>;
   handleBackendLogin: () => Promise<void>;
   handleBackendRefresh: () => Promise<void>;
-  runBackendDiagnostics: () => Promise<void>;
 }) {
   return (
     <>
@@ -78,10 +76,6 @@ export function SettingsTeamBackendConnectionPanel({
         >
           <RefreshCw size={16} />
           刷新在线数据
-        </button>
-        <button className="secondary-button" onClick={() => void runBackendDiagnostics()}>
-          <Server size={16} />
-          运行后台诊断
         </button>
         <span className={`backend-status backend-status-${backend.status}`}>
           {backendActionStatusLabel(backend.status)}

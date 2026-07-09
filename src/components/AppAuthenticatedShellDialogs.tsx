@@ -3,6 +3,7 @@ import { QuickProjectCreateModal } from "./QuickProjectCreateModal";
 import { MiniTimer } from "./focus/MiniTimer";
 import { CommandPalette } from "./CommandPalette";
 import { ConfirmDialog, ShortcutHelpDialog, SplitTaskDialog } from "./Dialogs";
+import { isTauriRuntime } from "../tauriEnvironment";
 
 type AppAuthenticatedShellDialogsProps = Pick<
   AppAuthenticatedShellProps,
@@ -64,7 +65,7 @@ export function AppAuthenticatedShellDialogs({
         onClose={closeQuickProjectCreate}
         onSubmit={submitQuickProjectCreate}
       />
-      {state.activeTimer && tab !== "focus" && (
+      {state.activeTimer && tab !== "focus" && !isTauriRuntime() && (
         <MiniTimer
           state={state}
           task={currentTask}
