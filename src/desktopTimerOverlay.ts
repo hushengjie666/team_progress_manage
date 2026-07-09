@@ -20,6 +20,20 @@ const DESKTOP_TIMER_WINDOW_HEIGHT = 138;
 
 let overlayVisible = false;
 
+export const getSharedDesktopTimerOverlayRequest = <T>(
+  requestRef: { current: Promise<T> | null },
+  createRequest: () => Promise<T>,
+) => {
+  if (requestRef.current) return requestRef.current;
+  const request = createRequest();
+  requestRef.current = request;
+  const clearRequest = () => {
+    if (requestRef.current === request) requestRef.current = null;
+  };
+  void request.then(clearRequest, clearRequest);
+  return request;
+};
+
 export const canApplyDesktopTimerOverlaySync = (
   syncSequence: { current: number },
   syncId: number,
@@ -38,7 +52,7 @@ const currentOverlayUrl = () => {
   return `${path}?window=${DESKTOP_TIMER_WINDOW_LABEL}`;
 };
 
-const ensureOverlayWindow = async () => {
+const createOrGetOverlayWindow = async () => {
   const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
   let overlayWindow = await WebviewWindow.getByLabel(DESKTOP_TIMER_WINDOW_LABEL);
   if (overlayWindow) {
@@ -84,6 +98,14 @@ const ensureOverlayWindow = async () => {
 
   return overlayWindow;
 };
+
+const overlayWindowRequestRef: {
+  current: ReturnType<typeof createOrGetOverlayWindow> | null;
+} = { current: null };
+
+const ensureOverlayWindow = () => (
+  getSharedDesktopTimerOverlayRequest(overlayWindowRequestRef, createOrGetOverlayWindow)
+);
 
 const workAreaFromCurrentMonitor = async (): Promise<DesktopTimerWorkArea | null> => {
   const { currentMonitor, primaryMonitor } = await import("@tauri-apps/api/window");
