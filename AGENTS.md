@@ -109,6 +109,8 @@ For small changes, run the nearest target test first, for example `npm test -- p
 
 This checkout does not include Git metadata, so no repository-specific commit history is available. Use concise imperative commit messages, for example `Add backend diagnostics` or `Fix focus timer reset`.
 
+After completing each development task, run the relevant verification, create a Git commit containing only the files changed for that task, and push the current branch to `origin`. In a dirty worktree, never use `git add .`; stage only the intended paths and leave unrelated local changes untouched. If commit or push fails, report the exact blocker and leave the worktree state clear.
+
 Pull requests should include a short summary, test results, and screenshots for visible UI changes. Mention any team-server or local-storage migration impact.
 
 ## Security & Configuration Tips
