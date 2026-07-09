@@ -23,11 +23,11 @@ const timemanagePids = () => {
   return result.stdout.trim().split(/\s+/).filter(Boolean);
 };
 
-const focusTimeManage = () => {
-  if (process.platform !== "darwin") return;
+const focusTimeManage = (pid) => {
+  if (process.platform !== "darwin" || !pid) return;
   const result = spawnSync("osascript", [
     "-e",
-    'tell application "System Events" to set frontmost of first process whose name is "timemanage-desktop" to true',
+    `tell application "System Events" to set frontmost of first process whose unix id is ${pid} to true`,
   ], { encoding: "utf8" });
   if (result.status !== 0) {
     return;
@@ -46,7 +46,7 @@ const focusPoll = process.platform === "darwin"
       scheduleFocusForPid(pids[pids.length - 1]);
       if (pendingFocusAttempts > 0) {
         pendingFocusAttempts -= 1;
-        focusTimeManage();
+        focusTimeManage(lastFocusedPid);
       }
     }, 500)
   : undefined;
