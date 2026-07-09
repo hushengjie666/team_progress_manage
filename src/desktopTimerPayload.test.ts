@@ -111,5 +111,21 @@ describe("desktop timer payload", () => {
     }, {
       sentAt: "2026-07-08T01:02:00.000Z",
     })).toBe(true);
+
+    expect(shouldApplyDesktopTimerPayload({
+      sentAt: "2026-07-08T01:01:00.000Z",
+      syncSequence: 12,
+    }, {
+      sentAt: "2026-07-08T01:02:00.000Z",
+      syncSequence: 1,
+    })).toBe(true);
+
+    expect(shouldApplyDesktopTimerPayload({
+      sentAt: "2026-07-08T01:02:00.000Z",
+      syncSequence: 3,
+    }, {
+      sentAt: "2026-07-08T01:02:00.000Z",
+      syncSequence: 2,
+    })).toBe(false);
   });
 });

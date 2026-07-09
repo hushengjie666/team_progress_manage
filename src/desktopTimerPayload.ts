@@ -70,13 +70,15 @@ export const shouldApplyDesktopTimerPayload = (
   next: DesktopTimerPayloadOrder,
 ) => {
   if (!current) return true;
-  if (current.syncSequence !== undefined && next.syncSequence !== undefined) {
-    return next.syncSequence >= current.syncSequence;
-  }
 
   const currentSentAt = Date.parse(current.sentAt);
   const nextSentAt = Date.parse(next.sentAt);
-  if (!Number.isFinite(nextSentAt)) return false;
   if (!Number.isFinite(currentSentAt)) return true;
-  return nextSentAt >= currentSentAt;
+  if (Number.isFinite(nextSentAt) && nextSentAt !== currentSentAt) {
+    return nextSentAt > currentSentAt;
+  }
+  if (current.syncSequence !== undefined && next.syncSequence !== undefined) {
+    return next.syncSequence >= current.syncSequence;
+  }
+  return Number.isFinite(nextSentAt);
 };
