@@ -1,5 +1,15 @@
 import { createInitialState } from "./seed";
-import type { AppState, AuthState, Settings, BackendConnectionState } from "./types";
+import type {
+  AppState,
+  AuthState,
+  BackendConnectionState,
+  DailyPlan,
+  ExecutionSignal,
+  FocusSession,
+  Settings,
+  Task,
+  WorkSession,
+} from "./types";
 
 const STORAGE_KEY = "timemanage.app_state.v4";
 
@@ -11,7 +21,17 @@ type StoredAppRuntime = {
   settings: Partial<Settings>;
   auth: Partial<AuthState>;
   backend: Pick<BackendConnectionState, "serverUrl" | "username" | "deviceId" | "token">;
+  activeRuntime?: StoredActiveRuntime;
   updatedAt: string;
+};
+
+type StoredActiveRuntime = {
+  activeTimer: AppState["activeTimer"];
+  tasks: Task[];
+  dailyPlans: DailyPlan[];
+  focusSessions: FocusSession[];
+  workSessions: WorkSession[];
+  executionSignals: ExecutionSignal[];
 };
 
 export const isCurrentAppStatePayload = (payload: unknown): payload is StoredAppRuntime => {
@@ -34,7 +54,7 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
   }
 
   const initial = createInitialState();
-  return {
+  const state: AppState = {
     ...initial,
     settings: {
       ...initial.settings,
@@ -55,9 +75,61 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
     },
     updatedAt: payload.updatedAt,
   };
+  return restoreStoredActiveRuntime(state, payload.activeRuntime);
 };
 
 const readStoredState = (payload: string): AppState => parseCurrentAppStatePayload(JSON.parse(payload));
+
+const asArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value as T[] : []);
+
+const restoreStoredActiveRuntime = (state: AppState, payload: unknown): AppState => {
+  if (!isRecord(payload) || !isRecord(payload.activeTimer)) return state;
+  const active = payload.activeTimer as unknown as NonNullable<AppState["activeTimer"]>;
+  const activeTaskId = active.taskId;
+  const workSessions = asArray<WorkSession>(payload.workSessions).filter((session) =>
+    session.id === active.workSessionId ||
+    session.focusSessionId === active.sessionId,
+  );
+  const workSessionIds = new Set(workSessions.map((session) => session.id));
+  return {
+    ...state,
+    activeTimer: active,
+    tasks: activeTaskId ? asArray<Task>(payload.tasks).filter((task) => task.id === activeTaskId) : [],
+    dailyPlans: activeTaskId
+      ? asArray<DailyPlan>(payload.dailyPlans).filter((plan) => plan.committedTaskIds.includes(activeTaskId))
+      : [],
+    focusSessions: asArray<FocusSession>(payload.focusSessions).filter((session) => session.id === active.sessionId),
+    workSessions,
+    executionSignals: asArray<ExecutionSignal>(payload.executionSignals).filter((signal) =>
+      workSessionIds.has(signal.workSessionId),
+    ),
+  };
+};
+
+const activeRuntimeFromState = (state: AppState): StoredActiveRuntime | undefined => {
+  const active = state.activeTimer;
+  if (!active) return undefined;
+  const activeTaskId = active.taskId;
+  const workSessionIds = new Set(
+    state.workSessions
+      .filter((session) =>
+        session.id === active.workSessionId ||
+        session.focusSessionId === active.sessionId,
+      )
+      .map((session) => session.id),
+  );
+  const tasks = activeTaskId ? state.tasks.filter((task) => task.id === activeTaskId) : [];
+  return {
+    activeTimer: active,
+    tasks,
+    dailyPlans: activeTaskId
+      ? state.dailyPlans.filter((plan) => plan.committedTaskIds.includes(activeTaskId))
+      : [],
+    focusSessions: state.focusSessions.filter((session) => session.id === active.sessionId),
+    workSessions: state.workSessions.filter((session) => workSessionIds.has(session.id)),
+    executionSignals: state.executionSignals.filter((signal) => workSessionIds.has(signal.workSessionId)),
+  };
+};
 
 export async function loadState(): Promise<AppState> {
   try {
@@ -89,6 +161,7 @@ export async function saveState(state: AppState): Promise<void> {
       deviceId: state.backend.deviceId,
       token: state.backend.token,
     },
+    activeRuntime: activeRuntimeFromState(state),
     updatedAt: new Date().toISOString(),
   };
   try {
