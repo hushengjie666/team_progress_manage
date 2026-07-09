@@ -186,6 +186,7 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
       currentTask?.estimatePomodoros,
     ],
   );
+  const hasPayload = payload !== null;
   payloadRef.current = payload;
 
   useEffect(() => {
@@ -214,6 +215,31 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
   }, [payload]);
 
   useEffect(() => {
+    if (!isTauriRuntime() || !hasPayload) return undefined;
+    let disposed = false;
+    let restoreInFlight = false;
+
+    const restoreOverlay = () => {
+      const latestPayload = payloadRef.current;
+      if (!latestPayload || restoreInFlight) return;
+      restoreInFlight = true;
+      void showOverlayWindow(latestPayload, syncSequenceRef.current)
+        .catch((error) => {
+          if (!disposed) console.error("Failed to recover desktop timer overlay", error);
+        })
+        .finally(() => {
+          restoreInFlight = false;
+        });
+    };
+
+    const restoreInterval = window.setInterval(restoreOverlay, 1500);
+    return () => {
+      disposed = true;
+      window.clearInterval(restoreInterval);
+    };
+  }, [hasPayload]);
+
+  useEffect(() => {
     if (!isTauriRuntime()) return undefined;
     let disposed = false;
     const unlisteners: Array<() => void> = [];
@@ -228,7 +254,11 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
       });
       const removeReady = await listen(DESKTOP_TIMER_READY_EVENT, () => {
         const latestPayload = payloadRef.current;
-        if (latestPayload) void emitOverlayState(latestPayload, syncSequenceRef.current);
+        if (latestPayload) {
+          void showOverlayWindow(latestPayload, syncSequenceRef.current).catch((error) => {
+            console.error("Failed to restore desktop timer overlay", error);
+          });
+        }
       }, {
         target: { kind: "WebviewWindow", label: "main" },
       });
