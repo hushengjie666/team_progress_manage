@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const tauriBin = join(rootDir, "node_modules", ".bin", process.platform === "win32" ? "tauri.cmd" : "tauri");
 const devConfigPath = join("src-tauri", "tauri.dev.conf.json");
+const devProcessName = "timemanage-desktop-dev";
 const focusAttemptsPerProcess = 8;
 
-const child = spawn(tauriBin, ["dev", "--config", devConfigPath], {
+const child = spawn(tauriBin, ["dev", "--config", devConfigPath, "--", "--bin", devProcessName], {
   cwd: rootDir,
   env: process.env,
   stdio: "inherit",
@@ -18,7 +19,7 @@ let pendingFocusAttempts = 0;
 
 const timemanagePids = () => {
   if (process.platform !== "darwin") return [];
-  const result = spawnSync("pgrep", ["-x", "timemanage-desktop"], { encoding: "utf8" });
+  const result = spawnSync("pgrep", ["-x", devProcessName], { encoding: "utf8" });
   if (result.status !== 0 || !result.stdout.trim()) return [];
   return result.stdout.trim().split(/\s+/).filter(Boolean);
 };

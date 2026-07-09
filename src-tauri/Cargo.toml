@@ -7,12 +7,21 @@ license = ""
 repository = "https://github.com/hushengjie666/team_progress_manage"
 edition = "2021"
 rust-version = "1.77.2"
+default-run = "timemanage-desktop"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
 name = "timemanage_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "timemanage-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "timemanage-desktop-dev"
+path = "src/main_dev.rs"
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
