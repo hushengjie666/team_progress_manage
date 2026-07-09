@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildDesktopTimerPayload, displayRemainingForDesktopTimer } from "./desktopTimerPayload";
+import {
+  buildDesktopTimerPayload,
+  displayRemainingForDesktopTimer,
+  shouldApplyDesktopTimerPayload,
+} from "./desktopTimerPayload";
 import { createTestState } from "./test/fixtures";
 
 describe("desktop timer payload", () => {
@@ -87,5 +91,25 @@ describe("desktop timer payload", () => {
       plannedEndAt: "2026-07-08T01:25:00.000Z",
       pendingSettlement: "pending",
     }, new Date("2026-07-08T01:24:20.000Z"))).toBe(0);
+  });
+
+  it("ignores stale desktop overlay payloads", () => {
+    expect(shouldApplyDesktopTimerPayload(null, {
+      sentAt: "2026-07-08T01:01:00.000Z",
+    })).toBe(true);
+
+    expect(shouldApplyDesktopTimerPayload({
+      sentAt: "2026-07-08T01:02:00.000Z",
+      syncSequence: 3,
+    }, {
+      sentAt: "2026-07-08T01:01:00.000Z",
+      syncSequence: 2,
+    })).toBe(false);
+
+    expect(shouldApplyDesktopTimerPayload({
+      sentAt: "2026-07-08T01:01:00.000Z",
+    }, {
+      sentAt: "2026-07-08T01:02:00.000Z",
+    })).toBe(true);
   });
 });

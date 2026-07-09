@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { buildDesktopTimerPayload, type DesktopTimerEndPayload, type DesktopTimerPayload } from "./desktopTimerPayload";
 import {
   readStoredDesktopTimerWindowPosition,
@@ -19,6 +19,12 @@ const DESKTOP_TIMER_WINDOW_WIDTH = 304;
 const DESKTOP_TIMER_WINDOW_HEIGHT = 138;
 
 let overlayVisible = false;
+
+export const canApplyDesktopTimerOverlaySync = (
+  syncSequence: { current: number },
+  syncId: number,
+  disposed: boolean,
+) => !disposed && syncSequence.current === syncId;
 
 type DesktopTimerOverlayOptions = {
   state: AppState | null;
@@ -100,9 +106,12 @@ const positionOverlayWindow = async (overlayWindow: Awaited<ReturnType<typeof en
   await overlayWindow.setPosition(new PhysicalPosition(Math.round(position.x), Math.round(position.y)));
 };
 
-const emitOverlayState = async (payload: DesktopTimerPayload) => {
+const emitOverlayState = async (payload: DesktopTimerPayload, syncSequence?: number) => {
   const { emitTo } = await import("@tauri-apps/api/event");
-  await emitTo(DESKTOP_TIMER_WINDOW_LABEL, DESKTOP_TIMER_STATE_EVENT, payload);
+  await emitTo(DESKTOP_TIMER_WINDOW_LABEL, DESKTOP_TIMER_STATE_EVENT, {
+    ...payload,
+    syncSequence,
+  });
 };
 
 export const emitDesktopTimerEnded = async (payload: DesktopTimerEndPayload) => {
@@ -111,24 +120,37 @@ export const emitDesktopTimerEnded = async (payload: DesktopTimerEndPayload) => 
   await emitTo(DESKTOP_TIMER_WINDOW_LABEL, DESKTOP_TIMER_ENDED_EVENT, payload);
 };
 
-const hideOverlayWindow = async () => {
+const hideOverlayWindow = async (canApplySync: () => boolean = () => true) => {
   const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
   const overlayWindow = await WebviewWindow.getByLabel(DESKTOP_TIMER_WINDOW_LABEL);
+  if (!canApplySync()) return;
   if (overlayWindow) await overlayWindow.hide();
+  if (!canApplySync()) return;
   overlayVisible = false;
 };
 
-const showOverlayWindow = async (payload: DesktopTimerPayload) => {
+const showOverlayWindow = async (
+  payload: DesktopTimerPayload,
+  syncSequence?: number,
+  canApplySync: () => boolean = () => true,
+) => {
   const overlayWindow = await ensureOverlayWindow();
+  if (!canApplySync()) return;
   const isVisible = await overlayWindow.isVisible().catch(() => overlayVisible);
+  if (!canApplySync()) return;
   if (!isVisible) await positionOverlayWindow(overlayWindow);
+  if (!canApplySync()) return;
   await overlayWindow.setAlwaysOnTop(true);
+  if (!canApplySync()) return;
   await overlayWindow.show();
+  if (!canApplySync()) return;
   overlayVisible = true;
-  await emitOverlayState(payload);
+  await emitOverlayState(payload, syncSequence);
 };
 
 export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortTimer }: DesktopTimerOverlayOptions) {
+  const syncSequenceRef = useRef(0);
+  const payloadRef = useRef<DesktopTimerPayload | null>(null);
   const payload = useMemo(
     () => buildDesktopTimerPayload(
       state?.auth.status === "authenticated" ? state : null,
@@ -142,18 +164,22 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
       currentTask?.estimatePomodoros,
     ],
   );
+  payloadRef.current = payload;
 
   useEffect(() => {
     if (!isTauriRuntime()) return undefined;
     let disposed = false;
+    const syncId = syncSequenceRef.current + 1;
+    syncSequenceRef.current = syncId;
+    const canApplySync = () => canApplyDesktopTimerOverlaySync(syncSequenceRef, syncId, disposed);
 
     const syncOverlay = async () => {
       try {
         if (!payload) {
-          await hideOverlayWindow();
+          await hideOverlayWindow(canApplySync);
           return;
         }
-        await showOverlayWindow(payload);
+        await showOverlayWindow(payload, syncId, canApplySync);
       } catch (error) {
         if (!disposed) console.error("Failed to sync desktop timer overlay", error);
       }
@@ -179,7 +205,8 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
         target: { kind: "WebviewWindow", label: "main" },
       });
       const removeReady = await listen(DESKTOP_TIMER_READY_EVENT, () => {
-        if (payload) void emitOverlayState(payload);
+        const latestPayload = payloadRef.current;
+        if (latestPayload) void emitOverlayState(latestPayload, syncSequenceRef.current);
       }, {
         target: { kind: "WebviewWindow", label: "main" },
       });
@@ -201,5 +228,5 @@ export function useDesktopTimerOverlay({ state, currentTask, toggleTimer, abortT
       disposed = true;
       unlisteners.forEach((unlisten) => unlisten());
     };
-  }, [abortTimer, payload, toggleTimer]);
+  }, [abortTimer, toggleTimer]);
 }

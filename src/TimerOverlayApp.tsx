@@ -8,7 +8,12 @@ import {
   DESKTOP_TIMER_STATE_EVENT,
   DESKTOP_TIMER_TOGGLE_EVENT,
 } from "./desktopTimerOverlay";
-import { displayRemainingForDesktopTimer, type DesktopTimerEndPayload, type DesktopTimerPayload } from "./desktopTimerPayload";
+import {
+  displayRemainingForDesktopTimer,
+  shouldApplyDesktopTimerPayload,
+  type DesktopTimerEndPayload,
+  type DesktopTimerPayload,
+} from "./desktopTimerPayload";
 import { writeStoredDesktopTimerWindowPosition } from "./desktopTimerWindowPosition";
 import { playTimerSound } from "./notifications";
 import { isTauriRuntime } from "./tauriEnvironment";
@@ -43,7 +48,9 @@ export function TimerOverlayApp() {
     const attach = async () => {
       const { emitTo, listen } = await import("@tauri-apps/api/event");
       const removeState = await listen<DesktopTimerPayload>(DESKTOP_TIMER_STATE_EVENT, (event) => {
-        setPayload(event.payload);
+        setPayload((current) => (
+          shouldApplyDesktopTimerPayload(current, event.payload) ? event.payload : current
+        ));
       });
       const removeEnded = await listen<DesktopTimerEndPayload>(DESKTOP_TIMER_ENDED_EVENT, (event) => {
         playEndSoundOnce(event.payload);

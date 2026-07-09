@@ -19,6 +19,7 @@ export type DesktopTimerPayload = {
   timerEndSoundVolume: number;
   timerEndSoundRepeats: number;
   sentAt: string;
+  syncSequence?: number;
 };
 
 export type DesktopTimerEndPayload = Pick<
@@ -60,4 +61,22 @@ export const displayRemainingForDesktopTimer = (
   now = new Date(),
 ) => {
   return calculateRemaining(payload, now);
+};
+
+type DesktopTimerPayloadOrder = Pick<DesktopTimerPayload, "sentAt" | "syncSequence">;
+
+export const shouldApplyDesktopTimerPayload = (
+  current: DesktopTimerPayloadOrder | null,
+  next: DesktopTimerPayloadOrder,
+) => {
+  if (!current) return true;
+  if (current.syncSequence !== undefined && next.syncSequence !== undefined) {
+    return next.syncSequence >= current.syncSequence;
+  }
+
+  const currentSentAt = Date.parse(current.sentAt);
+  const nextSentAt = Date.parse(next.sentAt);
+  if (!Number.isFinite(nextSentAt)) return false;
+  if (!Number.isFinite(currentSentAt)) return true;
+  return nextSentAt >= currentSentAt;
 };
