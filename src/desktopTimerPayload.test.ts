@@ -42,6 +42,7 @@ describe("desktop timer payload", () => {
       isRunning: true,
       plannedEndAt: "2026-07-08T01:25:00.000Z",
       pendingSettlement: undefined,
+      speedMultiplier: undefined,
       taskTitle: "适配 Tauri",
       actualPomodoros: 1,
       estimatePomodoros: 3,
@@ -60,6 +61,16 @@ describe("desktop timer payload", () => {
       isRunning: true,
       plannedEndAt: "2026-07-08T01:25:00.000Z",
     }, new Date("2026-07-08T01:24:20.100Z"))).toBe(40);
+  });
+
+  it("derives display remaining using timer speed multiplier", () => {
+    expect(displayRemainingForDesktopTimer({
+      duration: 1500,
+      remaining: 1500,
+      isRunning: true,
+      plannedEndAt: "2026-07-08T01:00:15.000Z",
+      speedMultiplier: 100,
+    }, new Date("2026-07-08T01:00:05.000Z"))).toBe(1000);
   });
 
   it("uses stored remaining when paused or pending settlement", () => {

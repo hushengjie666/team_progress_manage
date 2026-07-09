@@ -49,6 +49,7 @@ export const createInitialState = (): AppState => ({
     },
     advancedBackendVisible: false,
     commandPaletteHintDismissed: false,
+    devTimerSpeed100xEnabled: false,
   },
   auth: {
     status: "signed_out",

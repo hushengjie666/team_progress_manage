@@ -1,9 +1,17 @@
 import type { ActiveTimer, AppState, SessionMode } from "./types";
 import { completedFocusSessions } from "./domainQueries";
+import { normalizeTimerSpeedMultiplier, plannedTimerEndAt } from "./timerSpeed";
 
-export const calculateRemaining = (timer: ActiveTimer, now = new Date()) => {
+type TimerRemainingInput = Pick<
+  ActiveTimer,
+  "duration" | "remaining" | "isRunning" | "plannedEndAt" | "pendingSettlement" | "speedMultiplier"
+>;
+
+export const calculateRemaining = (timer: TimerRemainingInput, now = new Date()) => {
   if (!timer.isRunning || timer.pendingSettlement === "pending") return Math.max(0, timer.remaining);
-  return Math.max(0, Math.ceil((new Date(timer.plannedEndAt).getTime() - now.getTime()) / 1000));
+  const speedMultiplier = normalizeTimerSpeedMultiplier(timer.speedMultiplier);
+  const remaining = Math.ceil(((new Date(timer.plannedEndAt).getTime() - now.getTime()) / 1000) * speedMultiplier);
+  return Math.max(0, Math.min(timer.duration, remaining));
 };
 
 export const restoreTimer = (timer?: ActiveTimer, now = new Date()): ActiveTimer | undefined => {
@@ -30,7 +38,7 @@ export const resumeTimer = (timer: ActiveTimer, nowIso: string): ActiveTimer => 
     pausedAt: undefined,
     pendingSettlement: undefined,
     totalPausedSeconds: (timer.totalPausedSeconds ?? 0) + pausedSeconds,
-    plannedEndAt: new Date(new Date(nowIso).getTime() + timer.remaining * 1000).toISOString(),
+    plannedEndAt: plannedTimerEndAt(nowIso, timer.remaining, timer.speedMultiplier),
   };
 };
 

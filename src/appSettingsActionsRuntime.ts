@@ -1,5 +1,7 @@
 import { nowIso } from "./appModel";
+import { calculateRemaining } from "./timerCalculations";
 import { requestTimerNotifications } from "./notifications";
+import { normalizeTimerSpeedMultiplier, plannedTimerEndAt, timerSpeedMultiplierForSettings } from "./timerSpeed";
 import type { AppState } from "./types";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
@@ -19,11 +21,31 @@ export function createAppSettingsActionsRuntime({
   setToast,
 }: AppSettingsActionsRuntimeOptions): AppSettingsActionsRuntime {
   const updateSettings = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
-    updateState((current) => ({
-      ...current,
-      settings: { ...current.settings, [key]: value },
-      updatedAt: nowIso(),
-    }));
+    updateState((current) => {
+      const timestamp = nowIso();
+      const settings = { ...current.settings, [key]: value };
+      if (key !== "devTimerSpeed100xEnabled" || !current.activeTimer) {
+        return {
+          ...current,
+          settings,
+          updatedAt: timestamp,
+        };
+      }
+
+      const remaining = calculateRemaining(current.activeTimer, new Date(timestamp));
+      const speedMultiplier = normalizeTimerSpeedMultiplier(timerSpeedMultiplierForSettings(settings));
+      return {
+        ...current,
+        settings,
+        activeTimer: {
+          ...current.activeTimer,
+          remaining,
+          plannedEndAt: plannedTimerEndAt(timestamp, remaining, speedMultiplier),
+          speedMultiplier: speedMultiplier > 1 ? speedMultiplier : undefined,
+        },
+        updatedAt: timestamp,
+      };
+    });
   };
 
   const askNotificationPermissions = async () => {

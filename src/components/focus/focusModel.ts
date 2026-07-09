@@ -1,4 +1,4 @@
-import { completedFocusSessions } from "../../domain";
+import { calculateRemaining, completedFocusSessions } from "../../domain";
 import type { ActiveTimer, AppState, SessionMode, Task } from "../../types";
 
 export type FocusTaskGroup = {
@@ -11,9 +11,7 @@ export const focusProgressPercent = (active?: ActiveTimer) =>
   active ? 100 - (active.remaining / active.duration) * 100 : 0;
 
 export const displayRemainingForTimer = (active: ActiveTimer, now = new Date()) => {
-  if (!active.isRunning || active.pendingSettlement === "pending") return Math.max(0, active.remaining);
-  const remaining = Math.ceil((new Date(active.plannedEndAt).getTime() - now.getTime()) / 1000);
-  return Math.max(0, Math.min(active.duration, remaining));
+  return calculateRemaining(active, now);
 };
 
 export const upcomingBreakMode = (state: AppState): SessionMode =>

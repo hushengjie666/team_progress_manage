@@ -13,6 +13,7 @@ import { writeStoredDesktopTimerWindowPosition } from "./desktopTimerWindowPosit
 import { playTimerSound } from "./notifications";
 import { isTauriRuntime } from "./tauriEnvironment";
 import { PomodoroProgress } from "./components/focus/PomodoroProgress";
+import { normalizeTimerSpeedMultiplier } from "./timerSpeed";
 
 const CONTROL_SELECTOR = "button";
 
@@ -66,9 +67,10 @@ export function TimerOverlayApp() {
       setNow(new Date());
       return undefined;
     }
-    const interval = window.setInterval(() => setNow(new Date()), 1000);
+    const intervalDelay = normalizeTimerSpeedMultiplier(payload.speedMultiplier) > 1 ? 250 : 1000;
+    const interval = window.setInterval(() => setNow(new Date()), intervalDelay);
     return () => window.clearInterval(interval);
-  }, [payload?.isRunning, payload?.plannedEndAt, payload?.sessionId]);
+  }, [payload?.isRunning, payload?.plannedEndAt, payload?.sessionId, payload?.speedMultiplier]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return undefined;

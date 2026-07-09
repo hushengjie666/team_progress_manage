@@ -1,4 +1,5 @@
 import type { ActiveTimer, AppState, Task, TimerEndSound, TimerSettlement } from "./types";
+import { calculateRemaining } from "./timerCalculations";
 
 export type DesktopTimerPayload = {
   sessionId: string;
@@ -9,6 +10,7 @@ export type DesktopTimerPayload = {
   isRunning: boolean;
   plannedEndAt: string;
   pendingSettlement?: TimerSettlement;
+  speedMultiplier?: number;
   taskTitle?: string;
   actualPomodoros?: number;
   estimatePomodoros?: number;
@@ -41,6 +43,7 @@ export const buildDesktopTimerPayload = (
     isRunning: active.isRunning,
     plannedEndAt: active.plannedEndAt,
     pendingSettlement: active.pendingSettlement,
+    speedMultiplier: active.speedMultiplier,
     taskTitle: task?.title,
     actualPomodoros: task?.actualPomodoros,
     estimatePomodoros: task?.estimatePomodoros,
@@ -53,10 +56,8 @@ export const buildDesktopTimerPayload = (
 };
 
 export const displayRemainingForDesktopTimer = (
-  payload: Pick<DesktopTimerPayload, "duration" | "remaining" | "isRunning" | "plannedEndAt" | "pendingSettlement">,
+  payload: Pick<DesktopTimerPayload, "duration" | "remaining" | "isRunning" | "plannedEndAt" | "pendingSettlement" | "speedMultiplier">,
   now = new Date(),
 ) => {
-  if (!payload.isRunning || payload.pendingSettlement === "pending") return Math.max(0, payload.remaining);
-  const remaining = Math.ceil((new Date(payload.plannedEndAt).getTime() - now.getTime()) / 1000);
-  return Math.max(0, Math.min(payload.duration, remaining));
+  return calculateRemaining(payload, now);
 };

@@ -24,4 +24,5 @@ export interface Settings {
   notificationSettings: NotificationSettings;
   advancedBackendVisible?: boolean;
   commandPaletteHintDismissed?: boolean;
+  devTimerSpeed100xEnabled?: boolean;
 }

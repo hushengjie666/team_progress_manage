@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  calculateRemaining,
   pauseTimer,
   restoreTimer,
   resumeTimer,
@@ -45,5 +46,28 @@ describe("timer domain", () => {
     expect(resumed.isRunning).toBe(true);
     expect(resumed.totalPausedSeconds).toBe(120);
     expect(new Date(resumed.plannedEndAt).getTime()).toBe(new Date("2026-05-10T08:27:00Z").getTime());
+  });
+
+  it("calculates and resumes accelerated timers by their speed multiplier", () => {
+    const timer: ActiveTimer = {
+      sessionId: "session_fast",
+      mode: "focus",
+      duration: 1500,
+      remaining: 1500,
+      isRunning: true,
+      startedAt: iso("2026-05-10T08:00:00Z"),
+      plannedEndAt: iso("2026-05-10T08:00:15Z"),
+      totalPausedSeconds: 0,
+      cycleIndex: 1,
+      speedMultiplier: 100,
+    };
+
+    expect(calculateRemaining(timer, new Date("2026-05-10T08:00:05Z"))).toBe(1000);
+    const paused = pauseTimer(timer, iso("2026-05-10T08:00:05Z"));
+    const resumed = resumeTimer(paused, iso("2026-05-10T08:01:00Z"));
+
+    expect(paused.remaining).toBe(1000);
+    expect(resumed.totalPausedSeconds).toBe(55);
+    expect(new Date(resumed.plannedEndAt).getTime()).toBe(new Date("2026-05-10T08:01:10Z").getTime());
   });
 });

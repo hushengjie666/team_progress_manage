@@ -51,6 +51,7 @@ export function SettingsTimerPanel({
 }) {
   const stopWhiteNoisePreviewRef = useRef<(() => void) | null>(null);
   const [whiteNoisePreviewing, setWhiteNoisePreviewing] = useState(false);
+  const showDevTimerSpeed = import.meta.env.DEV;
 
   const stopWhiteNoisePreview = () => {
     stopWhiteNoisePreviewRef.current?.();
@@ -198,6 +199,16 @@ export function SettingsTimerPanel({
             <Bell size={16} />
             检查通知
           </button>
+          {showDevTimerSpeed && (
+            <label className="inline-toggle" title="仅开发模式显示，开启后倒计时按 100 倍速度运行">
+              <input
+                type="checkbox"
+                checked={Boolean(settings.devTimerSpeed100xEnabled)}
+                onChange={(event) => updateSettings("devTimerSpeed100xEnabled", event.target.checked)}
+              />
+              100倍速
+            </label>
+          )}
         </div>
         <p className="muted">通知权限：{settings.notificationSettings.permissionState}</p>
       </section>

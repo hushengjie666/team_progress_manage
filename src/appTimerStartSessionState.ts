@@ -10,6 +10,7 @@ import {
 } from "./workSessionTransitions";
 import { activeWorkSession, endWorkSessionForSwitch } from "./appTimerWorkSession";
 import { workspaceIdForTask } from "./dailyPlanScope";
+import { normalizeTimerSpeedMultiplier, plannedTimerEndAt, timerSpeedMultiplierForSettings } from "./timerSpeed";
 
 type StartTimerOptions = {
   startPaused?: boolean;
@@ -24,6 +25,8 @@ export const startTimerInState = (
   options: StartTimerOptions = {},
 ): AppState => {
   const startPaused = Boolean(options.startPaused);
+  const speedMultiplier = timerSpeedMultiplierForSettings(state.settings);
+  const normalizedSpeedMultiplier = normalizeTimerSpeedMultiplier(speedMultiplier);
   const durationMinutes =
     mode === "focus"
       ? state.settings.focusMinutes
@@ -110,10 +113,11 @@ export const startTimerInState = (
       remaining: session.duration,
       isRunning: !startPaused,
       startedAt: timestamp,
-      plannedEndAt: new Date(new Date(timestamp).getTime() + session.duration * 1000).toISOString(),
+      plannedEndAt: plannedTimerEndAt(timestamp, session.duration, normalizedSpeedMultiplier),
       pausedAt: startPaused ? timestamp : undefined,
       totalPausedSeconds: 0,
       cycleIndex: completedFocusSessions(stateWithPlan).length + (mode === "focus" ? 1 : 0),
+      speedMultiplier: normalizedSpeedMultiplier > 1 ? normalizedSpeedMultiplier : undefined,
     },
     tasks: taskId
       ? stateWithPlan.tasks.map((task) =>

@@ -17,6 +17,7 @@ import {
   updateWhiteNoisePlayback,
   updateActiveTimerPresence,
 } from "./timerRuntime";
+import { normalizeTimerSpeedMultiplier } from "./timerSpeed";
 import type { ActiveTimer, Settings } from "./types";
 
 const timerEndBody = (mode: ActiveTimer["mode"]) =>
@@ -49,6 +50,7 @@ export function useRunningTimerInterval({
 }: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitTeamData">) {
   useEffect(() => {
     if (!state?.activeTimer?.isRunning) return;
+    const intervalDelay = normalizeTimerSpeedMultiplier(state.activeTimer.speedMultiplier) > 1 ? 250 : 1000;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current?.activeTimer?.isRunning) return;
@@ -67,9 +69,9 @@ export function useRunningTimerInterval({
       setToast(title);
       announceTimerEndForRuntime(current.settings, current.activeTimer, title);
       commitTeamData(current, finishExpiredTimerInState(current, timestamp));
-    }, 1000);
+    }, intervalDelay);
     return () => window.clearInterval(handle);
-  }, [state?.activeTimer?.isRunning]);
+  }, [state?.activeTimer?.isRunning, state?.activeTimer?.speedMultiplier]);
 }
 
 export function useTimerRestoreListeners({
