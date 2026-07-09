@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   canApplyDesktopTimerOverlaySync,
   getSharedDesktopTimerOverlayRequest,
+  waitForDesktopTimerOverlayCreation,
 } from "./desktopTimerOverlay";
 
 describe("desktop timer overlay sync", () => {
@@ -37,5 +38,28 @@ describe("desktop timer overlay sync", () => {
     const third = getSharedDesktopTimerOverlayRequest(requestRef, () => Promise.resolve("next"));
     await expect(third).resolves.toBe("next");
     expect(third).not.toBe(first);
+  });
+
+  it("recovers overlay creation when the created event is missed", async () => {
+    vi.useFakeTimers();
+    try {
+      const overlayWindow = { once: vi.fn() };
+      const windowLookup = {
+        getByLabel: vi.fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({ label: "timer-overlay" }),
+      };
+
+      const result = waitForDesktopTimerOverlayCreation(overlayWindow, windowLookup, 1000, 10);
+      await vi.advanceTimersByTimeAsync(30);
+
+      await expect(result).resolves.toBeUndefined();
+      expect(overlayWindow.once).toHaveBeenCalledWith("tauri://created", expect.any(Function));
+      expect(overlayWindow.once).toHaveBeenCalledWith("tauri://error", expect.any(Function));
+      expect(windowLookup.getByLabel).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

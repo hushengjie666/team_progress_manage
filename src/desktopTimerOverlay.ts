@@ -17,8 +17,18 @@ export const DESKTOP_TIMER_ENDED_EVENT = "desktop-timer:ended";
 
 const DESKTOP_TIMER_WINDOW_WIDTH = 304;
 const DESKTOP_TIMER_WINDOW_HEIGHT = 138;
+const DESKTOP_TIMER_WINDOW_CREATE_TIMEOUT_MS = 2500;
+const DESKTOP_TIMER_WINDOW_CREATE_POLL_MS = 50;
 
 let overlayVisible = false;
+
+type DesktopTimerOverlayCreationWindow = {
+  once: (event: "tauri://created" | "tauri://error", handler: (event: { payload?: unknown }) => void) => unknown;
+};
+
+type DesktopTimerOverlayWindowLookup = {
+  getByLabel: (label: string) => Promise<unknown>;
+};
 
 export const getSharedDesktopTimerOverlayRequest = <T>(
   requestRef: { current: Promise<T> | null },
@@ -39,6 +49,57 @@ export const canApplyDesktopTimerOverlaySync = (
   syncId: number,
   disposed: boolean,
 ) => !disposed && syncSequence.current === syncId;
+
+export const waitForDesktopTimerOverlayCreation = (
+  overlayWindow: DesktopTimerOverlayCreationWindow,
+  windowLookup: DesktopTimerOverlayWindowLookup,
+  timeoutMs = DESKTOP_TIMER_WINDOW_CREATE_TIMEOUT_MS,
+  pollMs = DESKTOP_TIMER_WINDOW_CREATE_POLL_MS,
+) => new Promise<void>((resolve, reject) => {
+  let settled = false;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let intervalId: ReturnType<typeof setInterval> | undefined;
+
+  const settle = (callback: () => void) => {
+    if (settled) return;
+    settled = true;
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    if (intervalId !== undefined) clearInterval(intervalId);
+    callback();
+  };
+
+  const rejectWith = (error: unknown) => {
+    settle(() => reject(error instanceof Error ? error : new Error(String(error))));
+  };
+
+  const attachOnce = (
+    event: "tauri://created" | "tauri://error",
+    handler: (event: { payload?: unknown }) => void,
+  ) => {
+    try {
+      void Promise.resolve(overlayWindow.once(event, handler)).catch(rejectWith);
+    } catch (error) {
+      rejectWith(error);
+    }
+  };
+
+  const pollForWindow = () => {
+    void windowLookup.getByLabel(DESKTOP_TIMER_WINDOW_LABEL)
+      .then((existingWindow) => {
+        if (existingWindow) settle(() => resolve());
+      })
+      .catch(() => undefined);
+  };
+
+  attachOnce("tauri://created", () => settle(() => resolve()));
+  attachOnce("tauri://error", (event) => rejectWith(event.payload ?? "Failed to create desktop timer overlay window."));
+  pollForWindow();
+  intervalId = setInterval(pollForWindow, pollMs);
+  timeoutId = setTimeout(
+    () => rejectWith("Timed out creating desktop timer overlay window."),
+    timeoutMs,
+  );
+});
 
 type DesktopTimerOverlayOptions = {
   state: AppState | null;
@@ -64,7 +125,6 @@ const createOrGetOverlayWindow = async () => {
     await overlayWindow.setMinSize(overlaySize);
     await overlayWindow.setMaxSize(overlaySize);
     await overlayWindow.setShadow(false);
-    await overlayWindow.setFocusable(false);
     return overlayWindow;
   }
 
@@ -91,10 +151,7 @@ const createOrGetOverlayWindow = async () => {
     preventOverflow: { width: 12, height: 12 },
   });
 
-  await new Promise<void>((resolve, reject) => {
-    void overlayWindow.once("tauri://created", () => resolve());
-    void overlayWindow.once("tauri://error", (event) => reject(new Error(String(event.payload))));
-  });
+  await waitForDesktopTimerOverlayCreation(overlayWindow, WebviewWindow);
 
   return overlayWindow;
 };
