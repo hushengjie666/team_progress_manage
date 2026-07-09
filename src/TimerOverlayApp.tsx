@@ -25,6 +25,7 @@ const CONTROL_SELECTOR = "button";
 export function TimerOverlayApp() {
   const [payload, setPayload] = useState<DesktopTimerPayload | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const payloadRef = useRef<DesktopTimerPayload | null>(null);
   const overlayPressRef = useRef({ started: false, moved: false });
   const announcedEndRef = useRef<string | null>(null);
 
@@ -41,12 +42,19 @@ export function TimerOverlayApp() {
   }, []);
 
   useEffect(() => {
+    payloadRef.current = payload;
+  }, [payload]);
+
+  useEffect(() => {
     if (!isTauriRuntime()) return undefined;
     let disposed = false;
     const unlisteners: Array<() => void> = [];
 
     const attach = async () => {
       const { emitTo, listen } = await import("@tauri-apps/api/event");
+      const requestLatestState = () => emitTo("main", DESKTOP_TIMER_READY_EVENT).catch((error) => {
+        if (!disposed) console.error("Failed to request timer overlay state", error);
+      });
       const removeState = await listen<DesktopTimerPayload>(DESKTOP_TIMER_STATE_EVENT, (event) => {
         setPayload((current) => (
           shouldApplyDesktopTimerPayload(current, event.payload) ? event.payload : current
@@ -55,8 +63,21 @@ export function TimerOverlayApp() {
       const removeEnded = await listen<DesktopTimerEndPayload>(DESKTOP_TIMER_ENDED_EVENT, (event) => {
         playEndSoundOnce(event.payload);
       });
+      if (disposed) {
+        removeState();
+        removeEnded();
+        return;
+      }
       unlisteners.push(removeState, removeEnded);
-      await emitTo("main", DESKTOP_TIMER_READY_EVENT);
+      void requestLatestState();
+      const retryStateRequest = window.setInterval(() => {
+        if (payloadRef.current) {
+          window.clearInterval(retryStateRequest);
+          return;
+        }
+        void requestLatestState();
+      }, 500);
+      unlisteners.push(() => window.clearInterval(retryStateRequest));
     };
 
     void attach().catch((error) => {
