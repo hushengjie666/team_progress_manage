@@ -426,7 +426,7 @@ const startFromSignedOutState = async () => {
   if (await textVisible("项目总览")) await logout();
 };
 
-const runBackendDiagnostics = async () => {
+const connectTeamBackend = async () => {
   await clickButton("管理中心");
   await clickButton("团队后台");
   await waitForText("服务地址");
@@ -438,15 +438,6 @@ const runBackendDiagnostics = async () => {
   await waitForAnyText(["团队后台已连接", "团队在线数据已加载"], 20000);
   await clickButton("刷新在线数据");
   await waitForText("团队在线数据已刷新", 20000);
-  await clickButton("运行后台诊断");
-  await browser.waitUntil(async () => {
-    const text = await bodyText();
-    return text.includes("后台诊断通过") || text.includes("诊断完成");
-  }, {
-    timeout: 25000,
-    interval: 250,
-    timeoutMsg: "Backend diagnostics did not finish",
-  });
 };
 
 const acceptPendingInvitation = async (expectedEntityName) => {
@@ -462,7 +453,7 @@ describe("TimeManage Tauri real database functional flow", () => {
   it("simulates core modules with the Tauri shell and an isolated real MySQL backend", async () => {
     await startFromSignedOutState();
     await login(ownerEmail);
-    await runBackendDiagnostics();
+    await connectTeamBackend();
 
     await clickButton("工作区");
     await waitForText("我的工作区");

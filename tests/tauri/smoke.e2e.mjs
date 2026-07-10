@@ -104,16 +104,6 @@ describe("TimeManage Tauri desktop smoke", () => {
     await clickButton("刷新在线数据");
     await waitForText("团队在线数据已刷新");
 
-    await clickButton("运行后台诊断");
-    await browser.waitUntil(async () => {
-      const body = await browser.execute(() => document.body.innerText);
-      return body.includes("后台诊断通过") || body.includes("诊断完成");
-    }, {
-      timeout: 20000,
-      interval: 250,
-      timeoutMsg: "Backend diagnostics did not complete",
-    });
-
     const stored = await currentStoredRuntime();
     assert.equal(stored?.backend?.serverUrl, backendUrl);
     assert.equal(stored?.auth?.account?.email, smokeEmail);

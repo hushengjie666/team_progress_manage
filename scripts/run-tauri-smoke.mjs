@@ -3,7 +3,7 @@ import { once } from "node:events";
 import { createServer } from "node:http";
 import { platform } from "node:os";
 
-let backendUrl = process.env.TM_TAURI_SMOKE_BACKEND_URL ?? "http://127.0.0.1:8787";
+let backendUrl = process.env.TM_TAURI_SMOKE_BACKEND_URL ?? "http://127.0.0.1:18787";
 const smokeEmail = process.env.TM_TAURI_SMOKE_EMAIL ?? "admin";
 const smokePassword = process.env.TM_TAURI_SMOKE_PASSWORD ?? "hu626699";
 const explicitBackendUrl = Boolean(process.env.TM_TAURI_SMOKE_BACKEND_URL);
@@ -185,20 +185,15 @@ const startMockBackend = async () => {
 };
 
 const startBackendIfNeeded = async () => {
+  if (!explicitBackendUrl) {
+    await startMockBackend();
+    return;
+  }
   if (await healthAvailable() && await authStatusAvailable()) {
     console.log(`[tauri-smoke] Reusing backend at ${backendUrl}`);
     return;
   }
-  if (explicitBackendUrl) {
-    throw new Error(`${backendUrl} is not a usable TimeManage auth backend for smoke testing`);
-  }
-  if (await healthAvailable()) {
-    console.log(`[tauri-smoke] ${backendUrl} is occupied but /auth/status failed; using a mock smoke backend instead`);
-    await startMockBackend();
-    return;
-  }
-
-  await startMockBackend();
+  throw new Error(`${backendUrl} is not a usable TimeManage auth backend for smoke testing`);
 };
 
 const ensureSmokeAccount = async () => {
