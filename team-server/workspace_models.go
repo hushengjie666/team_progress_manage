@@ -7,6 +7,7 @@ type workspaceSummary struct {
 	OwnerAccountID string `json:"owner_account_id,omitempty"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
+	Revision       int64  `json:"revision"`
 }
 
 type workspaceMembershipSummary struct {
@@ -19,6 +20,7 @@ type workspaceMembershipSummary struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+	Revision    int64  `json:"revision"`
 }
 
 type workspaceCreateRequest struct {
@@ -28,14 +30,17 @@ type workspaceCreateRequest struct {
 }
 
 type workspaceUpdateRequest struct {
-	Name           string `json:"name"`
-	Type           string `json:"type"`
-	OwnerAccountID string `json:"owner_account_id,omitempty"`
+	Name                   string `json:"name"`
+	Type                   string `json:"type"`
+	OwnerAccountID         string `json:"owner_account_id,omitempty"`
+	ExpectedRevision       int64  `json:"expected_revision"`
+	ConfirmRestrictMembers bool   `json:"confirm_restrict_members,omitempty"`
 }
 
 type workspaceMembershipUpdateRequest struct {
-	Status string `json:"status"`
-	Role   string `json:"role"`
+	Status           string `json:"status"`
+	Role             string `json:"role"`
+	ExpectedRevision int64  `json:"expected_revision"`
 }
 
 type workspaceMembershipResponse struct {
@@ -43,13 +48,18 @@ type workspaceMembershipResponse struct {
 }
 
 type workspaceSwitchRequest struct {
-	WorkspaceID string `json:"workspace_id"`
-	DeviceID    string `json:"device_id,omitempty"`
+	WorkspaceID      string `json:"workspace_id"`
+	DeviceID         string `json:"device_id,omitempty"`
+	ExpectedRevision int64  `json:"expected_revision"`
 }
 
 type workspaceInvitationRequest struct {
 	WorkspaceID string `json:"workspace_id"`
 	Email       string `json:"email"`
+}
+
+type invitationActionRequest struct {
+	ExpectedRevision int64 `json:"expected_revision"`
 }
 
 type workspaceInvitationSummary struct {
@@ -65,5 +75,6 @@ type workspaceInvitationSummary struct {
 	Status           string `json:"status"`
 	CreatedAt        string `json:"created_at"`
 	UpdatedAt        string `json:"updated_at"`
+	Revision         int64  `json:"revision"`
 	AcceptedAt       string `json:"accepted_at,omitempty"`
 }

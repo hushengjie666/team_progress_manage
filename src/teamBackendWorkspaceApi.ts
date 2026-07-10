@@ -40,9 +40,23 @@ export async function updateWorkspace(
       name: input.name,
       type: input.type ?? "shared",
       owner_account_id: input.ownerAccountId,
+      expected_revision: input.expectedRevision,
+      confirm_restrict_members: input.confirmRestrictMembers,
     }),
   });
   return mapWorkspace(payload.workspace);
+}
+
+export async function fetchWorkspaceRestrictionImpact(
+  backend: BackendConnectionState,
+  token: string,
+  workspaceId: string,
+): Promise<{ activeMembers: number; pendingInvitations: number }> {
+  const payload = await requestJson<{ active_members: number; pending_invitations: number }>(
+    apiUrl(backend.serverUrl, `/workspaces/${encodeURIComponent(workspaceId)}/restriction-impact`),
+    { headers: authHeaders(token) },
+  );
+  return { activeMembers: payload.active_members, pendingInvitations: payload.pending_invitations };
 }
 
 export async function updateWorkspaceMembership(
@@ -60,6 +74,7 @@ export async function updateWorkspaceMembership(
       body: JSON.stringify({
         status: input.status,
         role: input.role,
+        expected_revision: input.expectedRevision,
       }),
     },
   );

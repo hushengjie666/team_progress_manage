@@ -21,11 +21,18 @@ export const handleMockInvitationRoute = async (
     }
 
     const now = new Date().toISOString();
+    const currentRevision = runtime.projectInvitations[invitationIndex].revision ?? 1;
+    const body = request.postDataJSON() as { expected_revision?: number };
+    if (body.expected_revision !== currentRevision) {
+      await fulfillError(route, 409, "revision_conflict");
+      return true;
+    }
     const invitation = {
       ...runtime.projectInvitations[invitationIndex],
       status: "accepted" as const,
       updated_at: now,
       accepted_at: now,
+      revision: currentRevision + 1,
     };
     runtime.projectInvitations[invitationIndex] = invitation;
     runtime.projectInvitationAccepted = true;
@@ -55,13 +62,14 @@ export const handleMockInvitationRoute = async (
         status: "pending",
         created_at: now,
         updated_at: now,
+        revision: 1,
       };
       runtime.workspaceInvitations.push(invitation);
       await fulfillJson(route, { invitation });
       return true;
     }
 
-    await fulfillJson(route, { invitations: runtime.workspaceInvitations });
+    await fulfillJson(route, { invitations: runtime.workspaceInvitations.map((invitation) => ({ ...invitation, revision: invitation.revision ?? 1 })) });
     return true;
   }
 
@@ -87,13 +95,14 @@ export const handleMockInvitationRoute = async (
         status: "pending" as const,
         created_at: now,
         updated_at: now,
+        revision: 1,
       };
       runtime.projectInvitations.push(invitation);
       await fulfillJson(route, { invitation });
       return true;
     }
 
-    await fulfillJson(route, { invitations: runtime.projectInvitations });
+    await fulfillJson(route, { invitations: runtime.projectInvitations.map((invitation) => ({ ...invitation, revision: invitation.revision ?? 1 })) });
     return true;
   }
 

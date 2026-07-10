@@ -17,6 +17,7 @@ export {
 } from "./teamBackendAuthApi";
 export {
   createWorkspace,
+  fetchWorkspaceRestrictionImpact,
   fetchWorkspaces,
   updateWorkspace,
   updateWorkspaceMembership,

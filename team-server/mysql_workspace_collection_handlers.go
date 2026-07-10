@@ -98,6 +98,7 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 			OwnerAccountID: account.ID,
 			CreatedAt:      now,
 			UpdatedAt:      now,
+			Revision:       1,
 		}
 		if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
@@ -113,6 +114,7 @@ func (a *app) handleWorkspacesMySQL(w http.ResponseWriter, r *http.Request, auth
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
+		account.Revision++
 		if err := tx.Commit(); err != nil {
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return

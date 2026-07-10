@@ -9,11 +9,14 @@ export type WorkspaceUpdateInput = {
   name: string;
   type: WorkspaceType;
   ownerAccountId?: string;
+  expectedRevision?: number;
+  confirmRestrictMembers?: boolean;
 };
 
 export type WorkspaceMembershipUpdateInput = {
   status?: WorkspaceMemberStatus;
   role?: WorkspaceMemberRole;
+  expectedRevision?: number;
 };
 
 export interface Workspace {
@@ -23,6 +26,7 @@ export interface Workspace {
   ownerAccountId?: string;
   createdAt: string;
   updatedAt: string;
+  revision?: number;
 }
 
 export interface WorkspaceMembership {
@@ -35,6 +39,7 @@ export interface WorkspaceMembership {
   status: WorkspaceMemberStatus;
   createdAt: string;
   updatedAt: string;
+  revision?: number;
 }
 
 export interface WorkspaceInvitation {
@@ -51,6 +56,7 @@ export interface WorkspaceInvitation {
   createdAt: string;
   updatedAt: string;
   acceptedAt?: string;
+  revision?: number;
 }
 
 export interface ProjectInvitation {
@@ -69,6 +75,7 @@ export interface ProjectInvitation {
   createdAt: string;
   updatedAt: string;
   acceptedAt?: string;
+  revision?: number;
 }
 
 export interface Account {
@@ -79,4 +86,5 @@ export interface Account {
   disabledAt?: string;
   createdAt: string;
   updatedAt: string;
+  revision?: number;
 }

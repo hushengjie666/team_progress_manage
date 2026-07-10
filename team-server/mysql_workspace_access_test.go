@@ -78,7 +78,7 @@ func TestMySQLWorkspaceSwitchingPreservesGlobalDataAndSharedMemberships(t *testi
 		}
 	}
 
-	switchBody := bytes.NewReader([]byte(`{"workspace_id":"` + privateLogin.Workspace.ID + `","device_id":"device_shared"}`))
+	switchBody := versionedJSONBody(t, `{"workspace_id":"`+privateLogin.Workspace.ID+`","device_id":"device_shared"}`, sharedLogin.Account.Revision)
 	switchRecorder := httptest.NewRecorder()
 	api.handleSwitchWorkspace(switchRecorder, httptest.NewRequest(http.MethodPost, "/auth/switch-workspace", switchBody), sharedAuth)
 	if switchRecorder.Code != http.StatusOK {
@@ -153,7 +153,7 @@ func TestMySQLWorkspaceSwitchingPreservesGlobalDataAndSharedMemberships(t *testi
 	}
 
 	memberAuth := authContext{AccountID: memberLogin.Account.ID, WorkspaceID: memberLogin.Workspace.ID}
-	deniedSwitchBody := bytes.NewReader([]byte(`{"workspace_id":"` + privateLogin.Workspace.ID + `","device_id":"device_member"}`))
+	deniedSwitchBody := versionedJSONBody(t, `{"workspace_id":"`+privateLogin.Workspace.ID+`","device_id":"device_member"}`, memberLogin.Account.Revision)
 	deniedSwitchRecorder := httptest.NewRecorder()
 	api.handleSwitchWorkspace(deniedSwitchRecorder, httptest.NewRequest(http.MethodPost, "/auth/switch-workspace", deniedSwitchBody), memberAuth)
 	if deniedSwitchRecorder.Code != http.StatusForbidden {

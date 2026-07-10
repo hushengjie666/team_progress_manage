@@ -101,7 +101,7 @@ func TestMySQLProjectInvitationAcceptAddsProjectMembershipOnly(t *testing.T) {
 	}
 
 	acceptRecorder := httptest.NewRecorder()
-	api.handleProjectInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/project-invitations/"+invitePayload.Invitation.ID+"/accept", nil), inviteeAuth)
+	api.handleProjectInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/project-invitations/"+invitePayload.Invitation.ID+"/accept", bytes.NewReader([]byte(`{"expected_revision":1}`))), inviteeAuth)
 	if acceptRecorder.Code != http.StatusOK {
 		t.Fatalf("accept project invitation status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
 	}
@@ -245,7 +245,7 @@ func TestMySQLProjectInvitationCancelHidesPendingInvitation(t *testing.T) {
 	inviteeAuth := authContext{AccountID: inviteeLogin.Account.ID, WorkspaceID: inviteeLogin.Workspace.ID}
 
 	cancelRecorder := httptest.NewRecorder()
-	api.handleProjectInvitationByID(cancelRecorder, httptest.NewRequest(http.MethodDelete, "/project-invitations/"+invitePayload.Invitation.ID, nil), inviteeAuth)
+	api.handleProjectInvitationByID(cancelRecorder, httptest.NewRequest(http.MethodDelete, "/project-invitations/"+invitePayload.Invitation.ID, bytes.NewReader([]byte(`{"expected_revision":1}`))), inviteeAuth)
 	if cancelRecorder.Code != http.StatusOK {
 		t.Fatalf("cancel project invitation status = %d, body = %s", cancelRecorder.Code, cancelRecorder.Body.String())
 	}

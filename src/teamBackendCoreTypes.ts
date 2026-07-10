@@ -6,6 +6,7 @@ export interface ServerAccount {
   disabled_at?: string;
   created_at: string;
   updated_at: string;
+  revision?: number;
 }
 
 export interface ServerWorkspace {
@@ -15,6 +16,7 @@ export interface ServerWorkspace {
   owner_account_id?: string;
   created_at: string;
   updated_at: string;
+  revision?: number;
 }
 
 export interface ServerWorkspaceMembership {
@@ -27,4 +29,5 @@ export interface ServerWorkspaceMembership {
   status: "active" | "disabled";
   created_at: string;
   updated_at: string;
+  revision?: number;
 }

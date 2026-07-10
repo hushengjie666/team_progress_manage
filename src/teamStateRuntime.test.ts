@@ -4,7 +4,9 @@ import { createTeamDataRuntime } from "./teamStateRuntime";
 import { businessRowsFromState } from "./teamBusinessRows";
 import type { AppState } from "./types";
 
-const withToken = (state: AppState): AppState => ({
+const withToken = (state: AppState): AppState => {
+  const revisions = Object.fromEntries(businessRowsFromState(state).map((row) => [`${row.workspace_id ?? ""}:${row.entity}:${row.id}`, 1]));
+  return ({
   ...state,
   auth: {
     ...state.auth,
@@ -16,8 +18,10 @@ const withToken = (state: AppState): AppState => ({
     ...state.backend,
     token: "token_runtime",
     serverUrl: "http://127.0.0.1:8787",
+    businessRowRevisions: revisions,
   },
 });
+};
 
 const changedState = (state: AppState): AppState => ({
   ...state,
@@ -58,7 +62,7 @@ const deferredResponse = () => {
 
 const teamStateResponse = (state: AppState) =>
   new Response(JSON.stringify({
-    rows: businessRowsFromState(state),
+    rows: businessRowsFromState(state).map((row) => ({ ...row, revision: 2 })),
   }), { status: 200, headers: { "content-type": "application/json" } });
 
 const flushPromises = async () => {
@@ -176,5 +180,25 @@ describe("team state runtime", () => {
     expect(getCurrent()?.auth.account).toEqual(before.auth.account);
     expect(getCurrent()?.backend.status).toBe("error");
     expect(getToast()).toContain("backend down");
+  });
+
+  it("restores server state when a destructive operation conflicts", async () => {
+    const before = withToken(createInitialState());
+    const after = { ...before, projects: [] };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        return new Response(JSON.stringify({ error: "revision_conflict" }), { status: 409, headers: { "content-type": "application/json" } });
+      }
+      return teamStateResponse(before);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
+
+    const saved = await runtime.persistTeamData(before, after);
+
+    expect(saved).toBeUndefined();
+    expect(getCurrent()?.projects).toHaveLength(before.projects.length);
+    expect(getToast()).toContain("revision_conflict");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

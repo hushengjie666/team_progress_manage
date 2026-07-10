@@ -42,6 +42,7 @@ export async function updatePlatformAccount(
       email: payload.email,
       password: payload.password,
       status: payload.status,
+      expected_revision: payload.expectedRevision,
     }),
   });
   return mapAccount(result.account);
@@ -78,6 +79,7 @@ export async function updateMemberAccount(
       email: payload.email,
       password: payload.password,
       roles: payload.roles,
+      expected_revision: payload.expectedRevision,
     }),
   });
   return result.member.payload as ProjectMember;

@@ -22,5 +22,6 @@ type projectInvitationSummary struct {
 	Status           string   `json:"status"`
 	CreatedAt        string   `json:"created_at"`
 	UpdatedAt        string   `json:"updated_at"`
+	Revision         int64    `json:"revision"`
 	AcceptedAt       string   `json:"accepted_at,omitempty"`
 }

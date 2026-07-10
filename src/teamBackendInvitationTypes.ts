@@ -14,6 +14,7 @@ export interface ServerWorkspaceInvitation {
   created_at: string;
   updated_at: string;
   accepted_at?: string;
+  revision?: number;
 }
 
 export interface ServerProjectInvitation {
@@ -32,6 +33,7 @@ export interface ServerProjectInvitation {
   created_at: string;
   updated_at: string;
   accepted_at?: string;
+  revision?: number;
 }
 
 export interface WorkspaceInvitationsResponse {

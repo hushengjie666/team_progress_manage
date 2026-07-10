@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { BusinessRow } from "../../src/teamBusinessRows";
+import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER, STORAGE_KEY } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { projectMoveState } from "./support/scenarioStates";
@@ -35,8 +35,8 @@ test("saves project settings only after clicking save", async ({ page }) => {
     request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
-  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await saveRequest).postDataJSON();
+  expect(businessOperationRows(requestBody)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "project",
@@ -75,8 +75,9 @@ test("moves a project to another shared workspace from project settings", async 
     await dialog.accept();
   });
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
-  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await saveRequest).postDataJSON();
+  const writtenRows = businessOperationRows(requestBody);
+  expect(writtenRows).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         workspace_id: "workspace_e2e_target",
@@ -85,7 +86,7 @@ test("moves a project to another shared workspace from project settings", async 
       }),
     ]),
   );
-  expect(requestBody.rows).not.toEqual(
+  expect(writtenRows).not.toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         workspace_id: "workspace_e2e",

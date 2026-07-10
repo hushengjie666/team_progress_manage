@@ -37,7 +37,7 @@ func main() {
 		if err := stopWindowsService(); err != nil {
 			log.Fatal(err)
 		}
-	case "db-status", "db-up", "db-backup", "db-rollback", "db-restore":
+	case "db-status", "db-audit", "db-up", "db-backup", "db-rollback", "db-restore":
 		if err := runDatabaseCommand(context.Background(), invocation); err != nil {
 			log.Fatal(err)
 		}

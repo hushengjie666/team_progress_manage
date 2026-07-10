@@ -60,40 +60,30 @@ func (a *app) handleAdminAccounts(w http.ResponseWriter, r *http.Request, auth a
 			writeError(w, http.StatusInternalServerError, "save failed")
 			return
 		}
-		if !found && strings.TrimSpace(req.Password) == "" {
+		if found {
+			writeError(w, http.StatusConflict, "account already exists; use PATCH")
+			return
+		}
+		if strings.TrimSpace(req.Password) == "" {
 			writeError(w, http.StatusBadRequest, "password is required for a new account")
 			return
 		}
 		now := time.Now().UTC().Format(time.RFC3339)
-		if !found {
-			hash, err := hashPassword(req.Password)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "password hashing failed")
-				return
-			}
-			accountID := newID("account")
-			account = accountRecord{
-				ID:           accountID,
-				WorkspaceID:  privateWorkspaceID(accountID),
-				Name:         name,
-				Email:        email,
-				PasswordHash: hash,
-				CreatedAt:    now,
-				UpdatedAt:    now,
-			}
-		} else {
-			account.WorkspaceID = privateWorkspaceID(account.ID)
-			account.Name = name
-			account.Email = email
-			account.UpdatedAt = now
-			if strings.TrimSpace(req.Password) != "" {
-				hash, err := hashPassword(req.Password)
-				if err != nil {
-					writeError(w, http.StatusInternalServerError, "password hashing failed")
-					return
-				}
-				account.PasswordHash = hash
-			}
+		hash, err := hashPassword(req.Password)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "password hashing failed")
+			return
+		}
+		accountID := newID("account")
+		account = accountRecord{
+			ID:           accountID,
+			WorkspaceID:  privateWorkspaceID(accountID),
+			Name:         name,
+			Email:        email,
+			PasswordHash: hash,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+			Revision:     1,
 		}
 		if status == "disabled" {
 			if account.ID == defaultAdminAccountID {

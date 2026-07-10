@@ -106,7 +106,7 @@ func TestMySQLWorkspaceInvitationAcceptAddsMembership(t *testing.T) {
 	}
 
 	acceptRecorder := httptest.NewRecorder()
-	api.handleWorkspaceInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+invitePayload.Invitation.ID+"/accept", nil), inviteeAuth)
+	api.handleWorkspaceInvitationByID(acceptRecorder, httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+invitePayload.Invitation.ID+"/accept", bytes.NewReader([]byte(`{"expected_revision":1}`))), inviteeAuth)
 	if acceptRecorder.Code != http.StatusOK {
 		t.Fatalf("accept invitation status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
 	}
@@ -246,7 +246,7 @@ func TestMySQLWorkspaceInvitationCancelHidesPendingInvitation(t *testing.T) {
 	inviteeAuth := authContext{AccountID: inviteeLogin.Account.ID, WorkspaceID: inviteeLogin.Workspace.ID}
 
 	cancelRecorder := httptest.NewRecorder()
-	api.handleWorkspaceInvitationByID(cancelRecorder, httptest.NewRequest(http.MethodDelete, "/workspace-invitations/"+invitePayload.Invitation.ID, nil), inviteeAuth)
+	api.handleWorkspaceInvitationByID(cancelRecorder, httptest.NewRequest(http.MethodDelete, "/workspace-invitations/"+invitePayload.Invitation.ID, bytes.NewReader([]byte(`{"expected_revision":1}`))), inviteeAuth)
 	if cancelRecorder.Code != http.StatusOK {
 		t.Fatalf("cancel invitation status = %d, body = %s", cancelRecorder.Code, cancelRecorder.Body.String())
 	}

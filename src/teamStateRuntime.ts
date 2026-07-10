@@ -1,5 +1,6 @@
 import { applyTeamStateSaveFailure } from "./appBoot";
-import { loadTeamData, saveTeamDataSnapshot } from "./teamBusinessApi";
+import { loadTeamData, saveTeamDataChanges } from "./teamBusinessApi";
+import { TeamHttpError } from "./teamBackendHttp";
 import type { AppState } from "./types";
 
 export type TeamDataRuntimeOptions = {
@@ -27,6 +28,7 @@ export type TeamDataRuntime = {
 
 export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOptions): TeamDataRuntime => {
   let commitSequence = 0;
+  let commitQueue = Promise.resolve();
 
   const persistTeamData = async (
     current: AppState,
@@ -43,12 +45,20 @@ export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOpt
     const applyFailureState = options.applyFailureState ?? true;
     const canApplyState = options.canApplyState ?? (() => true);
     try {
-      const saved = await saveTeamDataSnapshot(current.backend, token, next);
+      const saved = await saveTeamDataChanges(current.backend, token, current, next);
       const finalState = options.refreshAfterSave && saved ? await loadTeamData(saved) : saved;
       if (finalState && applySuccessState && canApplyState()) setState(finalState);
       return finalState;
     } catch (error) {
-      const failed = applyTeamStateSaveFailure(next, error);
+      let failureSource = next;
+      if (error instanceof TeamHttpError && error.status === 409) {
+        try {
+          failureSource = await loadTeamData(current);
+        } catch {
+          failureSource = next;
+        }
+      }
+      const failed = applyTeamStateSaveFailure(failureSource, error);
       if (applyFailureState && canApplyState()) setState(failed);
       if (showFailureToast && canApplyState()) setToast(failed.auth.message);
       return undefined;
@@ -70,9 +80,11 @@ export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOpt
         message: "正在写入团队后台",
       },
     });
-    void persistTeamData(current, next, {
-      refreshAfterSave: true,
-      canApplyState: () => sequence === commitSequence,
+    commitQueue = commitQueue.then(async () => {
+      await persistTeamData(current, next, {
+        refreshAfterSave: true,
+        canApplyState: () => sequence === commitSequence,
+      });
     });
   };
 

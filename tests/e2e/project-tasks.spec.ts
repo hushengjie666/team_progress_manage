@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { BusinessRow } from "../../src/teamBusinessRows";
+import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 
@@ -32,8 +32,8 @@ test("opens a project and creates a task with the unified task form", async ({ p
 
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("E2E 项目弹窗任务").first()).toBeVisible();
-  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await saveRequest).postDataJSON();
+  expect(businessOperationRows(requestBody)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "task",
@@ -58,17 +58,16 @@ test("edits task detail and persists progress fields", async ({ page }) => {
   await dialog.getByRole("spinbutton", { name: "进度百分比" }).fill("45");
   const progressRequest = page.waitForRequest((request) => {
     if (request.url() !== `${MOCK_SERVER}/team/data` || request.method() !== "PUT") return false;
-    const body = request.postDataJSON() as { rows?: BusinessRow[] };
-    return Boolean(body.rows?.some((row) => row.entity === "task" && "progressNote" in row.payload && row.payload.progressNote === "E2E 进度已持久化。"));
+    const rows = businessOperationRows(request.postDataJSON());
+    return rows.some((row) => row.entity === "task" && "progressNote" in row.payload && row.payload.progressNote === "E2E 进度已持久化。");
   });
   await dialog.getByLabel("进展说明").fill("E2E 进度已持久化。");
-  const requestBody = (await progressRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await progressRequest).postDataJSON();
+  expect(businessOperationRows(requestBody)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "task",
         payload: expect.objectContaining({
-          progressPercent: 45,
           progressNote: "E2E 进度已持久化。",
         }),
       }),

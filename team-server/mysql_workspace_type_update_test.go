@@ -80,7 +80,7 @@ func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
 	acceptRecorder := httptest.NewRecorder()
 	api.handleWorkspaceInvitationByID(
 		acceptRecorder,
-		httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+joinedInvite.Invitation.ID+"/accept", nil),
+		httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+joinedInvite.Invitation.ID+"/accept", bytes.NewReader([]byte(`{"expected_revision":1}`))),
 		authContext{AccountID: joinedLogin.Account.ID, WorkspaceID: joinedLogin.Workspace.ID},
 	)
 	if acceptRecorder.Code != http.StatusOK {
@@ -96,11 +96,37 @@ func TestMySQLWorkspaceUpdateCanMakeSharedWorkspacePrivate(t *testing.T) {
 	if pendingRecorder.Code != http.StatusOK {
 		t.Fatalf("invite pending status = %d, body = %s", pendingRecorder.Code, pendingRecorder.Body.String())
 	}
+	impactRecorder := httptest.NewRecorder()
+	api.handleWorkspaceByID(
+		impactRecorder,
+		httptest.NewRequest(http.MethodGet, "/workspaces/"+sharedLogin.Workspace.ID+"/restriction-impact", nil),
+		sharedAuth,
+	)
+	if impactRecorder.Code != http.StatusOK {
+		t.Fatalf("restriction impact status = %d, body = %s", impactRecorder.Code, impactRecorder.Body.String())
+	}
+	var impact map[string]int
+	if err := json.Unmarshal(impactRecorder.Body.Bytes(), &impact); err != nil {
+		t.Fatal(err)
+	}
+	if impact["active_members"] != 1 || impact["pending_invitations"] != 1 {
+		t.Fatalf("restriction impact = %#v", impact)
+	}
+	currentRevision := mysqlRowRevision(t, db, "workspaces", sharedLogin.Workspace.ID)
+	unconfirmedRecorder := httptest.NewRecorder()
+	api.handleWorkspaceByID(
+		unconfirmedRecorder,
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, versionedJSONBody(t, `{"name":"转为私人","type":"private"}`, currentRevision)),
+		sharedAuth,
+	)
+	if unconfirmedRecorder.Code != http.StatusPreconditionRequired {
+		t.Fatalf("unconfirmed private conversion status = %d, body = %s", unconfirmedRecorder.Code, unconfirmedRecorder.Body.String())
+	}
 
 	updateRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		updateRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"转为私人","type":"private"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, versionedJSONBody(t, `{"name":"转为私人","type":"private","confirm_restrict_members":true}`, mysqlRowRevision(t, db, "workspaces", sharedLogin.Workspace.ID))),
 		sharedAuth,
 	)
 	if updateRecorder.Code != http.StatusOK {
@@ -167,7 +193,7 @@ func TestMySQLWorkspaceUpdateRejectsPrivateWorkspaceTypeChange(t *testing.T) {
 	updateRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		updateRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+login.Workspace.ID, bytes.NewReader([]byte(`{"name":"仍是私人工作区","type":"shared"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+login.Workspace.ID, versionedJSONBody(t, `{"name":"仍是私人工作区","type":"shared"}`, mysqlRowRevision(t, db, "workspaces", login.Workspace.ID))),
 		authContext{AccountID: login.Account.ID, WorkspaceID: login.Workspace.ID},
 	)
 	if updateRecorder.Code != http.StatusBadRequest {

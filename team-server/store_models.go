@@ -13,6 +13,7 @@ type workspaceData struct {
 	OwnerAccountID string `json:"owner_account_id,omitempty"`
 	CreatedAt      string `json:"created_at"`
 	UpdatedAt      string `json:"updated_at"`
+	Revision       int64  `json:"revision"`
 }
 
 type accountRecord struct {
@@ -24,6 +25,7 @@ type accountRecord struct {
 	DisabledAt   string `json:"disabled_at,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	UpdatedAt    string `json:"updated_at"`
+	Revision     int64  `json:"revision"`
 }
 
 type workspaceMembershipRecord struct {
@@ -34,4 +36,5 @@ type workspaceMembershipRecord struct {
 	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
+	Revision    int64  `json:"revision"`
 }

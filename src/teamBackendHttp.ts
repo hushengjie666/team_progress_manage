@@ -14,6 +14,12 @@ export const authHeaders = (token?: string) => ({
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
+export class TeamHttpError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 const readResponse = async <T>(response: Response): Promise<T> => {
   if (response.ok) return response.json() as Promise<T>;
   let message = `${response.status} ${response.statusText}`;
@@ -24,7 +30,7 @@ const readResponse = async <T>(response: Response): Promise<T> => {
     const text = await response.text().catch(() => "");
     if (text) message = text;
   }
-  throw new Error(message);
+  throw new TeamHttpError(response.status, message);
 };
 
 export const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {

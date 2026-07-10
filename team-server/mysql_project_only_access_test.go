@@ -130,7 +130,22 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 			1,
 		)
 	}
-	modifiedBody, err := json.Marshal(teamDataSaveRequest{Rows: modifiedRows})
+	modifiedOperations := []businessOperation{}
+	for _, row := range modifiedRows {
+		if row.ID != teammatePlanID {
+			continue
+		}
+		modifiedOperations = append(modifiedOperations, businessOperation{
+			Operation:        "patch",
+			WorkspaceID:      row.WorkspaceID,
+			Entity:           row.Entity,
+			ID:               row.ID,
+			ExpectedRevision: row.Revision,
+			UpdatedAt:        row.UpdatedAt,
+			Patch:            row.Payload,
+		})
+	}
+	modifiedBody, err := json.Marshal(teamDataSaveRequest{ProtocolVersion: 2, Operations: modifiedOperations})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +158,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	hiddenPlanRow.ID = "plan_" + projectOnlyAuth.AccountID + "_" + workspaceID + "_2026-07-05"
 	hiddenPlanRow.UpdatedAt = "2026-07-05T08:00:00Z"
 	hiddenPlanRow.Payload = json.RawMessage(`{"id":"` + hiddenPlanRow.ID + `","workspaceId":"` + workspaceID + `","ownerAccountId":"` + projectOnlyAuth.AccountID + `","date":"2026-07-05","capacityPomodoros":3,"committedTaskIds":["task_hidden"],"completedPomodoros":0,"suggestedTaskIds":[],"reflection":"","review":{"mood":"normal","wins":"","blockers":"","interruptionPattern":"","tomorrowFocus":""},"createdAt":"2026-07-05T08:00:00Z","updatedAt":"2026-07-05T08:00:00Z"}`)
-	hiddenBody, err := json.Marshal(teamDataSaveRequest{Rows: append(stateResponse.Rows, hiddenPlanRow)})
+	hiddenBody, err := json.Marshal(teamDataSaveRequest{ProtocolVersion: 2, Operations: []businessOperation{{Operation: "create", Row: &hiddenPlanRow}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +169,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	}
 
 	disableRecorder := httptest.NewRecorder()
-	disableBody := bytes.NewReader([]byte(`{"workspace_id":"` + workspaceID + `","status":"disabled","roles":["executor"]}`))
+	disableBody := versionedJSONBody(t, `{"workspace_id":"`+workspaceID+`","status":"disabled","roles":["executor"]}`, member.Member.Revision)
 	api.handleMemberByID(disableRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+member.Member.ID, disableBody), sharedAuth)
 	if disableRecorder.Code != http.StatusOK {
 		t.Fatalf("disable project member status = %d, body = %s", disableRecorder.Code, disableRecorder.Body.String())

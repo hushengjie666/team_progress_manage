@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { BusinessRow } from "../../src/teamBusinessRows";
+import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 
@@ -60,8 +60,8 @@ test("creates a project from overview add card without navigating away", async (
   await expect(dialog).toHaveCount(0);
   await expect(projectOverview).toContainText("E2E 总览弹窗项目");
   await expect(page.getByRole("heading", { name: "我的工作区" })).toHaveCount(0);
-  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await saveRequest).postDataJSON();
+  expect(businessOperationRows(requestBody)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         workspace_id: "workspace_e2e",

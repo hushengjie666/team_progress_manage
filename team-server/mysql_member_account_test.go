@@ -42,7 +42,7 @@ func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 	if response.Account.Email != "executor@example.com" || response.Member.Entity != "project_member" {
 		t.Fatalf("unexpected member response: %#v", response)
 	}
-	patchBody := bytes.NewReader([]byte(`{"password":"new-demo"}`))
+	patchBody := versionedJSONBody(t, `{"password":"new-demo"}`, response.Member.Revision)
 	patchRecorder := httptest.NewRecorder()
 	api.handleMemberByID(patchRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+response.Member.ID, patchBody), ownerAuth())
 	if patchRecorder.Code != http.StatusOK {

@@ -47,6 +47,14 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 		writeError(w, http.StatusNotFound, "member not found")
 		return
 	}
+	if req.ExpectedRevision <= 0 {
+		writeError(w, http.StatusPreconditionRequired, "expected revision is required")
+		return
+	}
+	if existing.Revision != req.ExpectedRevision {
+		writeError(w, http.StatusConflict, "revision_conflict")
+		return
+	}
 	var payload map[string]any
 	if err := json.Unmarshal(existing.Payload, &payload); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid member payload")
@@ -61,10 +69,16 @@ func (a *app) handleMemberByIDMySQL(w http.ResponseWriter, r *http.Request, auth
 	existing.WorkspaceID = targetWorkspaceID
 	existing.UpdatedAt = now
 	existing.Payload = bytes
-	if err := businessUpsertRow(ctx, tx, existing); err != nil {
+	updated, err := businessUpdateRowAtRevision(ctx, tx, existing, req.ExpectedRevision)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
+	if !updated {
+		writeError(w, http.StatusConflict, "revision_conflict")
+		return
+	}
+	existing.Revision = req.ExpectedRevision + 1
 	if err := mysqlTouchWorkspace(ctx, tx, targetWorkspaceID, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return

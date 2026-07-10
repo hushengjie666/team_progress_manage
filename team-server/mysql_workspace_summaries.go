@@ -9,15 +9,15 @@ import (
 func mysqlWorkspaceSummariesForAccount(ctx context.Context, q sqlRunner, accountID string) ([]workspaceSummary, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT id, name, type, owner_account_id, created_at, updated_at
+		`SELECT id, name, type, owner_account_id, created_at, updated_at, row_version
 		 FROM (
-		   SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
+		   SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at, w.row_version
 		   FROM workspace_memberships m
 		   JOIN workspaces w ON w.id = m.workspace_id
 		   WHERE m.account_id = ? AND m.status = 'active'
 			     AND (w.type <> 'private' OR w.owner_account_id = ?)
 		   UNION
-		   SELECT DISTINCT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
+		   SELECT DISTINCT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at, w.row_version
 		   FROM business_project_members pm
 		   JOIN workspaces w ON w.id = pm.workspace_id
 			   WHERE pm.account_ref = ? AND pm.status = 'active'
@@ -46,7 +46,7 @@ func mysqlWorkspaceSummariesForAccount(ctx context.Context, q sqlRunner, account
 func mysqlWorkspaceMembershipSummaries(ctx context.Context, q sqlRunner, workspaceID string) ([]workspaceMembershipSummary, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at
+		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at, m.row_version
 		 FROM workspace_memberships m
 		 JOIN accounts a ON a.id = m.account_id
 		 WHERE m.workspace_id = ? AND m.status = 'active'
@@ -60,7 +60,7 @@ func mysqlWorkspaceMembershipSummaries(ctx context.Context, q sqlRunner, workspa
 	result := []workspaceMembershipSummary{}
 	for rows.Next() {
 		var item workspaceMembershipSummary
-		if err := rows.Scan(&item.ID, &item.WorkspaceID, &item.AccountID, &item.Name, &item.Email, &item.Role, &item.Status, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.WorkspaceID, &item.AccountID, &item.Name, &item.Email, &item.Role, &item.Status, &item.CreatedAt, &item.UpdatedAt, &item.Revision); err != nil {
 			return nil, err
 		}
 		result = append(result, item)
@@ -72,13 +72,13 @@ func mysqlWorkspaceMembershipSummaryByID(ctx context.Context, q sqlRunner, works
 	var item workspaceMembershipSummary
 	err := q.QueryRowContext(
 		ctx,
-		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at
+		`SELECT m.id, m.workspace_id, m.account_id, a.name, a.email, m.role, m.status, m.created_at, m.updated_at, m.row_version
 		 FROM workspace_memberships m
 		 JOIN accounts a ON a.id = m.account_id
 		 WHERE m.workspace_id = ? AND m.id = ?`,
 		workspaceID,
 		membershipID,
-	).Scan(&item.ID, &item.WorkspaceID, &item.AccountID, &item.Name, &item.Email, &item.Role, &item.Status, &item.CreatedAt, &item.UpdatedAt)
+	).Scan(&item.ID, &item.WorkspaceID, &item.AccountID, &item.Name, &item.Email, &item.Role, &item.Status, &item.CreatedAt, &item.UpdatedAt, &item.Revision)
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspaceMembershipSummary{}, false, nil
 	}

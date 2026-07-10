@@ -33,7 +33,7 @@ func upsertMemberAccountForRequest(
 	if name == "" {
 		return accountRecord{}, memberWriteFailure{status: http.StatusBadRequest, message: "name is required"}
 	}
-	account, found, err := mysqlAccountByEmail(ctx, tx, email)
+	account, found, err := mysqlAccountByEmailForUpdate(ctx, tx, email)
 	if err != nil {
 		return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
@@ -50,7 +50,7 @@ func upsertMemberAccountForRequest(
 		if projectID != "" {
 			accountWorkspaceID = privateWorkspaceID(accountID)
 		}
-		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: name, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
+		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: name, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now, Revision: 1}
 	} else {
 		account.Name = name
 		account.Email = email
@@ -64,8 +64,17 @@ func upsertMemberAccountForRequest(
 			account.PasswordHash = hash
 		}
 	}
-	if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
-		return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+	if found {
+		updated, err := mysqlUpdateAccountAtRevision(ctx, tx, account, account.Revision)
+		if err != nil {
+			return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+		}
+		if !updated {
+			return accountRecord{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
+		}
+		account.Revision++
+	} else if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
+		return accountRecord{}, memberWriteFailure{status: http.StatusConflict, message: "account already exists"}
 	}
 	if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
 		return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}

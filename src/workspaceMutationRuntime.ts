@@ -1,4 +1,5 @@
 import {
+  fetchWorkspaceRestrictionImpact,
   updateWorkspace as updateWorkspaceDetails,
   updateWorkspaceMembership as updateWorkspaceMembershipDetails,
 } from "./teamBackend";
@@ -35,10 +36,21 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
+      const currentWorkspace = source.auth.workspaces?.find((item) => item.id === workspaceId);
+      let confirmRestrictMembers = input.confirmRestrictMembers;
+      if (currentWorkspace?.type === "shared" && input.type === "private" && !confirmRestrictMembers) {
+        const impact = await fetchWorkspaceRestrictionImpact(source.backend, token, workspaceId);
+        confirmRestrictMembers = window.confirm(
+          `转为私人工作区将停用 ${impact.activeMembers} 名成员并取消 ${impact.pendingInvitations} 个待处理邀请，是否继续？`,
+        );
+        if (!confirmRestrictMembers) return false;
+      }
       const updatedWorkspace = await updateWorkspaceDetails(source.backend, token, workspaceId, {
         name,
         type: input.type,
         ownerAccountId: input.ownerAccountId,
+        expectedRevision: input.expectedRevision ?? currentWorkspace?.revision,
+        confirmRestrictMembers,
       });
       const loaded = await loadStateWithFreshWorkspaces(source, token, updatedWorkspace);
       setState(loaded);
@@ -62,7 +74,11 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
-      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, input);
+      const membership = source.auth.workspaceMemberships?.find((item) => item.id === membershipId && item.workspaceId === workspaceId);
+      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, {
+        ...input,
+        expectedRevision: input.expectedRevision ?? membership?.revision,
+      });
       const loaded = await loadStateWithFreshWorkspaces(source, token);
       setState(loaded);
       setToast(input.status === "disabled" ? "工作区成员已解除绑定" : "工作区成员已更新");

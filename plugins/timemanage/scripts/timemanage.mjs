@@ -5221,6 +5221,12 @@ var authHeaders = (token) => ({
   ...token ? { Authorization: `Bearer ${token}` } : {}
 });
 var REQUEST_TIMEOUT_MS = 8e3;
+var TeamHttpError = class extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+};
 var readResponse = async (response) => {
   if (response.ok) return response.json();
   let message = `${response.status} ${response.statusText}`;
@@ -5231,7 +5237,7 @@ var readResponse = async (response) => {
     const text = await response.text().catch(() => "");
     if (text) message = text;
   }
-  throw new Error(message);
+  throw new TeamHttpError(response.status, message);
 };
 var requestJson = async (input, init) => {
   const timeoutController = init?.signal ? void 0 : new AbortController();
@@ -5260,7 +5266,8 @@ var mapAccount = (account) => ({
   email: account.email,
   disabledAt: account.disabled_at || void 0,
   createdAt: account.created_at,
-  updatedAt: account.updated_at
+  updatedAt: account.updated_at,
+  ...account.revision ? { revision: account.revision } : {}
 });
 var mapWorkspace = (workspace) => ({
   id: workspace.id,
@@ -5268,7 +5275,8 @@ var mapWorkspace = (workspace) => ({
   type: workspace.type === "private" ? "private" : "shared",
   ownerAccountId: workspace.owner_account_id || void 0,
   createdAt: workspace.created_at,
-  updatedAt: workspace.updated_at
+  updatedAt: workspace.updated_at,
+  ...workspace.revision ? { revision: workspace.revision } : {}
 });
 var mapWorkspaceMembership = (membership) => ({
   id: membership.id,
@@ -5279,7 +5287,8 @@ var mapWorkspaceMembership = (membership) => ({
   role: membership.role,
   status: membership.status,
   createdAt: membership.created_at,
-  updatedAt: membership.updated_at
+  updatedAt: membership.updated_at,
+  ...membership.revision ? { revision: membership.revision } : {}
 });
 var mapWorkspaceInvitation = (invitation) => ({
   id: invitation.id,
@@ -5294,7 +5303,8 @@ var mapWorkspaceInvitation = (invitation) => ({
   status: invitation.status,
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
-  acceptedAt: invitation.accepted_at || void 0
+  acceptedAt: invitation.accepted_at || void 0,
+  ...invitation.revision ? { revision: invitation.revision } : {}
 });
 var mapProjectInvitation = (invitation) => ({
   id: invitation.id,
@@ -5311,7 +5321,8 @@ var mapProjectInvitation = (invitation) => ({
   status: invitation.status,
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
-  acceptedAt: invitation.accepted_at || void 0
+  acceptedAt: invitation.accepted_at || void 0,
+  ...invitation.revision ? { revision: invitation.revision } : {}
 });
 var sessionFromLogin = (payload) => ({
   token: payload.token,
@@ -5338,13 +5349,14 @@ async function loginToWorkspace(backend, email, password) {
   });
   return sessionFromLogin(payload);
 }
-async function switchWorkspace(backend, token, workspaceId) {
+async function switchWorkspace(backend, token, workspaceId, expectedRevision) {
   const payload = await requestJson(apiUrl(backend.serverUrl, "/auth/switch-workspace"), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
       workspace_id: workspaceId,
-      device_id: backend.deviceId
+      device_id: backend.deviceId,
+      expected_revision: expectedRevision
     })
   });
   return sessionFromLogin(payload);
@@ -5379,7 +5391,9 @@ async function updateWorkspace(backend, token, workspaceId, input) {
     body: JSON.stringify({
       name: input.name,
       type: input.type ?? "shared",
-      owner_account_id: input.ownerAccountId
+      owner_account_id: input.ownerAccountId,
+      expected_revision: input.expectedRevision,
+      confirm_restrict_members: input.confirmRestrictMembers
     })
   });
   return mapWorkspace(payload.workspace);
@@ -5392,7 +5406,8 @@ async function updateWorkspaceMembership(backend, token, workspaceId, membership
       headers: authHeaders(token),
       body: JSON.stringify({
         status: input.status,
-        role: input.role
+        role: input.role,
+        expected_revision: input.expectedRevision
       })
     }
   );
@@ -5417,22 +5432,28 @@ async function inviteWorkspaceMember(backend, token, workspaceId, email) {
   });
   return mapWorkspaceInvitation(payload.invitation);
 }
-async function acceptWorkspaceInvitation(backend, token, invitationId) {
+async function acceptWorkspaceInvitation(backend, token, invitationId, expectedRevision) {
+  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision })
     }
   );
   return mapWorkspaceInvitation(payload.invitation);
 }
-async function deleteWorkspaceInvitation(backend, token, invitationId) {
+async function deleteWorkspaceInvitation(backend, token, invitationId, expectedRevision) {
+  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision })
     }
   );
   return mapWorkspaceInvitation(payload.invitation);
@@ -5456,22 +5477,28 @@ async function inviteProjectMember(backend, token, input) {
   });
   return mapProjectInvitation(payload.invitation);
 }
-async function deleteProjectInvitation(backend, token, invitationId) {
+async function deleteProjectInvitation(backend, token, invitationId, expectedRevision) {
+  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision })
     }
   );
   return mapProjectInvitation(payload.invitation);
 }
-async function acceptProjectInvitation(backend, token, invitationId) {
+async function acceptProjectInvitation(backend, token, invitationId, expectedRevision) {
+  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
-      headers: authHeaders(token)
+      headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision })
     }
   );
   return mapProjectInvitation(payload.invitation);
@@ -5505,7 +5532,8 @@ async function updatePlatformAccount(backend, token, accountId, payload) {
       name: payload.name,
       email: payload.email,
       password: payload.password,
-      status: payload.status
+      status: payload.status,
+      expected_revision: payload.expectedRevision
     })
   });
   return mapAccount(result.account);
@@ -5534,7 +5562,8 @@ async function updateMemberAccount(backend, token, memberId, payload) {
       workspace_id: payload.workspaceId,
       email: payload.email,
       password: payload.password,
-      roles: payload.roles
+      roles: payload.roles,
+      expected_revision: payload.expectedRevision
     })
   });
   return result.member.payload;
@@ -5696,7 +5725,8 @@ function mergeBusinessRowsIntoState(local, rows) {
       ...local.backend,
       status: "ready",
       message: "\u56E2\u961F\u5728\u7EBF\u6570\u636E\u5DF2\u52A0\u8F7D",
-      lastLoadedAt: loadedAt
+      lastLoadedAt: loadedAt,
+      businessRowRevisions: Object.fromEntries(rows.map((row) => [businessRowKey(row), row.revision ?? 0]))
     },
     projects: [],
     projectMembers: [],
@@ -5731,6 +5761,79 @@ function mergeBusinessRowsIntoState(local, rows) {
     projectMembers: dedupeProjectMembersByIdentity(next.projectMembers)
   };
 }
+var businessRowKey = (row) => `${row.workspace_id ?? ""}:${row.entity}:${row.id}`;
+
+// src/teamBusinessMutations.ts
+var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+var mergePatchBetween = (before, after) => {
+  if (Object.is(before, after)) return void 0;
+  if (!isObject2(before) || !isObject2(after)) return after;
+  const patch = {};
+  const keys = /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)]);
+  for (const key of keys) {
+    if (!(key in after)) {
+      patch[key] = null;
+      continue;
+    }
+    const change = mergePatchBetween(before[key], after[key]);
+    if (change !== void 0) patch[key] = change;
+  }
+  return Object.keys(patch).length ? patch : void 0;
+};
+function businessOperationsBetween(before, after) {
+  const beforeRows = new Map(businessRowsFromState(before).map((row) => [businessRowKey(row), row]));
+  const afterRows = new Map(businessRowsFromState(after).map((row) => [businessRowKey(row), row]));
+  const revisions = before.backend.businessRowRevisions ?? {};
+  const operations = [];
+  for (const [key, row] of afterRows) {
+    const current = beforeRows.get(key);
+    if (!current) {
+      operations.push({ operation: "create", row });
+      continue;
+    }
+    const patch = mergePatchBetween(current.payload, row.payload);
+    if (patch === void 0) continue;
+    const expectedRevision = revisions[key];
+    if (!expectedRevision) throw new Error(`\u7F3A\u5C11\u4E1A\u52A1\u6570\u636E\u7248\u672C\uFF0C\u8BF7\u5148\u5237\u65B0\uFF1A${row.entity}/${row.id}`);
+    operations.push({
+      operation: "patch",
+      workspace_id: row.workspace_id ?? "",
+      entity: row.entity,
+      id: row.id,
+      expected_revision: expectedRevision,
+      updated_at: row.updated_at,
+      patch
+    });
+  }
+  for (const [key, row] of beforeRows) {
+    if (afterRows.has(key)) continue;
+    const expectedRevision = revisions[key];
+    if (!expectedRevision) throw new Error(`\u7F3A\u5C11\u4E1A\u52A1\u6570\u636E\u7248\u672C\uFF0C\u65E0\u6CD5\u5220\u9664\uFF1A${row.entity}/${row.id}`);
+    operations.push({
+      operation: "delete",
+      workspace_id: row.workspace_id ?? "",
+      entity: row.entity,
+      id: row.id,
+      expected_revision: expectedRevision
+    });
+  }
+  return operations;
+}
+var operationsCanRetry = (operations) => operations.length > 0 && operations.every((operation) => operation.operation === "patch");
+var operationsWithLatestRevisions = (operations, latest) => {
+  const revisions = latest.backend.businessRowRevisions ?? {};
+  return operations.map((operation) => {
+    if (operation.operation !== "patch") return operation;
+    const key = businessRowKey({
+      workspace_id: operation.workspace_id,
+      entity: operation.entity,
+      id: operation.id
+    });
+    const expectedRevision = revisions[key];
+    if (!expectedRevision) throw new Error(`\u6570\u636E\u5DF2\u88AB\u5220\u9664\uFF0C\u65E0\u6CD5\u81EA\u52A8\u91CD\u8BD5\uFF1A${operation.entity}/${operation.id}`);
+    return { ...operation, expected_revision: expectedRevision };
+  });
+};
 
 // src/teamActiveRuntimePreservation.ts
 var upsertById = (items, incoming) => items.some((item) => item.id === incoming.id) ? items.map((item) => item.id === incoming.id ? incoming : item) : [incoming, ...items];
@@ -5773,13 +5876,22 @@ async function loadTeamData(local) {
   });
   return preserveLocalActiveRuntime(mergeBusinessRowsIntoState(local, payload.rows), local);
 }
-async function saveTeamDataSnapshot(backend, token, state) {
+var submitTeamOperations = async (backend, token, operations) => requestJson(apiUrl(backend.serverUrl, "/team/data"), {
+  method: "PUT",
+  headers: authHeaders(token),
+  body: JSON.stringify({ protocol_version: 2, operations })
+});
+async function saveTeamDataChanges(backend, token, before, state) {
   const savedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const payload = await requestJson(apiUrl(backend.serverUrl, "/team/data"), {
-    method: "PUT",
-    headers: authHeaders(token),
-    body: JSON.stringify({ rows: businessRowsFromState(state) })
-  });
+  const operations = businessOperationsBetween(before, state);
+  let payload;
+  try {
+    payload = await submitTeamOperations(backend, token, operations);
+  } catch (error) {
+    if (!(error instanceof TeamHttpError) || error.status !== 409 || !operationsCanRetry(operations)) throw error;
+    const latest = await loadTeamData(before);
+    payload = await submitTeamOperations(backend, token, operationsWithLatestRevisions(operations, latest));
+  }
   return preserveLocalActiveRuntime(mergeBusinessRowsIntoState({
     ...state,
     backend: {
@@ -5847,7 +5959,7 @@ var TimeManageBaseClient = class {
     const local = bindAccountToMembers({ ...base, auth }, auth);
     return bindAccountToMembers(await loadTeamData(local), auth);
   }
-  async writeState(nextState) {
+  async writeState(before, nextState) {
     const session = await this.ensureSession();
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const stateToSave = {
@@ -5873,13 +5985,13 @@ var TimeManageBaseClient = class {
       },
       updatedAt: timestamp
     };
-    return saveTeamDataSnapshot(stateToSave.backend, session.token, stateToSave);
+    return saveTeamDataChanges(stateToSave.backend, session.token, before, stateToSave);
   }
   async mutate(_preferredProjectId, fn) {
     const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const before = await this.authenticatedState();
     const output = fn(before, timestamp);
-    const saved = await this.writeState(output.state);
+    const saved = await this.writeState(before, output.state);
     return { state: saved, result: output.result, savedAt: saved.backend.lastSavedAt };
   }
   async backendAndToken() {
@@ -5944,8 +6056,8 @@ var TimeManageBaseClient = class {
     return fetchWorkspaces(backend, token);
   }
   async switchWorkspace(workspaceId) {
-    const { backend, token } = await this.backendAndToken();
-    this.setSession(await switchWorkspace(backend, token, workspaceId));
+    const { backend, token, session } = await this.backendAndToken();
+    this.setSession(await switchWorkspace(backend, token, workspaceId, session.account.revision));
     return this.getCurrentAccount();
   }
   async createWorkspace(name) {
@@ -5955,11 +6067,13 @@ var TimeManageBaseClient = class {
   }
   async updateWorkspace(workspaceId, input) {
     const { backend, token } = await this.backendAndToken();
-    return updateWorkspace(backend, token, workspaceId, input);
+    const workspace = (await fetchWorkspaces(backend, token)).workspaces.find((item) => item.id === workspaceId);
+    return updateWorkspace(backend, token, workspaceId, { ...input, expectedRevision: input.expectedRevision ?? workspace?.revision });
   }
   async updateWorkspaceMembership(workspaceId, membershipId, input) {
     const { backend, token } = await this.backendAndToken();
-    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, input);
+    const membership = (await fetchWorkspaces(backend, token)).memberships.find((item) => item.id === membershipId);
+    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, { ...input, expectedRevision: input.expectedRevision ?? membership?.revision });
   }
   async listPlatformAccounts() {
     const { backend, token } = await this.backendAndToken();
@@ -5971,7 +6085,8 @@ var TimeManageBaseClient = class {
   }
   async updatePlatformAccount(accountId, input) {
     const { backend, token } = await this.backendAndToken();
-    return updatePlatformAccount(backend, token, accountId, input);
+    const account = (await fetchPlatformAccounts(backend, token)).find((item) => item.id === accountId);
+    return updatePlatformAccount(backend, token, accountId, { ...input, expectedRevision: input.expectedRevision ?? account?.revision });
   }
   async disablePlatformAccount(accountId) {
     return this.updatePlatformAccount(accountId, { status: "disabled" });
@@ -6016,8 +6131,16 @@ var TimeManageBaseClient = class {
     return createMemberAccount(backend, token, input);
   }
   async updateMemberAccount(memberId, input) {
-    const { backend, token } = await this.backendAndToken();
-    return updateMemberAccount(backend, token, memberId, input);
+    const state = await this.authenticatedState();
+    const member = state.projectMembers.find((item) => item.id === memberId);
+    const project = member ? state.projects.find((item) => item.id === member.projectId) : void 0;
+    const workspaceId = input.workspaceId ?? project?.workspaceId ?? state.auth.workspace?.id ?? "";
+    const revision = state.backend.businessRowRevisions?.[`${workspaceId}:project_member:${memberId}`];
+    return updateMemberAccount(state.backend, state.auth.token ?? state.backend.token ?? "", memberId, {
+      ...input,
+      workspaceId,
+      expectedRevision: input.expectedRevision ?? revision
+    });
   }
 };
 

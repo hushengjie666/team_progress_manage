@@ -9,10 +9,12 @@ import (
 )
 
 type workspaceUpdateInput struct {
-	workspaceID string
-	name        string
-	kind        string
-	ownerID     string
+	workspaceID            string
+	name                   string
+	kind                   string
+	ownerID                string
+	expectedRevision       int64
+	confirmRestrictMembers bool
 }
 
 func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, input workspaceUpdateInput) (workspaceData, memberWriteFailure) {
@@ -22,6 +24,12 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	}
 	if !found {
 		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "workspace access denied"}
+	}
+	if input.expectedRevision <= 0 {
+		return workspaceData{}, memberWriteFailure{status: http.StatusPreconditionRequired, message: "expected revision is required"}
+	}
+	if workspace.Revision != input.expectedRevision {
+		return workspaceData{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
 	}
 	workspaceType := input.kind
 	if workspace.Type == "private" && workspaceType != "private" {
@@ -45,6 +53,9 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	if workspaceType != workspace.Type && membership.Role != "owner" && membership.Role != "admin" {
 		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "only workspace owner or admin can change workspace type"}
 	}
+	if workspace.Type == "shared" && workspaceType == "private" && !input.confirmRestrictMembers {
+		return workspaceData{}, memberWriteFailure{status: http.StatusPreconditionRequired, message: "confirm_restrict_members is required"}
+	}
 	if failure := validateWorkspaceOwnerUpdate(ctx, tx, auth, input.workspaceID, workspace, membership, workspaceType, currentOwnerAccountID, ownerAccountID); failure.status != 0 {
 		return workspaceData{}, failure
 	}
@@ -53,9 +64,14 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	workspace.Type = workspaceType
 	workspace.OwnerAccountID = ownerAccountID
 	workspace.UpdatedAt = now
-	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
+	updated, err := mysqlUpdateWorkspaceAtRevision(ctx, tx, workspace, input.expectedRevision)
+	if err != nil {
 		return workspaceData{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
+	if !updated {
+		return workspaceData{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
+	}
+	workspace.Revision = input.expectedRevision + 1
 	if err := mysqlSetWorkspaceOwner(ctx, tx, workspace.ID, workspace.OwnerAccountID, now); err != nil {
 		return workspaceData{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}

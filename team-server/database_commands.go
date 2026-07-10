@@ -53,6 +53,15 @@ func runDatabaseCommand(ctx context.Context, invocation cliInvocation) error {
 			return fmt.Errorf("database is newer than this server; use the matching server release")
 		}
 		return nil
+	case "db-audit":
+		issues, err := auditDatabaseIntegrity(ctx, db)
+		if err != nil {
+			return err
+		}
+		if issues > 0 {
+			return fmt.Errorf("database integrity audit found %d issue(s)", issues)
+		}
+		return nil
 	case "db-up":
 		if err := migrateMySQLUp(ctx, db, invocation.config); err != nil {
 			return err

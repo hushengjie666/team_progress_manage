@@ -49,7 +49,11 @@ func (a *app) handleTeamDataSave(w http.ResponseWriter, r *http.Request, auth au
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if len(req.Rows) > 2000 {
+	if req.ProtocolVersion != 2 || req.Rows != nil {
+		writeError(w, http.StatusUpgradeRequired, "client write protocol must be upgraded")
+		return
+	}
+	if len(req.Operations) > 2000 {
 		writeError(w, http.StatusBadRequest, "too many rows")
 		return
 	}
@@ -62,84 +66,10 @@ func (a *app) handleTeamDataSave(w http.ResponseWriter, r *http.Request, auth au
 	}
 	defer mysqlRollback(tx)
 
-	currentRows, err := a.businessRowsForAccount(ctx, auth)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "load team data failed")
-		return
-	}
-	nextRows := []businessRow{}
-	nextKeys := map[string]bool{}
-	currentRowsByKey := businessRowsByKey(currentRows)
-	submittedWorkspaceIDs := map[string]bool{}
-	submittedTaskProjects := map[string]string{}
-	for _, row := range req.Rows {
-		targetWorkspaceID := businessWorkspaceIDForRow(auth, row)
-		if strings.TrimSpace(targetWorkspaceID) == "" {
-			continue
-		}
-		row.WorkspaceID = targetWorkspaceID
-		if strings.TrimSpace(row.AccountID) == "" {
-			row.AccountID = auth.AccountID
-		}
-		row.Entity = strings.TrimSpace(row.Entity)
-		row.ID = strings.TrimSpace(row.ID)
-		if row.Entity == "" || row.ID == "" {
-			continue
-		}
-		if _, ok := businessTableForEntity(row.Entity); !ok {
-			continue
-		}
-		if row.UpdatedAt == "" {
-			row.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
-		}
-		if !json.Valid(row.Payload) || len(row.Payload) == 0 {
-			row.Payload = json.RawMessage(`{}`)
-		}
-		row.Payload = businessPayloadWithWorkspaceID(row.Entity, row.Payload, row.WorkspaceID)
-		nextRows = append(nextRows, row)
-		nextKeys[businessRowKey(row)] = true
-		submittedWorkspaceIDs[row.WorkspaceID] = true
-		if row.Entity == "task" {
-			submittedTaskProjects[businessTaskWorkspaceKey(row.WorkspaceID, row.ID)] = businessProjectID(row)
-		}
-	}
-	if len(submittedWorkspaceIDs) == 0 && strings.TrimSpace(auth.WorkspaceID) != "" {
-		submittedWorkspaceIDs[strings.TrimSpace(auth.WorkspaceID)] = true
-	}
-	for _, row := range nextRows {
-		if _, found, err := mysqlWorkspaceVisibleToAccount(ctx, tx, auth.AccountID, row.WorkspaceID); err != nil {
-			writeError(w, http.StatusInternalServerError, "save failed")
-			return
-		} else if !found {
-			if current, exists := currentRowsByKey[businessRowKey(row)]; exists && businessRowsEquivalentForSave(current, row) {
-				continue
-			}
-			allowed, err := businessRowWritableByProjectAccess(ctx, tx, auth, row, submittedTaskProjects)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "save failed")
-				return
-			}
-			if !allowed {
-				writeError(w, http.StatusForbidden, "workspace access denied")
-				return
-			}
-		}
-	}
-	for _, current := range currentRows {
-		if !submittedWorkspaceIDs[current.WorkspaceID] {
-			continue
-		}
-		if nextKeys[businessRowKey(current)] {
-			continue
-		}
-		if err := businessDeleteRow(ctx, tx, current); err != nil {
-			writeError(w, http.StatusInternalServerError, "save failed")
-			return
-		}
-	}
-	for _, row := range nextRows {
-		if err := businessUpsertRow(ctx, tx, row); err != nil {
-			writeError(w, http.StatusInternalServerError, "save failed")
+	for _, operation := range req.Operations {
+		failure := applyBusinessOperation(ctx, tx, auth, operation)
+		if failure.status != 0 {
+			writeError(w, failure.status, failure.message)
 			return
 		}
 	}
@@ -218,8 +148,4 @@ func businessPayloadWithWorkspaceID(entity string, payload json.RawMessage, work
 
 func businessRowKey(row businessRow) string {
 	return strings.TrimSpace(row.WorkspaceID) + ":" + strings.TrimSpace(row.Entity) + ":" + strings.TrimSpace(row.ID)
-}
-
-func businessTaskWorkspaceKey(workspaceID string, taskID string) string {
-	return strings.TrimSpace(workspaceID) + ":" + strings.TrimSpace(taskID)
 }

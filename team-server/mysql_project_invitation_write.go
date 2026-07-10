@@ -25,6 +25,7 @@ func mysqlUpsertProjectInvitation(ctx context.Context, tx *sql.Tx, invitation pr
 		  roles_json = VALUES(roles_json),
 		  status = VALUES(status),
 		  updated_at = VALUES(updated_at),
+		  row_version = row_version + 1,
 		  accepted_at = VALUES(accepted_at)`,
 		invitation.ID,
 		invitation.WorkspaceID,

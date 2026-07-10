@@ -36,7 +36,6 @@ const oldBusinessDataPatterns = [
   "business" + "-changes",
   "business" + "-state",
   "tomb" + "stone",
-  "revi" + "sion",
   "last" + "SyncedAt",
   "lastPulled" + "Revi" + "sion",
   "deleted" + "_at",

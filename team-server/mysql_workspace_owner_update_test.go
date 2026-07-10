@@ -67,7 +67,7 @@ func TestMySQLWorkspaceUpdateCanChangeSharedWorkspaceOwner(t *testing.T) {
 	updateRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		updateRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"已转负责人协作区","type":"shared","owner_account_id":"`+accountPayload.Account.ID+`"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, versionedJSONBody(t, `{"name":"已转负责人协作区","type":"shared","owner_account_id":"`+accountPayload.Account.ID+`"}`, mysqlRowRevision(t, db, "workspaces", sharedLogin.Workspace.ID))),
 		sharedAuth,
 	)
 	if updateRecorder.Code != http.StatusOK {
@@ -157,7 +157,7 @@ func TestMySQLWorkspaceMembershipRoleSupportsMultipleOwners(t *testing.T) {
 	ownerRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		ownerRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID+"/members/"+membershipID, bytes.NewReader([]byte(`{"role":"owner"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID+"/members/"+membershipID, versionedJSONBody(t, `{"role":"owner"}`, mysqlRowRevision(t, db, "workspace_memberships", membershipID))),
 		sharedAuth,
 	)
 	if ownerRecorder.Code != http.StatusOK {
@@ -206,7 +206,7 @@ func TestMySQLWorkspaceMembershipRoleSupportsMultipleOwners(t *testing.T) {
 	memberRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		memberRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID+"/members/"+membershipID, bytes.NewReader([]byte(`{"role":"member"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID+"/members/"+membershipID, versionedJSONBody(t, `{"role":"member"}`, mysqlRowRevision(t, db, "workspace_memberships", membershipID))),
 		sharedAuth,
 	)
 	if memberRecorder.Code != http.StatusOK {
@@ -279,7 +279,7 @@ func TestMySQLWorkspaceMemberCanRenameSharedWorkspaceOnly(t *testing.T) {
 	renameRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		renameRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"成员已改名协作区","type":"shared"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, versionedJSONBody(t, `{"name":"成员已改名协作区","type":"shared"}`, mysqlRowRevision(t, db, "workspaces", sharedLogin.Workspace.ID))),
 		memberAuth,
 	)
 	if renameRecorder.Code != http.StatusOK {
@@ -298,7 +298,7 @@ func TestMySQLWorkspaceMemberCanRenameSharedWorkspaceOnly(t *testing.T) {
 	ownerRecorder := httptest.NewRecorder()
 	api.handleWorkspaceByID(
 		ownerRecorder,
-		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, bytes.NewReader([]byte(`{"name":"成员已改名协作区","type":"shared","owner_account_id":"`+accountPayload.Account.ID+`"}`))),
+		httptest.NewRequest(http.MethodPatch, "/workspaces/"+sharedLogin.Workspace.ID, versionedJSONBody(t, `{"name":"成员已改名协作区","type":"shared","owner_account_id":"`+accountPayload.Account.ID+`"}`, mysqlRowRevision(t, db, "workspaces", sharedLogin.Workspace.ID))),
 		memberAuth,
 	)
 	if ownerRecorder.Code != http.StatusForbidden {

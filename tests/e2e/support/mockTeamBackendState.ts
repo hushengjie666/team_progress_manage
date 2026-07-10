@@ -1,7 +1,8 @@
 import { businessRowsFromState, type BusinessRow } from "../../../src/teamBusinessRows";
 import type { AppState } from "../../../src/types";
 
-export const rowsFromState = (state: AppState): BusinessRow[] => businessRowsFromState(state);
+export const rowsFromState = (state: AppState): BusinessRow[] =>
+  businessRowsFromState(state).map((row) => ({ ...row, revision: row.revision ?? 1 }));
 
 export const rowsForRuntimeStates = (states: Record<string, AppState>): BusinessRow[] =>
   Object.values(states).flatMap(rowsFromState);

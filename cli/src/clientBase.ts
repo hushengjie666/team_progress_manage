@@ -25,7 +25,7 @@ import {
   type MemberAccountPayload,
   type PlatformAccountPayload,
 } from "../../src/teamBackend.js";
-import { loadTeamData, saveTeamDataSnapshot } from "../../src/teamApi.js";
+import { loadTeamData, saveTeamDataChanges } from "../../src/teamApi.js";
 import type { AppState, ProjectMemberRole, WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "../../src/types.js";
 import type { TimeManageCliConfig } from "./config.js";
 
@@ -93,7 +93,7 @@ export class TimeManageBaseClient {
     return bindAccountToMembers(await loadTeamData(local), auth);
   }
 
-  private async writeState(nextState: AppState) {
+  private async writeState(before: AppState, nextState: AppState) {
     const session = await this.ensureSession();
     const timestamp = new Date().toISOString();
     const stateToSave = {
@@ -119,14 +119,14 @@ export class TimeManageBaseClient {
       },
       updatedAt: timestamp,
     };
-    return saveTeamDataSnapshot(stateToSave.backend, session.token, stateToSave);
+    return saveTeamDataChanges(stateToSave.backend, session.token, before, stateToSave);
   }
 
   protected async mutate<T>(_preferredProjectId: string | undefined, fn: StateMutation<T>) {
     const timestamp = new Date().toISOString();
     const before = await this.authenticatedState();
     const output = fn(before, timestamp);
-    const saved = await this.writeState(output.state);
+    const saved = await this.writeState(before, output.state);
     return { state: saved, result: output.result, savedAt: saved.backend.lastSavedAt };
   }
 
@@ -198,8 +198,8 @@ export class TimeManageBaseClient {
   }
 
   async switchWorkspace(workspaceId: string) {
-    const { backend, token } = await this.backendAndToken();
-    this.setSession(await switchWorkspace(backend, token, workspaceId));
+    const { backend, token, session } = await this.backendAndToken();
+    this.setSession(await switchWorkspace(backend, token, workspaceId, session.account.revision));
     return this.getCurrentAccount();
   }
 
@@ -211,12 +211,14 @@ export class TimeManageBaseClient {
 
   async updateWorkspace(workspaceId: string, input: WorkspaceUpdateInput) {
     const { backend, token } = await this.backendAndToken();
-    return updateWorkspace(backend, token, workspaceId, input);
+    const workspace = (await fetchWorkspaces(backend, token)).workspaces.find((item) => item.id === workspaceId);
+    return updateWorkspace(backend, token, workspaceId, { ...input, expectedRevision: input.expectedRevision ?? workspace?.revision });
   }
 
   async updateWorkspaceMembership(workspaceId: string, membershipId: string, input: WorkspaceMembershipUpdateInput) {
     const { backend, token } = await this.backendAndToken();
-    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, input);
+    const membership = (await fetchWorkspaces(backend, token)).memberships.find((item) => item.id === membershipId);
+    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, { ...input, expectedRevision: input.expectedRevision ?? membership?.revision });
   }
 
   async listPlatformAccounts() {
@@ -231,7 +233,8 @@ export class TimeManageBaseClient {
 
   async updatePlatformAccount(accountId: string, input: PlatformAccountPayload) {
     const { backend, token } = await this.backendAndToken();
-    return updatePlatformAccount(backend, token, accountId, input);
+    const account = (await fetchPlatformAccounts(backend, token)).find((item) => item.id === accountId);
+    return updatePlatformAccount(backend, token, accountId, { ...input, expectedRevision: input.expectedRevision ?? account?.revision });
   }
 
   async disablePlatformAccount(accountId: string) {
@@ -288,7 +291,15 @@ export class TimeManageBaseClient {
   }
 
   async updateMemberAccount(memberId: string, input: Partial<Omit<MemberAccountPayload, "projectId">>) {
-    const { backend, token } = await this.backendAndToken();
-    return updateMemberAccount(backend, token, memberId, input);
+    const state = await this.authenticatedState();
+    const member = state.projectMembers.find((item) => item.id === memberId);
+    const project = member ? state.projects.find((item) => item.id === member.projectId) : undefined;
+    const workspaceId = input.workspaceId ?? project?.workspaceId ?? state.auth.workspace?.id ?? "";
+    const revision = state.backend.businessRowRevisions?.[`${workspaceId}:project_member:${memberId}`];
+    return updateMemberAccount(state.backend, state.auth.token ?? state.backend.token ?? "", memberId, {
+      ...input,
+      workspaceId,
+      expectedRevision: input.expectedRevision ?? revision,
+    });
   }
 }

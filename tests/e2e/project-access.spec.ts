@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { BusinessRow } from "../../src/teamBusinessRows";
+import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { projectInviteeScenario } from "./support/scenarioStates";
@@ -29,8 +29,8 @@ test("shows inherited workspace members in project member management", async ({ 
     request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
   );
   await wangshuoRow.getByLabel("项目负责人").check();
-  const requestBody = (await saveRequest).postDataJSON() as { rows: BusinessRow[] };
-  expect(requestBody.rows).toEqual(
+  const requestBody = (await saveRequest).postDataJSON();
+  expect(businessOperationRows(requestBody)).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         entity: "project_member",

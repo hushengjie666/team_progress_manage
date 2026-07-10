@@ -10,13 +10,23 @@ func privateWorkspaceID(accountID string) string {
 }
 
 func mysqlEnsurePrivateWorkspaceForAccount(ctx context.Context, tx *sql.Tx, account accountRecord, now string) (workspaceData, error) {
+	privateID := privateWorkspaceID(account.ID)
+	if existing, found, err := mysqlWorkspaceByID(ctx, tx, privateID); err != nil {
+		return workspaceData{}, err
+	} else if found {
+		if err := mysqlEnsureWorkspaceMembership(ctx, tx, existing.ID, account.ID, "owner", "active", now); err != nil {
+			return workspaceData{}, err
+		}
+		return existing, nil
+	}
 	workspace := workspaceData{
-		ID:             privateWorkspaceID(account.ID),
+		ID:             privateID,
 		Name:           account.Name + "的私人工作区",
 		Type:           "private",
 		OwnerAccountID: account.ID,
 		CreatedAt:      account.CreatedAt,
 		UpdatedAt:      now,
+		Revision:       1,
 	}
 	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
 		return workspaceData{}, err
@@ -43,7 +53,7 @@ func mysqlDefaultWorkspaceForAccount(ctx context.Context, q sqlRunner, account a
 	}
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
+		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at, w.row_version
 		 FROM workspace_memberships m
 		 JOIN workspaces w ON w.id = m.workspace_id
 		 WHERE m.account_id = ? AND m.status = 'active'

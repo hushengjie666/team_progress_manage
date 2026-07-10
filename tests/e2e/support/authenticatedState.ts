@@ -1,11 +1,12 @@
 import { createInitialState } from "../../../src/seed";
+import { today } from "../../../src/appModel";
 import type { AppState } from "../../../src/types";
 import { MOCK_SERVER } from "./constants";
 
 export const authenticatedState = (): AppState => {
   const base = createInitialState();
   const now = new Date().toISOString();
-  const today = now.slice(0, 10);
+  const todayKey = today();
   const privateWorkspace = {
     id: "workspace_private_account_owner",
     name: "项目负责人私人区",
@@ -131,10 +132,10 @@ export const authenticatedState = (): AppState => {
     ],
     dailyPlans: [
       {
-        id: `plan_account_owner_${today}`,
+        id: `plan_account_owner_${todayKey}`,
         ownerAccountId: "account_owner",
         workspaceId: "workspace_e2e",
-        date: today,
+        date: todayKey,
         capacityPomodoros: 8,
         committedTaskIds: ["task_e2e_prd"],
         completedPomodoros: 0,

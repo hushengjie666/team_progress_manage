@@ -2,6 +2,12 @@
 
 TimeManage `v0.2.3` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported.
 
+Before an upgrade, run the read-only integrity audit and review every non-zero result:
+
+```bat
+timemanage-team.exe db audit --config backend.json
+```
+
 ## Requirements
 
 - MySQL 5.7 or newer.

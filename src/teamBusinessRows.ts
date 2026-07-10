@@ -48,6 +48,7 @@ export type BusinessRow = {
   entity: BusinessEntity;
   id: string;
   updated_at: string;
+  revision?: number;
   payload: BusinessPayload;
 };
 
@@ -168,6 +169,7 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
       status: "ready",
       message: "团队在线数据已加载",
       lastLoadedAt: loadedAt,
+      businessRowRevisions: Object.fromEntries(rows.map((row) => [businessRowKey(row), row.revision ?? 0])),
     },
     projects: [],
     projectMembers: [],
@@ -204,3 +206,6 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
     projectMembers: dedupeProjectMembersByIdentity(next.projectMembers),
   };
 }
+
+export const businessRowKey = (row: Pick<BusinessRow, "workspace_id" | "entity" | "id">) =>
+  `${row.workspace_id ?? ""}:${row.entity}:${row.id}`;

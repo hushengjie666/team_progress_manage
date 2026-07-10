@@ -67,7 +67,7 @@ export function createWorkspaceDirectoryModalActions({
     if (!selectedCard || !canChangeSelectedWorkspaceOwner || selectedWorkspaceType === "private") return;
     const role = checked ? "owner" : "member";
     if (member.role === role) return;
-    await updateWorkspaceMembership(selectedCard.workspace.id, member.id, { role });
+    await updateWorkspaceMembership(selectedCard.workspace.id, member.id, { role, expectedRevision: member.revision });
   };
 
   const unbindWorkspaceMember = async (member: WorkspaceMembership) => {
@@ -80,7 +80,7 @@ export function createWorkspaceDirectoryModalActions({
     })) {
       return;
     }
-    await updateWorkspaceMembership(selectedCard.workspace.id, member.id, { status: "disabled" });
+    await updateWorkspaceMembership(selectedCard.workspace.id, member.id, { status: "disabled", expectedRevision: member.revision });
   };
 
   const updateWorkspaceMemberDraft = (workspaceId: string, patch: Partial<{ email: string }>) => {

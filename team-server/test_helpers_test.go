@@ -5,15 +5,44 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+func versionedJSONBody(t *testing.T, raw string, revision int64) *bytes.Reader {
+	t.Helper()
+	var value map[string]any
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		t.Fatal(err)
+	}
+	value["expected_revision"] = revision
+	body, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return bytes.NewReader(body)
+}
+
+func mysqlRowRevision(t *testing.T, db *sql.DB, table string, id string) int64 {
+	t.Helper()
+	allowed := map[string]bool{"workspaces": true, "workspace_memberships": true, "accounts": true}
+	if !allowed[table] {
+		t.Fatalf("unsupported revision table %s", table)
+	}
+	var revision int64
+	if err := db.QueryRowContext(context.Background(), fmt.Sprintf("SELECT row_version FROM %s WHERE id = ?", table), id).Scan(&revision); err != nil {
+		t.Fatal(err)
+	}
+	return revision
+}
 
 func testApp(t *testing.T) *app {
 	t.Helper()
@@ -116,7 +145,34 @@ func defaultAdminLoginBody(t *testing.T, deviceID string) *bytes.Reader {
 
 func saveRows(t *testing.T, api *app, auth authContext, _ string, rows []businessRow) teamDataResponse {
 	t.Helper()
-	body, err := json.Marshal(teamDataSaveRequest{Rows: rows})
+	current := loadRows(t, api, auth, 0)
+	currentByKey := map[string]businessRow{}
+	for _, row := range current.Rows {
+		currentByKey[businessRowKey(row)] = row
+	}
+	operations := make([]businessOperation, 0, len(rows))
+	for index := range rows {
+		row := rows[index]
+		if existing, found := currentByKey[businessRowKey(row)]; found {
+			var existingPayload any
+			var submittedPayload any
+			if existing.UpdatedAt == row.UpdatedAt && json.Unmarshal(existing.Payload, &existingPayload) == nil && json.Unmarshal(row.Payload, &submittedPayload) == nil && reflect.DeepEqual(existingPayload, submittedPayload) {
+				continue
+			}
+			operations = append(operations, businessOperation{
+				Operation:        "patch",
+				WorkspaceID:      row.WorkspaceID,
+				Entity:           row.Entity,
+				ID:               row.ID,
+				ExpectedRevision: existing.Revision,
+				UpdatedAt:        row.UpdatedAt,
+				Patch:            row.Payload,
+			})
+			continue
+		}
+		operations = append(operations, businessOperation{Operation: "create", Row: &row})
+	}
+	body, err := json.Marshal(teamDataSaveRequest{ProtocolVersion: 2, Operations: operations})
 	if err != nil {
 		t.Fatal(err)
 	}

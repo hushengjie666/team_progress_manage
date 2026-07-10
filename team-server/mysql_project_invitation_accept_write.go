@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authContext, invitationID string) memberWriteFailure {
+func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authContext, invitationID string, expectedRevision int64) memberWriteFailure {
 	invitation, found, err := mysqlProjectInvitationSummaryByID(ctx, tx, invitationID)
 	if err != nil {
 		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
@@ -22,6 +22,9 @@ func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authConte
 	}
 	if invitation.Status != "pending" {
 		return memberWriteFailure{status: http.StatusConflict, message: "project invitation is not pending"}
+	}
+	if invitation.Revision != expectedRevision {
+		return memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
 	}
 	account, foundAccount, err := mysqlAccountByID(ctx, tx, auth.AccountID)
 	if err != nil || !foundAccount || account.DisabledAt != "" {
@@ -49,14 +52,19 @@ func acceptProjectInvitationInTx(ctx context.Context, tx *sql.Tx, auth authConte
 	if failure.status != 0 {
 		return failure
 	}
-	if _, err := tx.ExecContext(
+	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE project_invitations SET status = 'accepted', accepted_at = ?, updated_at = ? WHERE id = ?`,
+		`UPDATE project_invitations SET status = 'accepted', accepted_at = ?, updated_at = ?, row_version = row_version + 1 WHERE id = ? AND status = 'pending' AND row_version = ?`,
 		now,
 		now,
 		invitation.ID,
-	); err != nil {
+		expectedRevision,
+	)
+	if err != nil {
 		return memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
+	}
+	if count, err := result.RowsAffected(); err != nil || count != 1 {
+		return memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
 	}
 	return memberWriteFailure{}
 }

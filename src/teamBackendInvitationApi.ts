@@ -27,23 +27,29 @@ export async function inviteWorkspaceMember(
   return mapWorkspaceInvitation(payload.invitation);
 }
 
-export async function acceptWorkspaceInvitation(backend: BackendConnectionState, token: string, invitationId: string): Promise<WorkspaceInvitation> {
+export async function acceptWorkspaceInvitation(backend: BackendConnectionState, token: string, invitationId: string, expectedRevision?: number): Promise<WorkspaceInvitation> {
+  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("邀请版本已失效，请刷新后重试");
   const payload = await requestJson<WorkspaceInvitationResponse>(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
       headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision }),
     },
   );
   return mapWorkspaceInvitation(payload.invitation);
 }
 
-export async function deleteWorkspaceInvitation(backend: BackendConnectionState, token: string, invitationId: string): Promise<WorkspaceInvitation> {
+export async function deleteWorkspaceInvitation(backend: BackendConnectionState, token: string, invitationId: string, expectedRevision?: number): Promise<WorkspaceInvitation> {
+  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("邀请版本已失效，请刷新后重试");
   const payload = await requestJson<WorkspaceInvitationResponse>(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
       headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision }),
     },
   );
   return mapWorkspaceInvitation(payload.invitation);
@@ -74,23 +80,29 @@ export async function inviteProjectMember(
   return mapProjectInvitation(payload.invitation);
 }
 
-export async function deleteProjectInvitation(backend: BackendConnectionState, token: string, invitationId: string): Promise<ProjectInvitation> {
+export async function deleteProjectInvitation(backend: BackendConnectionState, token: string, invitationId: string, expectedRevision?: number): Promise<ProjectInvitation> {
+  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("邀请版本已失效，请刷新后重试");
   const payload = await requestJson<ProjectInvitationResponse>(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
       headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision }),
     },
   );
   return mapProjectInvitation(payload.invitation);
 }
 
-export async function acceptProjectInvitation(backend: BackendConnectionState, token: string, invitationId: string): Promise<ProjectInvitation> {
+export async function acceptProjectInvitation(backend: BackendConnectionState, token: string, invitationId: string, expectedRevision?: number): Promise<ProjectInvitation> {
+  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
+  if (!revision) throw new Error("邀请版本已失效，请刷新后重试");
   const payload = await requestJson<ProjectInvitationResponse>(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
       headers: authHeaders(token),
+      body: JSON.stringify({ expected_revision: revision }),
     },
   );
   return mapProjectInvitation(payload.invitation);

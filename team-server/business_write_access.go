@@ -8,54 +8,96 @@ import (
 	"strings"
 )
 
-func businessRowsByKey(rows []businessRow) map[string]businessRow {
-	result := make(map[string]businessRow, len(rows))
-	for _, row := range rows {
-		result[businessRowKey(row)] = row
+func businessRowMutationAllowed(ctx context.Context, q sqlRunner, auth authContext, current businessRow, next businessRow, deleting bool) (bool, error) {
+	row := next
+	if deleting {
+		row = current
 	}
-	return result
-}
-
-func businessRowsEquivalentForSave(current businessRow, submitted businessRow) bool {
-	if current.WorkspaceID != submitted.WorkspaceID || current.AccountID != submitted.AccountID ||
-		current.Entity != submitted.Entity || current.ID != submitted.ID || current.UpdatedAt != submitted.UpdatedAt {
-		return false
-	}
-	current.Payload = businessPayloadWithWorkspaceID(current.Entity, current.Payload, current.WorkspaceID)
-	var currentValue any
-	var submittedValue any
-	if json.Unmarshal(current.Payload, &currentValue) != nil || json.Unmarshal(submitted.Payload, &submittedValue) != nil {
-		return false
-	}
-	return reflect.DeepEqual(currentValue, submittedValue)
-}
-
-func businessRowWritableByProjectAccess(ctx context.Context, q sqlRunner, auth authContext, row businessRow, submittedTaskProjects map[string]string) (bool, error) {
-	if businessPersonalRowOwnedByAccount(row, auth.AccountID) {
-		return businessPersonalRowTaskRefsAllowed(ctx, q, auth, row, submittedTaskProjects)
-	}
-	projectID, err := businessProjectIDForWriteRow(ctx, q, row.WorkspaceID, row, submittedTaskProjects)
+	workspace, fullAccess, err := mysqlWorkspaceVisibleToAccount(ctx, q, auth.AccountID, row.WorkspaceID)
 	if err != nil {
 		return false, err
 	}
-	return teamAccountCanAccessProject(ctx, q, row.WorkspaceID, auth.AccountID, projectID)
-}
-
-func businessPersonalRowOwnedByAccount(row businessRow, accountID string) bool {
-	if row.Entity != "daily_plan" && row.Entity != "reward_state" {
-		return false
+	canManageWorkspace, err := teamAccountCanManageWorkspace(ctx, q, auth, row.WorkspaceID)
+	if err != nil {
+		return false, err
 	}
-	rowAccountID := firstNonEmpty(row.AccountID, stringField(row.Payload, "ownerAccountId"), stringField(row.Payload, "accountId"))
-	return strings.TrimSpace(rowAccountID) == strings.TrimSpace(accountID)
+	switch row.Entity {
+	case "daily_plan", "focus_session", "work_session", "execution_signal", "interruption", "reward_state":
+		if row.AccountID != auth.AccountID {
+			return false, nil
+		}
+		return businessPersonalRowTaskRefsAllowed(ctx, q, auth, row)
+	case "task_template", "template_instance":
+		return fullAccess && workspace.ID != "", nil
+	case "project_member":
+		projectID := businessProjectID(row)
+		if canManageWorkspace {
+			return true, nil
+		}
+		if current.ID == "" && businessAccountRef(row) == auth.AccountID && hasRole(row.Payload, "project_owner") {
+			project, found, err := businessExistingRow(ctx, q, row.WorkspaceID, "project", projectID)
+			if err != nil {
+				return false, err
+			}
+			if found && project.AccountID == auth.AccountID {
+				return true, nil
+			}
+		}
+		return teamAccountCanManageProjectMembers(ctx, q, row.WorkspaceID, auth.AccountID, projectID)
+	case "project":
+		if current.ID == "" {
+			return fullAccess, nil
+		}
+		if canManageWorkspace {
+			return true, nil
+		}
+		return teamAccountCanManageProjectMembers(ctx, q, row.WorkspaceID, auth.AccountID, row.ID)
+	case "task":
+		projectID := businessProjectID(row)
+		allowed, err := businessAccountCanAccessProject(ctx, q, auth, row.WorkspaceID, projectID)
+		if err != nil || !allowed {
+			return allowed, err
+		}
+		if current.ID != "" && businessReviewFieldsChanged(current.Payload, next.Payload) {
+			if canManageWorkspace {
+				return true, nil
+			}
+			return teamAccountCanManageProjectMembers(ctx, q, row.WorkspaceID, auth.AccountID, projectID)
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
-func businessPersonalRowTaskRefsAllowed(ctx context.Context, q sqlRunner, auth authContext, row businessRow, submittedTaskProjects map[string]string) (bool, error) {
+func businessAccountCanAccessProject(ctx context.Context, q sqlRunner, auth authContext, workspaceID string, projectID string) (bool, error) {
+	if _, found, err := mysqlWorkspaceVisibleToAccount(ctx, q, auth.AccountID, workspaceID); err != nil || found {
+		return found, err
+	}
+	return teamAccountCanAccessProject(ctx, q, workspaceID, auth.AccountID, projectID)
+}
+
+func businessReviewFieldsChanged(current json.RawMessage, next json.RawMessage) bool {
+	var currentValue map[string]any
+	var nextValue map[string]any
+	if json.Unmarshal(current, &currentValue) != nil || json.Unmarshal(next, &nextValue) != nil {
+		return true
+	}
+	for _, field := range []string{"reviewSubmittedAt", "reviewSubmittedByMemberId", "reviewAcceptedAt", "reviewAcceptedByMemberId", "reviewReturnedAt", "reviewReturnedByMemberId", "reviewReturnReason"} {
+		if !reflect.DeepEqual(currentValue[field], nextValue[field]) {
+			return true
+		}
+	}
+	return false
+}
+
+func businessPersonalRowTaskRefsAllowed(ctx context.Context, q sqlRunner, auth authContext, row businessRow) (bool, error) {
 	for _, taskID := range businessReferencedTaskIDs(row) {
-		projectID, err := businessProjectIDForTask(ctx, q, row.WorkspaceID, taskID, submittedTaskProjects)
+		projectID, err := mysqlBusinessTaskProjectID(ctx, q, row.WorkspaceID, taskID)
 		if err != nil {
 			return false, err
 		}
-		allowed, err := teamAccountCanAccessProject(ctx, q, row.WorkspaceID, auth.AccountID, projectID)
+		allowed, err := businessAccountCanAccessProject(ctx, q, auth, row.WorkspaceID, projectID)
 		if err != nil || !allowed {
 			return allowed, err
 		}
@@ -90,23 +132,6 @@ func stringSliceField(payload json.RawMessage, field string) []string {
 		}
 	}
 	return result
-}
-
-func businessProjectIDForWriteRow(ctx context.Context, q sqlRunner, workspaceID string, row businessRow, submittedTaskProjects map[string]string) (string, error) {
-	if projectID := businessProjectID(row); projectID != "" {
-		return projectID, nil
-	}
-	if taskID := businessTaskID(row); taskID != "" {
-		return businessProjectIDForTask(ctx, q, workspaceID, taskID, submittedTaskProjects)
-	}
-	return "", nil
-}
-
-func businessProjectIDForTask(ctx context.Context, q sqlRunner, workspaceID string, taskID string, submittedTaskProjects map[string]string) (string, error) {
-	if projectID := submittedTaskProjects[businessTaskWorkspaceKey(workspaceID, taskID)]; projectID != "" {
-		return projectID, nil
-	}
-	return mysqlBusinessTaskProjectID(ctx, q, workspaceID, taskID)
 }
 
 func mysqlBusinessTaskProjectID(ctx context.Context, q sqlRunner, workspaceID string, taskID string) (string, error) {

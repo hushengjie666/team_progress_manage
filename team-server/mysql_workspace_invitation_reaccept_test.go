@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"net/http"
 	"net/http/httptest"
@@ -89,7 +90,7 @@ func TestMySQLWorkspaceInvitationAcceptReactivatesDisabledMembershipWithHistory(
 	acceptRecorder := httptest.NewRecorder()
 	api.handleWorkspaceInvitationByID(
 		acceptRecorder,
-		httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+newInvitationID+"/accept", nil),
+		httptest.NewRequest(http.MethodPost, "/workspace-invitations/"+newInvitationID+"/accept", bytes.NewReader([]byte(`{"expected_revision":1}`))),
 		authContext{AccountID: inviteeID, WorkspaceID: "workspace_invitee_home"},
 	)
 	if acceptRecorder.Code != http.StatusOK {

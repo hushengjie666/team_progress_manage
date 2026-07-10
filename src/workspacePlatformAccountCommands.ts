@@ -68,7 +68,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请先登录后台后再修改平台账号");
       return;
     }
-    void updatePlatformAccountRequest(source.backend, token, account.id, { name: normalizedName, email: normalizedEmail })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { name: normalizedName, email: normalizedEmail, expectedRevision: account.revision })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号资料已保存"))
       .catch((error) => {
@@ -92,7 +92,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请先登录后台后再停用平台账号");
       return;
     }
-    void updatePlatformAccountRequest(source.backend, token, account.id, { status: "disabled" })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { status: "disabled", expectedRevision: account.revision })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号已停用"))
       .catch((error) => {
@@ -112,7 +112,7 @@ export function createWorkspacePlatformAccountCommands({
       setToast("请输入新密码");
       return;
     }
-    void updatePlatformAccountRequest(source.backend, token, account.id, { password })
+    void updatePlatformAccountRequest(source.backend, token, account.id, { password, expectedRevision: account.revision })
       .then(() => refreshPlatformAccounts(source))
       .then(() => setToast("平台账号密码已更新"))
       .catch((error) => {

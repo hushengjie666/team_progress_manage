@@ -62,6 +62,7 @@ export interface BackendConnectionState {
   lastSavedAt?: string;
   status: BackendConnectionStatus;
   message: string;
+  businessRowRevisions?: Record<string, number>;
 }
 
 export interface AuthState {
