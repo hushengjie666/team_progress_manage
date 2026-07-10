@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import { authenticatedState } from "./support/authenticatedState";
 import { openApp } from "./support/openApp";
 
-test("keeps the focus timer geometry stable while the countdown changes", async ({ page }) => {
+test.use({ viewport: { width: 1280, height: 820 } });
+
+test("keeps the focus timer geometry stable while the countdown changes", async ({ page }, testInfo) => {
   const state = authenticatedState();
   const now = Date.now();
   state.tasks[0] = {
@@ -66,6 +68,27 @@ test("keeps the focus timer geometry stable while the countdown changes", async 
   expect(stableFace.x + stableFace.width / 2).toBe(stableOrbit.x + stableOrbit.width / 2);
   expect(stableFace.y + stableFace.height / 2).toBe(stableOrbit.y + stableOrbit.height / 2);
 
+  const countdownLayout = await countdown.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const faceBounds = element.closest(".timer-face")!.getBoundingClientRect();
+    return {
+      leftInset: bounds.left - faceBounds.left,
+      rightInset: faceBounds.right - bounds.right,
+      centerOffset: (bounds.left + bounds.width / 2) - (faceBounds.left + faceBounds.width / 2),
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    };
+  });
+  expect(countdownLayout.leftInset).toBeGreaterThanOrEqual(30);
+  expect(countdownLayout.rightInset).toBeGreaterThanOrEqual(30);
+  expect(countdownLayout.leftInset).toBeCloseTo(countdownLayout.rightInset, 1);
+  expect(countdownLayout.centerOffset).toBeCloseTo(0, 1);
+  expect(countdownLayout.scrollWidth).toBeLessThanOrEqual(countdownLayout.clientWidth);
+
   await expect(countdown).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(orbit.locator(".focus-orbit-progress")).toHaveCount(1);
+  await testInfo.attach("focus-timer-layout", {
+    body: await page.screenshot(),
+    contentType: "image/png",
+  });
 });
