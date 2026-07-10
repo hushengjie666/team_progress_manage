@@ -22,6 +22,7 @@ export function FocusTimerPanel(props: {
   const [, setDisplayTick] = useState(0);
   const displayRemaining = active ? displayRemainingForTimer(active) : 0;
   const displayProgress = active ? 100 - (displayRemaining / active.duration) * 100 : props.progress;
+  const normalizedProgress = Math.min(100, Math.max(0, displayProgress));
   const isCurrentTaskPendingReview = currentTask?.status === "pending_review";
   const startableTasks = props.committedTasks.filter((task) => task.status === "committed" || task.status === "in_progress");
 
@@ -33,10 +34,21 @@ export function FocusTimerPanel(props: {
 
   return (
     <div className="focus-timer-panel">
-      <div className="focus-orbit" style={{ background: `conic-gradient(#1f9d8a ${displayProgress}%, #e7e1d8 ${displayProgress}% 100%)` }}>
+      <div className="focus-orbit">
+        <svg className="focus-orbit-progress" viewBox="0 0 100 100" aria-hidden="true">
+          <circle className="focus-orbit-track" cx="50" cy="50" r="48.8" pathLength="100" />
+          <circle
+            className="focus-orbit-value"
+            cx="50"
+            cy="50"
+            r="48.8"
+            pathLength="100"
+            style={{ strokeDashoffset: 100 - normalizedProgress }}
+          />
+        </svg>
         <div className="timer-face">
           <p>{active ? modeLabel[active.mode] : "准备开始"}</p>
-          <strong>{active ? formatTime(displayRemaining) : `${props.focusMinutes}:00`}</strong>
+          <strong className="timer-countdown">{active ? formatTime(displayRemaining) : `${props.focusMinutes}:00`}</strong>
           <span>{currentTask?.title ?? "从我的任务选择一个任务"}</span>
           {currentTask && <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} compact />}
         </div>
