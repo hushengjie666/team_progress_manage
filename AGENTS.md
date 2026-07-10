@@ -79,7 +79,32 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm run backend:build`: build the Go backend binary into `team-server/bin/`.
 - `npm run backend:build:windows`: build the Windows Go backend binary into `team-server/bin/`.
 - `npm run backend:server`: start the local backend service.
-- `npm run deploy:team`: build the `/timemanage-team/` frontend, build a Windows Server 2008 compatible backend, and create `deploy/timemanageTeam-no-root.zip`.
+- `npm run deploy:team`: build Tauri desktop bundles, the `/timemanage-team/` frontend, and the Windows Server 2008 compatible backend into one versioned directory and matching ZIP under `deploy/`.
+
+## Unified Release Packaging
+
+Keep all distributable artifacts from one build together. `npm run deploy:team` is the single temporary-package entry point and must produce both:
+
+```text
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip
+```
+
+The version directory and ZIP root must have the same name. The version directory must contain:
+
+```text
+desktop/     Tauri applications and installers only
+web/         frontend built for /timemanage-team/
+server/      Windows backend, example config, and service scripts
+RELEASE.txt  version, timestamp, commit, and tree state
+```
+
+- Treat `deploy/timemanageTeam-v<version>-<timestamp>/` as the authoritative handoff location. `src-tauri/target/` and `dist/` are build-tool intermediates and must not be presented as separate deliverables.
+- Copy only distributable Tauri outputs into `desktop/`, such as `.app`, `.dmg`, `.msi`, installer `.exe`, `.deb`, `.rpm`, or `.AppImage`. Do not copy helper scripts, writable temporary DMGs, or other bundle intermediates.
+- Do not create ad hoc release files directly under `deploy/` or split one build across unrelated directories. Keep the matching ZIP next to its version directory.
+- Use `web/` and `server/` from the unified directory for server deployment; `desktop/` is not required on the server.
+- Before reporting a package complete, verify the expected desktop installer/application, `web/index.html`, backend executable, deployment scripts, and `RELEASE.txt`; test the ZIP with `unzip -t`; verify a macOS DMG with `hdiutil verify`; and report the final paths and SHA-256 values.
+- Temporary packages may use `npm run deploy:team`. Formal releases must be created from a clean release tag with `npm run release:team:tag -- <tag>` so `RELEASE.txt` records the tag and commit.
 
 ## Coding Style & Naming Conventions
 
