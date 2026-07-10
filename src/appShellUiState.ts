@@ -7,6 +7,7 @@ import type { SettingsSection } from "./components/settings/settingsTypes";
 export function useAppShellUiState() {
   const [tab, setTab] = useState<Tab>("workspace");
   const [workspaceMode, setWorkspaceMode] = useState<"board" | "workbench">("board");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [projectDetailTab, setProjectDetailTab] = useState<ProjectDetailTab>("overview");
   const [toast, setToast] = useState("");
@@ -28,6 +29,8 @@ export function useAppShellUiState() {
     setTab,
     workspaceMode,
     setWorkspaceMode,
+    selectedWorkspaceId,
+    setSelectedWorkspaceId,
     selectedProjectId,
     setSelectedProjectId,
     projectDetailTab,

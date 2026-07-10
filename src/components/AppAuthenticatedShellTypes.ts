@@ -48,6 +48,8 @@ export type AppShellView = {
 export type AppShellState = {
   setTab: Setter<Tab>;
   setWorkspaceMode: Setter<"board" | "workbench">;
+  selectedWorkspaceId: string | null;
+  setSelectedWorkspaceId: Setter<string | null>;
   setSelectedTaskId: Setter<string | null>;
   projectTaskFilters: ProjectTaskFilters;
   setProjectTaskFilters: Setter<ProjectTaskFilters>;

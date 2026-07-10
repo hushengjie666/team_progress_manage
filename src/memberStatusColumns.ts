@@ -15,11 +15,17 @@ import {
 import type { MemberStatusColumn } from "./memberStatusTypes";
 import type { AppState } from "./types";
 
-const sourceProjectIdsForMemberStatus = (state: AppState, projectId?: string) => {
+const sourceProjectIdsForMemberStatus = (state: AppState, projectId?: string, workspaceId?: string) => {
   const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state);
-  return projectId
+  const projectIds = projectId
     ? new Set(accessibleProjectIds.has(projectId) ? [projectId] : [])
     : accessibleProjectIds;
+  if (!workspaceId) return projectIds;
+  return new Set(
+    state.projects
+      .filter((project) => projectIds.has(project.id) && workspaceIdForProject(state, project) === workspaceId)
+      .map((project) => project.id),
+  );
 };
 
 const sourceTasksForMemberStatus = (state: AppState, sourceProjectIds: Set<string>) =>
@@ -37,14 +43,14 @@ const todayTaskIdsForMemberStatus = (state: AppState, sourceTaskIds: Set<string>
       .filter((taskId) => sourceTaskIds.has(taskId)),
   );
 
-export const countMemberStatusTodayTasks = (state: AppState, projectId?: string, date = today()) => {
-  const sourceProjectIds = sourceProjectIdsForMemberStatus(state, projectId);
+export const countMemberStatusTodayTasks = (state: AppState, projectId?: string, date = today(), workspaceId?: string) => {
+  const sourceProjectIds = sourceProjectIdsForMemberStatus(state, projectId, workspaceId);
   const sourceTaskIds = new Set(sourceTasksForMemberStatus(state, sourceProjectIds).map((task) => task.id));
   return todayTaskIdsForMemberStatus(state, sourceTaskIds, date).size;
 };
 
-export const buildMemberStatusColumns = (state: AppState, projectId?: string, date = today()): MemberStatusColumn[] => {
-  const sourceProjectIds = sourceProjectIdsForMemberStatus(state, projectId);
+export const buildMemberStatusColumns = (state: AppState, projectId?: string, date = today(), workspaceId?: string): MemberStatusColumn[] => {
+  const sourceProjectIds = sourceProjectIdsForMemberStatus(state, projectId, workspaceId);
   const accessibleWorkspaceIds = activeWorkspaceIdsForCurrentAccount(state);
   const sourceWorkspaceIds = new Set(
     state.projects

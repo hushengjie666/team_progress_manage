@@ -11,6 +11,7 @@ import {
 import { accessibleProjectIdsForCurrentUser } from "./accessControl";
 import type { AppState, DailyPlan, Task } from "./types";
 import { currentMemberForState } from "./workbenchFocusModel";
+import { filterProjectItemsForWorkspace, projectIdsForWorkspace } from "./workspaceScope";
 
 export { committedTasksForPlan, currentMemberForState, currentTaskForFocus, focusTasksForMember, taskById } from "./workbenchFocusModel";
 export { poolTasksForFilters } from "./workbenchPoolTasks";
@@ -22,15 +23,28 @@ export const deriveWorkspaceModel = (
   committedTasks: Task[],
   poolTasks: Task[],
   selectedWorkbenchProjectIds: string[],
+  selectedWorkspaceId: string | null = null,
 ) => {
   const remainingEstimate = Math.max(0, totalCommittedEstimate - todayPlan.completedPomodoros);
   const projects = Array.from(new Set(state.tasks.map((task) => task.project))).sort();
   const tags = Array.from(new Set(state.tasks.flatMap((task) => task.tags))).sort();
   const currentMember = currentMemberForState(state);
-  const myProjectTaskCards = buildMyProjectTaskCards(state, currentMember);
-  const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state, currentMember);
-  const todayCommittedTasks = filterTodayCommittedTasksForMember(state, committedTasks, currentMember, { includeUnassigned: true });
-  const todayCompletedTasks = filterTodayCompletedTasksForMember(state, todayPlan.date, currentMember, { includeUnassigned: true });
+  const workspaceProjectIds = projectIdsForWorkspace(state, selectedWorkspaceId);
+  const myProjectTaskCards = filterProjectItemsForWorkspace(
+    buildMyProjectTaskCards(state, currentMember),
+    workspaceProjectIds,
+  );
+  const accessibleProjectIds = new Set(
+    [...accessibleProjectIdsForCurrentUser(state, currentMember)].filter((projectId) => workspaceProjectIds.has(projectId)),
+  );
+  const todayCommittedTasks = filterProjectItemsForWorkspace(
+    filterTodayCommittedTasksForMember(state, committedTasks, currentMember, { includeUnassigned: true }),
+    workspaceProjectIds,
+  );
+  const todayCompletedTasks = filterProjectItemsForWorkspace(
+    filterTodayCompletedTasksForMember(state, todayPlan.date, currentMember, { includeUnassigned: true }),
+    workspaceProjectIds,
+  );
   const todayWorkbenchTasks = [
     ...todayCommittedTasks,
     ...todayCompletedTasks.filter((task) => !todayCommittedTasks.some((item) => item.id === task.id)),
@@ -57,8 +71,9 @@ export const deriveWorkspaceModel = (
     accessibleProjectIds.has(task.projectId) &&
     taskAssignedToMemberIdentity(task, memberIdentityIds, { includeUnassigned: true });
   const committedWorkbenchTasks = todayWorkbenchTasks.filter(isVisibleWorkbenchTask);
-  const poolWorkbenchTasks = poolTasks.filter(isVisiblePoolWorkbenchTask);
-  const projectOverviewCards = buildProjectOverviewCards(state);
+  const poolWorkbenchTasks = filterProjectItemsForWorkspace(poolTasks, workspaceProjectIds).filter(isVisiblePoolWorkbenchTask);
+  const allProjectOverviewCards = buildProjectOverviewCards(state);
+  const projectOverviewCards = filterProjectItemsForWorkspace(allProjectOverviewCards, workspaceProjectIds);
 
   return {
     remainingEstimate,
@@ -71,6 +86,7 @@ export const deriveWorkspaceModel = (
     committedWorkbenchTasks,
     poolWorkbenchTasks,
     projectOverviewCards,
+    allProjectOverviewCards,
   };
 };
 

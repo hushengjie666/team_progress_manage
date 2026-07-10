@@ -1,11 +1,24 @@
 import { getTodayPlan, type Tab } from "./appModel";
 import type { AppState } from "./types";
 import type { KeyboardRuntimeOptions } from "./keyboardRuntime";
+import { projectIdsForWorkspace } from "./workspaceScope";
 
 const selectedCommittedTaskId = (committedIds: string[], selectedTaskId: string | null) =>
   selectedTaskId && committedIds.includes(selectedTaskId)
     ? selectedTaskId
     : committedIds[0];
+
+const scopedCommittedTaskIds = (state: AppState, options: KeyboardRuntimeOptions) => {
+  const committedIds = getTodayPlan(state).committedTaskIds;
+  const workspaceId = options.getSelectedWorkspaceId();
+  if (!workspaceId) return committedIds;
+  const projectIds = projectIdsForWorkspace(state, workspaceId);
+  const taskById = new Map(state.tasks.map((task) => [task.id, task]));
+  return committedIds.filter((taskId) => {
+    const task = taskById.get(taskId);
+    return task ? projectIds.has(task.projectId) : false;
+  });
+};
 
 export function handleTaskKeyboardShortcut(
   event: KeyboardEvent,
@@ -21,8 +34,7 @@ export function handleTaskKeyboardShortcut(
     }
     if (!current.activeTimer) {
       if (currentTab !== "workspace") return true;
-      const plan = getTodayPlan(current);
-      const selected = selectedCommittedTaskId(plan.committedTaskIds, options.getSelectedTaskId());
+      const selected = selectedCommittedTaskId(scopedCommittedTaskIds(current, options), options.getSelectedTaskId());
       if (selected) {
         options.setTab("focus");
         void options.beginTimer("focus", selected);
@@ -33,8 +45,7 @@ export function handleTaskKeyboardShortcut(
     return true;
   }
 
-  const plan = getTodayPlan(current);
-  const committedIds = plan.committedTaskIds;
+  const committedIds = scopedCommittedTaskIds(current, options);
 
   if (currentTab === "workspace" && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
     event.preventDefault();

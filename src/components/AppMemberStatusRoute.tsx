@@ -7,6 +7,7 @@ export function AppMemberStatusRoute({ view, shellState }: AppMemberStatusRouteP
   return (
     <MemberStatusView
       state={view.state}
+      workspaceId={shellState.selectedWorkspaceId ?? undefined}
       selectTask={shellState.setSelectedTaskId}
     />
   );

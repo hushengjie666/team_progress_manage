@@ -66,6 +66,8 @@ export function buildAppShellState(shell: AppShellSource): AppShellState {
   return {
     setTab: shell.setTab,
     setWorkspaceMode: shell.setWorkspaceMode,
+    selectedWorkspaceId: shell.selectedWorkspaceId,
+    setSelectedWorkspaceId: shell.setSelectedWorkspaceId,
     setSelectedTaskId: shell.setSelectedTaskId,
     projectTaskFilters: shell.projectTaskFilters,
     setProjectTaskFilters: shell.setProjectTaskFilters,

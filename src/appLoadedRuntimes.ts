@@ -22,7 +22,7 @@ export function createAppLoadedRuntimes({
   updateState,
   persistTeamData,
 }: AppLoadedRuntimesOptions) {
-  const currentProjectId = state.projects[0]?.id ?? "project_starter";
+  const currentProjectId = viewModel.workspaceModel?.projectOverviewCards[0]?.projectId ?? "";
   const {
     taskActions,
     focusActions,

@@ -68,6 +68,7 @@ export function AppAuthenticatedShellRoutes({
     return (
       <AppWorkspaceDirectoryRoute
         view={view}
+        shellState={shellState}
         authActions={authActions}
         workspaceAccountActions={workspaceAccountActions}
         projectActions={projectActions}
@@ -104,6 +105,7 @@ export function AppAuthenticatedShellRoutes({
     return (
       <AppFocusRoute
         view={view}
+        shellState={shellState}
         taskActions={taskActions}
         focusActions={focusActions}
       />

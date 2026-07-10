@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { WorkspaceInvitationMenu } from "./WorkspaceInvitationMenu";
+import { WorkspaceScopeSelector } from "./WorkspaceScopeSelector";
 
 type AppAuthenticatedShellTopbarActionsProps = Pick<
   AppAuthenticatedShellProps,
@@ -16,6 +17,16 @@ export function AppAuthenticatedShellTopbarActions({
 }: AppAuthenticatedShellTopbarActionsProps) {
   return (
     <>
+      {view.tab !== "settings" && (
+        <WorkspaceScopeSelector
+          workspaces={view.visibleWorkspaces}
+          selectedWorkspaceId={shellState.selectedWorkspaceId}
+          selectWorkspace={(workspaceId) => {
+            shellState.setSelectedWorkspaceId((current) => current === workspaceId ? null : workspaceId);
+            shellState.setSelectedTaskId(null);
+          }}
+        />
+      )}
       <WorkspaceInvitationMenu
         workspaceInvitations={chrome.workspaceInvitations}
         projectInvitations={chrome.projectInvitations}

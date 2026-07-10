@@ -10,11 +10,12 @@ const mountedApiBaseFromBuiltAssets = (origin: string) => {
 };
 
 export const defaultBackendServerUrl = () => {
-  if (import.meta.env.VITE_TM_BACKEND_SERVER_URL) {
-    return import.meta.env.VITE_TM_BACKEND_SERVER_URL;
+  const env = import.meta.env ?? {};
+  if (env.VITE_TM_BACKEND_SERVER_URL) {
+    return env.VITE_TM_BACKEND_SERVER_URL;
   }
-  if (import.meta.env.VITE_WDIO_TAURI === "1" && import.meta.env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL) {
-    return import.meta.env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL;
+  if (env.VITE_WDIO_TAURI === "1" && env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL) {
+    return env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL;
   }
   if (typeof window === "undefined") return "http://127.0.0.1:8787";
   const { protocol, hostname, origin } = window.location;

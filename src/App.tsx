@@ -20,6 +20,7 @@ export function App() {
     suppressAutoLogin,
     selectedTaskId, preferredFocusTaskId, setPreferredFocusTaskId,
     selectedWorkbenchProjectIds, setSelectedWorkbenchProjectIds,
+    selectedWorkspaceId, setSelectedWorkspaceId,
     platformAccounts, setPlatformAccounts, setWorkspaceInvitations, setProjectInvitations,
     stateRef, reminderSentRef, stopNoiseRef, undoTimerRef, tabRef, selectedTaskIdRef,
   } = appShell;
@@ -68,6 +69,8 @@ export function App() {
     taskFilters,
     selectedWorkbenchProjectIds,
     setSelectedWorkbenchProjectIds,
+    selectedWorkspaceId,
+    setSelectedWorkspaceId,
     preferredFocusTaskId,
     setPreferredFocusTaskId,
     selectedTaskId,

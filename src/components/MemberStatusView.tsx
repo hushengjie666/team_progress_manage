@@ -16,14 +16,16 @@ export type {
 export function MemberStatusView({
   state,
   projectId,
+  workspaceId,
   selectTask,
 }: {
   state: AppState;
   projectId?: string;
+  workspaceId?: string;
   selectTask: (taskId: string | null) => void;
 }) {
-  const columns = buildMemberStatusColumns(state, projectId);
-  const todayTaskCount = countMemberStatusTodayTasks(state, projectId);
+  const columns = buildMemberStatusColumns(state, projectId, undefined, workspaceId);
+  const todayTaskCount = countMemberStatusTodayTasks(state, projectId, undefined, workspaceId);
 
   return (
     <section className="band member-status-panel">

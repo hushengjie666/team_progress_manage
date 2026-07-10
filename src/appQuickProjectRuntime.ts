@@ -9,6 +9,7 @@ export type AppQuickProjectRuntimeOptions = {
   setDraft: Setter<QuickProjectCreateDraft>;
   setWarning: Setter<string>;
   setOpen: Setter<boolean>;
+  getSelectedWorkspaceId: () => string | null;
   createProject: (
     name: string,
     description: string,
@@ -31,12 +32,17 @@ export function createAppQuickProjectRuntime({
   setDraft,
   setWarning,
   setOpen,
+  getSelectedWorkspaceId,
   createProject,
 }: AppQuickProjectRuntimeOptions): AppQuickProjectRuntime {
   const state = getState();
   const visibleWorkspaces = state.auth.workspaces ?? (state.auth.workspace ? [state.auth.workspace] : []);
+  const selectedWorkspaceId = getSelectedWorkspaceId();
   const defaultQuickProjectWorkspaceId =
-    visibleWorkspaces.find((workspace) => workspace.type === "private")?.id ?? visibleWorkspaces[0]?.id ?? "";
+    visibleWorkspaces.find((workspace) => workspace.id === selectedWorkspaceId)?.id ??
+    visibleWorkspaces.find((workspace) => workspace.type === "private")?.id ??
+    visibleWorkspaces[0]?.id ??
+    "";
 
   const openQuickProjectCreate = () => {
     setDraft({
