@@ -17,18 +17,18 @@ export function WorkspaceScopeSelector({
       {workspaces.map((workspace) => {
         const privateWorkspace = (workspace.type ?? "shared") === "private";
         const selected = selectedWorkspaceId === workspace.id;
-        const typeLabel = privateWorkspace ? "私人" : "协作";
+        const label = privateWorkspace ? "私人" : workspace.name;
         return (
           <button
             className={selected ? "workspace-scope-option active" : "workspace-scope-option"}
             aria-pressed={selected}
             key={workspace.id}
             onClick={() => selectWorkspace(workspace.id)}
-            title={`${typeLabel}工作区：${workspace.name}${selected ? "；再次点击显示全部工作区" : ""}`}
+            title={`${label}${selected ? "；再次点击显示全部工作区" : ""}`}
             type="button"
           >
             {privateWorkspace ? <House size={15} /> : <Building2 size={15} />}
-            <span>{typeLabel} · {workspace.name}</span>
+            <span>{label}</span>
           </button>
         );
       })}

@@ -64,8 +64,11 @@ test("filters business pages with the global workspace selector", async ({ page 
   await openApp(page, scopedState);
 
   const selector = page.getByRole("group", { name: "工作区筛选" });
-  const privateOption = selector.getByRole("button", { name: /私人 · 项目负责人私人区/ });
+  const privateOption = selector.getByRole("button", { name: "私人", exact: true });
+  const sharedOption = selector.getByRole("button", { name: "E2E 工作区", exact: true });
   await expect(selector.getByRole("button")).toHaveCount(2);
+  await expect(privateOption).toHaveText("私人");
+  await expect(sharedOption).toHaveText("E2E 工作区");
   await expect(privateOption).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByLabel("项目卡片总览")).toContainText("TimeManage 团队进度");
   await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
@@ -106,7 +109,7 @@ test("filters business pages with the global workspace selector", async ({ page 
   await nav.getByRole("button", { name: "项目总览" }).click();
   await privateOption.click();
   await page.getByLabel("项目卡片总览").locator("article").filter({ hasText: sharedProject.name }).getByRole("button", { name: "进入项目" }).click();
-  await selector.getByRole("button", { name: /私人 · 项目负责人私人区/ }).click();
+  await selector.getByRole("button", { name: "私人", exact: true }).click();
   await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
   await expect(page.getByText("协作工作区 · E2E 工作区")).toHaveCount(0);
 
