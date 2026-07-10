@@ -31,7 +31,7 @@ for (const file of requiredFiles) {
 
 const manifest = readJson(join(pluginRoot, ".codex-plugin", "plugin.json"));
 if (manifest.name !== "timemanage") fail("Plugin manifest name must be timemanage.");
-if (manifest.version !== "0.2.2") fail("Plugin manifest version must be 0.2.2.");
+if (manifest.version !== "0.2.3") fail("Plugin manifest version must be 0.2.3.");
 if (manifest.skills !== "./skills/") fail("Plugin manifest must point skills to ./skills/.");
 const retiredServerField = `${String.fromCharCode(109, 99, 112)}Servers`;
 if (retiredServerField in manifest) fail("CLI plugin manifest must not register server integrations.");

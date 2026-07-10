@@ -1,7 +1,7 @@
 @echo off
 setlocal
 if "%~1"=="" (
-  echo Usage: restore-database.bat backups\timemanage-db-0.2.2-yyyyMMdd-HHmmss.sql.gz
+  echo Usage: restore-database.bat backups\timemanage-db-0.2.3-yyyyMMdd-HHmmss.sql.gz
   exit /b 2
 )
 pushd "%~dp0"

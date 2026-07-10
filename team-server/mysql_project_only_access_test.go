@@ -116,6 +116,29 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	if !reloaded["daily_plan/"+dailyPlanRow.ID] {
 		t.Fatalf("project-only state missing account daily plan: %#v", reloaded)
 	}
+	modifiedRows := append([]businessRow(nil), reloadedRows.Rows...)
+	teammatePlanID := "plan_account_teammate_" + workspaceID + "_2026-07-04"
+	for index := range modifiedRows {
+		if modifiedRows[index].Entity != "daily_plan" || modifiedRows[index].ID != teammatePlanID {
+			continue
+		}
+		modifiedRows[index].UpdatedAt = "2026-07-04T09:00:00Z"
+		modifiedRows[index].Payload = bytes.Replace(
+			modifiedRows[index].Payload,
+			[]byte(`"reflection":""`),
+			[]byte(`"reflection":"unauthorized change"`),
+			1,
+		)
+	}
+	modifiedBody, err := json.Marshal(teamDataSaveRequest{Rows: modifiedRows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	modifiedRecorder := httptest.NewRecorder()
+	api.handleTeamDataSave(modifiedRecorder, httptest.NewRequest(http.MethodPut, "/team/data", bytes.NewReader(modifiedBody)), projectOnlyAuth)
+	if modifiedRecorder.Code != http.StatusForbidden {
+		t.Fatalf("modify teammate daily plan status = %d, body = %s", modifiedRecorder.Code, modifiedRecorder.Body.String())
+	}
 	hiddenPlanRow := dailyPlanRow
 	hiddenPlanRow.ID = "plan_" + projectOnlyAuth.AccountID + "_" + workspaceID + "_2026-07-05"
 	hiddenPlanRow.UpdatedAt = "2026-07-05T08:00:00Z"

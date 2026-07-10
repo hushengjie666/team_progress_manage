@@ -1,6 +1,6 @@
 # TimeManage Database Operations
 
-TimeManage `v0.2.2` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported.
+TimeManage `v0.2.3` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported.
 
 ## Requirements
 

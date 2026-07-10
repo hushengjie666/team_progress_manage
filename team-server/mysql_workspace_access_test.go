@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
+func TestMySQLWorkspaceSwitchingPreservesGlobalDataAndSharedMemberships(t *testing.T) {
 	dsn, cleanup := mysqlTestDSN(t)
 	defer cleanup()
 	db, err := openMySQLStore(dsn)
@@ -65,12 +65,17 @@ func TestMySQLWorkspaceSwitchingIsolationAndSharedMemberships(t *testing.T) {
 	}})
 
 	privateRows := loadRows(t, api, privateAuth, 0)
-	if len(privateRows.Rows) != 1 || privateRows.Rows[0].ID != "project_private" {
-		t.Fatalf("private workspace rows leaked or missing: %#v", privateRows)
-	}
 	sharedRows := loadRows(t, api, sharedAuth, 0)
-	if len(sharedRows.Rows) != 1 || sharedRows.Rows[0].ID != "project_shared" {
-		t.Fatalf("shared workspace rows leaked or missing: %#v", sharedRows)
+	for name, response := range map[string]teamDataResponse{"private auth": privateRows, "shared auth": sharedRows} {
+		projects := map[string]string{}
+		for _, row := range response.Rows {
+			if row.Entity == "project" {
+				projects[row.ID] = row.WorkspaceID
+			}
+		}
+		if projects["project_private"] != privateLogin.Workspace.ID || projects["project_shared"] != sharedLogin.Workspace.ID {
+			t.Fatalf("%s did not load both accessible workspaces: %#v", name, projects)
+		}
 	}
 
 	switchBody := bytes.NewReader([]byte(`{"workspace_id":"` + privateLogin.Workspace.ID + `","device_id":"device_shared"}`))

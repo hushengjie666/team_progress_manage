@@ -12,11 +12,14 @@ import (
 func TestBootstrapAndLoginCreateWorkspaceAccount(t *testing.T) {
 	dsn, cleanup := mysqlTestDSN(t)
 	defer cleanup()
-	db, err := openMySQLStore(dsn)
+	db, err := openMySQLDB(dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db.Close()
+	if err := ensureMySQLSchema(context.Background(), db); err != nil {
+		t.Fatal(err)
+	}
 	api := newApp(defaultConfig(), db)
 
 	body := bytes.NewReader([]byte(`{"workspace_name":"交付团队","name":"负责人","email":"owner@example.com","password":"secret","device_id":"device_a"}`))

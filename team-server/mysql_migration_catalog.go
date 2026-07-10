@@ -9,8 +9,8 @@ import (
 
 const (
 	baselineSchemaVersion int64 = 1
-	latestSchemaVersion   int64 = 5
-	serverReleaseVersion        = "v0.2.2"
+	latestSchemaVersion   int64 = 6
+	serverReleaseVersion        = "v0.2.3"
 )
 
 type migrationDefinition struct {
@@ -26,7 +26,8 @@ var migrationCatalog = []migrationDefinition{
 	{SchemaVersion: 2, ReleaseVersion: "v0.1.3", FileName: "00002_v0_1_3_noop.sql"},
 	{SchemaVersion: 3, ReleaseVersion: "v0.2.0", FileName: "00003_v0_2_0_noop.sql"},
 	{SchemaVersion: 4, ReleaseVersion: "v0.2.1", FileName: "00004_v0_2_1_noop.sql"},
-	{SchemaVersion: 5, ReleaseVersion: serverReleaseVersion, FileName: "00005_v0_2_2_migration_framework.sql"},
+	{SchemaVersion: 5, ReleaseVersion: "v0.2.2", FileName: "00005_v0_2_2_migration_framework.sql"},
+	{SchemaVersion: 6, ReleaseVersion: serverReleaseVersion, FileName: "00006_v0_2_3_noop.sql"},
 }
 
 func migrationForRelease(release string) (migrationDefinition, error) {
