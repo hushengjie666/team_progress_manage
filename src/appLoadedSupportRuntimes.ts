@@ -58,7 +58,7 @@ export function createAppLoadedSupportRuntimes({
     getState: () => shell.stateRef.current ?? state,
     getCurrentProjectId: () => currentProjectId,
     getCurrentTaskId: () => viewModel.currentTask?.id,
-    getFirstCommittedTaskId: () => viewModel.committedTasks[0]?.id,
+    getFirstCommittedTaskId: () => viewModel.focusCommittedTasks[0]?.id,
     updateState,
     setSelectedTaskId: shell.setSelectedTaskId,
     setWorkspaceMode: shell.setWorkspaceMode,
@@ -79,6 +79,7 @@ export function createAppLoadedSupportRuntimes({
     setDraft: shell.setQuickProjectDraft,
     setWarning: shell.setQuickProjectWarning,
     setOpen: shell.setQuickProjectCreateOpen,
+    getSelectedWorkspaceId: () => shell.selectedWorkspaceId,
     createProject: projectActions.createProject,
   });
 

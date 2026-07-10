@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createKeyboardRuntime } from "./keyboardRuntime";
 import type { useAppShellState } from "./appShellState";
 import type { SessionMode } from "./types";
@@ -16,10 +16,13 @@ export function useAppKeyboardShortcuts({
   toggleTimer: () => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
 }) {
+  const selectedWorkspaceIdRef = useRef(shell.selectedWorkspaceId);
+  selectedWorkspaceIdRef.current = shell.selectedWorkspaceId;
   useEffect(() => createKeyboardRuntime({
     getState: () => shell.stateRef.current,
     getCurrentTab: () => shell.tabRef.current,
     getSelectedTaskId: () => shell.selectedTaskIdRef.current,
+    getSelectedWorkspaceId: () => selectedWorkspaceIdRef.current,
     setCommandPaletteOpen: shell.setCommandPaletteOpen,
     setShowShortcutHelp: shell.setShowShortcutHelp,
     setSettingsSection: shell.setSettingsSection,

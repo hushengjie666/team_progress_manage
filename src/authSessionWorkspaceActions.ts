@@ -58,7 +58,7 @@ export function createAuthWorkspaceActions({
       const source = getState();
       if (!source) throw new Error("应用状态尚未加载");
       const session = await loginToWorkspace(source.backend, email, password);
-      if (remember) saveRememberedAuth(source.backend.serverUrl, session.account.email, password);
+      if (remember) saveRememberedAuth(source.backend.serverUrl, session.account.email);
       else clearRememberedAuth(source.backend.serverUrl);
       setSuppressAutoLogin(false);
       await applySession(session, `已登录 ${session.workspace.name}`);

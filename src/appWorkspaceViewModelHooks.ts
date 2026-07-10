@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { getTodayPlan, type TaskFilters } from "./appModel";
 import type { AppState } from "./types";
+import { workspacesForState } from "./accessControl";
 import {
   committedTasksForPlan,
   currentMemberForState,
@@ -9,6 +10,7 @@ import {
   focusTasksForMember,
   poolTasksForFilters,
 } from "./workbenchModel";
+import { filterProjectItemsForWorkspace, projectIdsForWorkspace, validWorkspaceSelection } from "./workspaceScope";
 
 type Setter<T> = (value: T | ((current: T) => T)) => void;
 
@@ -17,6 +19,8 @@ export type AppWorkspaceViewModelHooksOptions = {
   taskFilters: TaskFilters;
   selectedWorkbenchProjectIds: string[];
   setSelectedWorkbenchProjectIds: Setter<string[]>;
+  selectedWorkspaceId: string | null;
+  setSelectedWorkspaceId: Setter<string | null>;
   preferredFocusTaskId: string | null;
   setPreferredFocusTaskId: Setter<string | null>;
 };
@@ -26,6 +30,8 @@ export function useAppWorkspaceViewModelHooks({
   taskFilters,
   selectedWorkbenchProjectIds,
   setSelectedWorkbenchProjectIds,
+  selectedWorkspaceId,
+  setSelectedWorkspaceId,
   preferredFocusTaskId,
   setPreferredFocusTaskId,
 }: AppWorkspaceViewModelHooksOptions) {
@@ -33,8 +39,11 @@ export function useAppWorkspaceViewModelHooks({
 
   const committedTasks = useMemo(() => {
     if (!state || !todayPlan) return [];
-    return committedTasksForPlan(state, todayPlan);
-  }, [state, todayPlan]);
+    const tasks = committedTasksForPlan(state, todayPlan);
+    return selectedWorkspaceId
+      ? filterProjectItemsForWorkspace(tasks, projectIdsForWorkspace(state, selectedWorkspaceId))
+      : tasks;
+  }, [state, todayPlan, selectedWorkspaceId]);
 
   const totalCommittedEstimate = useMemo(
     () => committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0),
@@ -69,8 +78,25 @@ export function useAppWorkspaceViewModelHooks({
 
   const workspaceModel = useMemo(() => {
     if (!state || !todayPlan) return null;
-    return deriveWorkspaceModel(state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds);
-  }, [state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds]);
+    return deriveWorkspaceModel(
+      state,
+      todayPlan,
+      totalCommittedEstimate,
+      committedTasks,
+      poolTasks,
+      selectedWorkbenchProjectIds,
+      selectedWorkspaceId,
+    );
+  }, [state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds, selectedWorkspaceId]);
+
+  useEffect(() => {
+    setSelectedWorkspaceId(null);
+  }, [state?.auth.account?.id]);
+
+  useEffect(() => {
+    if (!state) return;
+    setSelectedWorkspaceId((current) => validWorkspaceSelection(workspacesForState(state), current));
+  }, [state?.auth.workspaces, state?.auth.workspace]);
 
   useEffect(() => {
     setSelectedWorkbenchProjectIds([]);

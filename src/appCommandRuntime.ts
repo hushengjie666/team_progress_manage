@@ -16,7 +16,7 @@ type UpdateState = (updater: (value: AppState) => AppState) => void;
 
 export type AppCommandRuntimeOptions = {
   getState: () => AppState;
-  getCurrentProjectId: () => string;
+  getCurrentProjectId: () => string | undefined;
   getCurrentTaskId: () => string | undefined;
   getFirstCommittedTaskId: () => string | undefined;
   updateState: UpdateState;
@@ -60,6 +60,10 @@ export function createAppCommandRuntime({
   const addParsedQuickTask = (parsed: ParsedQuickInput) => {
     const state = getState();
     const currentProjectId = getCurrentProjectId();
+    if (!currentProjectId || !state.projects.some((project) => project.id === currentProjectId)) {
+      setToast("当前工作区没有可用项目，请先创建项目");
+      return;
+    }
     const timestamp = nowIso();
     const task: Task = {
       id: uid("task"),

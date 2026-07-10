@@ -7,7 +7,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const scanRoots = [
   "src",
   "team-server",
-  "mcp-server/src",
+  "cli/src",
   "tests/e2e",
 ];
 

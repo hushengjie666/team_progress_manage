@@ -1,4 +1,5 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
+import { mergeScopedProjectOrder } from "../workspaceScope";
 import { WorkspaceView } from "./WorkspaceView";
 
 type AppWorkspaceRouteProps = Pick<
@@ -31,6 +32,17 @@ export function AppWorkspaceRoute({
     selectedTask,
   } = view;
   const { setSelectedTaskId, taskDraft, setTaskDraft } = shellState;
+  const reorderProjects = (orderedProjectIds: string[]) => {
+    if (!shellState.selectedWorkspaceId) {
+      projectActions.reorderProjects(orderedProjectIds);
+      return;
+    }
+    projectActions.reorderProjects(mergeScopedProjectOrder(
+      workspaceModel.allProjectOverviewCards.map((card) => card.projectId),
+      workspaceModel.projectOverviewCards.map((card) => card.projectId),
+      orderedProjectIds,
+    ));
+  };
 
   return (
     <WorkspaceView
@@ -58,7 +70,7 @@ export function AppWorkspaceRoute({
       moveCommittedTask={taskActions.moveCommittedTask}
       splitTask={taskActions.splitTask}
       beginFocus={beginFocus}
-      reorderProjects={projectActions.reorderProjects}
+      reorderProjects={reorderProjects}
       openProjectCreate={openQuickProjectCreate}
       openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
     />

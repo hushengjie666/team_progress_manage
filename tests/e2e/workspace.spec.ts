@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
+import { authenticatedState } from "./support/authenticatedState";
 import { workspaceMemberState } from "./support/scenarioStates";
 
 test.beforeEach(async ({ page }) => {
@@ -20,6 +21,100 @@ test("opens workspace directory instead of switching a single active workspace",
   await expect(page.getByRole("heading", { name: "项目负责人私人区" })).toBeVisible();
   await expect(page.locator("article").filter({ hasText: "E2E 工作区" }).getByRole("button", { name: /项目/ })).toContainText("1");
   await expect(page.locator("article").filter({ hasText: "E2E 工作区" }).getByRole("button", { name: /成员/ })).toContainText("2");
+});
+
+test("filters business pages with the global workspace selector", async ({ page }) => {
+  const state = authenticatedState();
+  const sharedProject = state.projects[0];
+  const sharedTask = state.tasks[0];
+  const privateProject = {
+    ...sharedProject,
+    id: "project_private_e2e",
+    workspaceId: "workspace_private_account_owner",
+    name: "E2E 私人项目",
+    sortOrder: 1000,
+  };
+  const privateTask = {
+    ...sharedTask,
+    id: "task_private_e2e",
+    workspaceId: "workspace_private_account_owner",
+    projectId: privateProject.id,
+    project: privateProject.name,
+    creatorMemberId: "member_private_e2e",
+    primaryExecutorMemberId: "member_private_e2e",
+    title: "整理私人工作清单",
+    sortOrder: 20,
+  };
+  const privateMember = {
+    ...state.projectMembers[0],
+    id: "member_private_e2e",
+    workspaceId: "workspace_private_account_owner",
+    projectId: privateProject.id,
+  };
+  const scopedState = {
+    ...state,
+    projects: [...state.projects, privateProject],
+    projectMembers: [...state.projectMembers, privateMember],
+    tasks: [...state.tasks, privateTask],
+    dailyPlans: state.dailyPlans.map((plan) => ({
+      ...plan,
+      committedTaskIds: [...plan.committedTaskIds, privateTask.id],
+    })),
+  };
+  await openApp(page, scopedState);
+
+  const selector = page.getByRole("group", { name: "工作区筛选" });
+  const privateOption = selector.getByRole("button", { name: "私人", exact: true });
+  const sharedOption = selector.getByRole("button", { name: "E2E 工作区", exact: true });
+  await expect(selector.getByRole("button")).toHaveCount(2);
+  await expect(privateOption).toHaveText("私人");
+  await expect(sharedOption).toHaveText("E2E 工作区");
+  await expect(privateOption).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByLabel("项目卡片总览")).toContainText("TimeManage 团队进度");
+  await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
+
+  await privateOption.click();
+  await expect(privateOption).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
+  await expect(page.getByLabel("项目卡片总览")).not.toContainText("TimeManage 团队进度");
+
+  await page.getByRole("button", { name: "新增项目" }).click();
+  const createDialog = page.getByRole("dialog", { name: "新增项目" });
+  await expect(createDialog.getByLabel("所属工作区")).toHaveValue("workspace_private_account_owner");
+  await createDialog.getByRole("button", { name: "关闭" }).click();
+
+  await page.getByTitle("命令面板").click();
+  const commandDialog = page.getByRole("dialog", { name: "命令面板" });
+  await commandDialog.getByPlaceholder(/搜索命令/).fill(sharedTask.title);
+  await expect(commandDialog.locator(".command-section")).toHaveCount(0);
+  await commandDialog.getByTitle("关闭").click();
+
+  const nav = page.getByLabel("页面导航");
+  await nav.getByRole("button", { name: "工作区" }).click();
+  await expect(page.getByRole("heading", { name: "项目负责人私人区" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E 工作区" })).toHaveCount(0);
+
+  await nav.getByRole("button", { name: "成员状况" }).click();
+  await expect(page.getByLabel("成员今日任务列")).toContainText(privateTask.title);
+  await expect(page.getByLabel("成员今日任务列")).not.toContainText(sharedTask.title);
+
+  await nav.getByRole("button", { name: "我的任务" }).click();
+  await expect(page.locator(".my-project-task-panel")).toContainText(privateProject.name);
+  await expect(page.locator(".my-project-task-panel")).not.toContainText(sharedProject.name);
+
+  await nav.getByRole("button", { name: "开始工作" }).click();
+  await expect(page.locator(".focus-todo-panel")).toContainText(privateTask.title);
+  await expect(page.locator(".focus-todo-panel")).not.toContainText(sharedTask.title);
+
+  await nav.getByRole("button", { name: "项目总览" }).click();
+  await privateOption.click();
+  await page.getByLabel("项目卡片总览").locator("article").filter({ hasText: sharedProject.name }).getByRole("button", { name: "进入项目" }).click();
+  await selector.getByRole("button", { name: "私人", exact: true }).click();
+  await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
+  await expect(page.getByText("协作工作区 · E2E 工作区")).toHaveCount(0);
+
+  await nav.getByRole("button", { name: "管理中心" }).click();
+  await expect(page.getByRole("group", { name: "工作区筛选" })).toHaveCount(0);
 });
 
 test("keeps private workspace member management locked to the owner", async ({ page }) => {

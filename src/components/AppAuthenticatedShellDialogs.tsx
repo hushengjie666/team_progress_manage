@@ -3,6 +3,8 @@ import { QuickProjectCreateModal } from "./QuickProjectCreateModal";
 import { MiniTimer } from "./focus/MiniTimer";
 import { CommandPalette } from "./CommandPalette";
 import { ConfirmDialog, ShortcutHelpDialog, SplitTaskDialog } from "./Dialogs";
+import { isTauriRuntime } from "../tauriEnvironment";
+import { filterProjectItemsForWorkspace, projectIdsForWorkspace } from "../workspaceScope";
 
 type AppAuthenticatedShellDialogsProps = Pick<
   AppAuthenticatedShellProps,
@@ -50,6 +52,9 @@ export function AppAuthenticatedShellDialogs({
     showShortcutHelp,
     setShowShortcutHelp,
   } = shellState;
+  const commandTasks = shellState.selectedWorkspaceId
+    ? filterProjectItemsForWorkspace(state.tasks, projectIdsForWorkspace(state, shellState.selectedWorkspaceId))
+    : state.tasks;
 
   return (
     <>
@@ -64,7 +69,7 @@ export function AppAuthenticatedShellDialogs({
         onClose={closeQuickProjectCreate}
         onSubmit={submitQuickProjectCreate}
       />
-      {state.activeTimer && tab !== "focus" && (
+      {state.activeTimer && tab !== "focus" && !isTauriRuntime() && (
         <MiniTimer
           state={state}
           task={currentTask}
@@ -106,7 +111,7 @@ export function AppAuthenticatedShellDialogs({
       <ShortcutHelpDialog open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
       <CommandPalette
         open={commandPaletteOpen}
-        tasks={state.tasks}
+        tasks={commandTasks}
         onClose={() => setCommandPaletteOpen(false)}
         onRun={runCommand}
       />

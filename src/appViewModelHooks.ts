@@ -12,6 +12,8 @@ export type AppViewModelHooksOptions = {
   taskFilters: TaskFilters;
   selectedWorkbenchProjectIds: string[];
   setSelectedWorkbenchProjectIds: Setter<string[]>;
+  selectedWorkspaceId: string | null;
+  setSelectedWorkspaceId: Setter<string | null>;
   preferredFocusTaskId: string | null;
   setPreferredFocusTaskId: Setter<string | null>;
   selectedTaskId: string | null;
@@ -25,6 +27,8 @@ export function useAppViewModelHooks({
   taskFilters,
   selectedWorkbenchProjectIds,
   setSelectedWorkbenchProjectIds,
+  selectedWorkspaceId,
+  setSelectedWorkspaceId,
   preferredFocusTaskId,
   setPreferredFocusTaskId,
   selectedTaskId,
@@ -36,6 +40,8 @@ export function useAppViewModelHooks({
     taskFilters,
     selectedWorkbenchProjectIds,
     setSelectedWorkbenchProjectIds,
+    selectedWorkspaceId,
+    setSelectedWorkspaceId,
     preferredFocusTaskId,
     setPreferredFocusTaskId,
   });

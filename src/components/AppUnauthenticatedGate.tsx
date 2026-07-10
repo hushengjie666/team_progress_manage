@@ -8,7 +8,6 @@ export function AppUnauthenticatedGate({
   message,
   suppressAutoLogin,
   updateServerUrl,
-  checkStatus,
   login,
 }: {
   status: AuthStatus;
@@ -16,7 +15,6 @@ export function AppUnauthenticatedGate({
   message: string;
   suppressAutoLogin: boolean;
   updateServerUrl: (serverUrl: string) => void;
-  checkStatus: () => Promise<void>;
   login: (email: string, password: string, remember: boolean) => Promise<void>;
 }) {
   const rememberedAuth = readRememberedAuth(serverUrl);
@@ -30,7 +28,6 @@ export function AppUnauthenticatedGate({
       initialPassword={rememberedAuth?.password}
       autoLogin={Boolean(rememberedAuth?.email && rememberedAuth.password) && !suppressAutoLogin}
       updateServerUrl={updateServerUrl}
-      checkStatus={checkStatus}
       login={login}
     />
   );

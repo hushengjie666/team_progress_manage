@@ -1,0 +1,40 @@
+[package]
+name = "timemanage-desktop"
+version = "0.1.0"
+description = "TimeManage desktop shell"
+authors = ["hushengjie666"]
+license = ""
+repository = "https://github.com/hushengjie666/team_progress_manage"
+edition = "2021"
+rust-version = "1.77.2"
+default-run = "timemanage-desktop"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "timemanage_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "timemanage-desktop"
+path = "src/main.rs"
+
+[[bin]]
+name = "timemanage-desktop-dev"
+path = "src/main_dev.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.11.3", features = ["macos-private-api"] }
+tauri-plugin-log = "2"
+tauri-plugin-wdio = "1.2.0"
+tauri-plugin-wdio-webdriver = "1.2.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.4"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSApplication", "NSButton", "NSRunningApplication", "NSWindow"] }

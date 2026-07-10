@@ -45,6 +45,7 @@ export function AppAuthenticatedShellRoutes({
   const { tab } = view;
   const { setTab } = shellState;
   const beginFocus = (taskId: string) => {
+    taskActions.commitTask(taskId);
     setTab("focus");
     void focusActions.beginTimer("focus", taskId);
   };
@@ -67,6 +68,7 @@ export function AppAuthenticatedShellRoutes({
     return (
       <AppWorkspaceDirectoryRoute
         view={view}
+        shellState={shellState}
         authActions={authActions}
         workspaceAccountActions={workspaceAccountActions}
         projectActions={projectActions}
@@ -103,6 +105,7 @@ export function AppAuthenticatedShellRoutes({
     return (
       <AppFocusRoute
         view={view}
+        shellState={shellState}
         taskActions={taskActions}
         focusActions={focusActions}
       />

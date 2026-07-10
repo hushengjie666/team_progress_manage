@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   clampMiniTimerPosition,
+  defaultMiniTimerPosition,
   readStoredMiniTimerPosition,
   writeStoredMiniTimerPosition,
   type MiniTimerPosition,
@@ -19,7 +20,12 @@ export function useMiniTimerDrag() {
   const panelRef = useRef<HTMLElement | null>(null);
   const longPressTimerRef = useRef<number | undefined>(undefined);
   const pressRef = useRef<MiniTimerPressState | null>(null);
-  const [position, setPosition] = useState<MiniTimerPosition | null>(() => readStoredMiniTimerPosition());
+  const hasCustomPositionRef = useRef(false);
+  const [position, setPosition] = useState<MiniTimerPosition | null>(() => {
+    const storedPosition = readStoredMiniTimerPosition();
+    hasCustomPositionRef.current = Boolean(storedPosition);
+    return storedPosition;
+  });
   const [dragging, setDragging] = useState(false);
 
   const clearLongPressTimer = () => {
@@ -36,6 +42,14 @@ export function useMiniTimerDrag() {
     return clampMiniTimerPosition({ x: clientX - press.offsetX, y: clientY - press.offsetY }, width, height);
   };
 
+  const positionForCurrentPanel = (current: MiniTimerPosition | null) => {
+    const panel = panelRef.current;
+    if (!panel) return null;
+    return hasCustomPositionRef.current && current
+      ? clampMiniTimerPosition(current, panel.offsetWidth, panel.offsetHeight)
+      : defaultMiniTimerPosition(panel.offsetWidth, panel.offsetHeight);
+  };
+
   const activateDrag = (press: MiniTimerPressState, clientX = press.startX, clientY = press.startY) => {
     if (press.active) return;
     press.active = true;
@@ -50,7 +64,11 @@ export function useMiniTimerDrag() {
     const rect = event.currentTarget.getBoundingClientRect();
     const press = createMiniTimerPressState({ event, rect });
     pressRef.current = press;
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Programmatic pointer events used by automation may not support capture.
+    }
     clearLongPressTimer();
     longPressTimerRef.current = window.setTimeout(() => {
       if (pressRef.current?.pointerId === event.pointerId) activateDrag(pressRef.current);
@@ -84,6 +102,7 @@ export function useMiniTimerDrag() {
     setDragging(false);
     if (press.active) {
       const finalPosition = positionFromPointer(press, event.clientX, event.clientY);
+      hasCustomPositionRef.current = true;
       setPosition(finalPosition);
       writeStoredMiniTimerPosition(finalPosition);
     }
@@ -97,22 +116,30 @@ export function useMiniTimerDrag() {
 
   useEffect(() => () => clearLongPressTimer(), []);
 
+  useLayoutEffect(() => {
+    setPosition((current) => {
+      const next = positionForCurrentPanel(current);
+      if (!next) return current;
+      if (hasCustomPositionRef.current) writeStoredMiniTimerPosition(next);
+      return next;
+    });
+  }, []);
+
   useEffect(() => {
-    if (!position) return;
     const handleResize = () => {
       const panel = panelRef.current;
       if (!panel) return;
       setPosition((current) => {
-        if (!current) return current;
-        const next = clampMiniTimerPosition(current, panel.offsetWidth, panel.offsetHeight);
-        writeStoredMiniTimerPosition(next);
+        const next = positionForCurrentPanel(current);
+        if (!next) return current;
+        if (hasCustomPositionRef.current) writeStoredMiniTimerPosition(next);
         return next;
       });
     };
     window.addEventListener("resize", handleResize);
     handleResize();
     return () => window.removeEventListener("resize", handleResize);
-  }, [position !== null]);
+  }, []);
 
   return {
     panelRef,

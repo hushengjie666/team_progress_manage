@@ -3,7 +3,7 @@ import type { ExecutionSignal, ExecutionSignalType, WorkSession } from "./types"
 
 export type IdFactory = (prefix: string) => string;
 
-export type ExecutionSignalSource = "app" | "mcp";
+export type ExecutionSignalSource = "app" | "cli";
 
 export const createExecutionSignal = (
   workSession: WorkSession,

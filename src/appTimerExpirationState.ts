@@ -13,14 +13,11 @@ export const finishExpiredTimerInState = (state: AppState, timestamp = nowIso())
   const active = state.activeTimer;
   if (!active) return state;
   const ended = endSessionInState(state, "completed", timestamp);
-  if (active.mode === "focus" && state.settings.autoStartBreaks) {
-    return startTimerInState(ended, nextBreakMode(ended), undefined, timestamp);
+  if (active.mode === "focus") {
+    return startTimerInState(ended, nextBreakMode(ended), undefined, timestamp, undefined, { startPaused: true });
   }
-  if (active.mode !== "focus" && state.settings.autoStartFocus) {
-    const nextTask = ended.tasks.find((task) => task.status === "committed" || task.status === "in_progress");
-    return startTimerInState(ended, "focus", nextTask?.id, timestamp);
-  }
-  return ended;
+  const nextTask = ended.tasks.find((task) => task.status === "committed" || task.status === "in_progress");
+  return startTimerInState(ended, "focus", nextTask?.id, timestamp, undefined, { startPaused: true });
 };
 
 export const restoreTimerInState = (state: AppState, timestamp = nowIso()): AppState => {

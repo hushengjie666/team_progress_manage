@@ -8,6 +8,7 @@ export function FocusView(props: {
   state: AppState;
   currentTask?: Task;
   committedTasks: Task[];
+  currentTaskWorkspaceLabel?: string;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   toggleTimer: () => void;
   resetTimer: () => void;
@@ -25,7 +26,11 @@ export function FocusView(props: {
     <div className="focus-layout">
       <section className="focus-stage">
         <div className="focus-stage-inner">
-          <FocusCurrentTaskPanel currentTask={currentTask} completeTask={props.completeTask} />
+          <FocusCurrentTaskPanel
+            currentTask={currentTask}
+            workspaceExceptionLabel={props.currentTaskWorkspaceLabel}
+            completeTask={props.completeTask}
+          />
           <FocusTimerPanel
             active={active}
             currentTask={currentTask}

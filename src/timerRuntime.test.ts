@@ -84,6 +84,15 @@ describe("timer runtime", () => {
     expect(mocks.sendTimerNotification).toHaveBeenCalledWith(state.settings, "专注已结束", "休息一下");
   });
 
+  it("can leave timer end sound to another runtime surface", () => {
+    const state = createInitialState();
+
+    announceTimerEnd(state.settings, "专注已结束", "休息一下", { playSound: false });
+
+    expect(mocks.playTimerSound).not.toHaveBeenCalled();
+    expect(mocks.sendTimerNotification).toHaveBeenCalledWith(state.settings, "专注已结束", "休息一下");
+  });
+
   it("marks due task reminders and commits the updated state", () => {
     const state = stateWithDueTask();
     const sentIds = new Set<string>();

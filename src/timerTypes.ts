@@ -59,4 +59,5 @@ export interface ActiveTimer {
   totalPausedSeconds: number;
   cycleIndex: number;
   pendingSettlement?: TimerSettlement;
+  speedMultiplier?: number;
 }

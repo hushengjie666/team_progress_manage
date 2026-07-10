@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { workspaceIdForProject } from "../accessControl";
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { AppTopbar } from "./AppTopbar";
 import { AppAuthenticatedShellDialogs } from "./AppAuthenticatedShellDialogs";
@@ -24,6 +26,20 @@ export function AppAuthenticatedShell({
   loadDemoData,
   runCommand,
 }: AppAuthenticatedShellProps) {
+  useEffect(() => {
+    if (view.tab !== "project" || !shellState.selectedWorkspaceId) return;
+    const activeProject = view.state.projects.find((project) => project.id === view.activeProjectId);
+    if (activeProject && workspaceIdForProject(view.state, activeProject) === shellState.selectedWorkspaceId) return;
+    shellState.setSelectedTaskId(null);
+    shellState.setWorkspaceMode("board");
+    shellState.setTab("workspace");
+  }, [
+    view.tab,
+    view.activeProjectId,
+    view.state.projects,
+    shellState.selectedWorkspaceId,
+  ]);
+
   return (
     <main className="app-shell">
       <section className="main-panel">

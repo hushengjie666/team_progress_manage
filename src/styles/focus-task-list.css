@@ -173,3 +173,7 @@
   font-size: 12px;
   font-weight: 800;
 }
+.workspace-scope-exception {
+  color: #9a5b32;
+  background: #fff1e7;
+}

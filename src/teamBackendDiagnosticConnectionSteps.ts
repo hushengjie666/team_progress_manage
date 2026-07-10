@@ -3,15 +3,37 @@ import { apiUrl, timed } from "./teamBackendDiagnosticHttp";
 import type { DiagnosticStepResult } from "./teamBackendDiagnosticStepTypes";
 import type { AppState } from "./types";
 
+type HealthStorageSummary = {
+  driver?: string;
+  database?: string;
+  business_rows?: number;
+  business_projects?: number;
+  business_tasks?: number;
+};
+
+type HealthResponse = {
+  storage?: HealthStorageSummary;
+};
+
+const healthDetail = (payload: HealthResponse | undefined) => {
+  const storage = payload?.storage;
+  if (!storage) return "团队后台 /health 可访问。";
+  const database = storage.database ? `数据库 ${storage.database}` : "MySQL";
+  const rows = typeof storage.business_rows === "number" ? `，业务行 ${storage.business_rows}` : "";
+  const projects = typeof storage.business_projects === "number" ? `，项目 ${storage.business_projects}` : "";
+  const tasks = typeof storage.business_tasks === "number" ? `，任务 ${storage.business_tasks}` : "";
+  return `团队后台 /health 可访问，${database}${rows}${projects}${tasks}。`;
+};
+
 export const runHealthDiagnosticStep = async (state: AppState): Promise<DiagnosticStepResult> => {
   try {
-    const { latencyMs } = await timed(async () => {
+    const { result, latencyMs } = await timed(async () => {
       const response = await fetch(apiUrl(state.backend.serverUrl, "/health"));
       if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
-      return response.text();
+      return response.json().catch(() => undefined) as Promise<HealthResponse | undefined>;
     });
     return {
-      step: { id: "health", label: "健康检查", ok: true, latencyMs, detail: "团队后台 /health 可访问。" },
+      step: { id: "health", label: "健康检查", ok: true, latencyMs, detail: healthDetail(result) },
     };
   } catch (error) {
     const lastError = error instanceof Error ? error.message : "健康检查失败";

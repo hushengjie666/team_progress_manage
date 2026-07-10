@@ -6,7 +6,10 @@ import {
   starterProjectMember,
 } from "./initialSeedData";
 
-export const todayKey = (date = new Date()) => date.toISOString().slice(0, 10);
+const padDatePart = (value: number) => String(value).padStart(2, "0");
+
+export const todayKey = (date = new Date()) =>
+  `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}`;
 
 export const uid = (prefix: string) => {
   const value =
@@ -39,11 +42,14 @@ export const createInitialState = (): AppState => ({
     whiteNoise: "off",
     whiteNoiseVolume: 35,
     timerEndSound: "soft",
+    timerEndSoundVolume: 100,
+    timerEndSoundRepeats: 1,
     notificationSettings: {
       permissionState: "unknown",
     },
     advancedBackendVisible: false,
     commandPaletteHintDismissed: false,
+    devTimerSpeed100xEnabled: false,
   },
   auth: {
     status: "signed_out",

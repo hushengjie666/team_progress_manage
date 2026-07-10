@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createInitialState } from "./seed";
 import { createTestState } from "./test/fixtures";
-import { runLoginDiagnosticStep } from "./teamBackendDiagnosticConnectionSteps";
+import { runHealthDiagnosticStep, runLoginDiagnosticStep } from "./teamBackendDiagnosticConnectionSteps";
 
-describe("runLoginDiagnosticStep", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
+describe("team backend diagnostic connection steps", () => {
   it("preserves workspace membership data after diagnostic login", async () => {
     const state = createTestState({
       backend: {
@@ -72,5 +73,23 @@ describe("runLoginDiagnosticStep", () => {
     expect(result.state?.auth.workspaces?.[0]?.id).toBe("workspace_private_account_admin");
     expect(result.state?.auth.workspaceMemberships).toHaveLength(1);
     expect(result.state?.auth.workspaceMemberships?.[0]?.role).toBe("owner");
+  });
+
+  it("includes backend storage summary in health diagnostics when available", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "ok",
+      storage: {
+        driver: "mysql",
+        database: "timemanage_team",
+        business_rows: 160,
+        business_projects: 4,
+        business_tasks: 19,
+      },
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    const result = await runHealthDiagnosticStep(createInitialState());
+
+    expect(result.step.ok).toBe(true);
+    expect(result.step.detail).toBe("团队后台 /health 可访问，数据库 timemanage_team，业务行 160，项目 4，任务 19。");
   });
 });

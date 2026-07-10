@@ -21,7 +21,8 @@ export const workspacesForState = (state: AppState) =>
 
 export const workspaceForProject = (state: AppState, project: Project) =>
   project.workspaceId
-    ? workspacesForState(state).find((item) => item.id === project.workspaceId) ?? state.auth.workspace
+    ? workspacesForState(state).find((item) => item.id === project.workspaceId) ??
+      (state.auth.workspace?.id === project.workspaceId ? state.auth.workspace : undefined)
     : state.auth.workspace;
 
 export const workspaceIdForProject = (state: AppState, project: Project) =>

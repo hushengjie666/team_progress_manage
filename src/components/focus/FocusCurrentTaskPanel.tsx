@@ -4,6 +4,7 @@ import { PomodoroProgress } from "./PomodoroProgress";
 
 export function FocusCurrentTaskPanel(props: {
   currentTask?: Task;
+  workspaceExceptionLabel?: string;
   completeTask: (taskId: string) => void;
 }) {
   const { currentTask } = props;
@@ -27,6 +28,9 @@ export function FocusCurrentTaskPanel(props: {
           <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} />
           <div className="task-meta">
             <span>{currentTask.project}</span>
+            {props.workspaceExceptionLabel && (
+              <span className="workspace-scope-exception">正在计时 · {props.workspaceExceptionLabel}</span>
+            )}
           </div>
           {isPendingReview ? (
             <button className="small-button" disabled>

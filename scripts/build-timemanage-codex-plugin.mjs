@@ -27,7 +27,7 @@ copy(
   join(pluginRoot, "skills", "timemanage", "SKILL.md"),
 );
 copy(
-  join(repoRoot, "mcp-server", "dist", "cli.js"),
+  join(repoRoot, "cli", "dist", "cli.js"),
   join(pluginRoot, "scripts", "timemanage.mjs"),
 );
 

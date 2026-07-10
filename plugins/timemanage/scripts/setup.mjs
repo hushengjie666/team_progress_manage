@@ -21,9 +21,9 @@ const hasFlag = (name) => args.includes(name);
 const defaultConfigPath = () => {
   if (platform() === "win32") {
     const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
-    return join(appData, "TimeManage MCP", "config.json");
+    return join(appData, "TimeManage CLI", "config.json");
   }
-  return join(homedir(), ".config", "timemanage-mcp", "config.json");
+  return join(homedir(), ".config", "timemanage-cli", "config.json");
 };
 
 const normalizeServerUrl = (serverUrl) => serverUrl.trim().replace(/\/+$/, "");
@@ -59,10 +59,9 @@ const ask = async (question, fallback = "") => {
 };
 
 const askHidden = async (question) => {
-  if (process.env.TIMEMANAGE_CLI_PASSWORD) return process.env.TIMEMANAGE_CLI_PASSWORD;
-  if (process.env.TIMEMANAGE_MCP_PASSWORD) return process.env.TIMEMANAGE_MCP_PASSWORD;
+  if (process.env.TM_CLI_PASSWORD) return process.env.TM_CLI_PASSWORD;
   if (!process.stdin.isTTY || !process.stdin.setRawMode) {
-    throw new Error("Password requires an interactive terminal, or set TIMEMANAGE_CLI_PASSWORD for this run.");
+    throw new Error("Password requires an interactive terminal, or set TM_CLI_PASSWORD for this run.");
   }
   return new Promise((resolve, reject) => {
     let value = "";
@@ -122,7 +121,7 @@ const main = async () => {
   if (existsSync(doctorPath)) {
     const result = spawnSync(process.execPath, [doctorPath, "--config", configPath], {
       stdio: "inherit",
-      env: { ...process.env, TIMEMANAGE_CLI_PASSWORD: password, TIMEMANAGE_MCP_PASSWORD: password },
+      env: { ...process.env, TM_CLI_PASSWORD: password },
     });
     if (result.status !== 0) process.exit(result.status ?? 1);
   }

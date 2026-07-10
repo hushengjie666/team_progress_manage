@@ -64,3 +64,23 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
 };
 
 export const applyTeamStateLoadFailure = applyAuthStatusFailure;
+
+export const applyTeamStateSaveFailure = (state: AppState, error: unknown): AppState => {
+  if (isAuthAccessDeniedError(error) && !errorDetail(error)?.toLowerCase().includes("workspace access denied")) {
+    return applyAuthStatusFailure(state, error);
+  }
+  const message = backendUnavailableMessage(state.backend.serverUrl, error);
+  return {
+    ...state,
+    auth: {
+      ...state.auth,
+      status: state.auth.status === "authenticated" ? "authenticated" : "error",
+      message,
+    },
+    backend: {
+      ...state.backend,
+      status: "error",
+      message,
+    },
+  };
+};

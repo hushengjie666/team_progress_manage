@@ -1,5 +1,5 @@
 import { resolveMemberIdForProject } from "./memberIdentity";
-import { uid } from "./seed";
+import { todayKey, uid } from "./seed";
 import type { AppState, WorkSession } from "./types";
 import { createExecutionSignal } from "./workSessionTransitions";
 import { claimTodayPlanTasksForCurrentMemberInState, ensurePlanInState } from "./workSessionTodayPlan";
@@ -73,7 +73,7 @@ export const ensureTodayPlan = (state: AppState): AppState => {
         })()
       : state;
   const staleActiveTaskIds = repairedState.workSessions
-    .filter((session) => (session.status === "active" || session.status === "paused") && session.startedAt.slice(0, 10) !== todayDate)
+    .filter((session) => (session.status === "active" || session.status === "paused") && todayKey(new Date(session.startedAt)) !== todayDate)
     .map((session) => session.taskId);
   const normalizedState = staleActiveTaskIds.reduce(
     (current, taskId) => endActiveWorkSessionsForTaskInState(current, taskId, timestamp, "stale_active_session"),

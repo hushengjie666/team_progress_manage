@@ -12,26 +12,26 @@ Use this skill when the user asks Codex to inspect, create, update, or troublesh
 - Use the bundled CLI. It runs one process per command, then exits, so it does not keep a long-lived tool context open.
 - The plugin CLI path is `plugins/timemanage/scripts/timemanage.mjs` inside the installed plugin root.
 - Configuration is read from the default local config path:
-  - macOS/Linux: `~/.config/timemanage-mcp/config.json`
-  - Windows: `%APPDATA%/TimeManage MCP/config.json`
-- Environment overrides remain supported: `TM_MCP_CONFIG`, `TM_MCP_SERVER_URL`, `TM_MCP_EMAIL`, `TM_MCP_PASSWORD`, `TM_MCP_DEVICE_ID`.
+  - macOS/Linux: `~/.config/timemanage-cli/config.json`
+  - Windows: `%APPDATA%/TimeManage CLI/config.json`
+- Environment overrides: `TM_CLI_CONFIG`, `TM_CLI_SERVER_URL`, `TM_CLI_EMAIL`, `TM_CLI_PASSWORD`, `TM_CLI_DEVICE_ID`.
 - Never print or commit real account passwords.
 
 ## Command Selection
 
-- Connectivity and identity: `timemanage doctor`, `timemanage account`, `timemanage workspaces`.
-- Projects and overview: `timemanage projects`, `timemanage project <project>`, `timemanage search <query>`.
-- Tasks: `timemanage tasks [--project <project>] [--status <status|all>] [--query <query>]`, `timemanage create-task`, `timemanage progress`, `timemanage complete`.
-- Today and execution: `timemanage today`, `timemanage active`, `timemanage add-today`, `timemanage start`.
+- Connectivity and identity: `timemanage doctor`, `timemanage account show`, `timemanage workspace list`.
+- Projects and overview: `timemanage project list`, `timemanage project show <project>`, `timemanage search <query>`.
+- Tasks: `timemanage task list [--project <project>] [--status <status|all>] [--query <query>]`, `timemanage task create`, `timemanage task progress`, `timemanage task status`.
+- Today and execution: `timemanage plan show`, `timemanage work active`, `timemanage plan add`, `timemanage work start`.
 - Use `--json` when downstream reasoning needs exact IDs or full structured fields.
 
 ## Workflow Rules
 
-- Resolve names to IDs with `timemanage search`, `timemanage projects`, or `timemanage tasks --json` before mutating data when the name is ambiguous.
+- Resolve names to IDs with `timemanage search`, `timemanage project list --json`, or `timemanage task list --json` before mutating data when the name is ambiguous.
 - Prefer project/task names for user-facing summaries; include IDs only when useful for the next command.
-- Use `timemanage today` for the current account's date plan.
-- Use `timemanage active` for current execution state; do not rely on a browser timer display alone.
-- `add-today` must not be described as moving a task between workspaces. A task's workspace follows its project.
+- Use `timemanage plan show` for the current account's date plan.
+- Use `timemanage work active` for current execution state; do not rely on a browser timer display alone.
+- `plan add` must not be described as moving a task between workspaces. A task's workspace follows its project.
 - After a write, run the matching read command again when the user is asking about final visible state.
 
 ## Confirmation Policy
@@ -45,7 +45,7 @@ Ask the user for explicit confirmation before destructive or terminal operations
 - accepting reviews
 - completing tasks
 
-For CLI `complete`, pass `--yes` only after the user clearly confirms.
+For terminal task status changes, pass `--yes` only after the user clearly confirms.
 
 Good confirmation prompt:
 

@@ -7,6 +7,7 @@ export type KeyboardRuntimeOptions = {
   getState: () => AppState | null;
   getCurrentTab: () => Tab;
   getSelectedTaskId: () => string | null;
+  getSelectedWorkspaceId: () => string | null;
   setCommandPaletteOpen: (open: boolean) => void;
   setShowShortcutHelp: (open: boolean) => void;
   setSettingsSection: (section: "members") => void;

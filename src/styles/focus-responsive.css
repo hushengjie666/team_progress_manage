@@ -74,7 +74,7 @@
   }
 
   .focus-orbit {
-    width: min(82vw, 360px);
+    --focus-orbit-size: min(82vw, 360px);
   }
 
   .mini-timer-panel {
@@ -109,7 +109,7 @@
   }
 
   .focus-orbit {
-    width: min(64vw, 240px);
+    --focus-orbit-size: min(64vw, 240px);
   }
 
   .focus-timer-panel {
