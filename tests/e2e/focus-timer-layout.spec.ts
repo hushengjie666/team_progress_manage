@@ -29,26 +29,42 @@ test("keeps the focus timer geometry stable while the countdown changes", async 
   await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
 
   const orbit = page.locator(".focus-orbit");
+  const face = page.locator(".timer-face");
   const countdown = page.locator(".timer-countdown");
   await expect(orbit).toBeVisible();
+  await expect(face).toBeVisible();
   await expect(countdown).toBeVisible();
 
-  const samples: Array<{ x: number; y: number; width: number; height: number }> = [];
+  const samples: Array<{
+    orbit: { x: number; y: number; width: number; height: number };
+    face: { x: number; y: number; width: number; height: number };
+  }> = [];
   for (let index = 0; index < 12; index += 1) {
-    const bounds = await orbit.boundingBox();
-    expect(bounds).not.toBeNull();
-    samples.push(bounds!);
+    const [orbitBounds, faceBounds] = await Promise.all([orbit.boundingBox(), face.boundingBox()]);
+    expect(orbitBounds).not.toBeNull();
+    expect(faceBounds).not.toBeNull();
+    samples.push({ orbit: orbitBounds!, face: faceBounds! });
     await page.waitForTimeout(120);
   }
 
-  const normalizedBounds = samples.map((bounds) => ({
+  const roundBounds = (bounds: { x: number; y: number; width: number; height: number }) => ({
     x: Math.round(bounds.x * 100) / 100,
     y: Math.round(bounds.y * 100) / 100,
     width: Math.round(bounds.width * 100) / 100,
     height: Math.round(bounds.height * 100) / 100,
+  });
+  const normalizedBounds = samples.map(({ orbit: orbitBounds, face: faceBounds }) => ({
+    orbit: roundBounds(orbitBounds),
+    face: roundBounds(faceBounds),
   }));
   expect(new Set(normalizedBounds.map((bounds) => JSON.stringify(bounds))).size).toBe(1);
-  expect(normalizedBounds[0].width).toBe(normalizedBounds[0].height);
+  const stableOrbit = normalizedBounds[0].orbit;
+  const stableFace = normalizedBounds[0].face;
+  expect(stableOrbit.width).toBe(stableOrbit.height);
+  expect(stableFace.width).toBe(stableFace.height);
+  expect(stableFace.width).toBe(stableOrbit.width - 20);
+  expect(stableFace.x + stableFace.width / 2).toBe(stableOrbit.x + stableOrbit.width / 2);
+  expect(stableFace.y + stableFace.height / 2).toBe(stableOrbit.y + stableOrbit.height / 2);
 
   await expect(countdown).toHaveCSS("font-variant-numeric", "tabular-nums");
   await expect(orbit.locator(".focus-orbit-progress")).toHaveCount(1);
