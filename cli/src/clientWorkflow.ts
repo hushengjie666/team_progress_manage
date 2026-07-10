@@ -22,8 +22,8 @@ import {
   updateSettingsInTeamState,
 } from "./businessReviewSettingsOperations.js";
 import type { WorkSessionInput } from "./businessTypes.js";
-import { TimeManageMcpTaskClient } from "./clientTasks.js";
-import { requireConfirmation } from "./toolResult.js";
+import { TimeManageTaskClient } from "./clientTasks.js";
+import { requireConfirmation } from "./confirmation.js";
 import {
   activeWorkView,
   compactTask,
@@ -32,7 +32,7 @@ import {
   todayWorkbenchView,
 } from "./views.js";
 
-export class TimeManageMcpWorkflowClient extends TimeManageMcpTaskClient {
+export class TimeManageWorkflowClient extends TimeManageTaskClient {
   async getTodayPlan(date?: string) {
     return dailyPlanView(await this.authenticatedState(), date);
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { today } from "../../src/appModel.js";
 import { currentAccountDailyPlanForWorkspaceDate } from "../../src/dailyPlanScope.js";
 import { createInitialState } from "../../src/seed.js";
@@ -43,6 +43,15 @@ import {
 } from "./businessTaskOperations.js";
 
 const timestamp = "2026-07-06T08:00:00.000Z";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(timestamp);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 const workspace = (id: string, name = id): Workspace => ({
   id,
   name,
@@ -131,7 +140,7 @@ const createTask = (state: AppState, title = "测试任务") => {
   return { state: next, task: latestTask(next) };
 };
 
-describe("MCP project and member business operations", () => {
+describe("CLI project and member business operations", () => {
   it("covers project create/update/archive/restore and member bind/update/unbind", () => {
     let state = makeState();
 
@@ -173,7 +182,7 @@ describe("MCP project and member business operations", () => {
   });
 });
 
-describe("MCP task, today plan, and work-session business operations", () => {
+describe("CLI task, today plan, and work-session business operations", () => {
   it("covers task create/update/assign/progress/status/split", () => {
     let state = makeState();
     const created = createTask(state);
@@ -239,7 +248,7 @@ describe("MCP task, today plan, and work-session business operations", () => {
   });
 });
 
-describe("MCP review, interruption, settings, and template business operations", () => {
+describe("CLI review, interruption, settings, and template business operations", () => {
   it("covers review flow, interruptions, daily review, settings, and templates", () => {
     let state = makeState();
     const created = createTask(state, "验收任务");

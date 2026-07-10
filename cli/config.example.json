@@ -2,5 +2,5 @@
   "serverUrl": "http://127.0.0.1:8787",
   "email": "member@example.com",
   "password": "change-me",
-  "deviceId": "timemanage_mcp_local"
+  "deviceId": "timemanage_cli_local"
 }

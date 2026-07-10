@@ -27,14 +27,14 @@ import {
 } from "../../src/teamBackend.js";
 import { loadTeamData, saveTeamDataSnapshot } from "../../src/teamApi.js";
 import type { AppState, ProjectMemberRole, WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "../../src/types.js";
-import type { TimeManageMcpConfig } from "./config.js";
+import type { TimeManageCliConfig } from "./config.js";
 
 export type StateMutation<T> = (state: AppState, timestamp: string) => { state: AppState; result: T };
 
-export class TimeManageMcpBaseClient {
+export class TimeManageBaseClient {
   private session?: AuthSession;
 
-  constructor(protected readonly config: TimeManageMcpConfig) {}
+  constructor(protected readonly config: TimeManageCliConfig) {}
 
   private backendState(session?: AuthSession): AppState {
     const state = createInitialState();

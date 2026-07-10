@@ -10,11 +10,11 @@ import { listProjectViews, projectOverviewView } from "./views.js";
 
 const sharedWorkspaceState = (): AppState => {
   const state = createInitialState();
-  const workspaceId = "workspace_mcp_accessible_members";
+  const workspaceId = "workspace_cli_accessible_members";
   const workspace = workspaceFixture({ id: workspaceId });
   const workspaceMemberships: WorkspaceMembership[] = [
     workspaceMembershipFixture({
-      id: "membership_mcp_owner",
+      id: "membership_cli_owner",
       workspaceId,
       accountId: "account_owner",
       name: "负责人",
@@ -22,14 +22,14 @@ const sharedWorkspaceState = (): AppState => {
       role: "owner",
     }),
     workspaceMembershipFixture({
-      id: "membership_mcp_teammate",
+      id: "membership_cli_teammate",
       workspaceId,
       accountId: "account_teammate",
       name: "协作成员",
       email: "teammate@example.com",
     }),
     workspaceMembershipFixture({
-      id: "membership_mcp_disabled",
+      id: "membership_cli_disabled",
       workspaceId,
       accountId: "account_disabled",
       name: "停用成员",
@@ -48,7 +48,7 @@ const sharedWorkspaceState = (): AppState => {
     projects: state.projects.map((project) => ({ ...project, workspaceId })),
     projectMembers: [
       {
-        id: "member_mcp_project_owner",
+        id: "member_cli_project_owner",
         workspaceId,
         projectId: state.projects[0].id,
         accountId: "account_owner",
@@ -60,7 +60,7 @@ const sharedWorkspaceState = (): AppState => {
         updatedAt: projectOverviewAccessNow,
       },
       {
-        id: "member_mcp_project_only",
+        id: "member_cli_project_only",
         workspaceId,
         projectId: state.projects[0].id,
         accountId: "account_project_only",
@@ -72,7 +72,7 @@ const sharedWorkspaceState = (): AppState => {
         updatedAt: projectOverviewAccessNow,
       },
       {
-        id: "member_mcp_project_disabled",
+        id: "member_cli_project_disabled",
         workspaceId,
         projectId: state.projects[0].id,
         accountId: "account_project_disabled",
@@ -87,7 +87,7 @@ const sharedWorkspaceState = (): AppState => {
   };
 };
 
-describe("MCP project views", () => {
+describe("CLI project views", () => {
   it("reports project member counts using accessible project members", () => {
     const state = sharedWorkspaceState();
     const projectId = state.projects[0].id;

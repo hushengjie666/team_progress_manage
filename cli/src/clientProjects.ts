@@ -10,8 +10,8 @@ import {
   updateProjectMemberInTeamState,
 } from "./businessProjectMemberOperations.js";
 import type { MemberInput, ProjectInput } from "./businessTypes.js";
-import { TimeManageMcpBaseClient } from "./clientBase.js";
-import { requireConfirmation } from "./toolResult.js";
+import { TimeManageBaseClient } from "./clientBase.js";
+import { requireConfirmation } from "./confirmation.js";
 import {
   compactMember,
   compactProject,
@@ -21,7 +21,7 @@ import {
   searchView,
 } from "./views.js";
 
-export class TimeManageMcpProjectClient extends TimeManageMcpBaseClient {
+export class TimeManageProjectClient extends TimeManageBaseClient {
   async listProjects() {
     return listProjectViews(await this.authenticatedState());
   }

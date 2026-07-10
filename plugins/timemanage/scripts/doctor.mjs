@@ -17,9 +17,9 @@ const hasFlag = (name) => args.includes(name);
 const defaultConfigPath = () => {
   if (platform() === "win32") {
     const appData = process.env.APPDATA || join(homedir(), "AppData", "Roaming");
-    return join(appData, "TimeManage MCP", "config.json");
+    return join(appData, "TimeManage CLI", "config.json");
   }
-  return join(homedir(), ".config", "timemanage-mcp", "config.json");
+  return join(homedir(), ".config", "timemanage-cli", "config.json");
 };
 
 const normalizeServerUrl = (serverUrl) => serverUrl.trim().replace(/\/+$/, "");
@@ -48,7 +48,7 @@ const requestJson = async (url, init) => {
 };
 
 const main = async () => {
-  const configPath = valueFor("--config") || process.env.TM_MCP_CONFIG || defaultConfigPath();
+  const configPath = valueFor("--config") || process.env.TM_CLI_CONFIG || defaultConfigPath();
   if (hasFlag("--dry-run")) {
     console.log(`TimeManage doctor dry run ok. Config path: ${configPath}`);
     return;
@@ -57,7 +57,7 @@ const main = async () => {
   const config = readConfig(configPath);
   const serverUrl = valueFor("--server-url") || config.serverUrl || defaultServerUrl;
   const email = valueFor("--email") || config.email;
-  const password = process.env.TIMEMANAGE_CLI_PASSWORD || process.env.TIMEMANAGE_MCP_PASSWORD || config.password;
+  const password = process.env.TM_CLI_PASSWORD || config.password;
   const deviceId = valueFor("--device-id") || config.deviceId || "timemanage_cli_doctor";
 
   if (!email) throw new Error("TimeManage email is required.");

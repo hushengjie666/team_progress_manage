@@ -95,7 +95,7 @@ const stateWithPrivateCurrentWorkspaceAndSharedTask = (): AppState => {
   };
 };
 
-describe("MCP business operations", () => {
+describe("CLI business operations", () => {
   it("schedules a task into the task project workspace instead of the current private workspace", () => {
     const source = stateWithPrivateCurrentWorkspaceAndSharedTask();
     const next = scheduleTaskForDateInState(source, "task_shared", "2026-07-10", "2026-07-06T08:00:00.000Z");

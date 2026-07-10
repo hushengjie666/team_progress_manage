@@ -9,11 +9,11 @@ import {
   updateTaskProgressInTeamState,
 } from "./businessTaskOperations.js";
 import type { TaskAssignmentInput, TaskInput, TaskUpdateInput } from "./businessTypes.js";
-import { TimeManageMcpProjectClient } from "./clientProjects.js";
-import { requireConfirmation } from "./toolResult.js";
+import { TimeManageProjectClient } from "./clientProjects.js";
+import { requireConfirmation } from "./confirmation.js";
 import { compactTask, listTaskViews, taskDetailView, type TaskListFilter } from "./views.js";
 
-export class TimeManageMcpTaskClient extends TimeManageMcpProjectClient {
+export class TimeManageTaskClient extends TimeManageProjectClient {
   async listTasks(filter: TaskListFilter = {}) {
     return listTaskViews(await this.authenticatedState(), filter);
   }

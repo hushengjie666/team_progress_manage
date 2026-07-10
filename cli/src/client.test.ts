@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { requireConfirmation } from "./core.js";
+import { requireConfirmation } from "./client.js";
 
-describe("TimeManage MCP guardrails", () => {
+describe("TimeManage CLI guardrails", () => {
   it("requires explicit confirmation for high-risk actions", () => {
     expect(() => requireConfirmation(false, "delete_task")).toThrow(/explicit user confirmation/i);
     expect(() => requireConfirmation(undefined, "accept_task_review")).toThrow(/explicit user confirmation/i);
