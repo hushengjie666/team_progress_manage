@@ -21,6 +21,7 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 fi
 
 cd "${ROOT_DIR}"
+node scripts/verify-release-version.mjs "${PACKAGE_VERSION}"
 mkdir -p "${DEPLOY_ROOT}"
 
 echo "[TimeManage] Building Tauri desktop bundles ..."
