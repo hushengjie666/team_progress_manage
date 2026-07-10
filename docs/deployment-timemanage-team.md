@@ -24,10 +24,29 @@ npm run release:team:tag -- v0.1.1
 npm run deploy:team
 ```
 
-打包结果固定为：
+打包结果固定为同名目录和 ZIP：
 
 ```text
+deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/
 deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip
+```
+
+`npm run deploy:team` 会一次构建 Tauri、团队 Web 前端和 Windows 后端。所有可管理产物统一复制到版本目录；`src-tauri/target/` 和 `dist/` 仍是构建工具使用的中间输出，不作为交付入口。
+
+统一版本目录结构：
+
+```text
+timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/desktop/   Tauri 应用与安装包
+timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/web/       服务器 Web 前端
+timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/server/    Windows 后端与部署脚本
+timemanageTeam-v<version>-<yyyyMMdd-HHmmss>/RELEASE.txt
+```
+
+在 macOS Apple Silicon 上，Tauri 产物位于：
+
+```text
+desktop/macos/TimeManage.app
+desktop/dmg/TimeManage_<version>_aarch64.dmg
 ```
 
 这个压缩包必须带外层版本根目录。压缩包文件名和解压后的根目录同名，例如：
@@ -63,6 +82,7 @@ C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe
 版本包目录里应包含：
 
 ```text
+C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/desktop/
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/RELEASE.txt
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/web/index.html
 C:/Users/Administrator/Desktop/timemanageTeam-v0.1.0-20260701-153000/server/timemanage-team.exe

@@ -23,12 +23,58 @@ fi
 cd "${ROOT_DIR}"
 mkdir -p "${DEPLOY_ROOT}"
 
+echo "[TimeManage] Building Tauri desktop bundles ..."
+npm run tauri:build
+
+TAURI_BUNDLE_DIR="${ROOT_DIR}/src-tauri/target/release/bundle"
+if [ ! -d "${TAURI_BUNDLE_DIR}" ]; then
+  echo "[TimeManage] Tauri bundle directory not found: ${TAURI_BUNDLE_DIR}" >&2
+  exit 1
+fi
+
 echo "[TimeManage] Building frontend for /timemanage-team/ ..."
 rm -rf dist
 npm run build -- --base=/timemanage-team/
 
 rm -rf "${PACKAGE_DIR}"
-mkdir -p "${PACKAGE_DIR}/web" "${PACKAGE_DIR}/server"
+mkdir -p "${PACKAGE_DIR}/desktop" "${PACKAGE_DIR}/web" "${PACKAGE_DIR}/server"
+
+TAURI_BUNDLE_COUNT=0
+copy_tauri_bundles() {
+  local bundle_group="$1"
+  shift
+  local bundle_path
+  mkdir -p "${PACKAGE_DIR}/desktop/${bundle_group}"
+  for bundle_path in "$@"; do
+    if [ ! -e "${bundle_path}" ]; then
+      continue
+    fi
+    if [[ "$(basename "${bundle_path}")" == rw.* ]]; then
+      continue
+    fi
+    rsync -a "${bundle_path}" "${PACKAGE_DIR}/desktop/${bundle_group}/"
+    TAURI_BUNDLE_COUNT=$((TAURI_BUNDLE_COUNT + 1))
+  done
+  if [ -z "$(find "${PACKAGE_DIR}/desktop/${bundle_group}" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
+    rmdir "${PACKAGE_DIR}/desktop/${bundle_group}"
+  fi
+}
+
+shopt -s nullglob
+copy_tauri_bundles macos "${TAURI_BUNDLE_DIR}"/macos/*.app
+copy_tauri_bundles dmg "${TAURI_BUNDLE_DIR}"/dmg/*.dmg
+copy_tauri_bundles msi "${TAURI_BUNDLE_DIR}"/msi/*.msi
+copy_tauri_bundles nsis "${TAURI_BUNDLE_DIR}"/nsis/*.exe
+copy_tauri_bundles deb "${TAURI_BUNDLE_DIR}"/deb/*.deb
+copy_tauri_bundles rpm "${TAURI_BUNDLE_DIR}"/rpm/*.rpm
+copy_tauri_bundles appimage "${TAURI_BUNDLE_DIR}"/appimage/*.AppImage
+shopt -u nullglob
+
+if [ "${TAURI_BUNDLE_COUNT}" -eq 0 ]; then
+  echo "[TimeManage] No distributable Tauri bundles found under: ${TAURI_BUNDLE_DIR}" >&2
+  exit 1
+fi
+
 rsync -a --delete dist/ "${PACKAGE_DIR}/web/"
 
 if ! command -v docker >/dev/null 2>&1; then
@@ -63,6 +109,7 @@ Git commit: ${GIT_COMMIT:-unknown}
 Git tree: ${GIT_DIRTY}
 
 Contents:
+  desktop\              Tauri desktop application and installers
   web\                  frontend files built for /timemanage-team/
   server\timemanage-team.exe
   server\backend.example.json
@@ -83,5 +130,6 @@ find "${PACKAGE_NAME}" -name ".DS_Store" -delete
 COPYFILE_DISABLE=1 zip -Xqr "${DEPLOY_ROOT}/${PACKAGE_NAME}.zip" "${PACKAGE_NAME}"
 
 echo "[TimeManage] Package ready: ${DEPLOY_ROOT}/${PACKAGE_NAME}.zip"
+echo "[TimeManage] Package directory: ${PACKAGE_DIR}"
 echo "[TimeManage] Zip root folder: ${PACKAGE_NAME}/"
-echo "[TimeManage] Upload as the live timemanageTeam folder, edit server/backend.json, then run server/start-backend.bat."
+echo "[TimeManage] Desktop bundles are under desktop/. For server deployment, use web/ and server/."
