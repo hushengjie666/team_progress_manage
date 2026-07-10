@@ -77,7 +77,7 @@ C:/Users/Administrator/Desktop/timemanageTeam/server/backend.json
 C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe
 ```
 
-推荐把新版本包解压为正式运行目录 `timemanageTeam`，不要再保留旧的升级/回滚脚本链路。
+推荐先将新版本解压到独立版本目录，按 `server/DATABASE-OPERATIONS.md` 完成数据库备份和升级验证，再切换正式运行目录。
 
 版本包目录里应包含：
 
@@ -136,8 +136,9 @@ golang:1.20-bookworm
 
 ```text
 github.com/go-sql-driver/mysql v1.8.1
-golang.org/x/sys v0.16.0
-golang.org/x/crypto v0.17.0
+github.com/pressly/goose/v3 v3.20.0
+golang.org/x/sys v0.18.0
+golang.org/x/crypto v0.21.0
 go 1.20
 ```
 
@@ -217,9 +218,18 @@ location ^~ /timemanage-team/ {
 5. 运行 `timemanageTeam/server/start-backend.bat`，或用 `install-windows-service.ps1` 安装 Windows Service。
 6. 重载 Nginx。
 
-## 数据库初始化
+## 数据库升级与回退
 
-后端启动时会在 MySQL 中幂等创建当前 schema，不再执行版本化迁移、旧 JSON store 导入或数据库回滚。需要重置时，先备份并重新初始化目标数据库，再启动后端。
+`v0.1.2` 是永久迁移基线。`v0.2.2` 起，后端启动时会持有 MySQL advisory lock 并自动执行安全迁移；数据库版本高于后端支持版本时会拒绝启动。每个发布包的 `server/migrations/` 都包含对应 SQL，程序本身也内嵌同一份 SQL。
+
+正式部署顺序：
+
+1. 停止后端服务。
+2. 运行 `server/backup-database.bat`，保留 `.sql.gz` 及同名 `.json` 校验清单。
+3. 运行 `server/migrate-database.bat` 和 `server/database-status.bat`。
+4. 启动新后端并验证 `/health`。
+
+安全回退使用 `rollback-database.bat <release>`，最低只能回到 `v0.1.2`。会丢失或重新解释数据的迁移不执行 Down SQL，必须使用 `restore-database.bat <backup.sql.gz>` 恢复。完整规则与命令见发布包中的 `server/DATABASE-OPERATIONS.md`。
 
 ## 验证地址
 

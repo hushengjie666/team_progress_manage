@@ -144,6 +144,16 @@ The default local backend endpoint is `http://127.0.0.1:8787` with demo credenti
 
 Production TimeManage Team deployment details are recorded in `docs/deployment-timemanage-team.md`. Use that file before changing deployment packaging, Nginx rules, server paths, or Windows backend build settings.
 
+## Database Migration Rules
+
+- MySQL schema version `v0.1.2` is the permanent migration baseline. Never add a rollback path below it.
+- Every formal application release must add exactly one ordered SQL file under `team-server/migrations/`, including releases with no schema changes. No-change releases use an explicit reversible no-op migration.
+- Released migration SQL is immutable. Add a new migration to correct a released schema; never edit an already released SQL file.
+- Startup may automatically apply safe pending migrations. Any migration marked as requiring backup must pass the recent verified-backup gate before it can run.
+- Destructive migrations must be marked restore-only and use backup restoration for rollback. Safe migrations must include working Goose `Up` and `Down` sections.
+- `npm run deploy:team` must include the migration SQL, database command scripts, and database operations documentation inside the versioned `deploy/timemanageTeam-v<version>-<timestamp>/server/` directory.
+- Before releasing, test empty-database upgrade, existing-baseline adoption, every supported cross-version upgrade and rollback, database-ahead rejection, and migration checksum verification against MySQL.
+
 ## Agent skills
 
 ### Issue tracker

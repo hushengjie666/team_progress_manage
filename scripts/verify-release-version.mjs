@@ -26,6 +26,7 @@ const cargoPackage = JSON.parse(cargoMetadata.stdout).packages
   .find((item) => item.name === "timemanage-desktop");
 const cliSource = readFileSync(join(rootDir, "cli", "src", "program.ts"), "utf8");
 const bootstrapSource = readFileSync(join(rootDir, "scripts", "bootstrap-timemanage-codex.mjs"), "utf8");
+const backendCatalogSource = readFileSync(join(rootDir, "team-server", "mysql_migration_catalog.go"), "utf8");
 
 const extract = (source, pattern, label) => {
   const value = source.match(pattern)?.[1];
@@ -41,6 +42,7 @@ const versions = {
   "plugins/timemanage/.codex-plugin/plugin.json": readJson("plugins/timemanage/.codex-plugin/plugin.json").version,
   "scripts/bootstrap-timemanage-codex.mjs default ref": extract(bootstrapSource, /defaultRef = "v([^"\n]+)"/, "bootstrap default ref"),
   "scripts/bootstrap-timemanage-codex.mjs plugin version": extract(bootstrapSource, /defaultPluginVersion = "([^"\n]+)"/, "bootstrap plugin version"),
+  "team-server/mysql_migration_catalog.go": extract(backendCatalogSource, /serverReleaseVersion\s+= "v([^"\n]+)"/, "backend release version"),
 };
 
 const mismatches = Object.entries(versions).filter(([, version]) => version !== expectedVersion);

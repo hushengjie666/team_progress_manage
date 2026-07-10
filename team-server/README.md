@@ -36,19 +36,28 @@ Configuration priority is `flags > env > config file > defaults`.
 ./timemanage-team uninstall                # 卸载 Windows Service（Windows 平台）
 ./timemanage-team start                    # 启动 Windows Service（Windows 平台）
 ./timemanage-team stop                     # 停止 Windows Service（Windows 平台）
+./timemanage-team db status --config <path> # 查看数据库版本
+./timemanage-team db up --config <path>     # 升级到当前数据库版本
+./timemanage-team db backup --config <path> # 创建校验过的 gzip SQL 备份
+./timemanage-team db rollback --config <path> --to v0.1.2 --confirm
+./timemanage-team db restore --config <path> --file <backup.sql.gz> --confirm
 ```
 
 > 说明：`service` 用于 Windows 服务进程入口；普通用户也可直接用 `serve`，两者参数同源、都支持 `--config` 与配置文件/环境变量。
 
 ## 数据库初始化
 
-服务启动时会在 MySQL 中幂等创建当前 schema。如果 schema 需要重置，应重新初始化目标数据库后启动服务。
+`v0.1.2` 是数据库迁移基线。服务启动时会获取 MySQL advisory lock，校验已发布 SQL 的 SHA-256，并自动应用安全的待执行迁移。数据库版本高于当前服务版本时，服务会拒绝启动。
+
+完整升级、备份、回退和恢复流程见 `DATABASE-OPERATIONS.md`。
 
 Windows 部署包包含：
 
 - `server\timemanage-team.exe`：后端程序。
 - `server\backend.example.json`：首次部署时用于生成正式目录 `backend.json` 的配置模板。
 - `server\start-backend.bat` / `server\stop-backend.bat`：手动启动和停止脚本。
+- `server\migrations\`：与程序内嵌内容一致的版本化 SQL。
+- `server\DATABASE-OPERATIONS.md` 和数据库运维批处理：升级、备份、回退和恢复入口。
 
 ## API
 

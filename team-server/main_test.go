@@ -46,6 +46,20 @@ func TestParseCLIConfigPriority(t *testing.T) {
 		t.Fatalf("config values were not applied: %#v", cfg)
 	}
 }
+
+func TestParseDatabaseCLI(t *testing.T) {
+	t.Setenv("TM_BACKEND_MYSQL_DSN", "user:pass@tcp(127.0.0.1:3306)/timemanage")
+	invocation, err := parseInvocation([]string{"db", "rollback", "--to", "v0.1.2", "--confirm", "--backup-dir", "db-backups"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if invocation.command != "db-rollback" || invocation.target != "v0.1.2" || !invocation.confirm {
+		t.Fatalf("unexpected invocation: %#v", invocation)
+	}
+	if invocation.config.backupDir != "db-backups" {
+		t.Fatalf("backup dir = %q", invocation.config.backupDir)
+	}
+}
 func TestHealthHandler(t *testing.T) {
 	api := testApp(t)
 	recorder := httptest.NewRecorder()

@@ -3,5 +3,9 @@
   "mysql_dsn": "timemanage:change-me@tcp(127.0.0.1:3306)/timemanage_team?parseTime=true&charset=utf8mb4",
   "username": "admin",
   "password": "hu626699",
-  "secret": "change-me-token-secret"
+  "secret": "change-me-token-secret",
+  "backup_dir": "backups",
+  "mysqldump_path": "mysqldump",
+  "mysql_path": "mysql",
+  "migration_backup_max_age_hours": 24
 }

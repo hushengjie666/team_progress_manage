@@ -7,22 +7,22 @@ import (
 )
 
 func main() {
-	command, cfg, configPath, err := parseCLI(os.Args[1:])
+	invocation, err := parseInvocation(os.Args[1:])
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	switch command {
+	switch invocation.command {
 	case "serve":
-		if err := runHTTPServer(context.Background(), cfg); err != nil {
+		if err := runHTTPServer(context.Background(), invocation.config); err != nil {
 			log.Fatal(err)
 		}
 	case "service":
-		if err := runWindowsService(cfg); err != nil {
+		if err := runWindowsService(invocation.config); err != nil {
 			log.Fatal(err)
 		}
 	case "install":
-		if err := installWindowsService(configPath); err != nil {
+		if err := installWindowsService(invocation.configPath); err != nil {
 			log.Fatal(err)
 		}
 	case "uninstall":
@@ -37,7 +37,11 @@ func main() {
 		if err := stopWindowsService(); err != nil {
 			log.Fatal(err)
 		}
+	case "db-status", "db-up", "db-backup", "db-rollback", "db-restore":
+		if err := runDatabaseCommand(context.Background(), invocation); err != nil {
+			log.Fatal(err)
+		}
 	default:
-		log.Fatalf("unknown command %q; use serve, service, install, uninstall, start or stop", command)
+		log.Fatalf("unknown command %q; use serve, service, install, uninstall, start, stop or db", invocation.command)
 	}
 }

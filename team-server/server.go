@@ -11,7 +11,7 @@ import (
 )
 
 func runHTTPServer(ctx context.Context, cfg config) error {
-	db, err := openMySQLStore(cfg.mysqlDSN)
+	db, err := openMySQLStoreWithConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("load mysql store: %w", err)
 	}

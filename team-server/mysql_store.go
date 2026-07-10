@@ -19,13 +19,19 @@ func emptyStore() store {
 }
 
 func openMySQLStore(dsn string) (*sql.DB, error) {
-	db, err := openMySQLDB(dsn)
+	cfg := defaultConfig()
+	cfg.mysqlDSN = dsn
+	return openMySQLStoreWithConfig(cfg)
+}
+
+func openMySQLStoreWithConfig(cfg config) (*sql.DB, error) {
+	db, err := openMySQLDB(cfg.mysqlDSN)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := ensureMySQLSchema(ctx, db); err != nil {
+	if err := migrateMySQLUp(ctx, db, cfg); err != nil {
 		_ = db.Close()
 		return nil, err
 	}
@@ -81,6 +87,30 @@ func ensureMySQLDatabase(dsn string) error {
 		return err
 	}
 	_, err = serverDB.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", escapeMySQLIdentifier(dbName)))
+	return err
+}
+
+func resetMySQLDatabase(dsn string) error {
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return err
+	}
+	if cfg.DBName == "" {
+		return errors.New("mysql_dsn must include a database name")
+	}
+	dbName := cfg.DBName
+	cfg.DBName = ""
+	serverDB, err := sql.Open("mysql", cfg.FormatDSN())
+	if err != nil {
+		return err
+	}
+	defer serverDB.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if _, err := serverDB.ExecContext(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS `%s`", escapeMySQLIdentifier(dbName))); err != nil {
+		return err
+	}
+	_, err = serverDB.ExecContext(ctx, fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", escapeMySQLIdentifier(dbName)))
 	return err
 }
 
