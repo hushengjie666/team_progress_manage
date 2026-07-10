@@ -165,6 +165,17 @@ const overlayWindowPosition = async () => withOverlayWindow(async () => {
   return { x: rect.x, y: rect.y };
 });
 
+const overlayCanvasBackgrounds = async () => withOverlayWindow(() => browser.execute(() => {
+  const root = document.querySelector("#root");
+  const overlay = document.querySelector(".timer-overlay-root");
+  return {
+    document: getComputedStyle(document.documentElement).backgroundColor,
+    body: getComputedStyle(document.body).backgroundColor,
+    root: root ? getComputedStyle(root).backgroundColor : "missing",
+    overlay: overlay ? getComputedStyle(overlay).backgroundColor : "missing",
+  };
+}));
+
 const moveOverlayWindowBy = async (deltaX, deltaY) => withOverlayWindow(async () => {
   const before = await browser.getWindowRect();
   await browser.setWindowRect(before.x + deltaX, before.y + deltaY, before.width, before.height);
@@ -514,6 +525,12 @@ describe("TimeManage Tauri real database functional flow", () => {
     await waitForDesktopTimerOverlayVisible();
     await waitForOverlayText(taskTitle);
     await waitForOverlayText("专注番茄");
+    assert.deepEqual(await overlayCanvasBackgrounds(), {
+      document: "rgba(0, 0, 0, 0)",
+      body: "rgba(0, 0, 0, 0)",
+      root: "rgba(0, 0, 0, 0)",
+      overlay: "rgba(0, 0, 0, 0)",
+    });
     const overlayPositionBeforeMove = await overlayWindowPosition();
     const overlayPositionAfterMove = await moveOverlayWindowBy(-80, -40);
     assert.ok(

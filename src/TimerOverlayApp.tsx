@@ -37,8 +37,14 @@ export function TimerOverlayApp() {
   };
 
   useEffect(() => {
+    const hadDocumentClass = document.documentElement.classList.contains("timer-overlay-document");
+    const hadBodyClass = document.body.classList.contains("timer-overlay-body");
+    document.documentElement.classList.add("timer-overlay-document");
     document.body.classList.add("timer-overlay-body");
-    return () => document.body.classList.remove("timer-overlay-body");
+    return () => {
+      if (!hadDocumentClass) document.documentElement.classList.remove("timer-overlay-document");
+      if (!hadBodyClass) document.body.classList.remove("timer-overlay-body");
+    };
   }, []);
 
   useEffect(() => {

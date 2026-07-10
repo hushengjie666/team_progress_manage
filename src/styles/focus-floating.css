@@ -63,6 +63,7 @@
   cursor: pointer;
 }
 
+html.timer-overlay-document,
 body.timer-overlay-body {
   min-width: 0;
   min-height: 0;

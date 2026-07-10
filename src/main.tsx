@@ -12,9 +12,15 @@ const prepareTauriSmokeRuntime = async () => {
   }
 };
 
+const params = new URLSearchParams(window.location.search);
+const timerOverlayWindow = params.get("window") === DESKTOP_TIMER_WINDOW_LABEL;
+if (timerOverlayWindow) {
+  document.documentElement.classList.add("timer-overlay-document");
+  document.body.classList.add("timer-overlay-body");
+}
+
 void prepareTauriSmokeRuntime().then(() => {
-  const params = new URLSearchParams(window.location.search);
-  const Root = params.get("window") === DESKTOP_TIMER_WINDOW_LABEL ? TimerOverlayApp : App;
+  const Root = timerOverlayWindow ? TimerOverlayApp : App;
   if (Root === App) scheduleTauriLaunchFocus();
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
