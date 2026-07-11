@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TimeManage",
   "version": "0.2.3",
-  "identifier": "com.hushengjie.timemanage",
+  "identifier": "xyz.hudashuai.timemanage",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://127.0.0.1:1420",

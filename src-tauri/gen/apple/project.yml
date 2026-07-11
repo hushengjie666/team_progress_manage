@@ -1,6 +1,6 @@
 name: timemanage-desktop
 options:
-  bundleIdPrefix: com.hushengjie.timemanage
+  bundleIdPrefix: xyz.hudashuai.timemanage
   deploymentTarget:
     iOS: 17.0
 fileGroups: [../../src]
@@ -14,7 +14,9 @@ settingGroups:
   app:
     base:
       PRODUCT_NAME: TimeManage
-      PRODUCT_BUNDLE_IDENTIFIER: com.hushengjie.timemanage
+      PRODUCT_BUNDLE_IDENTIFIER: xyz.hudashuai.timemanage
+      DEVELOPMENT_TEAM: 2P3ULGHFM8
+      CODE_SIGN_STYLE: Automatic
 targetTemplates:
   app:
     type: application
@@ -47,7 +49,7 @@ targets:
         NSSupportsLiveActivities: true
         UIBackgroundModes: [audio]
         CFBundleURLTypes:
-          - CFBundleURLName: com.hushengjie.timemanage
+          - CFBundleURLName: xyz.hudashuai.timemanage
             CFBundleURLSchemes: [timemanage]
         UIRequiredDeviceCapabilities: [arm64, metal]
         UISupportedInterfaceOrientations:
@@ -112,7 +114,7 @@ targets:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.hushengjie.timemanage.TimerLiveActivity
+        PRODUCT_BUNDLE_IDENTIFIER: xyz.hudashuai.timemanage.TimerLiveActivity
         SKIP_INSTALL: true
         APPLICATION_EXTENSION_API_ONLY: true
     dependencies:

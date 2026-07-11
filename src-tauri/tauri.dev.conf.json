@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "TimeManage Dev",
   "mainBinaryName": "timemanage-desktop-dev",
-  "identifier": "com.hushengjie.timemanage.dev",
+  "identifier": "xyz.hudashuai.timemanage.dev",
   "app": {
     "windows": [
       {
