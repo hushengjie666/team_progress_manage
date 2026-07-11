@@ -26,13 +26,13 @@ export function AddProjectMemberModal(props: {
   };
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={props.onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={props.onClose}>
       <section
         className="modal-panel add-project-member-modal no-search"
         role="dialog"
         aria-modal="true"
         aria-label="邀请项目成员"
-        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-heading">
           <div>

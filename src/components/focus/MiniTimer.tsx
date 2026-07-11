@@ -3,6 +3,7 @@ import { formatTime, modeLabel } from "../../appModel";
 import type { AppState, SessionOutcome, Task } from "../../types";
 import { PomodoroProgress } from "./PomodoroProgress";
 import { useMiniTimerDrag } from "./useMiniTimerDrag";
+import { platformCapabilities } from "../../platformCapabilities";
 
 export function MiniTimer(props: {
   state: AppState;
@@ -11,6 +12,7 @@ export function MiniTimer(props: {
   finishTimer: (outcome: SessionOutcome) => Promise<void>;
 }) {
   const miniTimerDrag = useMiniTimerDrag();
+  const mobile = platformCapabilities().isMobile;
   const active = props.state.activeTimer;
 
   if (!active) return null;
@@ -20,12 +22,12 @@ export function MiniTimer(props: {
     <aside
       className={miniTimerDrag.dragging ? "mini-timer-panel dragging" : "mini-timer-panel"}
       aria-label="迷你计时器"
-      onPointerCancel={miniTimerDrag.cancelDragPress}
-      onPointerDown={miniTimerDrag.beginDragPress}
-      onPointerMove={miniTimerDrag.moveDragPress}
-      onPointerUp={miniTimerDrag.finishDragPress}
+      onPointerCancel={mobile ? undefined : miniTimerDrag.cancelDragPress}
+      onPointerDown={mobile ? undefined : miniTimerDrag.beginDragPress}
+      onPointerMove={mobile ? undefined : miniTimerDrag.moveDragPress}
+      onPointerUp={mobile ? undefined : miniTimerDrag.finishDragPress}
       ref={miniTimerDrag.panelRef}
-      style={miniTimerDrag.position ? { left: miniTimerDrag.position.x, top: miniTimerDrag.position.y, right: "auto", bottom: "auto" } : undefined}
+      style={!mobile && miniTimerDrag.position ? { left: miniTimerDrag.position.x, top: miniTimerDrag.position.y, right: "auto", bottom: "auto" } : undefined}
     >
       <div>
         <p>{modeLabel[active.mode]}</p>

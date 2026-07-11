@@ -5,6 +5,8 @@ import { AppTopbar } from "./AppTopbar";
 import { AppAuthenticatedShellDialogs } from "./AppAuthenticatedShellDialogs";
 import { AppAuthenticatedShellRoutes } from "./AppAuthenticatedShellRoutes";
 import { AppAuthenticatedShellTopbarActions } from "./AppAuthenticatedShellTopbarActions";
+import { platformRootClass } from "../platformCapabilities";
+import { useMobileNavigationScroll } from "../useMobileNavigationScroll";
 
 export function AppAuthenticatedShell({
   view,
@@ -26,6 +28,7 @@ export function AppAuthenticatedShell({
   loadDemoData,
   runCommand,
 }: AppAuthenticatedShellProps) {
+  useMobileNavigationScroll(view.tab, view.workspaceMode, shellState.projectDetailTab);
   useEffect(() => {
     if (view.tab !== "project" || !shellState.selectedWorkspaceId) return;
     const activeProject = view.state.projects.find((project) => project.id === view.activeProjectId);
@@ -41,7 +44,7 @@ export function AppAuthenticatedShell({
   ]);
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${platformRootClass()}`}>
       <section className="main-panel">
         <AppTopbar
           navItems={chrome.topbarNavItems}

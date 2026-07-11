@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-sync-timer"
+description = "Enables the sync_timer command without any pre-configured scope."
+commands.allow = ["sync_timer"]
+
+[[permission]]
+identifier = "deny-sync-timer"
+description = "Denies the sync_timer command without any pre-configured scope."
+commands.deny = ["sync_timer"]

@@ -1,4 +1,5 @@
 import type { PermissionState, Settings, WhiteNoise } from "./types";
+import { platformCapabilities } from "./platformCapabilities";
 
 declare global {
   interface Window {
@@ -28,6 +29,14 @@ const makeStatus = (permissionState: PermissionState, message: string): Notifica
 });
 
 export async function requestTimerNotifications(): Promise<NotificationPermissionStatus> {
+  if (platformCapabilities().supportsNativeNotifications) {
+    const { isPermissionGranted, requestPermission } = await import("@tauri-apps/plugin-notification");
+    const permission = await isPermissionGranted() ? "granted" : await requestPermission();
+    return makeStatus(
+      permission === "granted" ? "granted" : "denied",
+      permission === "granted" ? "通知权限已开启。" : "通知权限被拒绝，可在系统设置中重新开启。",
+    );
+  }
   if (!("Notification" in window)) {
     return makeStatus("unavailable", "当前浏览器不支持系统通知。");
   }
@@ -40,8 +49,25 @@ export async function requestTimerNotifications(): Promise<NotificationPermissio
 
 export async function sendTimerNotification(settings: Settings, title: string, body: string): Promise<void> {
   if (!settings.notificationsEnabled) return;
+  if (platformCapabilities().supportsNativeNotifications) {
+    const { isPermissionGranted, sendNotification } = await import("@tauri-apps/plugin-notification");
+    if (await isPermissionGranted()) sendNotification({ title, body });
+    return;
+  }
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   new Notification(title, { body });
+}
+
+export async function scheduleTimerNotification(id: number, title: string, body: string, date: Date): Promise<void> {
+  if (!platformCapabilities().supportsNativeNotifications || date.getTime() <= Date.now()) return;
+  const { isPermissionGranted, Schedule, sendNotification } = await import("@tauri-apps/plugin-notification");
+  if (await isPermissionGranted()) sendNotification({ id, title, body, schedule: Schedule.at(date) });
+}
+
+export async function cancelTimerNotification(id: number): Promise<void> {
+  if (!platformCapabilities().supportsNativeNotifications) return;
+  const { cancel } = await import("@tauri-apps/plugin-notification");
+  await cancel([id]);
 }
 
 const audioContext = () => {
@@ -89,6 +115,16 @@ export function playTimerSound(settings: TimerSoundSettings): void {
 
 export function startWhiteNoise(kind: WhiteNoise, volume: number): () => void {
   if (kind === "off") return () => undefined;
+  if (platformCapabilities().supportsBackgroundAudio) {
+    void import("@tauri-apps/api/core").then(({ invoke }) =>
+      invoke("plugin:timer-native|start_audio", { request: { kind, volume } }),
+    ).catch((error) => console.error("Failed to start native background audio", error));
+    return () => {
+      void import("@tauri-apps/api/core").then(({ invoke }) =>
+        invoke("plugin:timer-native|stop_audio"),
+      ).catch((error) => console.error("Failed to stop native background audio", error));
+    };
+  }
   const context = audioContext();
   if (!context) return () => undefined;
   resumeAudioContext(context);

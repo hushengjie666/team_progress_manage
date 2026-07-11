@@ -36,13 +36,13 @@ export function WorkspaceMembersModal({
   closeModal,
 }: WorkspaceMembersModalProps) {
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={closeModal}>
+    <div className="modal-backdrop" role="presentation" onClick={closeModal}>
       <section
         className="modal-panel workspace-project-modal workspace-member-modal"
         role="dialog"
         aria-modal="true"
         aria-label={`${selectedCard.workspace.name} 成员管理`}
-        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-heading">
           <div>

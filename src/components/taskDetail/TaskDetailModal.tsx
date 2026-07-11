@@ -18,7 +18,7 @@ export function TaskDetailModal(props: TaskDetailPanelProps) {
     <div
       className="modal-backdrop task-detail-backdrop"
       role="presentation"
-      onMouseDown={(event) => {
+      onClick={(event) => {
         if (event.target === event.currentTarget) props.close();
       }}
     >

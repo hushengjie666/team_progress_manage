@@ -3,6 +3,7 @@ use tauri::Manager;
 fn restore_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
+        #[cfg(desktop)]
         let _ = window.unminimize();
         #[cfg(target_os = "macos")]
         activate_macos_window(&window);
@@ -93,9 +94,13 @@ fn configure_macos_minimize_button<R: tauri::Runtime>(app: &tauri::AppHandle<R>)
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_timer_native::init());
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, desktop))]
     if std::env::var_os("WDIO_EMBEDDED_SERVER").is_some() {
         builder = builder
             .plugin(tauri_plugin_wdio::init())

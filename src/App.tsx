@@ -9,6 +9,8 @@ import { BootScreen } from "./components/BootScreen";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
 import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
+import { useNativeTimerSync } from "./useNativeTimerSync";
+import { useIOSDeepLinks } from "./useIOSDeepLinks";
 
 export function App() {
   const appShell = useAppShellState();
@@ -90,6 +92,8 @@ export function App() {
     toggleTimer: toggleDesktopTimer,
     abortTimer: abortDesktopTimer,
   });
+  useNativeTimerSync(state, appViewModel.currentTask);
+  useIOSDeepLinks(appShell.setTab);
 
   if (!state || !todayPlan || !workspaceModel) {
     loadedRuntimesRef.current = null;

@@ -2,6 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "enables the default permissions",
+  "platforms": ["macOS", "windows", "linux"],
   "windows": [
     "main",
     "timer-overlay"
@@ -25,6 +26,9 @@
     "core:window:allow-start-dragging",
     "core:webview:allow-create-webview-window",
     "wdio:default",
-    "wdio-webdriver:default"
+    "wdio-webdriver:default",
+    "notification:default",
+    "timer-native:default",
+    "deep-link:default"
   ]
 }

@@ -27,6 +27,8 @@
     "tauri:dev": "node scripts/run-tauri-dev.mjs",
     "tauri:dev:raw": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
+    "tauri:ios:dev": "tauri ios dev",
+    "tauri:ios:build": "tauri ios build",
     "tauri:info": "tauri info",
     "test:tauri:smoke": "node scripts/run-tauri-smoke.mjs",
     "test:tauri:functional:real": "node scripts/run-tauri-functional-real.mjs",
@@ -45,6 +47,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-deep-link": "^2.4.9",
+    "@tauri-apps/plugin-notification": "^2.3.3",
     "commander": "^14.0.3",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",

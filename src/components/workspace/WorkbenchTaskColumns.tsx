@@ -54,7 +54,7 @@ export function TaskColumn(props: {
       </div>
       <div className="task-list">
         {props.tasks.length === 0 && <p className="empty">{props.empty}</p>}
-        {props.tasks.map((task) => (
+        {props.tasks.map((task, index) => (
           <WorkbenchTaskCard
             key={task.id}
             task={task}
@@ -70,6 +70,9 @@ export function TaskColumn(props: {
             onComplete={props.onComplete}
             onSelect={props.onSelect}
             onSplit={props.onSplit}
+            onMove={props.onMove}
+            canMoveUp={index > 0}
+            canMoveDown={index < props.tasks.length - 1}
             onDragStart={(event) => {
               if (!canDragSort) return;
               setDraggingTaskId(task.id);

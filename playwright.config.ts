@@ -14,14 +14,18 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://127.0.0.1:1420",
-    channel: "chrome",
     trace: "retain-on-failure",
   },
   projects: [
     {
       name: "chrome",
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
+      testIgnore: /mobile-layout\.spec\.ts/,
+    },
+    {
+      name: "mobile-webkit",
+      use: { ...devices["iPhone 13"] },
+      testMatch: /mobile-layout\.spec\.ts/,
     },
   ],
 });
-

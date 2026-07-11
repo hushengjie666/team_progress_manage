@@ -1,5 +1,5 @@
 import type React from "react";
-import { Activity, Check, PanelRight, Split, Trash2, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Check, PanelRight, Split, Trash2, X } from "lucide-react";
 import type { Task } from "../../types";
 
 type WorkbenchTaskActionsProps = {
@@ -16,6 +16,9 @@ type WorkbenchTaskActionsProps = {
   onComplete?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
+  onMove?: (taskId: string, direction: -1 | 1) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
 };
 
 export function WorkbenchTaskActions({
@@ -32,12 +35,25 @@ export function WorkbenchTaskActions({
   onComplete,
   onSelect,
   onSplit,
+  onMove,
+  canMoveUp,
+  canMoveDown,
 }: WorkbenchTaskActionsProps) {
   const canSplitTask = task.status !== "completed" && task.status !== "split" && task.status !== "archived";
 
   return (
     <div className="task-actions">
       <div className="task-secondary-actions">
+        {onMove && (
+          <>
+            <button className="icon-button small mobile-sort-action" title="上移任务" disabled={!canMoveUp} onClick={() => onMove(task.id, -1)}>
+              <ArrowUp size={16} />
+            </button>
+            <button className="icon-button small mobile-sort-action" title="下移任务" disabled={!canMoveDown} onClick={() => onMove(task.id, 1)}>
+              <ArrowDown size={16} />
+            </button>
+          </>
+        )}
         {onSelect && (
           <button className="icon-button small" title="任务详情" onClick={() => onSelect(task.id)}>
             <PanelRight size={16} />

@@ -18,6 +18,9 @@ export function WorkbenchTaskCard({
   onComplete,
   onSelect,
   onSplit,
+  onMove,
+  canMoveUp,
+  canMoveDown,
   onDragStart,
   onDragEnter,
   onDragOver,
@@ -37,6 +40,9 @@ export function WorkbenchTaskCard({
   onComplete?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
+  onMove?: (taskId: string, direction: -1 | 1) => void;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
   onDragStart: React.DragEventHandler<HTMLElement>;
   onDragEnter: React.DragEventHandler<HTMLElement>;
   onDragOver: React.DragEventHandler<HTMLElement>;
@@ -85,6 +91,9 @@ export function WorkbenchTaskCard({
           onComplete={onComplete}
           onSelect={onSelect}
           onSplit={onSplit}
+          onMove={onMove}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
         />
       </div>
     </article>

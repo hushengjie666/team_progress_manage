@@ -36,13 +36,13 @@ export function QuickProjectCreateModal({
     `${workspace.type === "private" ? "私人" : "协作"} · ${workspace.name}`;
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <section
         className="modal-panel quick-project-create-modal"
         role="dialog"
         aria-modal="true"
         aria-label="新增项目"
-        onMouseDown={(event) => event.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="modal-heading">
           <div>
