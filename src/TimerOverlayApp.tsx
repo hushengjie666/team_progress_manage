@@ -220,7 +220,7 @@ export function TimerOverlayApp() {
         <div className="timer-overlay-actions">
           <button
             className="icon-button small"
-            title={payload.isRunning ? "暂停" : remaining === payload.duration ? "开始" : "继续"}
+            title={payload.isRunning ? "暂停" : "继续"}
             onClick={() => void emitControl(DESKTOP_TIMER_TOGGLE_EVENT)}
           >
             {payload.isRunning ? <Pause size={14} /> : <Play size={14} />}

@@ -183,12 +183,21 @@ const moveOverlayWindowBy = async (deltaX, deltaY) => withOverlayWindow(async ()
   return { x: after.x, y: after.y };
 });
 
-const clickOverlayButton = async (title) => withOverlayWindow(() => browser.execute((targetTitle) => {
-  const button = Array.from(document.querySelectorAll("button"))
-    .find((element) => element.getAttribute("title") === targetTitle);
-  if (!button) throw new Error(`Overlay button not found: ${targetTitle}`);
-  button.click();
-}, title));
+const clickOverlayButton = async (title) => {
+  await browser.waitUntil(() => withOverlayWindow(() => browser.execute((targetTitle) =>
+    Array.from(document.querySelectorAll("button"))
+      .some((element) => element.getAttribute("title") === targetTitle), title)), {
+    timeout: 10000,
+    interval: 250,
+    timeoutMsg: `Overlay button not found: ${title}`,
+  });
+  await withOverlayWindow(() => browser.execute((targetTitle) => {
+    const button = Array.from(document.querySelectorAll("button"))
+      .find((element) => element.getAttribute("title") === targetTitle);
+    if (!button) throw new Error(`Overlay button disappeared: ${targetTitle}`);
+    button.click();
+  }, title));
+};
 
 const clickButton = async (text, options = {}) => {
   await browser.execute(({ text: targetText, exact = false, index = 0, withinText }) => {

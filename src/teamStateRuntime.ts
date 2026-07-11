@@ -29,6 +29,17 @@ export type TeamDataRuntime = {
 export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOptions): TeamDataRuntime => {
   let commitSequence = 0;
   let commitQueue = Promise.resolve();
+  let latestSavedState: AppState | undefined;
+
+  const withLatestRevisions = (state: AppState) => latestSavedState
+    ? {
+        ...state,
+        backend: {
+          ...state.backend,
+          businessRowRevisions: latestSavedState.backend.businessRowRevisions,
+        },
+      }
+    : state;
 
   const persistTeamData = async (
     current: AppState,
@@ -81,10 +92,11 @@ export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOpt
       },
     });
     commitQueue = commitQueue.then(async () => {
-      await persistTeamData(current, next, {
+      const saved = await persistTeamData(withLatestRevisions(current), withLatestRevisions(next), {
         refreshAfterSave: true,
         canApplyState: () => sequence === commitSequence,
       });
+      if (saved) latestSavedState = saved;
     });
   };
 

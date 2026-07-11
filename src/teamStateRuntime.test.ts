@@ -164,6 +164,52 @@ describe("team state runtime", () => {
     expect(getCurrent()?.projects[0]?.name).toBe(second.projects[0]?.name);
   });
 
+  it("uses revisions returned by an earlier queued create for the following patch", async () => {
+    const before = withToken(createInitialState());
+    const createdProject = {
+      ...before.projects[0]!,
+      id: "project_queued",
+      name: "队列新项目",
+      createdAt: "2026-07-01T08:00:00.000Z",
+      updatedAt: "2026-07-01T08:00:00.000Z",
+    };
+    const first = {
+      ...before,
+      projects: [...before.projects, createdProject],
+      updatedAt: createdProject.updatedAt,
+    };
+    const second = {
+      ...first,
+      projects: first.projects.map((project) => project.id === createdProject.id
+        ? { ...project, name: "队列项目已重命名", updatedAt: "2026-07-01T08:01:00.000Z" }
+        : project),
+      updatedAt: "2026-07-01T08:01:00.000Z",
+    };
+    let putCount = 0;
+    const putBodies: Array<{ operations: Array<{ operation?: string; expected_revision?: number }> }> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        putBodies.push(JSON.parse(String(init.body)));
+        putCount += 1;
+        return teamStateResponse(putCount === 1 ? first : second);
+      }
+      return teamStateResponse(putCount === 1 ? first : second);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent } = createRuntimeHarness(before);
+
+    runtime.commitTeamData(before, first);
+    runtime.commitTeamData(first, second);
+    await flushPromises();
+    await flushPromises();
+
+    expect(putBodies).toHaveLength(2);
+    expect(putBodies[0]?.operations[0]).toEqual(expect.objectContaining({ operation: "create" }));
+    expect(putBodies[1]?.operations[0]?.expected_revision).toBe(2);
+    expect(getCurrent()?.projects.find((project) => project.id === createdProject.id)?.name)
+      .toBe("队列项目已重命名");
+  });
+
   it("applies failure state and toast when remote save fails", async () => {
     const before = withToken(createInitialState());
     const after = changedState(before);

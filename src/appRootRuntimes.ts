@@ -2,13 +2,13 @@ import { ensureTodayPlan } from "./appModel";
 import type { useAppShellState } from "./appShellState";
 import { createAuthSessionRuntime } from "./authSessionRuntime";
 import { createBackendCommandRuntime } from "./teamBackendCommandRuntime";
-import { createTeamDataRuntime } from "./teamStateRuntime";
+import type { TeamDataRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 import { createWorkspaceAccountRuntime } from "./workspaceAccountRuntime";
 
 type AppShellSource = ReturnType<typeof useAppShellState>;
 
-export function createAppRootRuntimes(shell: AppShellSource) {
+export function createAppRootRuntimes(shell: AppShellSource, teamDataRuntime: TeamDataRuntime) {
   const {
     state,
     setState,
@@ -26,11 +26,7 @@ export function createAppRootRuntimes(shell: AppShellSource) {
     setBackendDiagnostic,
     stateRef,
   } = shell;
-  const { persistTeamData, commitTeamData } = createTeamDataRuntime({
-    getState: () => stateRef.current,
-    setState,
-    setToast,
-  });
+  const { persistTeamData, commitTeamData } = teamDataRuntime;
   const workspaceAccountRuntime = createWorkspaceAccountRuntime({
     getState: () => stateRef.current,
     setState,

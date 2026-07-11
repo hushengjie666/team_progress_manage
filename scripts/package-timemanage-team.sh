@@ -142,6 +142,11 @@ Install:
   run server\start-backend.bat or install the Windows service
 EOF
 
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo "[TimeManage] Building signed iOS archive, IPA, and App Store handoff ..."
+  bash scripts/package-ios-release.sh "${PACKAGE_DIR}"
+fi
+
 cd "${DEPLOY_ROOT}"
 rm -f "${DEPLOY_ROOT}/${PACKAGE_NAME}.zip"
 find "${PACKAGE_NAME}" -name ".DS_Store" -delete

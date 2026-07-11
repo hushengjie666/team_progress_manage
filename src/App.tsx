@@ -11,6 +11,7 @@ import { useAppShellState } from "./appShellState";
 import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
 import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
+import { createTeamDataRuntime } from "./teamStateRuntime";
 
 export function App() {
   const appShell = useAppShellState();
@@ -26,6 +27,14 @@ export function App() {
     platformAccounts, setPlatformAccounts, setWorkspaceInvitations, setProjectInvitations,
     stateRef, reminderSentRef, stopNoiseRef, undoTimerRef, tabRef, selectedTaskIdRef,
   } = appShell;
+  const teamDataRuntimeRef = useRef<ReturnType<typeof createTeamDataRuntime> | null>(null);
+  if (!teamDataRuntimeRef.current) {
+    teamDataRuntimeRef.current = createTeamDataRuntime({
+      getState: () => stateRef.current,
+      setState,
+      setToast,
+    });
+  }
   const {
     persistTeamData,
     commitTeamData,
@@ -33,7 +42,7 @@ export function App() {
     updateState,
     backendActions,
     authActions,
-  } = createAppRootRuntimes(appShell);
+  } = createAppRootRuntimes(appShell, teamDataRuntimeRef.current);
 
   useAppLifecycleHooks({
     state,

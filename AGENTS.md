@@ -94,6 +94,7 @@ The version directory and ZIP root must have the same name. The version director
 
 ```text
 desktop/     Tauri applications and installers only
+ios/         signed iOS Archive, IPA, screenshots, and App Store handoff
 web/         frontend built for /timemanage-team/
 server/      Windows backend, example config, and service scripts
 RELEASE.txt  version, timestamp, commit, and tree state
@@ -103,7 +104,7 @@ RELEASE.txt  version, timestamp, commit, and tree state
 - Copy only distributable Tauri outputs into `desktop/`, such as `.app`, `.dmg`, `.msi`, installer `.exe`, `.deb`, `.rpm`, or `.AppImage`. Do not copy helper scripts, writable temporary DMGs, or other bundle intermediates.
 - Do not create ad hoc release files directly under `deploy/` or split one build across unrelated directories. Keep the matching ZIP next to its version directory.
 - Use `web/` and `server/` from the unified directory for server deployment; `desktop/` is not required on the server.
-- Before reporting a package complete, verify the expected desktop installer/application, `web/index.html`, backend executable, deployment scripts, and `RELEASE.txt`; test the ZIP with `unzip -t`; verify a macOS DMG with `hdiutil verify`; and report the final paths and SHA-256 values.
+- Before reporting a package complete, verify the expected desktop installer/application, signed iOS IPA/Archive on macOS, `web/index.html`, backend executable, deployment scripts, and `RELEASE.txt`; test the ZIP with `unzip -t`; verify a macOS DMG with `hdiutil verify`; and report the final paths and SHA-256 values.
 - Temporary packages may use `npm run deploy:team`. Formal releases must be created from a clean release tag with `npm run release:team:tag -- <tag>` so `RELEASE.txt` records the tag and commit.
 
 ## Coding Style & Naming Conventions

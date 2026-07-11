@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C0E247F9CFC10AAD5B3D161 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 91165214B7D4143F23F78D7F /* main.mm */; };
 		17CC5372688E8EE5D9F97F43 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 2EA555A0FE61B7D363132CA0 /* assets */; };
+		1FA5BE7476CB24CD9DB9F0C5 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = F90AC179DA4B484D0F978549 /* PrivacyInfo.xcprivacy */; };
 		63A3E4AA5B29BBB599064087 /* TimerLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EFAEE626B268023778B825C9 /* TimerLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		86E3E522253B2CC9C35BD449 /* TimerActivityModel in Frameworks */ = {isa = PBXBuildFile; productRef = B870DDC329D44AA49ED53338 /* TimerActivityModel */; };
 		942EC68543DA7A63950C36DF /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 42E11CD32B76419773309C4E /* UIKit.framework */; };
@@ -72,6 +73,7 @@
 		EA8CC09A4B3626CC5551063C /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		EAB5E04B60F01D9244CC0CBA /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		EFAEE626B268023778B825C9 /* TimerLiveActivity.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = TimerLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F90AC179DA4B484D0F978549 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,7 +118,7 @@
 				2EA555A0FE61B7D363132CA0 /* assets */,
 				16E10A45CC68E49FFBAC15AA /* Assets.xcassets */,
 				AABAE602D8C504AF839D590E /* LaunchScreen.storyboard */,
-				756D9205DAE2006A7D4E7D13 /* Externals */,
+				F90AC179DA4B484D0F978549 /* PrivacyInfo.xcprivacy */,
 				C78ABB4029E62AD19C0009DE /* Packages */,
 				E64D0C2FDDB30B3C133609DA /* Sources */,
 				CDFE2833A71CE479E868A40E /* src */,
@@ -142,13 +144,6 @@
 				51339AF3FA4BBAB77F7BFF3D /* bindings */,
 			);
 			path = "timemanage-desktop";
-			sourceTree = "<group>";
-		};
-		756D9205DAE2006A7D4E7D13 /* Externals */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Externals;
 			sourceTree = "<group>";
 		};
 		8464325D082A415BAF5C4645 /* timemanage-desktop_iOS */ = {
@@ -264,6 +259,14 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					845DD3115806D303F33170F6 = {
+						DevelopmentTeam = 2P3ULGHFM8;
+						ProvisioningStyle = Automatic;
+					};
+					86A35CAFBAD903000E2BE4BC = {
+						DevelopmentTeam = 2P3ULGHFM8;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 2867C5DC3DC54245A358B6E8 /* Build configuration list for PBXProject "timemanage-desktop" */;
@@ -296,6 +299,7 @@
 			files = (
 				A254838DF6AF75417527FE3F /* Assets.xcassets in Resources */,
 				F168460736F57F5166B031C9 /* LaunchScreen.storyboard in Resources */,
+				1FA5BE7476CB24CD9DB9F0C5 /* PrivacyInfo.xcprivacy in Resources */,
 				17CC5372688E8EE5D9F97F43 /* assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -358,6 +362,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026071201;
+				DEVELOPMENT_TEAM = 2P3ULGHFM8;
 				INFOPLIST_FILE = TimerLiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -365,12 +372,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2P3ULGHFM8;
+				MARKETING_VERSION = 0.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.hudashuai.timemanage.TimerLiveActivity;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = debug;
 		};
@@ -503,6 +509,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "timemanage-desktop_iOS/timemanage-desktop_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026071201;
+				DEVELOPMENT_TEAM = 2P3ULGHFM8;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -516,12 +525,11 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2P3ULGHFM8;
+				MARKETING_VERSION = 0.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.hudashuai.timemanage;
 				PRODUCT_NAME = TimeManage;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALID_ARCHS = arm64;
 			};
 			name = debug;
@@ -530,6 +538,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026071201;
+				DEVELOPMENT_TEAM = 2P3ULGHFM8;
 				INFOPLIST_FILE = TimerLiveActivity/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -537,12 +548,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2P3ULGHFM8;
+				MARKETING_VERSION = 0.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.hudashuai.timemanage.TimerLiveActivity;
 				SDKROOT = iphoneos;
 				SKIP_INSTALL = YES;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = release;
 		};
@@ -556,6 +566,9 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = "timemanage-desktop_iOS/timemanage-desktop_iOS.entitlements";
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2026071201;
+				DEVELOPMENT_TEAM = 2P3ULGHFM8;
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -569,12 +582,11 @@
 				);
 				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 2P3ULGHFM8;
+				MARKETING_VERSION = 0.2.3;
 				PRODUCT_BUNDLE_IDENTIFIER = xyz.hudashuai.timemanage;
 				PRODUCT_NAME = TimeManage;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				VALID_ARCHS = arm64;
 			};
 			name = release;
