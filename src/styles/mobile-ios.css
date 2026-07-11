@@ -168,6 +168,7 @@
   }
 
   .modal-backdrop {
+    z-index: 80;
     align-items: end;
     padding: 0;
   }
@@ -182,6 +183,40 @@
     overflow: auto;
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
     border-radius: 8px 8px 0 0;
+  }
+
+  .modal-panel button,
+  .modal-panel input,
+  .modal-panel select,
+  .modal-panel textarea {
+    min-height: 44px;
+  }
+
+  .modal-panel select {
+    height: 44px;
+  }
+
+  .modal-panel .icon-button {
+    min-width: 44px;
+  }
+
+  .modal-panel textarea {
+    min-height: 96px;
+  }
+
+  .modal-panel.quick-project-create-modal {
+    overflow-y: auto;
+  }
+
+  .modal-panel .modal-actions {
+    position: sticky;
+    z-index: 2;
+    bottom: 0;
+    margin-right: -2px;
+    margin-left: -2px;
+    padding: 12px 2px max(12px, env(safe-area-inset-bottom));
+    background: #fbfaf6;
+    box-shadow: 0 -8px 16px rgba(41, 46, 48, 0.06);
   }
 
   .task-detail-modal .task-detail {
@@ -216,10 +251,24 @@
   }
 
   .project-detail-tabs,
-  .settings-tabs {
+  .settings-tabs,
+  .settings-section-tabs {
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .settings-section-tabs {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
+
+  .settings-section-tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    white-space: nowrap;
   }
 
   .schedule-calendar-toolbar {
@@ -254,7 +303,7 @@
 
   .project-detail-tabs button {
     flex: 0 0 auto;
-    min-height: 40px;
+    min-height: 44px;
   }
 
   .project-detail-identity {
@@ -390,6 +439,55 @@
     justify-self: start;
   }
 
+  .member-status-board {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: visible;
+  }
+
+  .focus-current-panel {
+    order: 2;
+    gap: 12px;
+    padding: 20px 16px 18px;
+    border-bottom: 0;
+  }
+
+  .focus-current-content {
+    gap: 10px;
+  }
+
+  .focus-current-content strong {
+    margin-bottom: 6px;
+    font-size: 24px;
+  }
+
+  .focus-current-content p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .focus-timer-panel {
+    order: 1;
+    gap: 16px;
+    padding: 24px 14px;
+    border-bottom: 1px solid #e3dacd;
+  }
+
+  .focus-orbit {
+    --focus-orbit-size: min(72vw, 280px);
+  }
+
+  .section-title {
+    align-items: flex-start;
+  }
+
+  .section-title > .button-row {
+    justify-content: flex-end;
+  }
+
   .global-toast {
     right: 12px;
     bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 12px);
@@ -399,6 +497,31 @@
 
   .mobile-sort-action {
     display: inline-grid;
+  }
+}
+
+@media (max-width: 390px) {
+  .section-title:has(> .button-row) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .section-title > .button-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .project-task-row,
+  .project-member-summary-grid,
+  .settings-grid,
+  .notification-grid,
+  .backend-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-task-row > div:first-child,
+  .project-task-row > .button-row {
+    grid-column: auto;
   }
 }
 
