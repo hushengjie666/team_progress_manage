@@ -216,11 +216,30 @@
   }
 
   .project-detail-tabs,
-  .settings-tabs,
-  .schedule-calendar-toolbar {
+  .settings-tabs {
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .schedule-calendar-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .schedule-calendar-toolbar > div:first-child {
+    min-width: 0;
+  }
+
+  .schedule-calendar-toolbar .button-row {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .schedule-calendar-toolbar .button-row button {
+    flex: 0 0 auto;
   }
 
   .project-detail-hero {
@@ -319,10 +338,56 @@
   }
 
   .backend-table,
-  .project-task-table,
   .schedule-timeline-board {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+  }
+
+  .project-task-table-head {
+    display: none;
+  }
+
+  .project-task-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .project-task-row > div:first-child,
+  .project-task-row > .button-row {
+    grid-column: 1 / -1;
+  }
+
+  .project-task-row select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .project-task-row > .button-row {
+    justify-content: flex-start;
+  }
+
+  .project-member-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-members-panel .member-section-title {
+    display: grid;
+    align-items: start;
+    justify-content: stretch;
+  }
+
+  .project-members-panel .member-section-title strong,
+  .project-members-panel .member-section-title span {
+    overflow-wrap: anywhere;
+  }
+
+  .project-members-panel .project-binding-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-members-panel .project-binding-row > .secondary-button,
+  .project-members-panel .project-binding-row > .project-binding-muted {
+    justify-self: start;
   }
 
   .global-toast {

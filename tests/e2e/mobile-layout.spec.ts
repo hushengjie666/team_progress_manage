@@ -30,6 +30,18 @@ test("offers every primary mobile destination and mobile-safe project detail", a
   for (const tabName of ["排期日历", "任务", "成员管理", "设置", "概览"]) {
     await projectTabs.getByRole("button", { name: tabName }).click();
     await expectNoPageOverflow(page);
+    if (tabName === "排期日历") {
+      const titleWidth = await page.getByRole("heading", { name: /排期$/ }).evaluate((element) => element.getBoundingClientRect().width);
+      expect(titleWidth).toBeGreaterThan(200);
+    }
+    if (tabName === "任务") {
+      const taskRow = page.locator(".project-task-row").first();
+      expect(await taskRow.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    }
+    if (tabName === "成员管理") {
+      const summaryColumns = await page.locator(".project-member-summary-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length);
+      expect(summaryColumns).toBe(2);
+    }
   }
 
   await mobileNavigation.getByRole("button", { name: "我的任务" }).click();

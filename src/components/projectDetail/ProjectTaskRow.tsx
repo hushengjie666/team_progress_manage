@@ -28,6 +28,7 @@ export function ProjectTaskRow(props: {
         <span>{labelTaskStage[props.task.stage]} · {props.task.tags.slice(0, 3).join("、") || "无标签"}</span>
       </div>
       <select
+        aria-label={`${props.task.title}执行人`}
         value={props.task.primaryExecutorMemberId ?? ""}
         disabled={!props.canEdit}
         onChange={(event) => props.updateTaskAssignment(props.task.id, { primaryExecutorMemberId: event.target.value || undefined })}
@@ -38,6 +39,7 @@ export function ProjectTaskRow(props: {
         ))}
       </select>
       <select
+        aria-label={`${props.task.title}状态`}
         value={props.task.status}
         disabled={!props.canEdit || (props.task.status === "pending_review" && !props.canReview)}
         onChange={(event) => props.updateStatus(props.task.id, event.target.value as TaskStatus)}
