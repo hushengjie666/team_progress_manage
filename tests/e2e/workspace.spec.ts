@@ -8,6 +8,23 @@ test.beforeEach(async ({ page }) => {
   await clearStoredApp(page);
 });
 
+test("signs out without writing the session change as business data", async ({ page }) => {
+  const businessWrites: string[] = [];
+  page.on("request", (request) => {
+    if (request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT") {
+      businessWrites.push(request.url());
+    }
+  });
+  await openApp(page);
+
+  await page.getByRole("button", { name: "退出登录：项目负责人" }).click();
+
+  await expect(page.getByRole("heading", { name: "登录账号" })).toBeVisible();
+  await expect(page.getByText("已退出登录")).toBeVisible();
+  await expect(page.getByText(/缺少业务数据版本/)).toHaveCount(0);
+  expect(businessWrites).toEqual([]);
+});
+
 test("opens workspace directory instead of switching a single active workspace", async ({ page }) => {
   await openApp(page);
 

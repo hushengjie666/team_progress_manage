@@ -86,6 +86,66 @@ describe("team state runtime", () => {
     expect(getCurrent()).toEqual(after);
   });
 
+  it("ends the authenticated session locally without saving it as business data", async () => {
+    const before = withToken(createInitialState());
+    const after: AppState = {
+      ...before,
+      auth: {
+        status: "signed_out",
+        bootstrapped: true,
+        message: "已退出登录",
+      },
+      backend: {
+        ...before.backend,
+        token: undefined,
+        message: "已退出团队工作区",
+      },
+    };
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent } = createRuntimeHarness(before);
+
+    runtime.commitTeamData(before, after);
+    await flushPromises();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(getCurrent()).toEqual(after);
+  });
+
+  it("does not let an in-flight save overwrite a signed-out session", async () => {
+    const before = withToken(createInitialState());
+    const changed = changedState(before);
+    const pending = deferredResponse();
+    const fetchMock = vi.fn(async () => pending.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
+
+    runtime.commitTeamData(before, changed);
+    await flushPromises();
+    const signedOut: AppState = {
+      ...changed,
+      auth: {
+        status: "signed_out",
+        bootstrapped: true,
+        message: "已退出登录",
+      },
+      backend: {
+        ...changed.backend,
+        token: undefined,
+        message: "已退出团队工作区",
+      },
+    };
+    runtime.commitTeamData(changed, signedOut);
+    pending.resolve(new Response(JSON.stringify({ error: "late save failed" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    }));
+    await flushPromises();
+
+    expect(getCurrent()).toEqual(signedOut);
+    expect(getToast()).toBe("");
+  });
+
   it("saves remote changes and applies the saved state", async () => {
     const before = withToken(createInitialState());
     const after = changedState(before);
