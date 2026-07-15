@@ -49,6 +49,19 @@ func TestMigrationReleaseLookupAndRiskRules(t *testing.T) {
 	}
 }
 
+func TestMigrationsBetween(t *testing.T) {
+	pending := migrationsBetween(3, 5)
+	if len(pending) != 2 {
+		t.Fatalf("pending migration count = %d, want 2", len(pending))
+	}
+	if pending[0].SchemaVersion != 4 || pending[1].SchemaVersion != 5 {
+		t.Fatalf("pending migrations = %#v", pending)
+	}
+	if current := migrationsBetween(latestSchemaVersion, latestSchemaVersion); len(current) != 0 {
+		t.Fatalf("current schema has pending migrations: %#v", current)
+	}
+}
+
 func TestMySQLMigrationLifecycle(t *testing.T) {
 	dsn, cleanup := mysqlTestDSN(t)
 	defer cleanup()

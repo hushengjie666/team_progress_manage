@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"time"
 
 	"github.com/pressly/goose/v3"
@@ -43,6 +44,21 @@ func migrateMySQLUp(ctx context.Context, db *sql.DB, cfg config) error {
 		if currentVersion > latestSchemaVersion {
 			return fmt.Errorf("database schema version %d is newer than server %s supports (%d)", currentVersion, serverReleaseVersion, latestSchemaVersion)
 		}
+		log.Printf(
+			"Database schema check: current=%s, target=%s (schema %d)",
+			schemaVersionLabel(currentVersion),
+			serverReleaseVersion,
+			latestSchemaVersion,
+		)
+		pendingMigrations := migrationsBetween(currentVersion, latestSchemaVersion)
+		if len(pendingMigrations) > 0 {
+			log.Printf(
+				"Database migration starting: %s -> %s (schema %d)",
+				schemaVersionLabel(currentVersion),
+				serverReleaseVersion,
+				latestSchemaVersion,
+			)
+		}
 		if pendingMigrationNeedsBackup(currentVersion, latestSchemaVersion) {
 			if err := requireRecentMigrationBackup(cfg, currentVersion); err != nil {
 				return err
@@ -57,6 +73,19 @@ func migrateMySQLUp(ctx context.Context, db *sql.DB, cfg config) error {
 		if err := verifyMigrationIntegrity(ctx, db, latestSchemaVersion); err != nil {
 			return err
 		}
+		if len(pendingMigrations) == 0 {
+			log.Printf("Database schema is current: %s", schemaVersionLabel(latestSchemaVersion))
+			return nil
+		}
+		for _, migration := range pendingMigrations {
+			log.Printf(
+				"Database migration applied: %s (schema %d) [%s]",
+				migration.ReleaseVersion,
+				migration.SchemaVersion,
+				migration.FileName,
+			)
+		}
+		log.Printf("Database migration completed: %s", schemaVersionLabel(latestSchemaVersion))
 		return nil
 	})
 }

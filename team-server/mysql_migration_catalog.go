@@ -70,6 +70,16 @@ func pendingMigrationNeedsBackup(currentVersion int64, targetVersion int64) bool
 	return false
 }
 
+func migrationsBetween(currentVersion int64, targetVersion int64) []migrationDefinition {
+	pending := []migrationDefinition{}
+	for _, migration := range migrationCatalog {
+		if migration.SchemaVersion > currentVersion && migration.SchemaVersion <= targetVersion {
+			pending = append(pending, migration)
+		}
+	}
+	return pending
+}
+
 func rollbackRequiresRestore(currentVersion int64, targetVersion int64) bool {
 	for _, migration := range migrationCatalog {
 		if migration.SchemaVersion > targetVersion && migration.SchemaVersion <= currentVersion && migration.RestoreOnly {
