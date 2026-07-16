@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { applyAuthStatusFailure, applyTeamStateLoadFailure, applyTeamStateSaveFailure, normalizeAuthMessage } from "./appBoot";
 import { shouldResetSignedOutLocalBackendUrl } from "./appBootRuntime";
+import { defaultBackendServerUrl } from "./defaultBackendServerUrl";
 import { createInitialState } from "./seed";
+import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 const signedInState = () => {
   const timestamp = "2026-06-30T09:00:00.000Z";
@@ -111,5 +117,22 @@ describe("app boot fallback", () => {
     expect(shouldResetSignedOutLocalBackendUrl(signedOutLocalTestState)).toBe(true);
     expect(shouldResetSignedOutLocalBackendUrl(signedOutRemoteState)).toBe(false);
     expect(shouldResetSignedOutLocalBackendUrl(signedInLocalTestState)).toBe(false);
+  });
+
+  it("migrates stale desktop localhost backends to the configured production backend", () => {
+    vi.stubEnv("VITE_TM_BACKEND_SERVER_URL", "https://www.hudashuai.xyz/timemanage-team/api/");
+
+    expect(defaultBackendServerUrl()).toBe("https://www.hudashuai.xyz/timemanage-team/api/");
+    expect(shouldUseRemoteOriginForBackend("http://127.0.0.1:64567")).toBe(true);
+    expect(shouldUseRemoteOriginForBackend("http://localhost:8787")).toBe(true);
+    expect(shouldUseRemoteOriginForBackend("https://team.example.com/api")).toBe(false);
+  });
+
+  it("keeps the isolated Tauri functional backend ahead of the desktop production backend", () => {
+    vi.stubEnv("VITE_TM_BACKEND_SERVER_URL", "https://www.hudashuai.xyz/timemanage-team/api/");
+    vi.stubEnv("VITE_WDIO_TAURI", "1");
+    vi.stubEnv("VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL", "http://127.0.0.1:64567");
+
+    expect(defaultBackendServerUrl()).toBe("http://127.0.0.1:64567");
   });
 });

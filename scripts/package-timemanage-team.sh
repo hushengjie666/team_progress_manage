@@ -23,6 +23,7 @@ fi
 cd "${ROOT_DIR}"
 node scripts/verify-release-version.mjs "${PACKAGE_VERSION}"
 node scripts/verify-database-migrations.mjs
+npm run verify:desktop:release
 mkdir -p "${DEPLOY_ROOT}"
 
 echo "[TimeManage] Building Tauri desktop bundles ..."

@@ -247,4 +247,35 @@ describe("team state runtime", () => {
     expect(getToast()).toContain("revision_conflict");
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("rebases and retries a patch after another device advances the row revision", async () => {
+    const before = withToken(createInitialState());
+    const after = changedState(before);
+    const putBodies: Array<{ operations: Array<{ expected_revision?: number }> }> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PUT") {
+        putBodies.push(JSON.parse(String(init.body)));
+        if (putBodies.length === 1) {
+          return new Response(JSON.stringify({ error: "revision_conflict" }), {
+            status: 409,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return teamStateResponse(after);
+      }
+      return teamStateResponse(before);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
+
+    const saved = await runtime.persistTeamData(before, after);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(putBodies).toHaveLength(2);
+    expect(putBodies[0]?.operations[0]?.expected_revision).toBe(1);
+    expect(putBodies[1]?.operations[0]?.expected_revision).toBe(2);
+    expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
+    expect(getCurrent()?.backend.status).toBe("ready");
+    expect(getToast()).toBe("");
+  });
 });

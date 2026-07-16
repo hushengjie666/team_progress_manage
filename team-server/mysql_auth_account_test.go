@@ -52,4 +52,20 @@ func TestBootstrapAndLoginCreateWorkspaceAccount(t *testing.T) {
 	if loginRecorder.Code != http.StatusOK {
 		t.Fatalf("login status = %d, body = %s", loginRecorder.Code, loginRecorder.Body.String())
 	}
+	var secondDevice loginResponse
+	if err := json.Unmarshal(loginRecorder.Body.Bytes(), &secondDevice); err != nil {
+		t.Fatal(err)
+	}
+	for device, token := range map[string]string{
+		"device_a": bootstrap.Token,
+		"device_b": secondDevice.Token,
+	} {
+		request := httptest.NewRequest(http.MethodGet, "/team/data", nil)
+		request.Header.Set("Authorization", "Bearer "+token)
+		response := httptest.NewRecorder()
+		api.withAuth(api.handleTeamDataLoad)(response, request)
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s token became unavailable after concurrent login: status = %d, body = %s", device, response.Code, response.Body.String())
+		}
+	}
 }
