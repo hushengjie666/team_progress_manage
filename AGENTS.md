@@ -69,6 +69,7 @@ Run the narrowest relevant check first, then escalate according to impact:
 - Navigation, persistence, timers, settings, backend UI, or browser workflows: `npm run verify:e2e`.
 - Go backend: nearest Go package test, then `npm run verify:backend` when shared behavior changes.
 - Tauri Rust: `cargo check --manifest-path src-tauri/Cargo.toml`.
+- Agent instructions: `npm run verify:agents` after changing `AGENTS.md`, referenced paths, or npm scripts.
 - Refactors or cleanup: `npm run verify:quality`.
 - New modules, moved code, or broad feature surfaces: `npm run audit:health` in addition to affected tests.
 
@@ -78,7 +79,7 @@ Common commands:
 
 - Development: `npm install`, `npm run dev`, `npm run preview`.
 - Frontend: `npm run build`, `npm run typecheck`, `npm test`, `npm run test:e2e`, `npm run verify:fast`, `npm run verify:e2e`.
-- Quality: `npm run typecheck:unused`, `npm run audit:health`, `npm run verify:quality`.
+- Quality: `npm run typecheck:unused`, `npm run audit:health`, `npm run verify:agents`, `npm run verify:quality`.
 - Backend: `npm run backend:server`, `npm run backend:build`, `npm run backend:build:windows`, `npm run verify:backend`.
 - Packaging: `npm run deploy:team` for desktop, iOS, web, and the Windows Server 2008-compatible backend; formal release: `npm run release:team:tag -- <tag>`.
 
