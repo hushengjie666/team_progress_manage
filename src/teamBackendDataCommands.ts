@@ -34,7 +34,7 @@ export function createBackendDataCommands({
     } catch (error) {
       const failed = applyTeamStateLoadFailure(current, error);
       setState(failed);
-      setToast(failed.auth.message);
+      setToast(failed.backend.message);
     }
   };
 

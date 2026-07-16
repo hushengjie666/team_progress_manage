@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Route } from "@playwright/test";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { authenticatedState } from "./support/authenticatedState";
@@ -23,6 +23,32 @@ test("signs out without writing the session change as business data", async ({ p
   await expect(page.getByText("已退出登录")).toBeVisible();
   await expect(page.getByText(/缺少业务数据版本/)).toHaveCount(0);
   expect(businessWrites).toEqual([]);
+});
+
+test("keeps the authenticated shell during a temporary backend outage", async ({ page }) => {
+  await openApp(page);
+  const abortTeamData = (route: Route) => route.abort("failed");
+  await page.route(`${MOCK_SERVER}/team/data`, abortTeamData);
+  const failedRefresh = page.waitForRequest((request) =>
+    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "GET",
+  );
+
+  await failedRefresh;
+  await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "登录账号" })).toHaveCount(0);
+  await page.getByLabel("页面导航").getByRole("button", { name: "管理中心" }).click();
+  await page.locator(".settings-section-tabs").getByRole("button", { name: "团队后台" }).click();
+  const backendPanel = page.locator("section.settings-panel").filter({
+    has: page.getByRole("heading", { name: "团队后台状态" }),
+  });
+  await expect(backendPanel).toContainText("团队后台不可用");
+
+  await page.unroute(`${MOCK_SERVER}/team/data`, abortTeamData);
+  await page.waitForResponse((response) =>
+    response.url() === `${MOCK_SERVER}/team/data` && response.request().method() === "GET" && response.ok(),
+  );
+  await expect(backendPanel).toContainText("团队在线数据已加载");
+  await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
 });
 
 test("opens workspace directory instead of switching a single active workspace", async ({ page }) => {

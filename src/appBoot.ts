@@ -1,4 +1,5 @@
 import type { AppState } from "./types";
+import { TeamHttpError } from "./teamBackendHttp";
 
 export const teamBackendUnavailableTitle = "团队后台不可用";
 
@@ -10,19 +11,7 @@ const withDetail = (message: string, error: unknown) => {
   return detail ? `${message}：${detail}` : message;
 };
 
-const isAuthAccessDeniedError = (error: unknown) => {
-  const detail = errorDetail(error)?.toLowerCase() ?? "";
-  return [
-    "workspace access denied",
-    "invalid token",
-    "token expired",
-    "missing auth",
-    "unauthorized",
-    "forbidden",
-    "account disabled",
-    "membership disabled",
-  ].some((pattern) => detail.includes(pattern));
-};
+const isAuthSessionRejected = (error: unknown) => error instanceof TeamHttpError && error.status === 401;
 
 export const normalizeAuthMessage = (message: string) =>
   message.toLowerCase().includes("workspace access denied") ? authAccessDeniedMessage : message;
@@ -30,8 +19,26 @@ export const normalizeAuthMessage = (message: string) =>
 export const backendUnavailableMessage = (serverUrl: string, error: unknown) =>
   withDetail(`团队后台不可用，请启动后台服务或检查地址：${serverUrl}`, error);
 
+const applyBackendUnavailable = (state: AppState, error: unknown): AppState => {
+  const message = backendUnavailableMessage(state.backend.serverUrl, error);
+  const hasCachedSession = Boolean(state.auth.token);
+  return {
+    ...state,
+    auth: {
+      ...state.auth,
+      status: hasCachedSession ? "authenticated" : "error",
+      message: hasCachedSession ? "已登录" : message,
+    },
+    backend: {
+      ...state.backend,
+      status: "error",
+      message,
+    },
+  };
+};
+
 export const applyAuthStatusFailure = (state: AppState, error: unknown): AppState => {
-  if (isAuthAccessDeniedError(error)) {
+  if (isAuthSessionRejected(error)) {
     return {
       ...state,
       auth: {
@@ -47,40 +54,14 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
       },
     };
   }
-  const message = backendUnavailableMessage(state.backend.serverUrl, error);
-  return {
-    ...state,
-    auth: {
-      ...state.auth,
-      status: "error",
-      message,
-    },
-    backend: {
-      ...state.backend,
-      status: "error",
-      message,
-    },
-  };
+  return applyBackendUnavailable(state, error);
 };
 
 export const applyTeamStateLoadFailure = applyAuthStatusFailure;
 
 export const applyTeamStateSaveFailure = (state: AppState, error: unknown): AppState => {
-  if (isAuthAccessDeniedError(error) && !errorDetail(error)?.toLowerCase().includes("workspace access denied")) {
+  if (isAuthSessionRejected(error)) {
     return applyAuthStatusFailure(state, error);
   }
-  const message = backendUnavailableMessage(state.backend.serverUrl, error);
-  return {
-    ...state,
-    auth: {
-      ...state.auth,
-      status: state.auth.status === "authenticated" ? "authenticated" : "error",
-      message,
-    },
-    backend: {
-      ...state.backend,
-      status: "error",
-      message,
-    },
-  };
+  return applyBackendUnavailable(state, error);
 };

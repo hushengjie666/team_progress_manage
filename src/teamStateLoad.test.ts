@@ -59,6 +59,24 @@ describe("team backend state loading", () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:8787/team/data");
   });
 
+  it("restores authenticated status after a successful retry", async () => {
+    const local = authenticatedState();
+    local.auth.status = "error";
+    local.auth.message = "团队后台不可用";
+    local.backend.status = "error";
+    local.backend.message = "团队后台不可用";
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      rows: [],
+    }), { status: 200, headers: { "content-type": "application/json" } })));
+
+    const loaded = await loadTeamData(local);
+
+    expect(loaded.auth.status).toBe("authenticated");
+    expect(loaded.auth.message).toBe("已登录");
+    expect(loaded.backend.status).toBe("ready");
+    expect(loaded.backend.message).toBe("团队在线数据已加载");
+  });
+
   it("saves team data to the unscoped endpoint", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       rows: [],

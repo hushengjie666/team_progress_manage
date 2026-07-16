@@ -162,7 +162,13 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
   const base = createInitialState();
   const next: AppState = {
     ...base,
-    auth: local.auth,
+    auth: local.auth.token
+      ? {
+          ...local.auth,
+          status: "authenticated",
+          message: "已登录",
+        }
+      : local.auth,
     settings: local.settings,
     backend: {
       ...local.backend,

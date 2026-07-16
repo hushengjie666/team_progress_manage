@@ -72,7 +72,7 @@ export const createTeamDataRuntime = ({ setState, setToast }: TeamDataRuntimeOpt
       }
       const failed = applyTeamStateSaveFailure(failureSource, error);
       if (applyFailureState && canApplyState()) setState(failed);
-      if (showFailureToast && canApplyState()) setToast(failed.auth.message);
+      if (showFailureToast && canApplyState()) setToast(failed.backend.message);
       return undefined;
     }
   };

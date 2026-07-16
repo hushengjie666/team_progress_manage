@@ -4,6 +4,7 @@ import { shouldResetSignedOutLocalBackendUrl } from "./appBootRuntime";
 import { defaultBackendServerUrl } from "./defaultBackendServerUrl";
 import { createInitialState } from "./seed";
 import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
+import { TeamHttpError } from "./teamBackendHttp";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -37,23 +38,24 @@ const signedInState = () => {
 };
 
 describe("app boot fallback", () => {
-  it("blocks cached sign-in when the team backend cannot be checked", () => {
+  it("keeps cached sign-in when the team backend cannot be checked", () => {
     const state = signedInState();
     const next = applyAuthStatusFailure(state, new Error("Load failed"));
 
-    expect(next.auth.status).toBe("error");
+    expect(next.auth.status).toBe("authenticated");
     expect(next.auth.token).toBe("token_cached");
     expect(next.auth.account).toEqual(state.auth.account);
+    expect(next.auth.message).toBe("已登录");
     expect(next.backend.status).toBe("error");
-    expect(next.auth.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
-    expect(next.backend.message).toBe(next.auth.message);
+    expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
   });
 
-  it("blocks the app when team state cannot be loaded from the backend", () => {
+  it("keeps cached business data available when team state cannot be loaded", () => {
     const state = signedInState();
     const next = applyTeamStateLoadFailure(state, new Error("Load failed"));
 
-    expect(next.auth.status).toBe("error");
+    expect(next.auth.status).toBe("authenticated");
+    expect(next.auth.message).toBe("已登录");
     expect(next.projects).toEqual(state.projects);
     expect(next.tasks).toEqual(state.tasks);
     expect(next.backend.status).toBe("error");
@@ -62,7 +64,7 @@ describe("app boot fallback", () => {
 
   it("clears cached sign-in when auth status says the current workspace can no longer be accessed", () => {
     const state = signedInState();
-    const next = applyAuthStatusFailure(state, new Error("workspace access denied"));
+    const next = applyAuthStatusFailure(state, new TeamHttpError(401, "workspace access denied"));
 
     expect(next.auth.status).toBe("signed_out");
     expect(next.auth.token).toBeUndefined();
@@ -75,14 +77,23 @@ describe("app boot fallback", () => {
 
   it("keeps the account signed in when team data saving is denied", () => {
     const state = signedInState();
-    const next = applyTeamStateSaveFailure(state, new Error("workspace access denied"));
+    const next = applyTeamStateSaveFailure(state, new TeamHttpError(403, "business row write denied"));
 
     expect(next.auth.status).toBe("authenticated");
     expect(next.auth.token).toBe("token_cached");
     expect(next.auth.account).toEqual(state.auth.account);
     expect(next.backend.token).toBe("token_cached");
     expect(next.backend.status).toBe("error");
-    expect(next.backend.message).toContain("workspace access denied");
+    expect(next.backend.message).toContain("business row write denied");
+  });
+
+  it("does not infer session expiry from an untyped error message", () => {
+    const state = signedInState();
+    const next = applyTeamStateLoadFailure(state, new Error("unauthorized upstream response"));
+
+    expect(next.auth.status).toBe("authenticated");
+    expect(next.auth.token).toBe("token_cached");
+    expect(next.backend.status).toBe("error");
   });
 
   it("normalizes stale persisted workspace access errors for login display", () => {
