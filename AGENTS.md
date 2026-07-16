@@ -81,6 +81,20 @@ Treat the current production UI as desktop-first. Do not add or change mobile-sp
 - `npm run backend:server`: start the local backend service.
 - `npm run deploy:team`: build Tauri desktop bundles, the `/timemanage-team/` frontend, and the Windows Server 2008 compatible backend into one versioned directory and matching ZIP under `deploy/`.
 
+## Release Branch Workflow
+
+Use a short-lived release branch for every formal release. Do not stabilize a release directly on `main` or create a formal release tag from an unreviewed feature branch.
+
+1. Start from a clean, up-to-date `main` branch and create `release/v<version>` from that exact commit.
+2. Perform release testing, version updates, required migration work, packaging adjustments, and release-only bug fixes on `release/v<version>`. Do not add unrelated product features after the release branch is cut.
+3. Commit and push every release fix to the release branch, then rerun all verification required by the affected frontend, backend, desktop, iOS, and database surfaces. The release branch must be clean before tagging.
+4. When the release is approved, create the annotated `v<version>` tag on the verified release-branch HEAD and push the tag. A formal tag is a Git tag, not a permanent tag branch, and released tags must never be moved or recreated.
+5. Build the formal release from that clean tag with `npm run release:team:tag -- <tag>` and complete the artifact checks in the unified packaging rules.
+6. Merge `release/v<version>` into `main` without dropping or rewriting release commits, push `main`, and verify that `main` contains the tagged release commit.
+7. After the tag, formal package, and `main` merge are all confirmed, delete the release branch locally and from `origin`. Keep the release tag permanently.
+
+If a defect is found after tagging, do not amend the released tag or revive the deleted release branch. Create the next patch-version release branch from the appropriate updated `main`, apply the fix there, and publish a new ordered tag.
+
 ## Unified Release Packaging
 
 Keep all distributable artifacts from one build together. `npm run deploy:team` is the single temporary-package entry point and must produce both:
