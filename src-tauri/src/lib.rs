@@ -95,7 +95,16 @@ fn configure_macos_minimize_button<R: tauri::Runtime>(app: &tauri::AppHandle<R>)
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
-    let mut builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            restore_main_window_on_main_thread(app);
+        }));
+    }
+
+    builder = builder
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_timer_native::init());

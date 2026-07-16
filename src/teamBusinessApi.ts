@@ -5,8 +5,9 @@ import {
 } from "./teamBusinessRows";
 import {
   businessOperationsBetween,
-  operationsCanRetry,
-  operationsWithLatestRevisions,
+  MissingBusinessRowRevisionError,
+  operationsCanRebase,
+  rebaseBusinessOperations,
   type BusinessOperation,
 } from "./teamBusinessMutations";
 import { preserveLocalActiveRuntime } from "./teamActiveRuntimePreservation";
@@ -43,14 +44,24 @@ export async function saveTeamDataChanges(
   state: AppState,
 ): Promise<AppState> {
   const savedAt = new Date().toISOString();
-  const operations = businessOperationsBetween(before, state);
+  let operations: BusinessOperation[];
+  try {
+    operations = businessOperationsBetween(before, state);
+  } catch (error) {
+    if (!(error instanceof MissingBusinessRowRevisionError) || error.operation === "delete") throw error;
+    const latest = await loadTeamData(before);
+    operations = rebaseBusinessOperations(before, state, latest);
+    if (!operationsCanRebase(operations)) throw error;
+  }
   let payload: TeamDataResponse;
   try {
     payload = await submitTeamOperations(backend, token, operations);
   } catch (error) {
-    if (!(error instanceof TeamHttpError) || error.status !== 409 || !operationsCanRetry(operations)) throw error;
+    if (!(error instanceof TeamHttpError) || error.status !== 409 || !operationsCanRebase(operations)) throw error;
     const latest = await loadTeamData(before);
-    payload = await submitTeamOperations(backend, token, operationsWithLatestRevisions(operations, latest));
+    const rebased = rebaseBusinessOperations(before, state, latest);
+    if (!operationsCanRebase(rebased)) throw error;
+    payload = await submitTeamOperations(backend, token, rebased);
   }
   return preserveLocalActiveRuntime(mergeBusinessRowsIntoState({
     ...state,
