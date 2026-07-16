@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ensureTodayPlan } from "./appModel";
 import { createInitialState } from "./seed";
-import { loadTeamData, saveTeamDataSnapshot } from "./teamApi";
-import type { BusinessRow } from "./teamBusinessRows";
+import { loadTeamData, saveTeamDataChanges, saveTeamDataSnapshot } from "./teamApi";
+import { businessRowsFromState, type BusinessRow } from "./teamBusinessRows";
 import type { BackendConnectionState } from "./types";
 
 const iso = (value: string) => new Date(value).toISOString();
@@ -70,6 +71,83 @@ describe("team backend state loading", () => {
     expect(String(fetchMock.mock.calls[0][0])).toBe("http://127.0.0.1:8787/team/data");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][1]?.method).toBe("PUT");
+  });
+
+  it("refreshes missing row revisions and replays a daily plan patch", async () => {
+    const before = ensureTodayPlan(authenticatedState());
+    const plan = before.dailyPlans[0];
+    const after = {
+      ...before,
+      dailyPlans: before.dailyPlans.map((item) => item.id === plan.id
+        ? { ...item, committedTaskIds: [...item.committedTaskIds, "task_queue_new"], updatedAt: iso("2026-07-15T01:00:00Z") }
+        : item),
+    };
+    const requests: Array<{ method: string; body?: { operations?: Array<Record<string, unknown>> } }> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      const state = init?.method === "PUT" ? after : before;
+      return new Response(JSON.stringify({
+        rows: businessRowsFromState(state).map((row) => ({ ...row, revision: init?.method === "PUT" ? 8 : 7 })),
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveTeamDataChanges(before.backend, "token", before, after);
+
+    expect(requests.map((request) => request.method)).toEqual(["GET", "PUT"]);
+    expect(requests[1]?.body?.operations).toEqual([expect.objectContaining({
+      operation: "patch",
+      entity: "daily_plan",
+      id: plan.id,
+      expected_revision: 7,
+      patch: expect.objectContaining({ committedTaskIds: [...plan.committedTaskIds, "task_queue_new"] }),
+    })]);
+  });
+
+  it("rebases a colliding create from another app instance", async () => {
+    const before = authenticatedState();
+    const project = {
+      ...before.projects[0],
+      id: "project_parallel_app",
+      name: "当前窗口名称",
+      updatedAt: iso("2026-07-15T01:00:00Z"),
+    };
+    const after = { ...before, projects: [...before.projects, project] };
+    const latest = {
+      ...before,
+      projects: [...before.projects, { ...project, name: "另一个窗口名称" }],
+    };
+    const requests: Array<{ method: string; body?: { operations?: Array<Record<string, unknown>> } }> = [];
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({
+        method: init?.method ?? "GET",
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      if (requests.length === 1) {
+        return new Response(JSON.stringify({ error: "revision_conflict" }), {
+          status: 409,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const state = init?.method === "PUT" ? after : latest;
+      return new Response(JSON.stringify({
+        rows: businessRowsFromState(state).map((row) => ({ ...row, revision: init?.method === "PUT" ? 6 : 5 })),
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await saveTeamDataChanges(before.backend, "token", before, after);
+
+    expect(requests.map((request) => request.method)).toEqual(["PUT", "GET", "PUT"]);
+    expect(requests[2]?.body?.operations).toEqual([expect.objectContaining({
+      operation: "patch",
+      id: project.id,
+      expected_revision: 5,
+      patch: expect.objectContaining({ name: "当前窗口名称" }),
+    })]);
   });
 
   it("does not resurrect starter members when the remote team has no member rows", async () => {
