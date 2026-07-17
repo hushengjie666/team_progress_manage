@@ -102,4 +102,34 @@ describe("team business mutations", () => {
       patch: expect.objectContaining({ name: "本地名称" }),
     })]);
   });
+
+  it("creates a refreshed daily plan that still has no server revision", () => {
+    const before = ensureTodayPlan(versionedState());
+    const plan = before.dailyPlans[0];
+    const key = businessRowKey(businessRowsFromState(before).find((row) => row.entity === "daily_plan" && row.id === plan.id)!);
+    const unversionedBefore = {
+      ...before,
+      backend: {
+        ...before.backend,
+        businessRowRevisions: Object.fromEntries(
+          Object.entries(before.backend.businessRowRevisions ?? {}).filter(([rowKey]) => rowKey !== key),
+        ),
+      },
+    };
+    const after = {
+      ...unversionedBefore,
+      dailyPlans: unversionedBefore.dailyPlans.map((item) => item.id === plan.id
+        ? { ...item, committedTaskIds: [...item.committedTaskIds, "task_new"], updatedAt: "2026-07-15T01:00:00.000Z" }
+        : item),
+    };
+
+    expect(rebaseBusinessOperations(unversionedBefore, after, unversionedBefore)).toEqual([{
+      operation: "create",
+      row: expect.objectContaining({
+        entity: "daily_plan",
+        id: plan.id,
+        payload: expect.objectContaining({ committedTaskIds: [...plan.committedTaskIds, "task_new"] }),
+      }),
+    }]);
+  });
 });

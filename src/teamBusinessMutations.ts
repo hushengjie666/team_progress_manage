@@ -115,12 +115,11 @@ export function rebaseBusinessOperations(
         ? mergePatchBetween(latestRow.payload, row.payload)
         : row.payload;
     if (patch === undefined) continue;
-    if (!latestRow) {
+    const expectedRevision = revisions[key];
+    if (!latestRow || !expectedRevision) {
       operations.push({ operation: "create", row });
       continue;
     }
-    const expectedRevision = revisions[key];
-    if (!expectedRevision) throw new MissingBusinessRowRevisionError("patch", latestRow);
     operations.push({
       operation: "patch",
       workspace_id: row.workspace_id ?? "",
