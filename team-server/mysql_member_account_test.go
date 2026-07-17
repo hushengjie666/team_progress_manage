@@ -42,6 +42,9 @@ func TestProjectOwnerCreatesMemberAccount(t *testing.T) {
 	if response.Account.Email != "executor@example.com" || response.Member.Entity != "project_member" {
 		t.Fatalf("unexpected member response: %#v", response)
 	}
+	if _, found, err := businessExistingRow(t.Context(), api.db, "workspace_test", "project_member", response.Member.ID); err != nil || !found {
+		t.Fatalf("created project member was not persisted: id=%q workspace=%q found=%v err=%v", response.Member.ID, response.Member.WorkspaceID, found, err)
+	}
 	patchBody := versionedJSONBody(t, `{"password":"new-demo"}`, 0)
 	patchRecorder := httptest.NewRecorder()
 	api.handleMemberByID(patchRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+response.Member.ID, patchBody), ownerAuth())

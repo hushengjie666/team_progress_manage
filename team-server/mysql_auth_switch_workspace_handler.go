@@ -40,13 +40,9 @@ func (a *app) handleSwitchWorkspaceMySQL(w http.ResponseWriter, r *http.Request,
 	}
 	account.WorkspaceID = workspace.ID
 	account.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	result, err := a.db.ExecContext(ctx, `UPDATE accounts SET workspace_id = ?, updated_at = ? WHERE id = ?`, account.WorkspaceID, account.UpdatedAt, account.ID)
+	_, err = a.db.ExecContext(ctx, `UPDATE accounts SET workspace_id = ?, updated_at = ? WHERE id = ?`, account.WorkspaceID, account.UpdatedAt, account.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if count, err := result.RowsAffected(); err != nil || count != 1 {
-		writeError(w, http.StatusNotFound, "account not found")
 		return
 	}
 	a.writeLoginResponse(w, account, workspace)

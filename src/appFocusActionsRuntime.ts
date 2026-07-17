@@ -70,9 +70,9 @@ export function createAppFocusActionsRuntime({
     const active = source.activeTimer;
     if (!active?.workSessionId) return;
     const session = source.workSessions.find((item) => item.id === active.workSessionId);
-    if (!session) return;
+    const taskId = session?.taskId ?? active.taskId;
     const action = active.isRunning ? "pause" : "resume";
-    void runTeamCommand({ kind: "action", resource: "work-sessions", id: session.id, action, workspaceId: source.tasks.find((item) => item.id === session.taskId)?.workspaceId })
+    void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action, workspaceId: source.tasks.find((item) => item.id === taskId)?.workspaceId })
       .then((saved) => saved && updateState((value) => ({ ...value, activeTimer: toggleTimerInState(value, nowIso()).activeTimer })));
   };
 
@@ -107,9 +107,11 @@ export function createAppFocusActionsRuntime({
     const active = source.activeTimer;
     if (active?.workSessionId) {
       const session = source.workSessions.find((item) => item.id === active.workSessionId);
-      await runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? source.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome } });
+      const saved = await runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: source.tasks.find((item) => item.id === (session?.taskId ?? active.taskId))?.workspaceId, payload: { outcome } });
+      if (!saved) return;
+    } else {
+      updateState((value) => ({ ...value, activeTimer: undefined }));
     }
-    updateState((value) => ({ ...value, activeTimer: undefined }));
     setToast(outcome === "completed" ? "番茄已记录" : "当前番茄已作废");
   };
 

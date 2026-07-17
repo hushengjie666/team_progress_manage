@@ -40,5 +40,9 @@ func mysqlUpdateAccount(ctx context.Context, tx *sql.Tx, account accountRecord) 
 		return false, err
 	}
 	count, err := result.RowsAffected()
-	return count == 1, err
+	if err != nil || count == 1 {
+		return count == 1, err
+	}
+	_, found, lookupErr := mysqlAccountByID(ctx, tx, account.ID)
+	return found, lookupErr
 }

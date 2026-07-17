@@ -117,3 +117,24 @@ func TestCORSAllowsPutPreflight(t *testing.T) {
 		t.Fatalf("PUT missing from allowed methods: %q", methods)
 	}
 }
+
+func TestCORSAllowsIdempotencyKeyPreflight(t *testing.T) {
+	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("preflight should not call wrapped handler")
+	}))
+	request := httptest.NewRequest(http.MethodOptions, "/tasks/task_test/start", nil)
+	request.Header.Set("Origin", "http://127.0.0.1:1420")
+	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	request.Header.Set("Access-Control-Request-Headers", "authorization,content-type,idempotency-key")
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("status = %d", recorder.Code)
+	}
+	headers := strings.ToLower(recorder.Header().Get("Access-Control-Allow-Headers"))
+	if !strings.Contains(headers, "idempotency-key") {
+		t.Fatalf("Idempotency-Key missing from allowed headers: %q", headers)
+	}
+}

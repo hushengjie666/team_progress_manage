@@ -263,7 +263,11 @@ func businessUpdateRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, 
 		return false, err
 	}
 	count, err := result.RowsAffected()
-	return count == 1, err
+	if err != nil || count == 1 {
+		return count == 1, err
+	}
+	_, found, lookupErr := businessExistingRow(ctx, tx, row.WorkspaceID, row.Entity, row.ID)
+	return found, lookupErr
 }
 
 func businessDeleteRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, error) {

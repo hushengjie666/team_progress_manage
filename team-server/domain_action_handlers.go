@@ -348,10 +348,19 @@ func (a *app) handleWorkSessionAction(w http.ResponseWriter, r *http.Request, au
 					return
 				}
 				focusPayload["endedAt"] = now
+				if strings.TrimSpace(req.Outcome) != "" {
+					focusPayload["outcome"] = strings.TrimSpace(req.Outcome)
+				}
 				if err := savePayloadObject(r.Context(), tx, focus, focusPayload, now); err != nil {
 					writeError(w, http.StatusInternalServerError, "save failed")
 					return
 				}
+			}
+		}
+		if req.Outcome == "completed" {
+			if err := completeFocusedTaskInTx(r.Context(), tx, auth, workspaceID, payload, now); err != nil {
+				writeError(w, http.StatusInternalServerError, "save failed")
+				return
 			}
 		}
 	}
