@@ -21,7 +21,10 @@ export class TeamHttpError extends Error {
 }
 
 const readResponse = async <T>(response: Response): Promise<T> => {
-  if (response.ok) return response.json() as Promise<T>;
+  if (response.ok) {
+    if (response.status === 204 || response.headers?.get?.("Content-Length") === "0") return undefined as T;
+    return response.json() as Promise<T>;
+  }
   let message = `${response.status} ${response.statusText}`;
   try {
     const body = (await response.json()) as { error?: string };

@@ -46,6 +46,15 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 		if !allowed {
 			return businessMutationFailure{status: http.StatusForbidden, message: "business row write denied"}
 		}
+		if current.Entity == "task" {
+			now := strings.TrimSpace(operation.UpdatedAt)
+			if now == "" {
+				now = time.Now().UTC().Format(time.RFC3339Nano)
+			}
+			if err := cleanupTaskReferencesForDelete(ctx, tx, current, now); err != nil {
+				return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
+			}
+		}
 		deleted, err := businessDeleteRow(ctx, tx, current)
 		if err != nil {
 			return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}

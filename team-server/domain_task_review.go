@@ -111,6 +111,10 @@ func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, t
 }
 
 func endTaskWorkSessionsForReview(ctx context.Context, tx *sql.Tx, task businessRow, now string) error {
+	return endTaskWorkSessionsInTx(ctx, tx, task, now, "submitted_for_review")
+}
+
+func endTaskWorkSessionsInTx(ctx context.Context, tx *sql.Tx, task businessRow, now string, outcome string) error {
 	rows, err := tx.QueryContext(
 		ctx,
 		`SELECT workspace_id, 'work_session' AS entity, id, account_id, updated_at, payload
@@ -135,7 +139,7 @@ func endTaskWorkSessionsForReview(ctx context.Context, tx *sql.Tx, task business
 		}
 		payload["status"] = "ended"
 		payload["endedAt"] = now
-		payload["outcome"] = "submitted_for_review"
+		payload["outcome"] = outcome
 		if err := savePayloadObject(ctx, tx, session, payload, now); err != nil {
 			return err
 		}
@@ -155,7 +159,7 @@ func endTaskWorkSessionsForReview(ctx context.Context, tx *sql.Tx, task business
 			return err
 		}
 		focusPayload["endedAt"] = now
-		focusPayload["outcome"] = "submitted_for_review"
+		focusPayload["outcome"] = outcome
 		if err := savePayloadObject(ctx, tx, focus, focusPayload, now); err != nil {
 			return err
 		}

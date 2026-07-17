@@ -59,14 +59,25 @@ export function createAppTaskDeletionRuntime({
     const deletedTaskSnapshot = getDeletedTaskSnapshot();
     if (!deletedTaskSnapshot) return;
     const { task } = deletedTaskSnapshot;
-    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> })
-      .then((saved) => {
-        if (!saved) return;
-        setSelectedTaskId(task.id);
-        setDeletedTaskSnapshot(null);
-        if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-        setToast("已撤销删除");
-      });
+    void (async () => {
+      const saved = await runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> });
+      if (!saved) return;
+      for (const planId of deletedTaskSnapshot.committedPlanIds) {
+        const restored = await runTeamCommand({
+          kind: "action",
+          resource: "daily-plans",
+          id: planId,
+          action: "add-task",
+          workspaceId: task.workspaceId,
+          payload: { task_id: task.id },
+        });
+        if (!restored) return;
+      }
+      setSelectedTaskId(task.id);
+      setDeletedTaskSnapshot(null);
+      if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+      setToast("已撤销删除");
+    })();
   };
 
   return {
