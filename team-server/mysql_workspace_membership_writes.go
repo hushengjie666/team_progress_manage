@@ -17,7 +17,7 @@ func mysqlUpsertWorkspaceMembership(ctx context.Context, tx *sql.Tx, membership 
 		ctx,
 		`INSERT INTO workspace_memberships (id, workspace_id, account_id, role, status, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?)
-			ON DUPLICATE KEY UPDATE role = VALUES(role), status = VALUES(status), updated_at = VALUES(updated_at), row_version = row_version + 1`,
+			ON DUPLICATE KEY UPDATE role = VALUES(role), status = VALUES(status), updated_at = VALUES(updated_at)`,
 		membership.ID,
 		membership.WorkspaceID,
 		membership.AccountID,
@@ -45,7 +45,7 @@ func mysqlRestrictWorkspaceToOwner(ctx context.Context, tx *sql.Tx, workspaceID 
 	if _, err := tx.ExecContext(
 		ctx,
 		`UPDATE workspace_memberships
-		 SET status = 'disabled', updated_at = ?, row_version = row_version + 1
+		 SET status = 'disabled', updated_at = ?
 		 WHERE workspace_id = ? AND account_id <> ? AND status <> 'disabled'`,
 		now,
 		workspaceID,
@@ -56,7 +56,7 @@ func mysqlRestrictWorkspaceToOwner(ctx context.Context, tx *sql.Tx, workspaceID 
 	_, err := tx.ExecContext(
 		ctx,
 		`UPDATE workspace_invitations
-		 SET status = 'cancelled', updated_at = ?, row_version = row_version + 1
+		 SET status = 'cancelled', updated_at = ?
 		 WHERE workspace_id = ? AND status = 'pending'`,
 		now,
 		workspaceID,

@@ -10,7 +10,7 @@ const exportOptions = read("src-tauri/gen/apple/ExportOptions.plist");
 const iosEnvironment = read(".env.ios-production");
 
 const expected = {
-  version: "0.2.3",
+  version: "0.2.4",
   build: "2026071201",
   bundleId: "xyz.hudashuai.timemanage",
   extensionBundleId: "xyz.hudashuai.timemanage.TimerLiveActivity",

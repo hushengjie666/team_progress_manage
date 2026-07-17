@@ -1,5 +1,5 @@
-import { deleteTaskFromState, undoDeleteTaskInState } from "./appTaskDeletionState";
-import { nowIso, type DeletedTaskSnapshot } from "./appModel";
+import { deleteTaskFromState } from "./appTaskDeletionState";
+import { nowIso } from "./appModel";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 
 type AppTaskDeletionRuntime = Pick<
@@ -13,7 +13,7 @@ type AppTaskDeletionRuntimeOptions = Pick<
   | "getSelectedTaskId"
   | "getPendingDeleteTask"
   | "getDeletedTaskSnapshot"
-  | "updateState"
+  | "runTeamCommand"
   | "setToast"
   | "setSelectedTaskId"
   | "setPendingDeleteTask"
@@ -26,7 +26,7 @@ export function createAppTaskDeletionRuntime({
   getSelectedTaskId,
   getPendingDeleteTask,
   getDeletedTaskSnapshot,
-  updateState,
+  runTeamCommand,
   setToast,
   setSelectedTaskId,
   setPendingDeleteTask,
@@ -42,31 +42,31 @@ export function createAppTaskDeletionRuntime({
     const pendingDeleteTask = getPendingDeleteTask();
     if (!pendingDeleteTask) return;
     const taskId = pendingDeleteTask.id;
-    const timestamp = nowIso();
-    let snapshot: DeletedTaskSnapshot | null = null;
-    updateState((value) => {
-      const result = deleteTaskFromState(value, pendingDeleteTask, timestamp);
-      snapshot = result.snapshot;
-      return result.state;
-    });
-    if (getSelectedTaskId() === taskId) setSelectedTaskId(null);
-    setPendingDeleteTask(null);
-    setDeletedTaskSnapshot(snapshot);
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    undoTimerRef.current = window.setTimeout(() => setDeletedTaskSnapshot(null), 8_000);
-    setToast("任务已删除，可在 8 秒内撤销");
+    const snapshot = deleteTaskFromState(getState(), pendingDeleteTask, nowIso()).snapshot;
+    void runTeamCommand({ kind: "delete", entity: "task", id: taskId, workspaceId: pendingDeleteTask.workspaceId })
+      .then((saved) => {
+        if (!saved) return;
+        if (getSelectedTaskId() === taskId) setSelectedTaskId(null);
+        setPendingDeleteTask(null);
+        setDeletedTaskSnapshot(snapshot);
+        if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+        undoTimerRef.current = window.setTimeout(() => setDeletedTaskSnapshot(null), 8_000);
+        setToast("任务已删除，可在 8 秒内撤销");
+      });
   };
 
   const undoDeleteTask = () => {
     const deletedTaskSnapshot = getDeletedTaskSnapshot();
     if (!deletedTaskSnapshot) return;
     const { task } = deletedTaskSnapshot;
-    const timestamp = nowIso();
-    updateState((value) => undoDeleteTaskInState(value, deletedTaskSnapshot, timestamp));
-    setSelectedTaskId(task.id);
-    setDeletedTaskSnapshot(null);
-    if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
-    setToast("已撤销删除");
+    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> })
+      .then((saved) => {
+        if (!saved) return;
+        setSelectedTaskId(task.id);
+        setDeletedTaskSnapshot(null);
+        if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
+        setToast("已撤销删除");
+      });
   };
 
   return {

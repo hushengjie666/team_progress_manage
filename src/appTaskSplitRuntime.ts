@@ -1,6 +1,4 @@
-import { buildSplitTaskText, splitTaskInState } from "./appTaskSplitState";
-import { nowIso } from "./appModel";
-import { uid } from "./seed";
+import { buildSplitTaskText } from "./appTaskSplitState";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 
 type AppTaskSplitRuntime = Pick<
@@ -10,13 +8,13 @@ type AppTaskSplitRuntime = Pick<
 
 type AppTaskSplitRuntimeOptions = Pick<
   AppTaskActionsRuntimeOptions,
-  "getState" | "getPendingSplit" | "updateState" | "setToast" | "setSelectedTaskId" | "setPendingSplit"
+  "getState" | "getPendingSplit" | "runTeamCommand" | "setToast" | "setSelectedTaskId" | "setPendingSplit"
 >;
 
 export function createAppTaskSplitRuntime({
   getState,
   getPendingSplit,
-  updateState,
+  runTeamCommand,
   setToast,
   setSelectedTaskId,
   setPendingSplit,
@@ -40,16 +38,20 @@ export function createAppTaskSplitRuntime({
       return;
     }
 
-    const timestamp = nowIso();
-    let newTaskCount = 0;
-    updateState((value) => {
-      const result = splitTaskInState(value, task, titles, timestamp, () => uid("task"));
-      newTaskCount = result.newTasks.length;
-      return result.state;
+    void runTeamCommand({
+      kind: "action",
+      resource: "tasks",
+      id: task.id,
+      action: "split",
+      workspaceId: task.workspaceId,
+      payload: { child_titles: titles },
+      idempotencyKey: `split:${task.id}:${titles.join("|")}`,
+    }).then((saved) => {
+      if (!saved) return;
+      setSelectedTaskId(task.id);
+      setPendingSplit(null);
+      setToast(`已拆分为 ${titles.length} 个子任务`);
     });
-    setSelectedTaskId(task.id);
-    setPendingSplit(null);
-    setToast(`已拆分为 ${newTaskCount} 个子任务`);
   };
 
   return {

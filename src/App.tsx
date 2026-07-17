@@ -12,6 +12,7 @@ import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
 import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
 import { createTeamDataRuntime } from "./teamStateRuntime";
+import { createDailyPlanForDate, nowIso, today } from "./appModel";
 
 export function App() {
   const appShell = useAppShellState();
@@ -36,8 +37,7 @@ export function App() {
     });
   }
   const {
-    persistTeamData,
-    commitTeamData,
+    runTeamCommand,
     workspaceAccountRuntime,
     updateState,
     backendActions,
@@ -56,8 +56,7 @@ export function App() {
     undoTimerRef,
     stopNoiseRef,
     reminderSentRef,
-    persistTeamData,
-    commitTeamData,
+    runTeamCommand,
     setState,
     setToast,
     setToastVisible,
@@ -88,7 +87,8 @@ export function App() {
     selectedProjectId,
     projectTaskFilters,
   });
-  const { todayPlan, workspaceModel } = appViewModel;
+  const { workspaceModel } = appViewModel;
+  const todayPlan = appViewModel.todayPlan ?? (state ? createDailyPlanForDate(state, today(), nowIso()) : undefined);
   const toggleDesktopTimer = useCallback(() => {
     loadedRuntimesRef.current?.focusActions.toggleTimer();
   }, []);
@@ -114,7 +114,7 @@ export function App() {
     state,
     viewModel: appViewModel,
     updateState,
-    persistTeamData,
+    runTeamCommand,
   });
   loadedRuntimesRef.current = loadedRuntimes;
   if (state.auth.status !== "authenticated" || !state.auth.token) {

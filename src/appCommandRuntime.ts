@@ -11,15 +11,14 @@ import type {
   SessionMode,
   Task,
 } from "./types";
-
-type UpdateState = (updater: (value: AppState) => AppState) => void;
+import type { RunTeamDomainCommand } from "./teamDomainCommands";
 
 export type AppCommandRuntimeOptions = {
   getState: () => AppState;
   getCurrentProjectId: () => string | undefined;
   getCurrentTaskId: () => string | undefined;
   getFirstCommittedTaskId: () => string | undefined;
-  updateState: UpdateState;
+  runTeamCommand: RunTeamDomainCommand;
   setSelectedTaskId: (taskId: string) => void;
   setWorkspaceMode: (mode: "board" | "workbench") => void;
   setSettingsSection: (section: "members" | "backend") => void;
@@ -43,7 +42,7 @@ export function createAppCommandRuntime({
   getCurrentProjectId,
   getCurrentTaskId,
   getFirstCommittedTaskId,
-  updateState,
+  runTeamCommand,
   setSelectedTaskId,
   setWorkspaceMode,
   setSettingsSection,
@@ -82,11 +81,14 @@ export function createAppCommandRuntime({
       ...emptyTaskDefaults(timestamp, Date.now()),
       dueAt: parsed.dueAt,
     };
-    updateState((value) => ({ ...value, tasks: [task, ...value.tasks], updatedAt: timestamp }));
-    setSelectedTaskId(task.id);
-    setWorkspaceMode("workbench");
-    setTab("workspace");
-    setToast(`已添加：${task.title}`);
+    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> })
+      .then((saved) => {
+        if (!saved) return;
+        setSelectedTaskId(task.id);
+        setWorkspaceMode("workbench");
+        setTab("workspace");
+        setToast(`已添加：${task.title}`);
+      });
   };
 
   const runCommand = (action: CommandAction, parsed?: ParsedQuickInput, taskId?: string) => {

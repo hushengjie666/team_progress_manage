@@ -1,19 +1,15 @@
 import { applyTeamStateLoadFailure } from "./appBoot";
-import { ensureTodayPlan, initialFilters, nowIso, type Tab, type TaskFilters } from "./appModel";
+import { initialFilters, nowIso, type Tab, type TaskFilters } from "./appModel";
 import { demoTaskIdForProject, mergeDemoDataIntoState } from "./demoData";
 import type { AppState } from "./types";
+import { importTeamBusinessData } from "./teamBusinessApi";
+import { businessRowsFromState } from "./teamBusinessRows";
 
-type PersistTeamData = (
-  current: AppState,
-  next: AppState,
-  options?: { refreshAfterSave?: boolean },
-) => Promise<AppState | undefined>;
 type Setter<T> = (value: T | ((current: T) => T)) => void;
 
 export type AppDemoDataRuntimeOptions = {
   getState: () => AppState | null;
   getSelectedProjectId: () => string | null;
-  persistTeamData: PersistTeamData;
   setState: Setter<AppState | null>;
   setToast: (message: string) => void;
   setSelectedProjectId: Setter<string | null>;
@@ -30,7 +26,6 @@ export type AppDemoDataRuntime = {
 export function createAppDemoDataRuntime({
   getState,
   getSelectedProjectId,
-  persistTeamData,
   setState,
   setToast,
   setSelectedProjectId,
@@ -57,9 +52,9 @@ export function createAppDemoDataRuntime({
     }
     setToast("正在写入团队后台...");
     try {
-      const next = ensureTodayPlan(mergeDemoDataIntoState(current, targetProjectId, nowIso()));
-      const saved = await persistTeamData(current, next, { refreshAfterSave: true });
-      if (!saved) return;
+      const next = mergeDemoDataIntoState(current, targetProjectId, nowIso());
+      const saved = await importTeamBusinessData(current, businessRowsFromState(next));
+      setState(saved);
       setSelectedProjectId(targetProjectId);
       setProjectDetailTab("overview");
       setSelectedTaskId(demoTaskIdForProject("demo_task_today_deep", targetProjectId));

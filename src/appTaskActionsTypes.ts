@@ -1,8 +1,8 @@
 import type { ProjectTaskInput } from "./projectDetail";
 import type { DeletedTaskSnapshot, SplitDraft, TaskDraft } from "./appModel";
 import type { AppState, Task, TaskTemplate } from "./types";
+import type { RunTeamDomainCommand } from "./teamDomainCommands";
 
-export type UpdateAppTaskState = (updater: (value: AppState) => AppState) => void;
 export type AppTaskActionSetter<T> = (value: T | ((current: T) => T)) => void;
 
 export type AppTaskActionsRuntimeOptions = {
@@ -13,7 +13,7 @@ export type AppTaskActionsRuntimeOptions = {
   getPendingDeleteTask: () => Task | null;
   getDeletedTaskSnapshot: () => DeletedTaskSnapshot | null;
   getPendingSplit: () => SplitDraft | null;
-  updateState: UpdateAppTaskState;
+  runTeamCommand: RunTeamDomainCommand;
   setDraft: AppTaskActionSetter<TaskDraft>;
   setToast: (message: string) => void;
   setSelectedTaskId: AppTaskActionSetter<string | null>;

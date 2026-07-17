@@ -9,14 +9,11 @@ import type { useAppViewModelHooks } from "./appViewModelHooks";
 import type { TeamDataRuntime } from "./teamStateRuntime";
 import type { AppState } from "./types";
 
-type UpdateState = (updater: (value: AppState) => AppState) => void;
-
 type AppLoadedSupportRuntimesOptions = {
   shell: ReturnType<typeof useAppShellState>;
   state: AppState;
   viewModel: ReturnType<typeof useAppViewModelHooks>;
-  updateState: UpdateState;
-  persistTeamData: TeamDataRuntime["persistTeamData"];
+  runTeamCommand: TeamDataRuntime["runTeamCommand"];
   currentProjectId: string;
   focusActions: ReturnType<typeof createAppFocusActionsRuntime>;
   projectActions: ReturnType<typeof createAppProjectActionsRuntime>;
@@ -26,8 +23,7 @@ export function createAppLoadedSupportRuntimes({
   shell,
   state,
   viewModel,
-  updateState,
-  persistTeamData,
+  runTeamCommand,
   currentProjectId,
   focusActions,
   projectActions,
@@ -35,7 +31,6 @@ export function createAppLoadedSupportRuntimes({
   const { loadDemoData } = createAppDemoDataRuntime({
     getState: () => shell.stateRef.current,
     getSelectedProjectId: () => shell.selectedProjectId,
-    persistTeamData,
     setState: shell.setState,
     setToast: shell.setToast,
     setSelectedProjectId: shell.setSelectedProjectId,
@@ -59,7 +54,7 @@ export function createAppLoadedSupportRuntimes({
     getCurrentProjectId: () => currentProjectId,
     getCurrentTaskId: () => viewModel.currentTask?.id,
     getFirstCommittedTaskId: () => viewModel.focusCommittedTasks[0]?.id,
-    updateState,
+    runTeamCommand,
     setSelectedTaskId: shell.setSelectedTaskId,
     setWorkspaceMode: shell.setWorkspaceMode,
     setSettingsSection: shell.setSettingsSection,

@@ -30,6 +30,7 @@ describe("app settings actions runtime", () => {
       updateState: (updater) => {
         state = updater(state);
       },
+      runTeamCommand: vi.fn(async () => state),
       setToast: () => undefined,
     });
 

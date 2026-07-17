@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { projectInviteeScenario } from "./support/scenarioStates";
@@ -26,23 +25,16 @@ test("shows inherited workspace members in project member management", async ({ 
   await expect(wangshuoRow.getByLabel("项目负责人")).not.toBeChecked();
 
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
+    request.url().startsWith(`${MOCK_SERVER}/project-members`) && request.method() === "POST",
   );
-  await wangshuoRow.getByLabel("项目负责人").check();
+  await wangshuoRow.getByLabel("项目负责人").click();
   const requestBody = (await saveRequest).postDataJSON();
-  expect(businessOperationRows(requestBody)).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        entity: "project_member",
-        payload: expect.objectContaining({
-          projectId: "project_starter",
-          accountId: "account_wangshuo",
-          roles: expect.arrayContaining(["executor", "project_owner"]),
-          status: "active",
-        }),
-      }),
-    ]),
-  );
+  expect(requestBody).toEqual(expect.objectContaining({
+    projectId: "project_starter",
+    accountId: "account_wangshuo",
+    roles: expect.arrayContaining(["executor", "project_owner"]),
+    status: "active",
+  }));
 });
 
 test("sends project member invitation from current project", async ({ page }) => {

@@ -13,7 +13,7 @@ func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, p
 	}
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project' AS entity, id, account_id, updated_at, row_version, payload
+		`SELECT workspace_id, 'project' AS entity, id, account_id, updated_at, payload
 		 FROM business_projects
 		 WHERE id = ? AND (? = '' OR workspace_id = ?)
 		 ORDER BY updated_at DESC

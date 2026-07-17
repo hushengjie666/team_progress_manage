@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createInitialState, todayKey } from "./seed";
+import { todayKey } from "./seed";
+import { createInitialState } from "./test/fixtures";
 import { workbenchTask, workbenchTodayPlan } from "./test/workbenchFixtures";
 import { deriveWorkspaceModel } from "./workbenchModel";
 import type { AppState, ProjectMember, Task } from "./types";

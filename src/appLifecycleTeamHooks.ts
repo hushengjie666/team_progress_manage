@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import { applyTeamStateLoadFailure } from "./appBoot";
-import { ensureTodayPlan } from "./appModel";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
 import { loadTeamData } from "./teamBusinessApi";
 
@@ -22,6 +21,7 @@ export function useTeamBusinessRefresh({
     let cancelled = false;
     let inFlight = false;
     let failureCount = 0;
+    let refreshSequence = 0;
     let refreshTimer: number | undefined;
     const scheduleRefresh = (delay: number) => {
       refreshTimer = window.setTimeout(() => void refreshIfNeeded(), delay);
@@ -31,11 +31,16 @@ export function useTeamBusinessRefresh({
       const current = stateRef.current;
       const currentToken = current?.auth.token ?? current?.backend.token;
       if (!current || !currentToken) return;
+      if (current.backend.status === "saving") {
+        scheduleRefresh(TEAM_BUSINESS_REFRESH_MS);
+        return;
+      }
+      const sequence = ++refreshSequence;
       inFlight = true;
       try {
         const next = await loadTeamData(current);
         failureCount = 0;
-        if (!cancelled) setState(ensureTodayPlan(next));
+        if (!cancelled && sequence === refreshSequence && stateRef.current?.backend.status !== "saving") setState(next);
       } catch (error) {
         failureCount += 1;
         if (!cancelled) setState((value) => (value ? applyTeamStateLoadFailure(value, error) : value));
@@ -50,17 +55,4 @@ export function useTeamBusinessRefresh({
       if (refreshTimer !== undefined) window.clearTimeout(refreshTimer);
     };
   }, [loaded, state?.auth.token, state?.backend.token, state?.backend.serverUrl]);
-}
-
-export function useTodayPlanRepair({
-  state,
-  commitTeamData,
-}: Pick<AppLifecycleHooksOptions, "state" | "commitTeamData">) {
-  useEffect(() => {
-    if (!state) return;
-    const repaired = ensureTodayPlan(state);
-    if (repaired !== state) {
-      commitTeamData(state, repaired);
-    }
-  }, [state]);
 }

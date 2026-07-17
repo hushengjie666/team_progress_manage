@@ -16,11 +16,10 @@ func isDefaultAdminAuth(auth authContext) bool {
 }
 
 type platformAccountRequest struct {
-	Name             string `json:"name"`
-	Email            string `json:"email"`
-	Password         string `json:"password"`
-	Status           string `json:"status"`
-	ExpectedRevision int64  `json:"expected_revision"`
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Status   string `json:"status"`
 }
 
 type platformAccountsResponse struct {
@@ -58,7 +57,7 @@ func normalizePlatformAccountStatus(value string) string {
 func mysqlPlatformAccounts(ctx context.Context, q sqlRunner) ([]accountRecord, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at, row_version
+		`SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at
 		 FROM accounts
 		 ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END, created_at ASC, name ASC`,
 		defaultAdminAccountID,

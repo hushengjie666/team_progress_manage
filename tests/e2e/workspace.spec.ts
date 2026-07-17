@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
 test("signs out without writing the session change as business data", async ({ page }) => {
   const businessWrites: string[] = [];
   page.on("request", (request) => {
-    if (request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT") {
+    if (/\/(projects|tasks|daily-plans|work-sessions)\b/.test(request.url()) && request.method() !== "GET") {
       businessWrites.push(request.url());
     }
   });
@@ -25,29 +25,22 @@ test("signs out without writing the session change as business data", async ({ p
   expect(businessWrites).toEqual([]);
 });
 
-test("keeps the authenticated shell during a temporary backend outage", async ({ page }) => {
+test("hides business data during a temporary backend outage", async ({ page }) => {
   await openApp(page);
   const abortTeamData = (route: Route) => route.abort("failed");
-  await page.route(`${MOCK_SERVER}/team/data`, abortTeamData);
+  await page.route(`${MOCK_SERVER}/app/bootstrap`, abortTeamData);
   const failedRefresh = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "GET",
+    request.url() === `${MOCK_SERVER}/app/bootstrap` && request.method() === "GET",
   );
 
   await failedRefresh;
-  await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "登录账号" })).toHaveCount(0);
-  await page.getByLabel("页面导航").getByRole("button", { name: "管理中心" }).click();
-  await page.locator(".settings-section-tabs").getByRole("button", { name: "团队后台" }).click();
-  const backendPanel = page.locator("section.settings-panel").filter({
-    has: page.getByRole("heading", { name: "团队后台状态" }),
-  });
-  await expect(backendPanel).toContainText("团队后台不可用");
+  await expect(page.getByLabel("项目卡片总览")).toHaveCount(0);
+  await expect(page.getByText(/团队后台不可用/).first()).toBeVisible();
 
-  await page.unroute(`${MOCK_SERVER}/team/data`, abortTeamData);
+  await page.unroute(`${MOCK_SERVER}/app/bootstrap`, abortTeamData);
   await page.waitForResponse((response) =>
-    response.url() === `${MOCK_SERVER}/team/data` && response.request().method() === "GET" && response.ok(),
+    response.url() === `${MOCK_SERVER}/app/bootstrap` && response.request().method() === "GET" && response.ok(),
   );
-  await expect(backendPanel).toContainText("团队在线数据已加载");
   await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
 });
 

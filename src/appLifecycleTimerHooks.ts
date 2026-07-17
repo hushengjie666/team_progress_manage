@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 import {
-  finishExpiredTimerInState,
   modeLabel,
   nowIso,
   restoreTimerInState,
@@ -46,8 +45,8 @@ export function useRunningTimerInterval({
   stateRef,
   setState,
   setToast,
-  commitTeamData,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "commitTeamData">) {
+  runTeamCommand,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
   useEffect(() => {
     if (!state?.activeTimer?.isRunning) return;
     const intervalDelay = normalizeTimerSpeedMultiplier(state.activeTimer.speedMultiplier) > 1 ? 250 : 1000;
@@ -64,11 +63,15 @@ export function useRunningTimerInterval({
         });
         return;
       }
-      const timestamp = nowIso();
       const title = `${modeLabel[current.activeTimer.mode]}已结束`;
       setToast(title);
       announceTimerEndForRuntime(current.settings, current.activeTimer, title);
-      commitTeamData(current, finishExpiredTimerInState(current, timestamp));
+      const active = current.activeTimer;
+      if (active.workSessionId) {
+        const session = current.workSessions.find((item) => item.id === active.workSessionId);
+        void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
+      }
+      setState({ ...current, activeTimer: undefined });
     }, intervalDelay);
     return () => window.clearInterval(handle);
   }, [state?.activeTimer?.isRunning, state?.activeTimer?.speedMultiplier]);
@@ -78,8 +81,8 @@ export function useTimerRestoreListeners({
   stateRef,
   setState,
   setToast,
-  commitTeamData,
-}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "commitTeamData">) {
+  runTeamCommand,
+}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
   useEffect(() => {
     const handle = () => {
       const current = stateRef.current;
@@ -92,7 +95,11 @@ export function useTimerRestoreListeners({
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         announceTimerEndForRuntime(current.settings, current.activeTimer, title);
         setToast(`${title}，已自动记录`);
-        commitTeamData(current, next);
+        if (current.activeTimer.workSessionId) {
+          const session = current.workSessions.find((item) => item.id === current.activeTimer?.workSessionId);
+          void runTeamCommand({ kind: "action", resource: "work-sessions", id: current.activeTimer.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
+        }
+        setState({ ...next, activeTimer: undefined });
         return;
       }
       setState(next);
@@ -131,14 +138,17 @@ export function useTaskReminderInterval({
   state,
   stateRef,
   reminderSentRef,
-  commitTeamData,
-}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "commitTeamData">) {
+  runTeamCommand,
+}: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "runTeamCommand">) {
   useEffect(() => {
     if (!state?.settings.notificationsEnabled) return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current) return;
-      runDueTaskReminders(current, reminderSentRef.current, commitTeamData);
+      runDueTaskReminders(current, reminderSentRef.current, (taskId, timestamp) => {
+        const task = current.tasks.find((item) => item.id === taskId);
+        if (task) void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: { lastReminderSentAt: timestamp } });
+      });
     }, 30_000);
     return () => window.clearInterval(handle);
   }, [state?.settings.notificationsEnabled]);

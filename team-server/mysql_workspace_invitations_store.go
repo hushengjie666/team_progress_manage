@@ -23,7 +23,6 @@ func scanWorkspaceInvitationSummary(row interface{ Scan(...any) error }) (worksp
 		&invitation.Status,
 		&invitation.CreatedAt,
 		&invitation.UpdatedAt,
-		&invitation.Revision,
 		&acceptedAt,
 	)
 	if acceptedAt.Valid {
@@ -36,7 +35,7 @@ func mysqlWorkspaceInvitationSummariesForAccount(ctx context.Context, q sqlRunne
 	rows, err := q.QueryContext(
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, w.type, i.inviter_account_id, inviter.name, inviter.email,
-		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM workspace_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
@@ -63,7 +62,7 @@ func mysqlWorkspaceInvitationSummaryByID(ctx context.Context, q sqlRunner, invit
 	invitation, err := scanWorkspaceInvitationSummary(q.QueryRowContext(
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, w.type, i.inviter_account_id, inviter.name, inviter.email,
-		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM workspace_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
@@ -80,7 +79,7 @@ func mysqlPendingWorkspaceInvitation(ctx context.Context, q sqlRunner, workspace
 	invitation, err := scanWorkspaceInvitationSummary(q.QueryRowContext(
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, w.type, i.inviter_account_id, inviter.name, inviter.email,
-		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.invitee_account_id, i.invitee_email, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM workspace_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
@@ -107,7 +106,6 @@ func mysqlUpsertWorkspaceInvitation(ctx context.Context, tx *sql.Tx, invitation 
 		  invitee_email = VALUES(invitee_email),
 		  status = VALUES(status),
 		  updated_at = VALUES(updated_at),
-		  row_version = row_version + 1,
 		  accepted_at = VALUES(accepted_at)`,
 		invitation.ID,
 		invitation.WorkspaceID,

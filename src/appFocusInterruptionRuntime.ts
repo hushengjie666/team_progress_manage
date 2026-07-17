@@ -1,14 +1,14 @@
 import { nowIso } from "./appModel";
 import { uid } from "./seed";
 import type { AppState, Interruption, InterruptionAction, InterruptionType } from "./types";
+import type { RunTeamDomainCommand } from "./teamDomainCommands";
 
-type UpdateState = (updater: (value: AppState) => AppState) => void;
 type Setter<T> = (value: T | ((current: T) => T)) => void;
 
 export type AppFocusInterruptionRuntimeOptions = {
   getState: () => AppState;
   getQuickNote: () => string;
-  updateState: UpdateState;
+  runTeamCommand: RunTeamDomainCommand;
   setQuickNote: Setter<string>;
   setToast: (message: string) => void;
 };
@@ -20,7 +20,7 @@ export type AppFocusInterruptionRuntime = {
 export function createAppFocusInterruptionRuntime({
   getState,
   getQuickNote,
-  updateState,
+  runTeamCommand,
   setQuickNote,
   setToast,
 }: AppFocusInterruptionRuntimeOptions): AppFocusInterruptionRuntime {
@@ -39,26 +39,12 @@ export function createAppFocusInterruptionRuntime({
       createdAt: timestamp,
     };
 
-    updateState((value) => ({
-      ...value,
-      interruptions: [interruption, ...value.interruptions],
-      focusSessions: active
-        ? value.focusSessions.map((session) =>
-            session.id === active.sessionId
-              ? {
-                  ...session,
-                  interruptionCounts: {
-                    ...session.interruptionCounts,
-                    [type]: session.interruptionCounts[type] + 1,
-                  },
-                }
-              : session,
-          )
-        : value.focusSessions,
-      updatedAt: timestamp,
-    }));
-    setQuickNote("");
-    setToast(type === "internal" ? "已记录内部中断，继续当前番茄" : "已记录外部中断，稍后答复");
+    void runTeamCommand({ kind: "create", entity: "interruption", workspaceId: interruption.workspaceId, payload: interruption as unknown as Record<string, unknown> })
+      .then((saved) => {
+        if (!saved) return;
+        setQuickNote("");
+        setToast(type === "internal" ? "已记录内部中断，继续当前番茄" : "已记录外部中断，稍后答复");
+      });
   };
 
   return { addInterruption };

@@ -50,7 +50,7 @@ func upsertMemberAccountForRequest(
 		if projectID != "" {
 			accountWorkspaceID = privateWorkspaceID(accountID)
 		}
-		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: name, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now, Revision: 1}
+		account = accountRecord{ID: accountID, WorkspaceID: accountWorkspaceID, Name: name, Email: email, PasswordHash: hash, CreatedAt: now, UpdatedAt: now}
 	} else {
 		account.Name = name
 		account.Email = email
@@ -65,14 +65,13 @@ func upsertMemberAccountForRequest(
 		}
 	}
 	if found {
-		updated, err := mysqlUpdateAccountAtRevision(ctx, tx, account, account.Revision)
+		updated, err := mysqlUpdateAccount(ctx, tx, account)
 		if err != nil {
 			return accountRecord{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 		}
 		if !updated {
-			return accountRecord{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
+			return accountRecord{}, memberWriteFailure{status: http.StatusNotFound, message: "account not found"}
 		}
-		account.Revision++
 	} else if err := mysqlUpsertAccount(ctx, tx, account); err != nil {
 		return accountRecord{}, memberWriteFailure{status: http.StatusConflict, message: "account already exists"}
 	}

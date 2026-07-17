@@ -7,7 +7,7 @@ import (
 )
 
 func mysqlFirstWorkspace(ctx context.Context, q sqlRunner) (workspaceData, bool, error) {
-	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at, row_version FROM workspaces ORDER BY created_at ASC LIMIT 1`))
+	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at FROM workspaces ORDER BY created_at ASC LIMIT 1`))
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspaceData{}, false, nil
 	}
@@ -15,7 +15,7 @@ func mysqlFirstWorkspace(ctx context.Context, q sqlRunner) (workspaceData, bool,
 }
 
 func mysqlWorkspaceByID(ctx context.Context, q sqlRunner, workspaceID string) (workspaceData, bool, error) {
-	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at, row_version FROM workspaces WHERE id = ?`, workspaceID))
+	workspace, err := scanWorkspace(q.QueryRowContext(ctx, `SELECT id, name, type, owner_account_id, created_at, updated_at FROM workspaces WHERE id = ?`, workspaceID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return workspaceData{}, false, nil
 	}

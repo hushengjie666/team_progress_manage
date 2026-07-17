@@ -30,11 +30,6 @@ func (a *app) handleWorkspaceInvitationByID(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "unsupported invitation action")
 		return
 	}
-	var req invitationActionRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.ExpectedRevision <= 0 {
-		writeError(w, http.StatusPreconditionRequired, "expected revision is required")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -58,10 +53,6 @@ func (a *app) handleWorkspaceInvitationByID(w http.ResponseWriter, r *http.Reque
 	}
 	if invitation.Status != "pending" {
 		writeError(w, http.StatusConflict, "workspace invitation is not pending")
-		return
-	}
-	if invitation.Revision != req.ExpectedRevision {
-		writeError(w, http.StatusConflict, "revision_conflict")
 		return
 	}
 	account, foundAccount, err := mysqlAccountByID(ctx, tx, auth.AccountID)
@@ -85,18 +76,17 @@ func (a *app) handleWorkspaceInvitationByID(w http.ResponseWriter, r *http.Reque
 	}
 	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE workspace_invitations SET status = 'accepted', accepted_at = ?, updated_at = ?, row_version = row_version + 1 WHERE id = ? AND status = 'pending' AND row_version = ?`,
+		`UPDATE workspace_invitations SET status = 'accepted', accepted_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'`,
 		now,
 		now,
 		invitation.ID,
-		req.ExpectedRevision,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if count, err := result.RowsAffected(); err != nil || count != 1 {
-		writeError(w, http.StatusConflict, "revision_conflict")
+		writeError(w, http.StatusConflict, "workspace invitation is not pending")
 		return
 	}
 	if err := mysqlTouchWorkspace(ctx, tx, invitation.WorkspaceID, now); err != nil {
@@ -116,11 +106,6 @@ func (a *app) handleWorkspaceInvitationByID(w http.ResponseWriter, r *http.Reque
 }
 
 func (a *app) cancelWorkspaceInvitation(w http.ResponseWriter, r *http.Request, auth authContext, invitationID string) {
-	var req invitationActionRequest
-	if err := decodeJSON(w, r, &req); err != nil || req.ExpectedRevision <= 0 {
-		writeError(w, http.StatusPreconditionRequired, "expected revision is required")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -146,24 +131,19 @@ func (a *app) cancelWorkspaceInvitation(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusConflict, "workspace invitation is not pending")
 		return
 	}
-	if invitation.Revision != req.ExpectedRevision {
-		writeError(w, http.StatusConflict, "revision_conflict")
-		return
-	}
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE workspace_invitations SET status = 'cancelled', updated_at = ?, row_version = row_version + 1 WHERE id = ? AND status = 'pending' AND row_version = ?`,
+		`UPDATE workspace_invitations SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'pending'`,
 		now,
 		invitation.ID,
-		req.ExpectedRevision,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if count, err := result.RowsAffected(); err != nil || count != 1 {
-		writeError(w, http.StatusConflict, "revision_conflict")
+		writeError(w, http.StatusConflict, "workspace invitation is not pending")
 		return
 	}
 	if err := tx.Commit(); err != nil {

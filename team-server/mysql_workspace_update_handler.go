@@ -55,7 +55,6 @@ func (a *app) handleWorkspaceByIDMySQL(w http.ResponseWriter, r *http.Request, a
 		name:                   name,
 		kind:                   workspaceType,
 		ownerID:                req.OwnerAccountID,
-		expectedRevision:       req.ExpectedRevision,
 		confirmRestrictMembers: req.ConfirmRestrictMembers,
 	})
 	if writeMemberFailure(w, failure) {

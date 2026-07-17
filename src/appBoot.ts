@@ -57,7 +57,24 @@ export const applyAuthStatusFailure = (state: AppState, error: unknown): AppStat
   return applyBackendUnavailable(state, error);
 };
 
-export const applyTeamStateLoadFailure = applyAuthStatusFailure;
+export const applyTeamStateLoadFailure = (state: AppState, error: unknown): AppState => {
+  const failed = applyAuthStatusFailure(state, error);
+  return {
+    ...failed,
+    auth: { ...failed.auth, status: "error", message: failed.backend.message },
+    projects: [],
+    projectMembers: [],
+    tasks: [],
+    dailyPlans: [],
+    focusSessions: [],
+    workSessions: [],
+    executionSignals: [],
+    interruptions: [],
+    taskTemplates: [],
+    templateInstances: [],
+    activeTimer: undefined,
+  };
+};
 
 export const applyTeamStateSaveFailure = (state: AppState, error: unknown): AppState => {
   if (isAuthSessionRejected(error)) {

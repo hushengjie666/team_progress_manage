@@ -26,7 +26,6 @@ func mysqlEnsurePrivateWorkspaceForAccount(ctx context.Context, tx *sql.Tx, acco
 		OwnerAccountID: account.ID,
 		CreatedAt:      account.CreatedAt,
 		UpdatedAt:      now,
-		Revision:       1,
 	}
 	if err := mysqlUpsertWorkspace(ctx, tx, workspace); err != nil {
 		return workspaceData{}, err
@@ -53,7 +52,7 @@ func mysqlDefaultWorkspaceForAccount(ctx context.Context, q sqlRunner, account a
 	}
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at, w.row_version
+		`SELECT w.id, w.name, w.type, w.owner_account_id, w.created_at, w.updated_at
 		 FROM workspace_memberships m
 		 JOIN workspaces w ON w.id = m.workspace_id
 		 WHERE m.account_id = ? AND m.status = 'active'

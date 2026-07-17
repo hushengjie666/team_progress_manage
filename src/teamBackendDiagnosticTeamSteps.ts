@@ -1,6 +1,7 @@
 import { timed } from "./teamBackendDiagnosticHttp";
 import type { DiagnosticStepResult } from "./teamBackendDiagnosticStepTypes";
-import { loadTeamData, saveTeamDataSnapshot } from "./teamApi";
+import { loadTeamData } from "./teamApi";
+import { submitTeamDomainCommand } from "./teamDomainCommands";
 import type { AppState, BackendDiagnosticStep } from "./types";
 
 export const unauthenticatedTeamDiagnosticSteps = (): BackendDiagnosticStep[] => [
@@ -10,7 +11,10 @@ export const unauthenticatedTeamDiagnosticSteps = (): BackendDiagnosticStep[] =>
 
 export const runSaveDiagnosticStep = async (workingState: AppState, token: string): Promise<DiagnosticStepResult> => {
   try {
-    const saveResult = await timed(() => saveTeamDataSnapshot(workingState.backend, token, workingState));
+    const saveResult = await timed(async () => {
+      await submitTeamDomainCommand(workingState.backend, token, { kind: "settings", patch: {} });
+      return loadTeamData(workingState);
+    });
     return {
       state: saveResult.result,
       step: {
@@ -18,7 +22,7 @@ export const runSaveDiagnosticStep = async (workingState: AppState, token: strin
         label: "保存检查",
         ok: true,
         latencyMs: saveResult.latencyMs,
-        detail: "团队业务数据可保存。",
+        detail: "团队领域接口可原子写入。",
       },
     };
   } catch (error) {

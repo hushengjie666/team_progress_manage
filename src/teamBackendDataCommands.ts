@@ -1,5 +1,5 @@
 import { applyTeamStateLoadFailure } from "./appBoot";
-import { ensureTodayPlan, nowIso } from "./appModel";
+import { nowIso } from "./appModel";
 import type { SetBackendConnectionStatus, BackendCommandRuntimeOptions, BackendDataCommands } from "./teamBackendCommandTypes";
 import { runBackendDiagnostics as runBackendDiagnosticsApi } from "./teamBackendDiagnostics";
 import { loadTeamData } from "./teamBusinessApi";
@@ -28,7 +28,7 @@ export function createBackendDataCommands({
     }
     setBackendConnectionStatus({ status: "loading", message: "正在刷新团队在线数据" });
     try {
-      const next = ensureTodayPlan(await loadTeamData(current));
+      const next = await loadTeamData(current);
       setState(next);
       setToast("团队在线数据已刷新");
     } catch (error) {
@@ -45,7 +45,7 @@ export function createBackendDataCommands({
     try {
       const { result, state: diagnosedState } = await runBackendDiagnosticsApi(source, getBackendPassword());
       setBackendDiagnostic(result);
-      setState(ensureTodayPlan(diagnosedState));
+      setState(diagnosedState);
       setToast(result.lastError ? `诊断完成：${result.lastError}` : "后台诊断通过");
     } catch (error) {
       const message = error instanceof Error ? error.message : "后台诊断失败";

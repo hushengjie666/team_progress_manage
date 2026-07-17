@@ -83,7 +83,6 @@ func (a *app) handleAdminAccounts(w http.ResponseWriter, r *http.Request, auth a
 			PasswordHash: hash,
 			CreatedAt:    now,
 			UpdatedAt:    now,
-			Revision:     1,
 		}
 		if status == "disabled" {
 			if account.ID == defaultAdminAccountID {

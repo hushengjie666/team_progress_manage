@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER, STORAGE_KEY } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { projectMoveState } from "./support/scenarioStates";
@@ -19,7 +18,7 @@ test("saves project settings only after clicking save", async ({ page }) => {
 
   const teamDataRequests: string[] = [];
   page.on("request", (request) => {
-    if (request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT") {
+    if (request.url().startsWith(`${MOCK_SERVER}/projects/`) && request.method() === "PATCH") {
       teamDataRequests.push(request.postData() ?? "");
     }
   });
@@ -32,22 +31,15 @@ test("saves project settings only after clicking save", async ({ page }) => {
   expect(teamDataRequests).toHaveLength(0);
 
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
+    request.url().startsWith(`${MOCK_SERVER}/projects/project_starter`) && request.method() === "PATCH",
   );
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
   const requestBody = (await saveRequest).postDataJSON();
-  expect(businessOperationRows(requestBody)).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        entity: "project",
-        payload: expect.objectContaining({
-          name: "E2E 保存后项目名",
-          description: "设置页点击保存后才写入。",
-          taskStageMode: "regular",
-        }),
-      }),
-    ]),
-  );
+  expect(requestBody).toEqual(expect.objectContaining({
+    name: "E2E 保存后项目名",
+    description: "设置页点击保存后才写入。",
+    taskStageMode: "regular",
+  }));
 
   await page.getByRole("button", { name: "概览" }).click();
   await page.locator(".project-overview-task-board").getByRole("button", { name: "添加任务" }).click();
@@ -68,7 +60,7 @@ test("moves a project to another shared workspace from project settings", async 
   await expect(settingsPanel.getByLabel("所属工作区")).toBeEnabled();
   await settingsPanel.getByLabel("所属工作区").selectOption("workspace_e2e_target");
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
+    request.url().startsWith(`${MOCK_SERVER}/projects/project_starter/move`) && request.method() === "POST",
   );
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("E2E 目标工作区");
@@ -76,25 +68,10 @@ test("moves a project to another shared workspace from project settings", async 
   });
   await settingsPanel.getByRole("button", { name: "保存项目资料" }).click();
   const requestBody = (await saveRequest).postDataJSON();
-  const writtenRows = businessOperationRows(requestBody);
-  expect(writtenRows).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        workspace_id: "workspace_e2e_target",
-        entity: "project",
-        id: "project_starter",
-      }),
-    ]),
-  );
-  expect(writtenRows).not.toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        workspace_id: "workspace_e2e",
-        entity: "project",
-        id: "project_starter",
-      }),
-    ]),
-  );
+  expect(requestBody).toEqual(expect.objectContaining({
+    target_workspace_id: "workspace_e2e_target",
+    patch: expect.objectContaining({ workspaceId: "workspace_e2e_target" }),
+  }));
 
   await expect(page.getByText("协作工作区 · E2E 目标工作区")).toBeVisible();
   await expect

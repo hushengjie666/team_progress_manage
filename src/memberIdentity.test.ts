@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInitialState } from "./seed";
+import { createInitialState } from "./test/fixtures";
 import { resolveCurrentMember, resolveMemberIdForProject } from "./memberIdentity";
 import type { ProjectMember } from "./types";
 

@@ -13,7 +13,7 @@ func mysqlAccountCount(ctx context.Context, q sqlRunner) (int, error) {
 }
 
 func mysqlAccountByEmail(ctx context.Context, q sqlRunner, email string) (accountRecord, bool, error) {
-	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at, row_version FROM accounts WHERE email = ?`, normalizeEmail(email)))
+	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at FROM accounts WHERE email = ?`, normalizeEmail(email)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return accountRecord{}, false, nil
 	}
@@ -21,7 +21,7 @@ func mysqlAccountByEmail(ctx context.Context, q sqlRunner, email string) (accoun
 }
 
 func mysqlAccountByEmailForUpdate(ctx context.Context, tx *sql.Tx, email string) (accountRecord, bool, error) {
-	account, err := scanAccount(tx.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at, row_version FROM accounts WHERE email = ? FOR UPDATE`, normalizeEmail(email)))
+	account, err := scanAccount(tx.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at FROM accounts WHERE email = ? FOR UPDATE`, normalizeEmail(email)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return accountRecord{}, false, nil
 	}
@@ -29,7 +29,7 @@ func mysqlAccountByEmailForUpdate(ctx context.Context, tx *sql.Tx, email string)
 }
 
 func mysqlAccountByID(ctx context.Context, q sqlRunner, accountID string) (accountRecord, bool, error) {
-	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at, row_version FROM accounts WHERE id = ?`, accountID))
+	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at FROM accounts WHERE id = ?`, accountID))
 	if errors.Is(err, sql.ErrNoRows) {
 		return accountRecord{}, false, nil
 	}
@@ -37,7 +37,7 @@ func mysqlAccountByID(ctx context.Context, q sqlRunner, accountID string) (accou
 }
 
 func mysqlAccountByEmailInWorkspace(ctx context.Context, q sqlRunner, workspaceID string, email string) (accountRecord, bool, error) {
-	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at, row_version FROM accounts WHERE workspace_id = ? AND email = ?`, workspaceID, normalizeEmail(email)))
+	account, err := scanAccount(q.QueryRowContext(ctx, `SELECT id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at FROM accounts WHERE workspace_id = ? AND email = ?`, workspaceID, normalizeEmail(email)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return accountRecord{}, false, nil
 	}

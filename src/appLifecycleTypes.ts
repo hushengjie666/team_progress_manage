@@ -17,8 +17,7 @@ export type AppLifecycleHooksOptions = {
   undoTimerRef: Ref<number | null>;
   stopNoiseRef: Ref<(() => void) | null>;
   reminderSentRef: Ref<Set<string>>;
-  persistTeamData: TeamDataRuntime["persistTeamData"];
-  commitTeamData: TeamDataRuntime["commitTeamData"];
+  runTeamCommand: TeamDataRuntime["runTeamCommand"];
   setState: Setter<AppState | null>;
   setToast: (message: string) => void;
   setToastVisible: Setter<boolean>;

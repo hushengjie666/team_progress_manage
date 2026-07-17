@@ -79,10 +79,6 @@ func (a *app) handleMembersMySQL(w http.ResponseWriter, r *http.Request, auth au
 		return
 	}
 	row := makeProjectMemberRow(account, targetWorkspaceID, projectID, memberID, req.Name, req.Roles, req.Status, now)
-	row.Revision = 1
-	if projectMemberExists {
-		row.Revision = existingProjectMemberRow.Revision + 1
-	}
 	if err := businessUpsertRow(ctx, tx, row); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return

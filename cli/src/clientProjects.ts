@@ -1,12 +1,8 @@
 import type { ProjectMemberRole } from "../../src/types.js";
 import {
-  archiveProjectInTeamState,
   bindMemberToProjectInTeamState,
   createProjectInTeamState,
   createProjectMemberInTeamState,
-  restoreProjectInTeamState,
-  unbindProjectMemberInTeamState,
-  updateProjectInTeamState,
   updateProjectMemberInTeamState,
 } from "./businessProjectMemberOperations.js";
 import type { MemberInput, ProjectInput } from "./businessTypes.js";
@@ -35,36 +31,42 @@ export class TimeManageProjectClient extends TimeManageBaseClient {
   }
 
   async createProject(input: ProjectInput) {
-    const saved = await this.mutate(undefined, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = createProjectInTeamState(state, input, timestamp);
       const project = next.projects.find((item) => !state.projects.some((existing) => existing.id === item.id));
       return { state: next, result: project?.id };
     });
-    return compactProject(saved.state, saved.state.projects.find((project) => project.id === saved.result)!);
+    const project = prepared.output.state.projects.find((item) => item.id === prepared.output.result)!;
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project", workspaceId: project.workspaceId, payload: project as unknown as Record<string, unknown> });
+    return compactProject(saved.state, saved.state.projects.find((item) => item.id === project.id)!);
   }
 
   async updateProject(projectId: string, input: Partial<ProjectInput>) {
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: updateProjectInTeamState(state, projectId, input, timestamp),
-      result: projectId,
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId)!;
+    const saved = await this.runBusinessCommand(input.workspaceId && current.workspaceId && input.workspaceId !== current.workspaceId
+      ? {
+          kind: "action",
+          resource: "projects",
+          id: projectId,
+          action: "move",
+          workspaceId: current.workspaceId,
+          payload: { target_workspace_id: input.workspaceId, patch: input as Record<string, unknown> },
+          idempotencyKey: `cli-project-move-${projectId}-${input.workspaceId}`,
+        }
+      : { kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: input as Record<string, unknown> });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId)!);
   }
 
   async archiveProject(projectId: string, confirmed?: boolean) {
     requireConfirmation(confirmed, "archive_project");
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: archiveProjectInTeamState(state, projectId, timestamp),
-      result: projectId,
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId)!;
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: { archivedAt: new Date().toISOString() } });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId)!);
   }
 
   async restoreProject(projectId: string) {
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: restoreProjectInTeamState(state, projectId, timestamp),
-      result: projectId,
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId)!;
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: { archivedAt: null } });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId)!);
   }
 
@@ -76,7 +78,7 @@ export class TimeManageProjectClient extends TimeManageBaseClient {
   }
 
   async createMember(input: MemberInput) {
-    const saved = await this.mutate(input.projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = createProjectMemberInTeamState(state, input, timestamp);
       const created = next.projectMembers.find((item) => !state.projectMembers.some((existing) => existing.id === item.id));
       const matched = created ?? next.projectMembers.find(
@@ -90,33 +92,34 @@ export class TimeManageProjectClient extends TimeManageBaseClient {
       );
       return { state: next, result: matched?.id };
     });
-    return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === saved.result)!);
+    const member = prepared.output.state.projectMembers.find((item) => item.id === prepared.output.result)!;
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member as unknown as Record<string, unknown> });
+    return compactMember(saved.state, saved.state.projectMembers.find((item) => item.id === member.id)!);
   }
 
   async updateMember(projectMemberId: string, input: Parameters<typeof updateProjectMemberInTeamState>[2]) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: updateProjectMemberInTeamState(state, projectMemberId, input, timestamp),
-      result: projectMemberId,
-    }));
+    const current = (await this.authenticatedState()).projectMembers.find((member) => member.id === projectMemberId)!;
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project_member", id: projectMemberId, workspaceId: current.workspaceId, patch: input as Record<string, unknown> });
     return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === projectMemberId)!);
   }
 
   async deleteMember(projectMemberId: string, confirmed?: boolean) {
     requireConfirmation(confirmed, "delete_member");
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: unbindProjectMemberInTeamState(state, projectMemberId, timestamp),
-      result: projectMemberId,
-    }));
-    return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === projectMemberId)!);
+    const current = (await this.authenticatedState()).projectMembers.find((member) => member.id === projectMemberId)!;
+    const saved = await this.runBusinessCommand({ kind: "delete", entity: "project_member", id: projectMemberId, workspaceId: current.workspaceId });
+    return { deletedMemberId: projectMemberId, savedAt: saved.savedAt };
   }
 
   async bindMemberToProject(projectId: string, memberRef: string, roles: ProjectMemberRole[]) {
-    const saved = await this.mutate(projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = bindMemberToProjectInTeamState(state, projectId, memberRef, roles, timestamp);
       const member = next.projectMembers.find((item) => !state.projectMembers.some((existing) => existing.id === item.id));
       return { state: next, result: member?.id };
     });
-    return saved.result ? compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === saved.result)!) : undefined;
+    if (!prepared.output.result) return undefined;
+    const member = prepared.output.state.projectMembers.find((item) => item.id === prepared.output.result)!;
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member as unknown as Record<string, unknown> });
+    return compactMember(saved.state, saved.state.projectMembers.find((item) => item.id === member.id)!);
   }
 
   async updateProjectMember(projectMemberId: string, input: Parameters<typeof updateProjectMemberInTeamState>[2]) {

@@ -10,7 +10,7 @@ func mysqlUpsertAccount(ctx context.Context, tx *sql.Tx, account accountRecord) 
 		ctx,
 		`INSERT INTO accounts (id, workspace_id, name, email, password_hash, disabled_at, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), password_hash = VALUES(password_hash), disabled_at = VALUES(disabled_at), updated_at = VALUES(updated_at), row_version = row_version + 1`,
+			ON DUPLICATE KEY UPDATE name = VALUES(name), email = VALUES(email), password_hash = VALUES(password_hash), disabled_at = VALUES(disabled_at), updated_at = VALUES(updated_at)`,
 		account.ID,
 		account.WorkspaceID,
 		account.Name,
@@ -23,11 +23,11 @@ func mysqlUpsertAccount(ctx context.Context, tx *sql.Tx, account accountRecord) 
 	return err
 }
 
-func mysqlUpdateAccountAtRevision(ctx context.Context, tx *sql.Tx, account accountRecord, expectedRevision int64) (bool, error) {
+func mysqlUpdateAccount(ctx context.Context, tx *sql.Tx, account accountRecord) (bool, error) {
 	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE accounts SET workspace_id = ?, name = ?, email = ?, password_hash = ?, disabled_at = ?, updated_at = ?, row_version = row_version + 1
-		 WHERE id = ? AND row_version = ?`,
+		`UPDATE accounts SET workspace_id = ?, name = ?, email = ?, password_hash = ?, disabled_at = ?, updated_at = ?
+		 WHERE id = ?`,
 		account.WorkspaceID,
 		account.Name,
 		account.Email,
@@ -35,7 +35,6 @@ func mysqlUpdateAccountAtRevision(ctx context.Context, tx *sql.Tx, account accou
 		nullString(account.DisabledAt),
 		account.UpdatedAt,
 		account.ID,
-		expectedRevision,
 	)
 	if err != nil {
 		return false, err

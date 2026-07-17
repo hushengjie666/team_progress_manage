@@ -63,8 +63,15 @@ Windows 部署包包含：
 
 - `GET /health`
 - `POST /auth/login`
-- `GET /team/data`
-- `POST /team/data`
+- `GET /app/bootstrap`：登录后聚合读取当前工作区与可见业务数据。
+- `POST /projects`、`PATCH /projects/{id}`、`DELETE /projects/{id}`
+- `POST /tasks`、`PATCH /tasks/{id}`、`DELETE /tasks/{id}`
+- `POST /daily-plans/{id}/add-task|remove-task|move-task`
+- `POST /tasks/{id}/start|split|submit-review|accept-review|return-review|archive|restore`
+- `POST /work-sessions/{id}/pause|resume|finish`
+- `GET /settings`、`PATCH /settings`
+
+业务数据只以后端数据库为准。接口不接受客户端版本号；字段修改在事务内合并，跨实体动作原子提交，命令重试可使用 `Idempotency-Key`。
 
 The React app defaults to `http://127.0.0.1:8787`, username `admin`, password `hu626699`.
 

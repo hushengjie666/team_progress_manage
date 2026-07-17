@@ -28,15 +28,15 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 	workspaceID := strings.TrimSpace(operation.WorkspaceID)
 	entity := strings.TrimSpace(operation.Entity)
 	id := strings.TrimSpace(operation.ID)
-	if workspaceID == "" || entity == "" || id == "" || operation.ExpectedRevision <= 0 {
-		return businessMutationFailure{status: http.StatusBadRequest, message: "business operation key and expected revision are required"}
+	if workspaceID == "" || entity == "" || id == "" {
+		return businessMutationFailure{status: http.StatusBadRequest, message: "business operation key is required"}
 	}
 	current, found, err := businessExistingRowForUpdate(ctx, tx, workspaceID, entity, id)
 	if err != nil {
 		return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
-	if !found || current.Revision != operation.ExpectedRevision {
-		return businessMutationFailure{status: http.StatusConflict, message: "revision_conflict"}
+	if !found {
+		return businessMutationFailure{status: http.StatusNotFound, message: "business row not found"}
 	}
 	if kind == "delete" {
 		allowed, err := businessRowMutationAllowed(ctx, tx, auth, current, current, true)
@@ -46,12 +46,12 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 		if !allowed {
 			return businessMutationFailure{status: http.StatusForbidden, message: "business row write denied"}
 		}
-		deleted, err := businessDeleteRowAtRevision(ctx, tx, current, operation.ExpectedRevision)
+		deleted, err := businessDeleteRow(ctx, tx, current)
 		if err != nil {
 			return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 		}
 		if !deleted {
-			return businessMutationFailure{status: http.StatusConflict, message: "revision_conflict"}
+			return businessMutationFailure{status: http.StatusNotFound, message: "business row not found"}
 		}
 		return businessMutationFailure{}
 	}
@@ -75,12 +75,12 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 	if !allowed {
 		return businessMutationFailure{status: http.StatusForbidden, message: "business row write denied"}
 	}
-	updated, err := businessUpdateRowAtRevision(ctx, tx, next, operation.ExpectedRevision)
+	updated, err := businessUpdateRow(ctx, tx, next)
 	if err != nil {
 		return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
 	if !updated {
-		return businessMutationFailure{status: http.StatusConflict, message: "revision_conflict"}
+		return businessMutationFailure{status: http.StatusNotFound, message: "business row not found"}
 	}
 	return businessMutationFailure{}
 }
@@ -102,10 +102,9 @@ func applyBusinessCreate(ctx context.Context, tx *sql.Tx, auth authContext, oper
 	if _, found, err := businessExistingRowForUpdate(ctx, tx, row.WorkspaceID, row.Entity, row.ID); err != nil {
 		return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 	} else if found {
-		return businessMutationFailure{status: http.StatusConflict, message: "revision_conflict"}
+		return businessMutationFailure{status: http.StatusConflict, message: "business row already exists"}
 	}
 	row.AccountID = auth.AccountID
-	row.Revision = 1
 	row.UpdatedAt = strings.TrimSpace(row.UpdatedAt)
 	if row.UpdatedAt == "" {
 		row.UpdatedAt = time.Now().UTC().Format(time.RFC3339Nano)
@@ -127,7 +126,7 @@ func applyBusinessCreate(ctx context.Context, tx *sql.Tx, auth authContext, oper
 func businessCreateFailure(err error) businessMutationFailure {
 	var mysqlError *mysql.MySQLError
 	if errors.As(err, &mysqlError) && mysqlError.Number == 1062 {
-		return businessMutationFailure{status: http.StatusConflict, message: "revision_conflict"}
+		return businessMutationFailure{status: http.StatusConflict, message: "business row already exists"}
 	}
 	return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 }
@@ -139,8 +138,8 @@ func businessExistingRowForUpdate(ctx context.Context, tx *sql.Tx, workspaceID s
 	}
 	var row businessRow
 	var accountID sql.NullString
-	err := tx.QueryRowContext(ctx, `SELECT workspace_id, id, account_id, updated_at, row_version, payload FROM `+spec.table+` WHERE workspace_id = ? AND id = ? FOR UPDATE`, workspaceID, id).
-		Scan(&row.WorkspaceID, &row.ID, &accountID, &row.UpdatedAt, &row.Revision, &row.Payload)
+	err := tx.QueryRowContext(ctx, `SELECT workspace_id, id, account_id, updated_at, payload FROM `+spec.table+` WHERE workspace_id = ? AND id = ? FOR UPDATE`, workspaceID, id).
+		Scan(&row.WorkspaceID, &row.ID, &accountID, &row.UpdatedAt, &row.Payload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return businessRow{}, false, nil
 	}

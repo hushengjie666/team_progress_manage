@@ -102,7 +102,7 @@ func TestCORSAllowsPutPreflight(t *testing.T) {
 	handler := withCORS(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("preflight should not call wrapped handler")
 	}))
-	request := httptest.NewRequest(http.MethodOptions, "/team/data", nil)
+	request := httptest.NewRequest(http.MethodOptions, "/app/bootstrap", nil)
 	request.Header.Set("Origin", "http://127.0.0.1:1420")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPut)
 	recorder := httptest.NewRecorder()

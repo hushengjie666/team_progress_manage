@@ -58,6 +58,5 @@ func publicWorkspace(workspace workspaceData) workspaceSummary {
 		OwnerAccountID: workspace.OwnerAccountID,
 		CreatedAt:      workspace.CreatedAt,
 		UpdatedAt:      workspace.UpdatedAt,
-		Revision:       workspace.Revision,
 	}
 }

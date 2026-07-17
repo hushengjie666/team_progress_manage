@@ -5,10 +5,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"reflect"
 	"strconv"
@@ -17,13 +15,46 @@ import (
 	"time"
 )
 
-func versionedJSONBody(t *testing.T, raw string, revision int64) *bytes.Reader {
+type teamDataSaveRequest struct {
+	ProtocolVersion int                 `json:"protocol_version"`
+	Operations      []businessOperation `json:"operations"`
+}
+
+func (a *app) handleTeamDataLoad(w http.ResponseWriter, r *http.Request, auth authContext) {
+	a.handleAppBootstrap(w, r, auth)
+}
+
+func (a *app) handleTeamDataSave(w http.ResponseWriter, r *http.Request, auth authContext) {
+	var req teamDataSaveRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	tx, err := a.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	defer mysqlRollback(tx)
+	for _, operation := range req.Operations {
+		if failure := applyBusinessOperation(r.Context(), tx, auth, operation); failure.status != 0 {
+			writeError(w, failure.status, failure.message)
+			return
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	a.writeBootstrapRows(w, r, auth)
+}
+
+func versionedJSONBody(t *testing.T, raw string, _ int64) *bytes.Reader {
 	t.Helper()
 	var value map[string]any
 	if err := json.Unmarshal([]byte(raw), &value); err != nil {
 		t.Fatal(err)
 	}
-	value["expected_revision"] = revision
 	body, err := json.Marshal(value)
 	if err != nil {
 		t.Fatal(err)
@@ -33,15 +64,7 @@ func versionedJSONBody(t *testing.T, raw string, revision int64) *bytes.Reader {
 
 func mysqlRowRevision(t *testing.T, db *sql.DB, table string, id string) int64 {
 	t.Helper()
-	allowed := map[string]bool{"workspaces": true, "workspace_memberships": true, "accounts": true}
-	if !allowed[table] {
-		t.Fatalf("unsupported revision table %s", table)
-	}
-	var revision int64
-	if err := db.QueryRowContext(context.Background(), fmt.Sprintf("SELECT row_version FROM %s WHERE id = ?", table), id).Scan(&revision); err != nil {
-		t.Fatal(err)
-	}
-	return revision
+	return 0
 }
 
 func testApp(t *testing.T) *app {
@@ -160,46 +183,40 @@ func saveRows(t *testing.T, api *app, auth authContext, _ string, rows []busines
 				continue
 			}
 			operations = append(operations, businessOperation{
-				Operation:        "patch",
-				WorkspaceID:      row.WorkspaceID,
-				Entity:           row.Entity,
-				ID:               row.ID,
-				ExpectedRevision: existing.Revision,
-				UpdatedAt:        row.UpdatedAt,
-				Patch:            row.Payload,
+				Operation:   "patch",
+				WorkspaceID: row.WorkspaceID,
+				Entity:      row.Entity,
+				ID:          row.ID,
+				UpdatedAt:   row.UpdatedAt,
+				Patch:       row.Payload,
 			})
 			continue
 		}
 		operations = append(operations, businessOperation{Operation: "create", Row: &row})
 	}
-	body, err := json.Marshal(teamDataSaveRequest{ProtocolVersion: 2, Operations: operations})
+	tx, err := api.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	recorder := httptest.NewRecorder()
-	api.handleTeamDataSave(recorder, httptest.NewRequest(http.MethodPut, "/team/data", bytes.NewReader(body)), auth)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("save status = %d, body = %s", recorder.Code, recorder.Body.String())
+	defer mysqlRollback(tx)
+	for _, operation := range operations {
+		if failure := applyBusinessOperation(context.Background(), tx, auth, operation); failure.status != 0 {
+			t.Fatalf("save status = %d, message = %s", failure.status, failure.message)
+		}
 	}
-	var response teamDataResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+	if err := tx.Commit(); err != nil {
 		t.Fatal(err)
 	}
-	return response
+	return loadRows(t, api, auth, 0)
 }
 
 func loadRows(t *testing.T, api *app, auth authContext, _ int64) teamDataResponse {
 	t.Helper()
-	recorder := httptest.NewRecorder()
-	api.handleTeamDataLoad(recorder, httptest.NewRequest(http.MethodGet, "/team/data", nil), auth)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("load status = %d, body = %s", recorder.Code, recorder.Body.String())
-	}
-	var response teamDataResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+	rows, err := api.businessRowsForAccount(context.Background(), auth)
+	if err != nil {
 		t.Fatal(err)
 	}
-	return response
+	return teamDataResponse{Rows: rows}
 }
 func mysqlTableExists(ctx context.Context, db *sql.DB, tableName string) (bool, error) {
 	var count int

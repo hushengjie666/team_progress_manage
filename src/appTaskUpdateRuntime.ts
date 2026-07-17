@@ -1,9 +1,3 @@
-import { nowIso } from "./appModel";
-import { updateTaskInState } from "./appTaskState";
-import {
-  assignTaskInState,
-  updateTaskProgressInState,
-} from "./teamProgress";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 import type { Task } from "./types";
 
@@ -12,25 +6,30 @@ type AppTaskUpdateRuntime = Pick<
   "updateTask" | "updateTaskAssignment" | "updateTaskProgress"
 >;
 
-type AppTaskUpdateRuntimeOptions = Pick<AppTaskActionsRuntimeOptions, "updateState">;
+type AppTaskUpdateRuntimeOptions = Pick<AppTaskActionsRuntimeOptions, "getState" | "runTeamCommand">;
 
-export function createAppTaskUpdateRuntime({ updateState }: AppTaskUpdateRuntimeOptions): AppTaskUpdateRuntime {
+export function createAppTaskUpdateRuntime({ getState, runTeamCommand }: AppTaskUpdateRuntimeOptions): AppTaskUpdateRuntime {
   const updateTask = (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => {
-    const timestamp = nowIso();
-    updateState((value) => updateTaskInState(value, taskId, updater, timestamp));
+    const source = getState();
+    const current = source.tasks.find((item) => item.id === taskId);
+    if (!current) return;
+    const next = typeof updater === "function" ? updater(current) : { ...current, ...updater };
+    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: next as unknown as Record<string, unknown> });
   };
 
   const updateTaskAssignment = (
     taskId: string,
     assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] },
   ) => {
-    const timestamp = nowIso();
-    updateState((value) => assignTaskInState(value, taskId, assignment, timestamp));
+    const task = getState().tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: assignment });
   };
 
   const updateTaskProgress = (taskId: string, progressPercent: number, progressNote: string) => {
-    const timestamp = nowIso();
-    updateState((value) => updateTaskProgressInState(value, taskId, progressPercent, progressNote, timestamp));
+    const task = getState().tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: { progressPercent, progressNote } });
   };
 
   return {

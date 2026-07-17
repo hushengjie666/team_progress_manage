@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { businessOperationRows } from "./support/businessOperationRows";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 
@@ -53,7 +52,7 @@ test("creates a project from overview add card without navigating away", async (
   await dialog.getByLabel("项目类型").selectOption("regular");
   await dialog.getByLabel("项目说明").fill("从项目总览弹窗创建。");
   const saveRequest = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/team/data` && request.method() === "PUT",
+    request.url().startsWith(`${MOCK_SERVER}/projects`) && request.method() === "POST",
   );
   await dialog.getByRole("button", { name: "添加项目" }).click();
 
@@ -61,19 +60,12 @@ test("creates a project from overview add card without navigating away", async (
   await expect(projectOverview).toContainText("E2E 总览弹窗项目");
   await expect(page.getByRole("heading", { name: "我的工作区" })).toHaveCount(0);
   const requestBody = (await saveRequest).postDataJSON();
-  expect(businessOperationRows(requestBody)).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        workspace_id: "workspace_e2e",
-        entity: "project",
-        payload: expect.objectContaining({
-          name: "E2E 总览弹窗项目",
-          taskStageMode: "regular",
-          description: "从项目总览弹窗创建。",
-        }),
-      }),
-    ]),
-  );
+  expect(requestBody).toEqual(expect.objectContaining({
+    workspaceId: "workspace_e2e",
+    name: "E2E 总览弹窗项目",
+    taskStageMode: "regular",
+    description: "从项目总览弹窗创建。",
+  }));
 });
 
 test("hides project member management for private workspace projects", async ({ page }) => {

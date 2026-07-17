@@ -1,5 +1,11 @@
 import { createInitialState as createEmptyInitialState, todayKey } from "../seed";
+import {
+  defaultTaskTemplates,
+  starterProject,
+  starterProjectMember,
+} from "../initialSeedData";
 import type { AppState, ExecutionSignal, Project, ProjectMember, Task, WorkSession } from "../types";
+import { businessRowsFromState, type BusinessRow } from "../teamBusinessRows";
 
 export const iso = (value: string) => new Date(value).toISOString();
 
@@ -110,6 +116,8 @@ export const createInitialState = (): AppState => {
   ];
   return {
     ...state,
+    projects: [starterProject],
+    projectMembers: [starterProjectMember],
     tasks,
     dailyPlans: [{
       id: "plan_test_today",
@@ -129,6 +137,7 @@ export const createInitialState = (): AppState => {
       createdAt: now,
       updatedAt: now,
     }],
+    taskTemplates: defaultTaskTemplates,
     updatedAt: now,
   };
 };
@@ -137,6 +146,50 @@ export const createTestState = (overrides: Partial<AppState> = {}): AppState => 
   ...createInitialState(),
   ...overrides,
 });
+
+export const teamBootstrapPayload = (
+  state: AppState,
+  rows: BusinessRow[] = businessRowsFromState(state),
+) => {
+  const timestamp = state.updatedAt;
+  const workspace = {
+    id: "workspace_test",
+    name: "测试工作区",
+    type: "shared" as const,
+    owner_account_id: "account_owner",
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+  const account = {
+    id: "account_owner",
+    workspace_id: workspace.id,
+    name: "项目负责人",
+    email: "owner@example.com",
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+  const membership = {
+    id: "membership_owner",
+    workspace_id: workspace.id,
+    account_id: account.id,
+    name: account.name,
+    email: account.email,
+    role: "owner" as const,
+    status: "active" as const,
+    created_at: timestamp,
+    updated_at: timestamp,
+  };
+  return {
+    account,
+    workspace,
+    membership,
+    workspaces: [workspace],
+    workspace_memberships: [membership],
+    rows,
+    loaded_at: timestamp,
+    settings: state.settings,
+  };
+};
 
 export const withProject = (state: AppState, overrides: Partial<Project> = {}): AppState => {
   const base = state.projects[0];

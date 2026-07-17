@@ -11,7 +11,6 @@ export const mapAccount = (account: ServerAccount): Account => ({
   disabledAt: account.disabled_at || undefined,
   createdAt: account.created_at,
   updatedAt: account.updated_at,
-  ...(account.revision ? { revision: account.revision } : {}),
 });
 
 export const mapWorkspace = (workspace: ServerWorkspace): Workspace => ({
@@ -21,7 +20,6 @@ export const mapWorkspace = (workspace: ServerWorkspace): Workspace => ({
   ownerAccountId: workspace.owner_account_id || undefined,
   createdAt: workspace.created_at,
   updatedAt: workspace.updated_at,
-  ...(workspace.revision ? { revision: workspace.revision } : {}),
 });
 
 export const mapWorkspaceMembership = (membership: ServerWorkspaceMembership): WorkspaceMembership => ({
@@ -34,7 +32,6 @@ export const mapWorkspaceMembership = (membership: ServerWorkspaceMembership): W
   status: membership.status,
   createdAt: membership.created_at,
   updatedAt: membership.updated_at,
-  ...(membership.revision ? { revision: membership.revision } : {}),
 });
 
 export const mapWorkspaceInvitation = (invitation: ServerWorkspaceInvitation): WorkspaceInvitation => ({
@@ -51,7 +48,6 @@ export const mapWorkspaceInvitation = (invitation: ServerWorkspaceInvitation): W
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
   acceptedAt: invitation.accepted_at || undefined,
-  ...(invitation.revision ? { revision: invitation.revision } : {}),
 });
 
 export const mapProjectInvitation = (invitation: ServerProjectInvitation): ProjectInvitation => ({
@@ -70,7 +66,6 @@ export const mapProjectInvitation = (invitation: ServerProjectInvitation): Proje
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
   acceptedAt: invitation.accepted_at || undefined,
-  ...(invitation.revision ? { revision: invitation.revision } : {}),
 });
 
 export const sessionFromLogin = (payload: LoginResponse): AuthSession => ({

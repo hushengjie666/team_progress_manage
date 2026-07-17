@@ -1,4 +1,3 @@
-import { ensureTodayPlan } from "./appModel";
 import {
   fetchWorkspaces,
   type AuthSession,
@@ -51,7 +50,7 @@ export async function loadAuthenticatedWorkspaceSession(
   });
   const metadata = await loadWorkspaceAccountMetadata(bound, token);
   return {
-    state: ensureTodayPlan(await loadTeamData(bound)),
+    state: await loadTeamData(bound),
     platformAccounts: metadata.platformAccounts,
     workspaceInvitations: metadata.workspaceInvitations,
     projectInvitations: metadata.projectInvitations,

@@ -11,7 +11,7 @@ func mysqlProjectInvitationSummariesForAccount(ctx context.Context, q sqlRunner,
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
-		        i.roles_json, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
@@ -40,7 +40,7 @@ func mysqlProjectInvitationSummaryByID(ctx context.Context, q sqlRunner, invitat
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
-		        i.roles_json, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id
@@ -59,7 +59,7 @@ func mysqlPendingProjectInvitation(ctx context.Context, q sqlRunner, workspaceID
 		ctx,
 		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
-		        i.roles_json, i.status, i.created_at, i.updated_at, i.row_version, i.accepted_at
+		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i
 		 JOIN workspaces w ON w.id = i.workspace_id
 		 JOIN accounts inviter ON inviter.id = i.inviter_account_id

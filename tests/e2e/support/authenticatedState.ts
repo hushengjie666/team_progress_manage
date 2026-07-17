@@ -1,4 +1,4 @@
-import { createInitialState } from "../../../src/seed";
+import { createInitialState } from "../../../src/test/fixtures";
 import { today } from "../../../src/appModel";
 import type { AppState } from "../../../src/types";
 import { MOCK_SERVER } from "./constants";

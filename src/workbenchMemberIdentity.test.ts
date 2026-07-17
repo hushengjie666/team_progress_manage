@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInitialState } from "./seed";
+import { createInitialState } from "./test/fixtures";
 import { currentMemberForState, deriveWorkspaceModel } from "./workbenchModel";
 import type { ProjectMember } from "./types";
 import {

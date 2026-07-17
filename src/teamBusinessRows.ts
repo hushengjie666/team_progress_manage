@@ -48,7 +48,6 @@ export type BusinessRow = {
   entity: BusinessEntity;
   id: string;
   updated_at: string;
-  revision?: number;
   payload: BusinessPayload;
 };
 
@@ -175,7 +174,6 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
       status: "ready",
       message: "团队在线数据已加载",
       lastLoadedAt: loadedAt,
-      businessRowRevisions: Object.fromEntries(rows.map((row) => [businessRowKey(row), row.revision ?? 0])),
     },
     projects: [],
     projectMembers: [],

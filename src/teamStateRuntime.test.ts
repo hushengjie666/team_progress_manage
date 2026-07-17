@@ -1,39 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "./seed";
 import { createTeamDataRuntime } from "./teamStateRuntime";
 import { businessRowsFromState } from "./teamBusinessRows";
+import { createTestState, teamBootstrapPayload } from "./test/fixtures";
 import type { AppState } from "./types";
 
-const withToken = (state: AppState): AppState => {
-  const revisions = Object.fromEntries(businessRowsFromState(state).map((row) => [`${row.workspace_id ?? ""}:${row.entity}:${row.id}`, 1]));
-  return ({
-  ...state,
-  auth: {
-    ...state.auth,
-    status: "authenticated",
-    token: "token_runtime",
-    message: "已登录",
-  },
-  backend: {
-    ...state.backend,
-    token: "token_runtime",
-    serverUrl: "http://127.0.0.1:8787",
-    businessRowRevisions: revisions,
-  },
-});
-};
+afterEach(() => vi.restoreAllMocks());
 
-const changedState = (state: AppState): AppState => ({
-  ...state,
-  projects: state.projects.map((project) =>
-    project.id === state.projects[0]?.id
-      ? { ...project, name: `${project.name} 已更新`, updatedAt: "2026-07-01T08:00:00.000Z" }
-      : project,
-  ),
-  updatedAt: "2026-07-01T08:00:00.000Z",
-});
-
-const createRuntimeHarness = (initial: AppState) => {
+const createHarness = (initial: AppState) => {
   let current: AppState | null = initial;
   let toast = "";
   const runtime = createTeamDataRuntime({
@@ -41,301 +14,86 @@ const createRuntimeHarness = (initial: AppState) => {
     setState: (updater) => {
       current = typeof updater === "function" ? updater(current) : updater;
     },
-    setToast: (message) => {
-      toast = message;
-    },
+    setToast: (message) => { toast = message; },
   });
+  return { runtime, getCurrent: () => current, getToast: () => toast };
+};
+
+const signedInState = () => {
+  const state = createTestState();
   return {
-    runtime,
-    getCurrent: () => current,
-    getToast: () => toast,
+    ...state,
+    auth: { ...state.auth, token: "token_runtime", status: "authenticated" as const },
+    backend: { ...state.backend, token: "token_runtime", serverUrl: "http://127.0.0.1:8787" },
   };
 };
 
-const deferredResponse = () => {
-  let resolve!: (response: Response) => void;
-  const promise = new Promise<Response>((done) => {
-    resolve = done;
-  });
-  return { promise, resolve };
-};
-
-const teamStateResponse = (state: AppState) =>
-  new Response(JSON.stringify({
-    rows: businessRowsFromState(state).map((row) => ({ ...row, revision: 2 })),
-  }), { status: 200, headers: { "content-type": "application/json" } });
-
-const flushPromises = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-  await new Promise((resolve) => setTimeout(resolve, 0));
-};
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe("team state runtime", () => {
-  it("commits local state immediately when no team token exists", () => {
-    const before = createInitialState();
-    const after = changedState(before);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
+  it("rejects business commands when no backend session exists", async () => {
+    const state = createTestState();
+    const { runtime, getCurrent, getToast } = createHarness(state);
 
-    runtime.commitTeamData(before, after);
+    const result = await runtime.runTeamCommand({ kind: "delete", entity: "task", id: state.tasks[0].id });
 
-    expect(getCurrent()).toEqual(after);
+    expect(result).toBeUndefined();
+    expect(getCurrent()).toEqual(state);
+    expect(getToast()).toBe("请先连接团队后台");
   });
 
-  it("ends the authenticated session locally without saving it as business data", async () => {
-    const before = withToken(createInitialState());
-    const after: AppState = {
+  it("waits for the command and then replaces business state from bootstrap", async () => {
+    const before = signedInState();
+    const remote = {
       ...before,
-      auth: {
-        status: "signed_out",
-        bootstrapped: true,
-        message: "已退出登录",
-      },
-      backend: {
-        ...before.backend,
-        token: undefined,
-        message: "已退出团队工作区",
-      },
+      projects: before.projects.map((project) => ({ ...project, name: "服务端确认名称" })),
     };
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify({ row: businessRowsFromState(remote)[0] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify(teamBootstrapPayload(remote, businessRowsFromState(remote))), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
     vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
+    const { runtime, getCurrent } = createHarness(before);
 
-    runtime.commitTeamData(before, after);
-    await flushPromises();
+    const pending = runtime.runTeamCommand({
+      kind: "patch",
+      entity: "project",
+      id: before.projects[0].id,
+      patch: { name: "服务端确认名称" },
+    });
+    expect(getCurrent()?.projects[0].name).toBe(before.projects[0].name);
+    const saved = await pending;
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(getCurrent()).toEqual(after);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(`/projects/${before.projects[0].id}`);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/app/bootstrap");
+    expect(saved?.projects[0].name).toBe("服务端确认名称");
+    expect(getCurrent()?.projects[0].name).toBe("服务端确认名称");
   });
 
-  it("does not let an in-flight save overwrite a signed-out session", async () => {
-    const before = withToken(createInitialState());
-    const changed = changedState(before);
-    const pending = deferredResponse();
-    const fetchMock = vi.fn(async () => pending.promise);
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
-
-    runtime.commitTeamData(before, changed);
-    await flushPromises();
-    const signedOut: AppState = {
-      ...changed,
-      auth: {
-        status: "signed_out",
-        bootstrapped: true,
-        message: "已退出登录",
-      },
-      backend: {
-        ...changed.backend,
-        token: undefined,
-        message: "已退出团队工作区",
-      },
-    };
-    runtime.commitTeamData(changed, signedOut);
-    pending.resolve(new Response(JSON.stringify({ error: "late save failed" }), {
+  it("keeps confirmed business data unchanged when a command fails", async () => {
+    const before = signedInState();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "backend down" }), {
       status: 500,
       headers: { "content-type": "application/json" },
-    }));
-    await flushPromises();
+    })));
+    const { runtime, getCurrent, getToast } = createHarness(before);
 
-    expect(getCurrent()).toEqual(signedOut);
-    expect(getToast()).toBe("");
-  });
-
-  it("saves remote changes and applies the saved state", async () => {
-    const before = withToken(createInitialState());
-    const after = changedState(before);
-    const fetchMock = vi.fn(async () => teamStateResponse(after));
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
-
-    const saved = await runtime.persistTeamData(before, after);
-
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(saved?.backend.status).toBe("ready");
-    expect(saved?.backend.message).toBe("团队在线数据已加载");
-    expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
-    expect(getCurrent()).toEqual(saved);
-  });
-
-  it("refreshes team state after a committed remote save", async () => {
-    const before = withToken(createInitialState());
-    const after = changedState(before);
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith("/team/data")) {
-        return teamStateResponse(after);
-      }
-      return teamStateResponse(after);
+    const result = await runtime.runTeamCommand({
+      kind: "patch",
+      entity: "project",
+      id: before.projects[0].id,
+      patch: { name: "不应显示" },
     });
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
 
-    const saved = await runtime.persistTeamData(before, after, { refreshAfterSave: true });
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(saved?.backend.status).toBe("ready");
-    expect(saved?.backend.message).toBe("团队在线数据已加载");
-    expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
-    expect(getCurrent()).toEqual(saved);
-  });
-
-  it("keeps the latest optimistic commit when an older remote refresh finishes later", async () => {
-    const before = withToken(createInitialState());
-    const first = changedState(before);
-    const second = {
-      ...first,
-      projects: first.projects.map((project) =>
-        project.id === first.projects[0]?.id
-          ? { ...project, name: `${project.name} 再次更新`, updatedAt: "2026-07-01T08:01:00.000Z" }
-          : project,
-      ),
-      updatedAt: "2026-07-01T08:01:00.000Z",
-    };
-    const stateResponses = [deferredResponse(), deferredResponse()];
-    let stateResponseIndex = 0;
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      if (url.endsWith("/team/data") && init?.method === "PUT") {
-        return stateResponses[stateResponseIndex++].promise;
-      }
-      return teamStateResponse(second);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
-
-    runtime.commitTeamData(before, first);
-    expect(getCurrent()?.projects[0]?.name).toBe(first.projects[0]?.name);
-
-    runtime.commitTeamData(first, second);
-    expect(getCurrent()?.projects[0]?.name).toBe(second.projects[0]?.name);
-
-    await flushPromises();
-    stateResponses[1].resolve(teamStateResponse(second));
-    await flushPromises();
-    expect(getCurrent()?.projects[0]?.name).toBe(second.projects[0]?.name);
-
-    stateResponses[0].resolve(teamStateResponse(first));
-    await flushPromises();
-    expect(getCurrent()?.projects[0]?.name).toBe(second.projects[0]?.name);
-  });
-
-  it("uses revisions returned by an earlier queued create for the following patch", async () => {
-    const before = withToken(createInitialState());
-    const createdProject = {
-      ...before.projects[0]!,
-      id: "project_queued",
-      name: "队列新项目",
-      createdAt: "2026-07-01T08:00:00.000Z",
-      updatedAt: "2026-07-01T08:00:00.000Z",
-    };
-    const first = {
-      ...before,
-      projects: [...before.projects, createdProject],
-      updatedAt: createdProject.updatedAt,
-    };
-    const second = {
-      ...first,
-      projects: first.projects.map((project) => project.id === createdProject.id
-        ? { ...project, name: "队列项目已重命名", updatedAt: "2026-07-01T08:01:00.000Z" }
-        : project),
-      updatedAt: "2026-07-01T08:01:00.000Z",
-    };
-    let putCount = 0;
-    const putBodies: Array<{ operations: Array<{ operation?: string; expected_revision?: number }> }> = [];
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "PUT") {
-        putBodies.push(JSON.parse(String(init.body)));
-        putCount += 1;
-        return teamStateResponse(putCount === 1 ? first : second);
-      }
-      return teamStateResponse(putCount === 1 ? first : second);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent } = createRuntimeHarness(before);
-
-    runtime.commitTeamData(before, first);
-    runtime.commitTeamData(first, second);
-    await flushPromises();
-    await flushPromises();
-
-    expect(putBodies).toHaveLength(2);
-    expect(putBodies[0]?.operations[0]).toEqual(expect.objectContaining({ operation: "create" }));
-    expect(putBodies[1]?.operations[0]?.expected_revision).toBe(2);
-    expect(getCurrent()?.projects.find((project) => project.id === createdProject.id)?.name)
-      .toBe("队列项目已重命名");
-  });
-
-  it("applies failure state and toast when remote save fails", async () => {
-    const before = withToken(createInitialState());
-    const after = changedState(before);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      error: "backend down",
-    }), { status: 500, headers: { "content-type": "application/json" } })));
-    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
-
-    const saved = await runtime.persistTeamData(before, after);
-
-    expect(saved).toBeUndefined();
-    expect(getCurrent()?.auth.status).toBe("authenticated");
-    expect(getCurrent()?.auth.token).toBe(before.auth.token);
-    expect(getCurrent()?.auth.account).toEqual(before.auth.account);
-    expect(getCurrent()?.backend.status).toBe("error");
+    expect(result).toBeUndefined();
+    expect(getCurrent()?.projects).toEqual(before.projects);
     expect(getToast()).toContain("backend down");
-  });
-
-  it("restores server state when a destructive operation conflicts", async () => {
-    const before = withToken(createInitialState());
-    const after = { ...before, projects: [] };
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "PUT") {
-        return new Response(JSON.stringify({ error: "revision_conflict" }), { status: 409, headers: { "content-type": "application/json" } });
-      }
-      return teamStateResponse(before);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
-
-    const saved = await runtime.persistTeamData(before, after);
-
-    expect(saved).toBeUndefined();
-    expect(getCurrent()?.projects).toHaveLength(before.projects.length);
-    expect(getToast()).toContain("revision_conflict");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("rebases and retries a patch after another device advances the row revision", async () => {
-    const before = withToken(createInitialState());
-    const after = changedState(before);
-    const putBodies: Array<{ operations: Array<{ expected_revision?: number }> }> = [];
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      if (init?.method === "PUT") {
-        putBodies.push(JSON.parse(String(init.body)));
-        if (putBodies.length === 1) {
-          return new Response(JSON.stringify({ error: "revision_conflict" }), {
-            status: 409,
-            headers: { "content-type": "application/json" },
-          });
-        }
-        return teamStateResponse(after);
-      }
-      return teamStateResponse(before);
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { runtime, getCurrent, getToast } = createRuntimeHarness(before);
-
-    const saved = await runtime.persistTeamData(before, after);
-
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-    expect(putBodies).toHaveLength(2);
-    expect(putBodies[0]?.operations[0]?.expected_revision).toBe(1);
-    expect(putBodies[1]?.operations[0]?.expected_revision).toBe(2);
-    expect(saved?.projects[0]?.name).toBe(after.projects[0]?.name);
-    expect(getCurrent()?.backend.status).toBe("ready");
-    expect(getToast()).toBe("");
   });
 });

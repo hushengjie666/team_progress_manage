@@ -30,10 +30,6 @@ func (a *app) handleAdminAccountByID(w http.ResponseWriter, r *http.Request, aut
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	if req.ExpectedRevision <= 0 {
-		writeError(w, http.StatusPreconditionRequired, "expected revision is required")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 	defer cancel()
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -49,10 +45,6 @@ func (a *app) handleAdminAccountByID(w http.ResponseWriter, r *http.Request, aut
 	}
 	if !found {
 		writeError(w, http.StatusNotFound, "account not found")
-		return
-	}
-	if account.Revision != req.ExpectedRevision {
-		writeError(w, http.StatusConflict, "revision_conflict")
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -100,16 +92,15 @@ func (a *app) handleAdminAccountByID(w http.ResponseWriter, r *http.Request, aut
 	}
 	account.WorkspaceID = privateWorkspaceID(account.ID)
 	account.UpdatedAt = now
-	updated, err := mysqlUpdateAccountAtRevision(ctx, tx, account, req.ExpectedRevision)
+	updated, err := mysqlUpdateAccount(ctx, tx, account)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if !updated {
-		writeError(w, http.StatusConflict, "revision_conflict")
+		writeError(w, http.StatusNotFound, "account not found")
 		return
 	}
-	account.Revision = req.ExpectedRevision + 1
 	if _, err := mysqlEnsurePrivateWorkspaceForAccount(ctx, tx, account, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return

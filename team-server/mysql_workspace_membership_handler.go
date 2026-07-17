@@ -35,10 +35,6 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 		writeError(w, http.StatusBadRequest, "workspace member status or role is required")
 		return
 	}
-	if req.ExpectedRevision <= 0 {
-		writeError(w, http.StatusPreconditionRequired, "expected revision is required")
-		return
-	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	tx, err := a.db.BeginTx(ctx, nil)
@@ -73,10 +69,6 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 	}
 	if !foundTargetMembership {
 		writeError(w, http.StatusNotFound, "workspace member not found")
-		return
-	}
-	if targetMembership.Revision != req.ExpectedRevision {
-		writeError(w, http.StatusConflict, "revision_conflict")
 		return
 	}
 	nextStatus := targetMembership.Status
@@ -123,20 +115,19 @@ func (a *app) handleWorkspaceMembershipByIDMySQL(w http.ResponseWriter, r *http.
 	now := time.Now().UTC().Format(time.RFC3339)
 	result, err := tx.ExecContext(
 		ctx,
-		`UPDATE workspace_memberships SET role = ?, status = ?, updated_at = ?, row_version = row_version + 1 WHERE workspace_id = ? AND id = ? AND row_version = ?`,
+		`UPDATE workspace_memberships SET role = ?, status = ?, updated_at = ? WHERE workspace_id = ? AND id = ?`,
 		nextRole,
 		nextStatus,
 		now,
 		workspaceID,
 		membershipID,
-		req.ExpectedRevision,
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	if count, err := result.RowsAffected(); err != nil || count != 1 {
-		writeError(w, http.StatusConflict, "revision_conflict")
+		writeError(w, http.StatusNotFound, "workspace member not found")
 		return
 	}
 	if err := mysqlTouchWorkspace(ctx, tx, workspaceID, now); err != nil {

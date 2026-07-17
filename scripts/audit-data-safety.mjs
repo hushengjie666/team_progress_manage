@@ -8,15 +8,24 @@ const failures = [];
 const handler = read("team-server/business_handlers.go");
 const store = read("team-server/business_store.go");
 const api = read("src/teamBusinessApi.ts");
+const routes = read("team-server/server_routes.go");
+const commands = read("src/teamDomainCommands.ts");
+const storage = read("src/storage.ts");
 
 if (handler.includes("nextKeys") || handler.includes("businessDeleteRow(ctx")) {
   failures.push("team data save still contains snapshot-absence deletion");
 }
-if (!store.includes("DELETE FROM %s WHERE workspace_id = ? AND id = ? AND row_version = ?")) {
-  failures.push("business deletion is not guarded by row revision");
+if (store.includes("row_version") || store.includes("expected_revision")) {
+  failures.push("business storage still contains client revision concurrency");
 }
-if (!api.includes("protocol_version: 2") || api.includes("JSON.stringify({ rows:")) {
-  failures.push("frontend team writes are not using protocol 2 operations");
+if (routes.includes('"/team/data"') || !routes.includes('"/app/bootstrap"')) {
+  failures.push("server routes still expose the snapshot protocol or omit bootstrap");
+}
+if (!api.includes('"/app/bootstrap"') || !commands.includes("submitTeamDomainCommand")) {
+  failures.push("frontend is not using bootstrap plus domain commands");
+}
+if (storage.includes("activeRuntime:") || storage.includes("projects: state.projects")) {
+  failures.push("local storage still persists business data");
 }
 
 if (failures.length) {

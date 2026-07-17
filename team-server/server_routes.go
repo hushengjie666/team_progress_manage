@@ -20,5 +20,8 @@ func (a *app) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/project-invitations/", a.withAuth(a.handleProjectInvitationByID))
 	mux.HandleFunc("/members", a.withAuth(a.handleMembers))
 	mux.HandleFunc("/members/", a.withAuth(a.handleMemberByID))
-	mux.HandleFunc("/team/data", a.withAuth(a.handleTeamData))
+	mux.HandleFunc("/app/bootstrap", a.withAuth(a.handleAppBootstrap))
+	mux.HandleFunc("/app/import", a.withAuth(a.handleBusinessImport))
+	mux.HandleFunc("/settings", a.withAuth(a.handleAccountSettings))
+	a.registerBusinessResourceRoutes(mux)
 }

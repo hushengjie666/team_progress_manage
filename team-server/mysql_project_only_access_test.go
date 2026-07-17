@@ -136,13 +136,12 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 			continue
 		}
 		modifiedOperations = append(modifiedOperations, businessOperation{
-			Operation:        "patch",
-			WorkspaceID:      row.WorkspaceID,
-			Entity:           row.Entity,
-			ID:               row.ID,
-			ExpectedRevision: row.Revision,
-			UpdatedAt:        row.UpdatedAt,
-			Patch:            row.Payload,
+			Operation:   "patch",
+			WorkspaceID: row.WorkspaceID,
+			Entity:      row.Entity,
+			ID:          row.ID,
+			UpdatedAt:   row.UpdatedAt,
+			Patch:       row.Payload,
 		})
 	}
 	modifiedBody, err := json.Marshal(teamDataSaveRequest{ProtocolVersion: 2, Operations: modifiedOperations})
@@ -169,7 +168,7 @@ func TestMySQLTeamStateAllProjectOnlyAccess(t *testing.T) {
 	}
 
 	disableRecorder := httptest.NewRecorder()
-	disableBody := versionedJSONBody(t, `{"workspace_id":"`+workspaceID+`","status":"disabled","roles":["executor"]}`, member.Member.Revision)
+	disableBody := versionedJSONBody(t, `{"workspace_id":"`+workspaceID+`","status":"disabled","roles":["executor"]}`, 0)
 	api.handleMemberByID(disableRecorder, httptest.NewRequest(http.MethodPatch, "/members/"+member.Member.ID, disableBody), sharedAuth)
 	if disableRecorder.Code != http.StatusOK {
 		t.Fatalf("disable project member status = %d, body = %s", disableRecorder.Code, disableRecorder.Body.String())

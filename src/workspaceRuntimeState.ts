@@ -1,4 +1,3 @@
-import { ensureTodayPlan } from "./appModel";
 import { fetchWorkspaces } from "./teamBackend";
 import { loadTeamData } from "./teamBusinessApi";
 import type { AppState, Workspace } from "./types";
@@ -21,5 +20,5 @@ export async function loadStateWithFreshWorkspaces(
       workspaceMemberships: workspacePayload.memberships,
     },
   };
-  return ensureTodayPlan(await loadTeamData(nextWithWorkspaces));
+  return loadTeamData(nextWithWorkspaces);
 }

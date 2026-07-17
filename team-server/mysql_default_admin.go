@@ -72,7 +72,7 @@ func ensureDefaultAdminAccountCredentials(ctx context.Context, tx *sql.Tx) error
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err = tx.ExecContext(
 		ctx,
-		`UPDATE accounts SET name = ?, email = ?, password_hash = ?, disabled_at = NULL, updated_at = ?, row_version = row_version + 1 WHERE id = ?`,
+		`UPDATE accounts SET name = ?, email = ?, password_hash = ?, disabled_at = NULL, updated_at = ? WHERE id = ?`,
 		defaultAdminName,
 		defaultAdminUsername,
 		hash,

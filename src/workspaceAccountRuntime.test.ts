@@ -14,7 +14,6 @@ const serverAccount = {
   disabled_at: "",
   created_at: "2026-07-01T08:00:00.000Z",
   updated_at: "2026-07-01T08:00:00.000Z",
-  revision: 1,
 };
 
 const serverInvitation = {
@@ -31,7 +30,6 @@ const serverInvitation = {
   created_at: "2026-07-01T08:00:00.000Z",
   updated_at: "2026-07-01T08:00:00.000Z",
   accepted_at: "",
-  revision: 1,
 };
 
 const serverProjectInvitation = {
@@ -50,7 +48,6 @@ const serverProjectInvitation = {
   created_at: "2026-07-01T08:00:00.000Z",
   updated_at: "2026-07-01T08:00:00.000Z",
   accepted_at: "",
-  revision: 1,
 };
 
 const withAdminToken = (state: AppState): AppState => ({
@@ -66,7 +63,6 @@ const withAdminToken = (state: AppState): AppState => ({
       email: "admin",
       createdAt: "2026-07-01T08:00:00.000Z",
       updatedAt: "2026-07-01T08:00:00.000Z",
-      revision: 1,
     },
     message: "已登录",
   },
@@ -157,7 +153,6 @@ describe("workspace account runtime", () => {
       disabledAt: undefined,
       createdAt: "2026-07-01T08:00:00.000Z",
       updatedAt: "2026-07-01T08:00:00.000Z",
-      revision: 1,
     }]);
     expect(metadata.workspaceInvitations[0]?.workspaceName).toBe("交付团队");
     expect(metadata.projectInvitations[0]?.projectName).toBe("消毒中心");
@@ -269,7 +264,6 @@ describe("workspace account runtime", () => {
     await vi.waitFor(() => expect(getToast()).toBe("已删除工作区邀请"));
 
     expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
-      ["http://127.0.0.1:8787/workspace-invitations", "GET"],
       ["http://127.0.0.1:8787/workspace-invitations/invitation_1", "DELETE"],
       ["http://127.0.0.1:8787/workspace-invitations", "GET"],
     ]);
@@ -302,7 +296,6 @@ describe("workspace account runtime", () => {
     await vi.waitFor(() => expect(getToast()).toBe("已删除项目邀请"));
 
     expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
-      ["http://127.0.0.1:8787/project-invitations", "GET"],
       ["http://127.0.0.1:8787/project-invitations/project_invitation_1", "DELETE"],
       ["http://127.0.0.1:8787/project-invitations", "GET"],
     ]);
@@ -339,7 +332,6 @@ describe("workspace account runtime", () => {
     await vi.waitFor(() => expect(getToast()).toBe("已加入项目 消毒中心，刷新项目数据失败，请刷新页面"));
 
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
-      "http://127.0.0.1:8787/project-invitations",
       "http://127.0.0.1:8787/project-invitations/project_invitation_1/accept",
       "http://127.0.0.1:8787/workspaces",
     ]);

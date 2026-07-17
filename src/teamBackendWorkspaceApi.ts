@@ -40,7 +40,6 @@ export async function updateWorkspace(
       name: input.name,
       type: input.type ?? "shared",
       owner_account_id: input.ownerAccountId,
-      expected_revision: input.expectedRevision,
       confirm_restrict_members: input.confirmRestrictMembers,
     }),
   });
@@ -74,7 +73,6 @@ export async function updateWorkspaceMembership(
       body: JSON.stringify({
         status: input.status,
         role: input.role,
-        expected_revision: input.expectedRevision,
       }),
     },
   );

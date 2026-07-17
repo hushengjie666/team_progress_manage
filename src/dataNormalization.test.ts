@@ -6,7 +6,7 @@ describe("current app state payload", () => {
   it("accepts the runtime cache shape without business data", () => {
     const state = createInitialState();
     const payload = {
-      version: 4,
+      version: 5,
       settings: state.settings,
       auth: state.auth,
       backend: {
@@ -31,7 +31,7 @@ describe("current app state payload", () => {
   it("does not restore business arrays from cached payloads", () => {
     const state = createInitialState();
     const parsed = parseCurrentAppStatePayload({
-      version: 4,
+      version: 5,
       settings: state.settings,
       auth: state.auth,
       backend: {
@@ -45,12 +45,12 @@ describe("current app state payload", () => {
       updatedAt: state.updatedAt,
     });
 
-    expect(parsed.projects).toEqual(createInitialState().projects);
+    expect(parsed.projects).toEqual([]);
     expect(parsed.tasks).toEqual([]);
     expect(parsed.dailyPlans).toEqual([]);
   });
 
-  it("restores only the active timer runtime cache", () => {
+  it("does not restore the active timer runtime cache", () => {
     const state = createInitialState();
     const activeTimer = {
       sessionId: "focus_active",
@@ -106,7 +106,7 @@ describe("current app state payload", () => {
     };
 
     const parsed = parseCurrentAppStatePayload({
-      version: 4,
+      version: 5,
       settings: state.settings,
       auth: state.auth,
       backend: {
@@ -131,12 +131,12 @@ describe("current app state payload", () => {
       updatedAt: state.updatedAt,
     });
 
-    expect(parsed.activeTimer).toEqual(activeTimer);
-    expect(parsed.tasks).toEqual([state.tasks[0]]);
-    expect(parsed.dailyPlans).toEqual([state.dailyPlans[0]]);
-    expect(parsed.focusSessions).toEqual([activeFocusSession]);
-    expect(parsed.workSessions).toEqual([activeWorkSession]);
-    expect(parsed.executionSignals).toEqual([activeSignal]);
+    expect(parsed.activeTimer).toBeUndefined();
+    expect(parsed.tasks).toEqual([]);
+    expect(parsed.dailyPlans).toEqual([]);
+    expect(parsed.focusSessions).toEqual([]);
+    expect(parsed.workSessions).toEqual([]);
+    expect(parsed.executionSignals).toEqual([]);
   });
 
   it("fills new settings defaults for existing runtime caches", () => {
@@ -148,7 +148,7 @@ describe("current app state payload", () => {
     } = state.settings;
 
     const parsed = parseCurrentAppStatePayload({
-      version: 4,
+      version: 5,
       settings,
       auth: state.auth,
       backend: {
@@ -174,7 +174,7 @@ describe("current app state payload", () => {
   it("rejects runtime caches missing required auth", () => {
     const state = createInitialState();
     const incomplete = {
-      version: 4,
+      version: 5,
       settings: state.settings,
       backend: {
         serverUrl: state.backend.serverUrl,

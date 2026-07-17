@@ -1,10 +1,5 @@
 import type { AppState } from "./types";
 import { defaultBackendServerUrl } from "./defaultBackendServerUrl";
-import {
-  defaultTaskTemplates,
-  starterProject,
-  starterProjectMember,
-} from "./initialSeedData";
 
 const padDatePart = (value: number) => String(value).padStart(2, "0");
 
@@ -56,8 +51,8 @@ export const createInitialState = (): AppState => ({
     bootstrapped: undefined,
     message: "请使用管理员分配的账号登录",
   },
-  projects: [starterProject],
-  projectMembers: [starterProjectMember],
+  projects: [],
+  projectMembers: [],
   tasks: [],
   dailyPlans: [],
   focusSessions: [],
@@ -78,7 +73,7 @@ export const createInitialState = (): AppState => ({
     status: "idle",
     message: "本地团队后台未连接",
   },
-  taskTemplates: defaultTaskTemplates,
+  taskTemplates: [],
   templateInstances: [],
   updatedAt: now(),
 });

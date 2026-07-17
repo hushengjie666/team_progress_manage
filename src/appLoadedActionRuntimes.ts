@@ -4,6 +4,7 @@ import { createAppSettingsActionsRuntime } from "./appSettingsActionsRuntime";
 import { createAppTaskActionsRuntime } from "./appTaskActionsRuntime";
 import type { useAppShellState } from "./appShellState";
 import type { AppState } from "./types";
+import type { RunTeamDomainCommand } from "./teamDomainCommands";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
 
@@ -12,6 +13,7 @@ type AppLoadedActionRuntimesOptions = {
   state: AppState;
   updateState: UpdateState;
   currentProjectId: string;
+  runTeamCommand: RunTeamDomainCommand;
 };
 
 export function createAppLoadedActionRuntimes({
@@ -19,6 +21,7 @@ export function createAppLoadedActionRuntimes({
   state,
   updateState,
   currentProjectId,
+  runTeamCommand,
 }: AppLoadedActionRuntimesOptions) {
   const taskActions = createAppTaskActionsRuntime({
     getState: () => shell.stateRef.current ?? state,
@@ -28,7 +31,7 @@ export function createAppLoadedActionRuntimes({
     getPendingDeleteTask: () => shell.pendingDeleteTask,
     getDeletedTaskSnapshot: () => shell.deletedTaskSnapshot,
     getPendingSplit: () => shell.pendingSplit,
-    updateState,
+    runTeamCommand,
     setDraft: shell.setDraft,
     setToast: shell.setToast,
     setSelectedTaskId: shell.setSelectedTaskId,
@@ -43,17 +46,20 @@ export function createAppLoadedActionRuntimes({
     getState: () => shell.stateRef.current ?? state,
     getQuickNote: () => shell.quickNote,
     updateState,
+    runTeamCommand,
     setQuickNote: shell.setQuickNote,
     setToast: shell.setToast,
     setPreferredFocusTaskId: shell.setPreferredFocusTaskId,
     setPendingReset: shell.setPendingReset,
   });
   const projectActions = createAppProjectActionsRuntime({
-    updateState,
+    getState: () => shell.stateRef.current ?? state,
+    runTeamCommand,
     setToast: shell.setToast,
   });
   const settingsActions = createAppSettingsActionsRuntime({
     updateState,
+    runTeamCommand,
     setToast: shell.setToast,
   });
 

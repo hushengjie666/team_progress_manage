@@ -1,4 +1,3 @@
-import { ensureTodayPlan } from "./appModel";
 import type { AppState, ExecutionSignal, FocusSession, Task, WorkSession } from "./types";
 
 const upsertById = <T extends { id: string }>(items: T[], incoming: T) =>
@@ -49,5 +48,5 @@ export const preserveLocalActiveRuntime = (remote: AppState, local: AppState): A
     }
   }
 
-  return ensureTodayPlan(next);
+  return next;
 };

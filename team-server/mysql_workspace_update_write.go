@@ -13,7 +13,6 @@ type workspaceUpdateInput struct {
 	name                   string
 	kind                   string
 	ownerID                string
-	expectedRevision       int64
 	confirmRestrictMembers bool
 }
 
@@ -24,12 +23,6 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	}
 	if !found {
 		return workspaceData{}, memberWriteFailure{status: http.StatusForbidden, message: "workspace access denied"}
-	}
-	if input.expectedRevision <= 0 {
-		return workspaceData{}, memberWriteFailure{status: http.StatusPreconditionRequired, message: "expected revision is required"}
-	}
-	if workspace.Revision != input.expectedRevision {
-		return workspaceData{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
 	}
 	workspaceType := input.kind
 	if workspace.Type == "private" && workspaceType != "private" {
@@ -64,14 +57,13 @@ func updateWorkspaceInTx(ctx context.Context, tx *sql.Tx, auth authContext, inpu
 	workspace.Type = workspaceType
 	workspace.OwnerAccountID = ownerAccountID
 	workspace.UpdatedAt = now
-	updated, err := mysqlUpdateWorkspaceAtRevision(ctx, tx, workspace, input.expectedRevision)
+	updated, err := mysqlUpdateWorkspace(ctx, tx, workspace)
 	if err != nil {
 		return workspaceData{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}
 	if !updated {
-		return workspaceData{}, memberWriteFailure{status: http.StatusConflict, message: "revision_conflict"}
+		return workspaceData{}, memberWriteFailure{status: http.StatusNotFound, message: "workspace not found"}
 	}
-	workspace.Revision = input.expectedRevision + 1
 	if err := mysqlSetWorkspaceOwner(ctx, tx, workspace.ID, workspace.OwnerAccountID, now); err != nil {
 		return workspaceData{}, memberWriteFailure{status: http.StatusInternalServerError, message: "save failed"}
 	}

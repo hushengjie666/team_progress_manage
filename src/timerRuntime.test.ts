@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "./seed";
+import { createInitialState } from "./test/fixtures";
 import {
   announceTimerEnd,
   runDueTaskReminders,
@@ -108,14 +108,7 @@ describe("timer runtime", () => {
 
     expect(sentIds.has("task_due")).toBe(true);
     expect(mocks.sendTimerNotification).toHaveBeenCalledWith(state.settings, "任务提醒", "到期提醒任务");
-    expect(commitTeamData).toHaveBeenCalledWith(state, expect.objectContaining({
-      tasks: [expect.objectContaining({
-        id: "task_due",
-        lastReminderSentAt: "2026-07-01T08:00:00.000Z",
-        updatedAt: "2026-07-01T08:00:00.000Z",
-      })],
-      updatedAt: "2026-07-01T08:00:00.000Z",
-    }));
+    expect(commitTeamData).toHaveBeenCalledWith("task_due", "2026-07-01T08:00:00.000Z");
   });
 
   it("replaces white noise when a running timer wants ambient sound", () => {

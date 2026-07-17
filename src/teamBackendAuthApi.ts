@@ -35,14 +35,13 @@ export async function loginToWorkspace(backend: BackendConnectionState, email: s
   return sessionFromLogin(payload);
 }
 
-export async function switchWorkspace(backend: BackendConnectionState, token: string, workspaceId: string, expectedRevision?: number): Promise<AuthSession> {
+export async function switchWorkspace(backend: BackendConnectionState, token: string, workspaceId: string): Promise<AuthSession> {
   const payload = await requestJson<LoginResponse>(apiUrl(backend.serverUrl, "/auth/switch-workspace"), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
       workspace_id: workspaceId,
       device_id: backend.deviceId,
-      expected_revision: expectedRevision,
     }),
   });
   return sessionFromLogin(payload);

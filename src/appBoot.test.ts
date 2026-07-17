@@ -50,14 +50,13 @@ describe("app boot fallback", () => {
     expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
   });
 
-  it("keeps cached business data available when team state cannot be loaded", () => {
+  it("clears cached business data when team state cannot be loaded", () => {
     const state = signedInState();
     const next = applyTeamStateLoadFailure(state, new Error("Load failed"));
 
-    expect(next.auth.status).toBe("authenticated");
-    expect(next.auth.message).toBe("已登录");
-    expect(next.projects).toEqual(state.projects);
-    expect(next.tasks).toEqual(state.tasks);
+    expect(next.auth.status).toBe("error");
+    expect(next.projects).toEqual([]);
+    expect(next.tasks).toEqual([]);
     expect(next.backend.status).toBe("error");
     expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
   });
@@ -91,7 +90,7 @@ describe("app boot fallback", () => {
     const state = signedInState();
     const next = applyTeamStateLoadFailure(state, new Error("unauthorized upstream response"));
 
-    expect(next.auth.status).toBe("authenticated");
+    expect(next.auth.status).toBe("error");
     expect(next.auth.token).toBe("token_cached");
     expect(next.backend.status).toBe("error");
   });

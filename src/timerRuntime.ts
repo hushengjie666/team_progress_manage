@@ -3,7 +3,7 @@ import { playTimerSound, sendTimerNotification, startWhiteNoise } from "./notifi
 import type { ActiveTimer, AppState, Settings } from "./types";
 
 type StopNoiseRef = { current: (() => void) | null };
-type CommitTeamData = (before: AppState, after: AppState) => void;
+type MarkReminderSent = (taskId: string, timestamp: string) => void;
 type AnnounceTimerEndOptions = { playSound?: boolean };
 
 export const stopWhiteNoise = (stopNoiseRef: StopNoiseRef) => {
@@ -39,7 +39,7 @@ export const announceTimerEnd = (
 export const runDueTaskReminders = (
   state: AppState,
   reminderSentIds: Set<string>,
-  commitTeamData: CommitTeamData,
+  markReminderSent: MarkReminderSent,
   nowMs = Date.now(),
   timestamp = nowIso(),
 ) => {
@@ -52,13 +52,7 @@ export const runDueTaskReminders = (
     if (!Number.isNaN(reminderTime) && reminderTime <= nowMs) {
       reminderSentIds.add(task.id);
       void sendTimerNotification(state.settings, "任务提醒", task.title);
-      commitTeamData(state, {
-        ...state,
-        tasks: state.tasks.map((item) =>
-          item.id === task.id ? { ...item, lastReminderSentAt: timestamp, updatedAt: timestamp } : item,
-        ),
-        updatedAt: timestamp,
-      });
+      markReminderSent(task.id, timestamp);
     }
   }
 };

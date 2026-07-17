@@ -12,7 +12,7 @@ type AppLoadedRuntimesOptions = {
   state: AppState;
   viewModel: ReturnType<typeof useAppViewModelHooks>;
   updateState: UpdateState;
-  persistTeamData: TeamDataRuntime["persistTeamData"];
+  runTeamCommand: TeamDataRuntime["runTeamCommand"];
 };
 
 export function createAppLoadedRuntimes({
@@ -20,7 +20,7 @@ export function createAppLoadedRuntimes({
   state,
   viewModel,
   updateState,
-  persistTeamData,
+  runTeamCommand,
 }: AppLoadedRuntimesOptions) {
   const currentProjectId = viewModel.workspaceModel?.projectOverviewCards[0]?.projectId ?? "";
   const {
@@ -33,6 +33,7 @@ export function createAppLoadedRuntimes({
     state,
     updateState,
     currentProjectId,
+    runTeamCommand,
   });
   const {
     loadDemoData,
@@ -43,8 +44,7 @@ export function createAppLoadedRuntimes({
     shell,
     state,
     viewModel,
-    updateState,
-    persistTeamData,
+    runTeamCommand,
     currentProjectId,
     focusActions,
     projectActions,

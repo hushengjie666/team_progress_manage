@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createInitialState } from "./seed";
-import { saveTeamDataSnapshot } from "./teamBusinessApi";
 import { loadTeamData } from "./teamApi";
-import type { ActiveTimer, FocusSession, BackendConnectionState, Task, WorkSession } from "./types";
-
-const iso = (value: string) => new Date(value).toISOString();
+import { businessRowsFromState } from "./teamBusinessRows";
+import { createTestState, teamBootstrapPayload, withWorkSession } from "./test/fixtures";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -12,218 +9,47 @@ afterEach(() => {
 });
 
 describe("team backend active timer state loading", () => {
-  it("preserves the local active timer when refreshing team state", async () => {
+  it("reconstructs the active timer only from the backend active work session", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-06-30T06:12:00Z"));
-    const base = createInitialState();
-    const task: Task = {
-      id: "task_active",
-      title: "刷新后仍在执行",
-      notes: "",
-      tags: [],
-      projectId: base.projects[0].id,
-      project: base.projects[0].name,
-      creatorMemberId: base.projectMembers[0].id,
-      primaryExecutorMemberId: base.projectMembers[0].id,
-      collaboratorMemberIds: [],
-      progressPercent: 0,
-      progressNote: "",
-      priority: "high",
-      severity: "medium",
-      stage: "development",
-      estimatePomodoros: 2,
-      status: "committed",
-      repeatRule: "none",
-      subtasks: [],
-      sortOrder: 1,
-      actualPomodoros: 0,
-      estimateHistory: [],
-      createdAt: iso("2026-06-30T06:00:00Z"),
-      updatedAt: iso("2026-06-30T06:00:00Z"),
-    };
-    const localStartedTask = {
-      ...task,
-      status: "in_progress" as const,
-      updatedAt: iso("2026-06-30T06:10:00Z"),
-    };
-    const focusSession: FocusSession = {
-      id: "session_active",
-      taskId: task.id,
-      mode: "focus",
-      duration: 25 * 60,
-      startedAt: iso("2026-06-30T06:10:00Z"),
-      interruptionCounts: { internal: 0, external: 0 },
-    };
-    const workSession: WorkSession = {
-      id: "work_session_active",
-      taskId: task.id,
-      executorMemberId: base.projectMembers[0].id,
-      focusSessionId: focusSession.id,
+    vi.setSystemTime(new Date("2026-07-17T08:05:00.000Z"));
+    const base = createTestState();
+    const startedAt = "2026-07-17T08:00:00.000Z";
+    const remote = withWorkSession({
+      ...base,
+      focusSessions: [{
+        id: "focus_backend",
+        taskId: base.tasks[0].id,
+        mode: "focus",
+        duration: 1500,
+        startedAt,
+        interruptionCounts: { internal: 0, external: 0 },
+      }],
+      workSessions: [],
+    }, {
+      id: "work_backend",
+      taskId: base.tasks[0].id,
+      focusSessionId: "focus_backend",
       status: "active",
-      startedAt: focusSession.startedAt,
-      totalPausedSeconds: 0,
-      createdAt: focusSession.startedAt,
-      updatedAt: focusSession.startedAt,
-    };
-    const activeTimer: ActiveTimer = {
-      sessionId: focusSession.id,
-      taskId: task.id,
-      workSessionId: workSession.id,
-      mode: "focus",
-      duration: focusSession.duration,
-      remaining: focusSession.duration,
-      isRunning: true,
-      startedAt: focusSession.startedAt,
-      plannedEndAt: iso("2026-06-30T06:35:00Z"),
-      totalPausedSeconds: 0,
-      cycleIndex: 1,
-    };
+      startedAt,
+      updatedAt: startedAt,
+    });
     const local = {
       ...base,
-      auth: {
-        status: "authenticated" as const,
-        token: "token",
-        account: {
-          id: "account_owner",
-          workspaceId: "workspace_test",
-          name: "负责人",
-          email: "owner@example.com",
-          createdAt: iso("2026-06-30T06:00:00Z"),
-          updatedAt: iso("2026-06-30T06:00:00Z"),
-        },
-        workspace: {
-          id: "workspace_test",
-          name: "测试团队",
-          createdAt: iso("2026-06-30T06:00:00Z"),
-          updatedAt: iso("2026-06-30T06:00:00Z"),
-        },
-        bootstrapped: true,
-        message: "已登录",
-      },
-      backend: {
-        ...base.backend,
-        serverUrl: "http://127.0.0.1:8787",
-        token: "token",
-      } satisfies BackendConnectionState,
-      tasks: [localStartedTask],
-      focusSessions: [focusSession],
-      workSessions: [workSession],
-      activeTimer,
-      updatedAt: iso("2026-06-30T06:10:00Z"),
+      auth: { ...base.auth, token: "token", status: "authenticated" as const },
+      backend: { ...base.backend, token: "token" },
+      activeTimer: undefined,
     };
-
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      rows: [
-        {
-          workspace_id: "workspace_test",
-          entity: "task",
-          id: task.id,
-          updated_at: task.updatedAt,
-          payload: task,
-        },
-      ],
-    }), { status: 200, headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(
+      teamBootstrapPayload(remote, businessRowsFromState(remote)),
+    ), { status: 200, headers: { "content-type": "application/json" } })));
 
     const loaded = await loadTeamData(local);
 
-    expect(loaded.activeTimer?.sessionId).toBe(activeTimer.sessionId);
-    expect(loaded.workSessions.find((session) => session.id === workSession.id)?.status).toBe("active");
-    expect(loaded.focusSessions.some((session) => session.id === focusSession.id)).toBe(true);
-    expect(loaded.tasks.find((item) => item.id === task.id)?.status).toBe("in_progress");
-    expect(loaded.dailyPlans.some((plan) => plan.committedTaskIds.includes(task.id))).toBe(true);
-  });
-
-  it("preserves the local active timer after saving team state", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-06-30T06:12:00Z"));
-    const base = createInitialState();
-    const task: Task = {
-      id: "task_active",
-      title: "保存后仍在执行",
-      notes: "",
-      tags: [],
-      projectId: base.projects[0].id,
-      project: base.projects[0].name,
-      creatorMemberId: base.projectMembers[0].id,
-      primaryExecutorMemberId: base.projectMembers[0].id,
-      collaboratorMemberIds: [],
-      progressPercent: 0,
-      progressNote: "",
-      priority: "high",
-      severity: "medium",
-      stage: "development",
-      estimatePomodoros: 2,
-      status: "in_progress",
-      repeatRule: "none",
-      subtasks: [],
-      sortOrder: 1,
-      actualPomodoros: 0,
-      estimateHistory: [],
-      createdAt: iso("2026-06-30T06:00:00Z"),
-      updatedAt: iso("2026-06-30T06:10:00Z"),
-    };
-    const focusSession: FocusSession = {
-      id: "session_active",
-      taskId: task.id,
-      mode: "focus",
-      duration: 25 * 60,
-      startedAt: iso("2026-06-30T06:10:00Z"),
-      interruptionCounts: { internal: 0, external: 0 },
-    };
-    const workSession: WorkSession = {
-      id: "work_session_active",
-      taskId: task.id,
-      executorMemberId: base.projectMembers[0].id,
-      focusSessionId: focusSession.id,
-      status: "active",
-      startedAt: focusSession.startedAt,
-      totalPausedSeconds: 0,
-      createdAt: focusSession.startedAt,
-      updatedAt: focusSession.startedAt,
-    };
-    const activeTimer: ActiveTimer = {
-      sessionId: focusSession.id,
-      taskId: task.id,
-      workSessionId: workSession.id,
-      mode: "focus",
-      duration: focusSession.duration,
-      remaining: focusSession.duration,
+    expect(loaded.activeTimer).toMatchObject({
+      sessionId: "focus_backend",
+      workSessionId: "work_backend",
+      taskId: base.tasks[0].id,
       isRunning: true,
-      startedAt: focusSession.startedAt,
-      plannedEndAt: iso("2026-06-30T06:35:00Z"),
-      totalPausedSeconds: 0,
-      cycleIndex: 1,
-    };
-    const local = {
-      ...base,
-      backend: {
-        ...base.backend,
-        serverUrl: "http://127.0.0.1:8787",
-        token: "token",
-      } satisfies BackendConnectionState,
-      tasks: [task],
-      focusSessions: [focusSession],
-      workSessions: [workSession],
-      activeTimer,
-      updatedAt: iso("2026-06-30T06:10:00Z"),
-    };
-
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
-      rows: [
-        {
-          workspace_id: "workspace_test",
-          entity: "task",
-          id: task.id,
-          updated_at: task.updatedAt,
-          payload: task,
-        },
-      ],
-    }), { status: 200, headers: { "content-type": "application/json" } })));
-
-    const saved = await saveTeamDataSnapshot(local.backend, "token", local);
-
-    expect(saved.activeTimer?.sessionId).toBe(activeTimer.sessionId);
-    expect(saved.workSessions.find((session) => session.id === workSession.id)?.status).toBe("active");
-    expect(saved.focusSessions.some((session) => session.id === focusSession.id)).toBe(true);
+    });
   });
 });

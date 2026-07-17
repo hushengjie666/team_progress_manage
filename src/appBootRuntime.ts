@@ -1,21 +1,14 @@
 import { applyAuthStatusFailure, applyTeamStateLoadFailure } from "./appBoot";
-import { ensureTodayPlan, restoreTimerInState } from "./appModel";
 import { bindAccountToMembers } from "./authModel";
 import { mergeDemoDataIntoState } from "./demoData";
 import { defaultBackendServerUrl } from "./seed";
 import { loadState } from "./storage";
 import { fetchWorkspaces, getAuthStatus } from "./teamBackend";
 import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
-import { loadTeamData } from "./teamBusinessApi";
-import type { PersistTeamDataOptions } from "./teamStateRuntime";
+import { importTeamBusinessData, loadTeamData } from "./teamBusinessApi";
+import { businessRowsFromState } from "./teamBusinessRows";
 import type { Account, AppState, ProjectInvitation, WorkspaceInvitation } from "./types";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountRuntime";
-
-type PersistTeamData = (
-  before: AppState,
-  after: AppState,
-  options?: PersistTeamDataOptions,
-) => Promise<AppState | undefined>;
 
 export type AppBootResult = {
   state?: AppState;
@@ -23,10 +16,6 @@ export type AppBootResult = {
   workspaceInvitations: WorkspaceInvitation[];
   projectInvitations: ProjectInvitation[];
   toast?: string;
-};
-
-export type AppBootRuntimeOptions = {
-  persistTeamData: PersistTeamData;
 };
 
 const shouldLoadDemoData = () => {
@@ -66,10 +55,10 @@ export const shouldResetSignedOutLocalBackendUrl = (state: AppState) => {
     normalizeServerUrl(state.backend.serverUrl) !== normalizeServerUrl(defaultUrl);
 };
 
-export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOptions): Promise<AppBootResult> {
+export async function loadInitialAppState(): Promise<AppBootResult> {
   const value = await loadState();
   const shouldLoadDemo = shouldLoadDemoData();
-  let next = ensureTodayPlan(restoreTimerInState(value));
+  let next = value;
   let platformAccounts: Account[] = [];
   let workspaceInvitations: WorkspaceInvitation[] = [];
   let projectInvitations: ProjectInvitation[] = [];
@@ -165,12 +154,12 @@ export async function loadInitialAppState({ persistTeamData }: AppBootRuntimeOpt
   }
 
   if (shouldLoadDemo && next.auth.status === "authenticated" && next.auth.token) {
-    const demoState = ensureTodayPlan(mergeDemoDataIntoState(next, next.projects[0]?.id));
-    const saved = await persistTeamData(next, demoState, { applySuccessState: false, refreshAfterSave: true });
-    if (!saved) {
+    const demoState = mergeDemoDataIntoState(next, next.projects[0]?.id);
+    try {
+      next = await importTeamBusinessData(next, businessRowsFromState(demoState));
+    } catch {
       return { platformAccounts, workspaceInvitations, projectInvitations };
     }
-    next = saved;
     try {
       sessionStorage.removeItem("timemanage.load_demo");
     } catch {

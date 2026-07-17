@@ -25,7 +25,6 @@ func scanProjectInvitationSummary(row interface{ Scan(...any) error }) (projectI
 		&invitation.Status,
 		&invitation.CreatedAt,
 		&invitation.UpdatedAt,
-		&invitation.Revision,
 		&acceptedAt,
 	)
 	if len(rolesRaw) > 0 {

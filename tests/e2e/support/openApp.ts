@@ -11,7 +11,7 @@ export const clearStoredApp = async (page: Page) => {
 };
 
 const storedRuntimeForState = (state: AppState) => ({
-  version: 4,
+  version: 5,
   settings: state.settings,
   auth: {
     status: state.auth.status,

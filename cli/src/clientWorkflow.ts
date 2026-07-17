@@ -1,25 +1,11 @@
 import type { Settings } from "../../src/types.js";
+import { today } from "../../src/appModel.js";
+import { currentAccountDailyPlanForWorkspaceDate, dailyPlanIdForDate, workspaceIdForTask } from "../../src/dailyPlanScope.js";
 import {
-  addTaskToTodayInTeamState,
-  batchAddTasksToTodayInTeamState,
-  finishWorkSessionInTeamState,
-  moveTodayTaskInTeamState,
-  pauseWorkSessionInTeamState,
-  removeTaskFromTodayInTeamState,
-  resumeWorkSessionInTeamState,
-  scheduleTaskForDateInState,
-  startTaskInTeamState,
-} from "./businessTaskOperations.js";
-import {
-  acceptTaskReviewInTeamState,
-  deleteTaskTemplateInTeamState,
   instantiateTaskTemplateInTeamState,
   recordInterruptionInTeamState,
-  returnTaskReviewInTeamState,
   saveTaskTemplateInTeamState,
-  submitTaskReviewInTeamState,
   updateDailyReviewInTeamState,
-  updateSettingsInTeamState,
 } from "./businessReviewSettingsOperations.js";
 import type { WorkSessionInput } from "./businessTypes.js";
 import { TimeManageTaskClient } from "./clientTasks.js";
@@ -42,74 +28,77 @@ export class TimeManageWorkflowClient extends TimeManageTaskClient {
   }
 
   async addTaskToToday(taskId: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: addTaskToTodayInTeamState(state, taskId, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const workspaceId = workspaceIdForTask(state, task);
+    const date = today();
+    const planId = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date)?.id ?? dailyPlanIdForDate(state, date, workspaceId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: planId, action: "add-task", workspaceId, payload: { task_id: taskId, date } });
     return dailyPlanView(saved.state);
   }
 
   async batchAddTasksToToday(taskIds: string[]) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: batchAddTasksToTodayInTeamState(state, taskIds, timestamp),
-      result: taskIds,
-    }));
-    return dailyPlanView(saved.state);
+    for (const taskId of taskIds) await this.addTaskToToday(taskId);
+    return dailyPlanView(await this.authenticatedState());
   }
 
   async removeTaskFromToday(taskId: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: removeTaskFromTodayInTeamState(state, taskId, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const workspaceId = workspaceIdForTask(state, task);
+    const plan = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, today());
+    if (!plan) return dailyPlanView(state);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId } });
     return dailyPlanView(saved.state);
   }
 
   async moveTodayTask(taskId: string, direction: -1 | 1) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: moveTodayTaskInTeamState(state, taskId, direction, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const workspaceId = workspaceIdForTask(state, task);
+    const plan = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, today());
+    if (!plan) return dailyPlanView(state);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction } });
     return dailyPlanView(saved.state);
   }
 
   async scheduleTaskForDate(taskId: string, date: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: scheduleTaskForDateInState(state, taskId, date, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const workspaceId = workspaceIdForTask(state, task);
+    const planId = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date)?.id ?? dailyPlanIdForDate(state, date, workspaceId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: planId, action: "add-task", workspaceId, payload: { task_id: taskId, date } });
     return dailyPlanView(saved.state, date);
   }
 
   async startTask(taskId: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: startTaskInTeamState(state, taskId, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "start", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-start-${taskId}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
 
   async pauseWorkSession(input: WorkSessionInput) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: pauseWorkSessionInTeamState(state, input, timestamp),
-      result: input,
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "active");
+    if (!session) throw new Error("Active work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "pause", workspaceId: session.workspaceId, idempotencyKey: `cli-pause-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
 
   async resumeWorkSession(input: WorkSessionInput) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: resumeWorkSessionInTeamState(state, input, timestamp),
-      result: input,
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "paused");
+    if (!session) throw new Error("Paused work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "resume", workspaceId: session.workspaceId, idempotencyKey: `cli-resume-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
 
   async finishWorkSession(input: WorkSessionInput) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: finishWorkSessionInTeamState(state, input, timestamp),
-      result: input,
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "active" || item.status === "paused");
+    if (!session) throw new Error("Active work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "finish", workspaceId: session.workspaceId, payload: { outcome: input.outcome }, idempotencyKey: `cli-finish-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
 
@@ -118,35 +107,34 @@ export class TimeManageWorkflowClient extends TimeManageTaskClient {
   }
 
   async recordInterruption(input: Parameters<typeof recordInterruptionInTeamState>[1]) {
-    const saved = await this.mutate(undefined, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = recordInterruptionInTeamState(state, input, timestamp);
       return { state: next, result: next.interruptions[0]?.id };
     });
-    return saved.state.interruptions.find((item) => item.id === saved.result);
+    const interruption = prepared.output.state.interruptions.find((item) => item.id === prepared.output.result)!;
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "interruption", workspaceId: interruption.workspaceId, payload: interruption as unknown as Record<string, unknown> });
+    return saved.state.interruptions.find((item) => item.id === interruption.id);
   }
 
   async submitTaskReview(taskId: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: submitTaskReviewInTeamState(state, taskId, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-submit-review-${taskId}-${Date.now()}` });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId)!);
   }
 
   async acceptTaskReview(taskId: string, confirmed?: boolean) {
     requireConfirmation(confirmed, "accept_task_review");
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: acceptTaskReviewInTeamState(state, taskId, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "accept-review", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-accept-review-${taskId}-${Date.now()}` });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId)!);
   }
 
   async returnTaskReview(taskId: string, reason: string) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: returnTaskReviewInTeamState(state, taskId, reason, timestamp),
-      result: taskId,
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId)!;
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "return-review", workspaceId: workspaceIdForTask(state, task), payload: { reason }, idempotencyKey: `cli-return-review-${taskId}-${Date.now()}` });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId)!);
   }
 
@@ -163,11 +151,15 @@ export class TimeManageWorkflowClient extends TimeManageTaskClient {
   }
 
   async updateDailyReview(input: Parameters<typeof updateDailyReviewInTeamState>[1]) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: updateDailyReviewInTeamState(state, input, timestamp),
-      result: input.date,
+    const prepared = await this.prepareMutation((state, timestamp) => ({
+      state: updateDailyReviewInTeamState(state, input, timestamp), result: input.date ?? today(),
     }));
-    return dailySummaryView(saved.state, input.date);
+    const plan = currentAccountDailyPlanForWorkspaceDate(prepared.output.state, input.workspaceId ?? prepared.before.auth.workspace?.id, prepared.output.result)!;
+    const existing = prepared.before.dailyPlans.some((item) => item.id === plan.id);
+    const saved = await this.runBusinessCommand(existing
+      ? { kind: "patch", entity: "daily_plan", id: plan.id, workspaceId: plan.workspaceId, patch: plan as unknown as Record<string, unknown> }
+      : { kind: "create", entity: "daily_plan", workspaceId: plan.workspaceId, payload: plan as unknown as Record<string, unknown> });
+    return dailySummaryView(saved.state, prepared.output.result);
   }
 
   async getSettings() {
@@ -175,10 +167,7 @@ export class TimeManageWorkflowClient extends TimeManageTaskClient {
   }
 
   async updateSettings(input: Partial<Settings>) {
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: updateSettingsInTeamState(state, input, timestamp),
-      result: undefined,
-    }));
+    const saved = await this.runBusinessCommand({ kind: "settings", patch: input as Record<string, unknown> });
     return saved.state.settings;
   }
 
@@ -188,28 +177,41 @@ export class TimeManageWorkflowClient extends TimeManageTaskClient {
   }
 
   async saveTaskTemplate(input: Parameters<typeof saveTaskTemplateInTeamState>[1]) {
-    const saved = await this.mutate(undefined, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = saveTaskTemplateInTeamState(state, input, timestamp);
       return { state: next, result: input.id ?? next.taskTemplates[0]?.id };
     });
-    return saved.state.taskTemplates.find((template) => template.id === saved.result);
+    const template = prepared.output.state.taskTemplates.find((item) => item.id === prepared.output.result)!;
+    const exists = prepared.before.taskTemplates.some((item) => item.id === template.id);
+    const saved = await this.runBusinessCommand(exists
+      ? { kind: "patch", entity: "task_template", id: template.id, workspaceId: prepared.before.auth.workspace?.id, patch: template as unknown as Record<string, unknown> }
+      : { kind: "create", entity: "task_template", workspaceId: prepared.before.auth.workspace?.id, payload: template as unknown as Record<string, unknown> });
+    return saved.state.taskTemplates.find((item) => item.id === template.id);
   }
 
   async deleteTaskTemplate(templateId: string, confirmed?: boolean) {
     requireConfirmation(confirmed, "delete_task_template");
-    const saved = await this.mutate(undefined, (state, timestamp) => ({
-      state: deleteTaskTemplateInTeamState(state, templateId, timestamp),
-      result: templateId,
-    }));
+    const state = await this.authenticatedState();
+    const saved = await this.runBusinessCommand({ kind: "delete", entity: "task_template", id: templateId, workspaceId: state.auth.workspace?.id });
     return { deletedTemplateId: templateId, savedAt: saved.savedAt };
   }
 
   async instantiateTaskTemplate(templateId: string, projectId: string) {
-    const saved = await this.mutate(projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = instantiateTaskTemplateInTeamState(state, templateId, projectId, timestamp);
       const taskId = next.templateInstances[0]?.taskId;
       return { state: next, result: taskId };
     });
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === saved.result)!);
+    const task = prepared.output.state.tasks.find((item) => item.id === prepared.output.result)!;
+    const saved = await this.runBusinessCommand({
+      kind: "action",
+      resource: "task-templates",
+      id: templateId,
+      action: "instantiate",
+      workspaceId: task.workspaceId,
+      payload: { task: task as unknown as Record<string, unknown> },
+      idempotencyKey: `cli-template-${templateId}-${task.id}`,
+    });
+    return compactTask(saved.state, saved.state.tasks.find((item) => item.id === task.id)!);
   }
 }

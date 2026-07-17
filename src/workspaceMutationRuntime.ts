@@ -49,7 +49,6 @@ export function createWorkspaceMutationRuntime({
         name,
         type: input.type,
         ownerAccountId: input.ownerAccountId,
-        expectedRevision: input.expectedRevision ?? currentWorkspace?.revision,
         confirmRestrictMembers,
       });
       const loaded = await loadStateWithFreshWorkspaces(source, token, updatedWorkspace);
@@ -74,11 +73,7 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
-      const membership = source.auth.workspaceMemberships?.find((item) => item.id === membershipId && item.workspaceId === workspaceId);
-      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, {
-        ...input,
-        expectedRevision: input.expectedRevision ?? membership?.revision,
-      });
+      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, input);
       const loaded = await loadStateWithFreshWorkspaces(source, token);
       setState(loaded);
       setToast(input.status === "disabled" ? "工作区成员已解除绑定" : "工作区成员已更新");

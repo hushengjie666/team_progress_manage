@@ -10,7 +10,6 @@ export interface MemberAccountPayload {
   password: string;
   roles: ProjectMember["roles"];
   status?: "active" | "disabled";
-  expectedRevision?: number;
 }
 
 export interface MemberResponse {
@@ -30,5 +29,4 @@ export interface PlatformAccountPayload {
   email?: string;
   password?: string;
   status?: "active" | "disabled";
-  expectedRevision?: number;
 }

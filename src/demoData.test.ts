@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createInitialState, todayKey } from "./seed";
+import { todayKey } from "./seed";
+import { createInitialState } from "./test/fixtures";
 import { createProjectInState } from "./teamProgress";
 import { demoTaskIdForProject, mergeDemoDataIntoState } from "./demoData";
 import type { ProjectMemberRole, TaskStage } from "./types";
@@ -59,7 +60,9 @@ describe("mergeDemoDataIntoState", () => {
     });
     expect(merged.tasks.some((task) => task.projectId === targetProject.id && task.title === "完成工作台信息精简")).toBe(false);
     expect(merged.tasks.some((task) => task.projectId === "project_starter" && task.id.startsWith("demo_task_"))).toBe(false);
-    expect(merged.dailyPlans.find((plan) => plan.date === todayKey())?.committedTaskIds).toContain(mappedTaskId);
+    expect(merged.dailyPlans.some((plan) =>
+      plan.date === todayKey() && plan.committedTaskIds.includes(mappedTaskId),
+    )).toBe(true);
   });
 
   it("assigns active demo tasks to the current account member instead of the first executor", () => {

@@ -11,7 +11,7 @@ func scanBusinessRows(rows *sql.Rows) ([]businessRow, error) {
 	for rows.Next() {
 		var row businessRow
 		var accountID sql.NullString
-		if err := rows.Scan(&row.WorkspaceID, &row.Entity, &row.ID, &accountID, &row.UpdatedAt, &row.Revision, &row.Payload); err != nil {
+		if err := rows.Scan(&row.WorkspaceID, &row.Entity, &row.ID, &accountID, &row.UpdatedAt, &row.Payload); err != nil {
 			return result, err
 		}
 		if accountID.Valid {
@@ -26,7 +26,7 @@ func businessLoadRows(ctx context.Context, q sqlRunner, workspaceID string) ([]b
 	result := []businessRow{}
 	for _, spec := range businessEntityTables {
 		query := fmt.Sprintf(
-			`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, row_version, payload
+			`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
 			 FROM %s WHERE workspace_id = ? ORDER BY updated_at ASC`,
 			spec.entity,
 			spec.table,
@@ -59,7 +59,7 @@ func businessLoadRowsByColumn(ctx context.Context, q sqlRunner, spec businessEnt
 		args = append(args, value)
 	}
 	query := fmt.Sprintf(
-		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, row_version, payload
+		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
 		 FROM %s WHERE workspace_id = ? AND %s IN (%s) ORDER BY updated_at ASC`,
 		spec.entity,
 		spec.table,
@@ -82,7 +82,7 @@ func businessLoadDailyPlanRowsForProjects(ctx context.Context, q sqlRunner, work
 	}
 	dailyPlanSpec, _ := businessTableForEntity("daily_plan")
 	query := fmt.Sprintf(
-		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, row_version, payload
+		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
 		 FROM %s WHERE workspace_id = ? ORDER BY updated_at ASC`,
 		dailyPlanSpec.entity,
 		dailyPlanSpec.table,
@@ -187,8 +187,8 @@ func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 	_, err := tx.ExecContext(
 		ctx,
 		fmt.Sprintf(`INSERT INTO %s
-			(workspace_id, id, account_id, project_id, task_id, account_ref, status, kind, row_date, updated_at, row_version, payload)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+			(workspace_id, id, account_id, project_id, task_id, account_ref, status, kind, row_date, updated_at, payload)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON DUPLICATE KEY UPDATE
 				project_id = VALUES(project_id),
 				task_id = VALUES(task_id),
@@ -197,7 +197,6 @@ func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 				kind = VALUES(kind),
 				row_date = VALUES(row_date),
 				updated_at = VALUES(updated_at),
-				row_version = row_version + 1,
 				payload = VALUES(payload)`, spec.table),
 		row.WorkspaceID,
 		row.ID,
@@ -222,8 +221,8 @@ func businessCreateRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 	_, err := tx.ExecContext(
 		ctx,
 		fmt.Sprintf(`INSERT INTO %s
-			(workspace_id, id, account_id, project_id, task_id, account_ref, status, kind, row_date, updated_at, row_version, payload)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`, spec.table),
+			(workspace_id, id, account_id, project_id, task_id, account_ref, status, kind, row_date, updated_at, payload)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, spec.table),
 		row.WorkspaceID,
 		row.ID,
 		nullString(row.AccountID),
@@ -239,7 +238,7 @@ func businessCreateRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 	return err
 }
 
-func businessUpdateRowAtRevision(ctx context.Context, tx *sql.Tx, row businessRow, expectedRevision int64) (bool, error) {
+func businessUpdateRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, error) {
 	spec, ok := businessTableForEntity(row.Entity)
 	if !ok {
 		return false, fmt.Errorf("unsupported business entity %q", row.Entity)
@@ -247,8 +246,8 @@ func businessUpdateRowAtRevision(ctx context.Context, tx *sql.Tx, row businessRo
 	result, err := tx.ExecContext(
 		ctx,
 		fmt.Sprintf(`UPDATE %s SET project_id = ?, task_id = ?, account_ref = ?, status = ?, kind = ?, row_date = ?,
-			updated_at = ?, row_version = row_version + 1, payload = ?
-			WHERE workspace_id = ? AND id = ? AND row_version = ?`, spec.table),
+			updated_at = ?, payload = ?
+			WHERE workspace_id = ? AND id = ?`, spec.table),
 		nullString(businessProjectID(row)),
 		nullString(businessTaskID(row)),
 		nullString(businessAccountRef(row)),
@@ -259,7 +258,6 @@ func businessUpdateRowAtRevision(ctx context.Context, tx *sql.Tx, row businessRo
 		row.Payload,
 		row.WorkspaceID,
 		row.ID,
-		expectedRevision,
 	)
 	if err != nil {
 		return false, err
@@ -268,12 +266,12 @@ func businessUpdateRowAtRevision(ctx context.Context, tx *sql.Tx, row businessRo
 	return count == 1, err
 }
 
-func businessDeleteRowAtRevision(ctx context.Context, tx *sql.Tx, row businessRow, expectedRevision int64) (bool, error) {
+func businessDeleteRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, error) {
 	spec, ok := businessTableForEntity(row.Entity)
 	if !ok {
 		return false, fmt.Errorf("unsupported business entity %q", row.Entity)
 	}
-	result, err := tx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM %s WHERE workspace_id = ? AND id = ? AND row_version = ?`, spec.table), row.WorkspaceID, row.ID, expectedRevision)
+	result, err := tx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM %s WHERE workspace_id = ? AND id = ?`, spec.table), row.WorkspaceID, row.ID)
 	if err != nil {
 		return false, err
 	}

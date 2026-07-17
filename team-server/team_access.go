@@ -65,7 +65,7 @@ func teamAccountCanManageWorkspace(ctx context.Context, q sqlRunner, auth authCo
 func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, workspaceID string, accountID string, projectID string) (bool, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, row_version, payload
+		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, payload
 		 FROM business_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
 			   AND status = 'active'`,
