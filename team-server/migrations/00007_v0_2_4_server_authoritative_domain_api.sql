@@ -17,7 +17,7 @@ ALTER TABLE business_task_templates DROP COLUMN row_version;
 ALTER TABLE business_template_instances DROP COLUMN row_version;
 
 CREATE TABLE IF NOT EXISTS idempotency_keys (
-  account_id VARCHAR(191) NOT NULL,
+  account_id VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
   idempotency_key VARCHAR(191) NOT NULL,
   request_path VARCHAR(255) NOT NULL,
   response_status INT NOT NULL,
@@ -25,15 +25,15 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   created_at VARCHAR(64) NOT NULL,
   PRIMARY KEY (account_id, idempotency_key),
   CONSTRAINT fk_idempotency_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS account_settings (
-  account_id VARCHAR(191) NOT NULL,
+  account_id VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL,
   payload JSON NOT NULL,
   updated_at VARCHAR(64) NOT NULL,
   PRIMARY KEY (account_id),
   CONSTRAINT fk_account_settings_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down
 DROP TABLE IF EXISTS account_settings;

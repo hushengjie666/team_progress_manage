@@ -27,6 +27,25 @@ func TestMigrationCatalogIsContiguousAndChecksummed(t *testing.T) {
 	}
 }
 
+func TestServerAuthoritativeMigrationMatchesAccountIdentitySchema(t *testing.T) {
+	content, err := embeddedMigrations.ReadFile("migrations/00007_v0_2_4_server_authoritative_domain_api.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := string(content)
+	compatibleAccountColumn := "account_id VARCHAR(128) COLLATE utf8mb4_unicode_ci NOT NULL"
+	if count := strings.Count(sql, compatibleAccountColumn); count != 2 {
+		t.Fatalf("compatible account foreign-key columns = %d, want 2", count)
+	}
+	compatibleTableOptions := "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+	if count := strings.Count(sql, compatibleTableOptions); count != 2 {
+		t.Fatalf("compatible account foreign-key table options = %d, want 2", count)
+	}
+	if strings.Contains(sql, "account_id VARCHAR(191)") {
+		t.Fatal("account foreign-key width must match accounts.id VARCHAR(128)")
+	}
+}
+
 func TestMigrationReleaseLookupAndRiskRules(t *testing.T) {
 	migration, err := migrationForRelease("0.1.2")
 	if err != nil || migration.SchemaVersion != baselineSchemaVersion {
