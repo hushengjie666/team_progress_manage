@@ -9,7 +9,7 @@ type WorkspaceMemberListPanelProps = {
   selectedWorkspaceType: WorkspaceType;
   selectedOwnerAccountId: string;
   selectedMemberDraft: { email: string };
-  canEditSelectedWorkspace: boolean;
+  canManageSelectedWorkspaceMembers: boolean;
   canChangeSelectedWorkspaceOwner: boolean;
   updateWorkspaceMemberRole: (member: WorkspaceMembership, checked: boolean) => Promise<void>;
   updateWorkspaceMemberDraft: (workspaceId: string, patch: Partial<{ email: string }>) => void;
@@ -24,7 +24,7 @@ export function WorkspaceMemberListPanel({
   selectedWorkspaceType,
   selectedOwnerAccountId,
   selectedMemberDraft,
-  canEditSelectedWorkspace,
+  canManageSelectedWorkspaceMembers,
   canChangeSelectedWorkspaceOwner,
   updateWorkspaceMemberRole,
   updateWorkspaceMemberDraft,
@@ -40,7 +40,7 @@ export function WorkspaceMemberListPanel({
       </div>
       {selectedWorkspaceType === "private" ? (
         <p className="muted compact-copy">私人工作区只允许本人使用，不支持添加成员。</p>
-      ) : (
+      ) : canManageSelectedWorkspaceMembers ? (
         <div className="workspace-member-invite">
           <label>
             成员登录账号
@@ -63,6 +63,8 @@ export function WorkspaceMemberListPanel({
             发送邀请
           </button>
         </div>
+      ) : (
+        <p className="muted compact-copy">当前账号没有成员邀请权限。</p>
       )}
       <div className="workspace-member-list">
         {selectedMembers.map((member) => {
@@ -71,7 +73,7 @@ export function WorkspaceMemberListPanel({
           const isCurrentAccount = member.accountId === currentAccount?.id;
           const cannotUnsetOnlyOwner = isOwner && activeOwnerCount <= 1;
           const unbindDisabledReason =
-            !canEditSelectedWorkspace
+            !canManageSelectedWorkspaceMembers
               ? "当前账号没有成员管理权限"
               : selectedWorkspaceType === "private"
                 ? "私人工作区不支持成员解除绑定"

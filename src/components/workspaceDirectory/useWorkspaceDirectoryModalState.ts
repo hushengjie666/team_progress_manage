@@ -47,7 +47,7 @@ export function useWorkspaceDirectoryModalState({
     selectedMembers,
     selectedWorkspaceType,
     selectedOwnerAccountId,
-    canEditSelectedWorkspace,
+    canManageSelectedWorkspaceMembers,
     canChangeSelectedWorkspaceOwner,
   } = selection;
   const actions = createWorkspaceDirectoryModalActions({
@@ -55,7 +55,7 @@ export function useWorkspaceDirectoryModalState({
     selectedMembers,
     selectedWorkspaceType,
     selectedOwnerAccountId,
-    canEditSelectedWorkspace,
+    canManageSelectedWorkspaceMembers,
     canChangeSelectedWorkspaceOwner,
     currentAccount,
     workspaceEditDraft,

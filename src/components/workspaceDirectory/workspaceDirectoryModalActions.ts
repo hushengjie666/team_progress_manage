@@ -16,7 +16,7 @@ type WorkspaceDirectoryModalActionOptions = {
   selectedMembers: WorkspaceMembership[];
   selectedWorkspaceType: WorkspaceType;
   selectedOwnerAccountId: string;
-  canEditSelectedWorkspace: boolean;
+  canManageSelectedWorkspaceMembers: boolean;
   canChangeSelectedWorkspaceOwner: boolean;
   currentAccount?: Account;
   workspaceEditDraft: WorkspaceUpdateInput;
@@ -32,7 +32,7 @@ export function createWorkspaceDirectoryModalActions({
   selectedMembers,
   selectedWorkspaceType,
   selectedOwnerAccountId,
-  canEditSelectedWorkspace,
+  canManageSelectedWorkspaceMembers,
   canChangeSelectedWorkspaceOwner,
   currentAccount,
   workspaceEditDraft,
@@ -75,7 +75,7 @@ export function createWorkspaceDirectoryModalActions({
       member,
       selectedOwnerAccountId,
       currentAccount,
-      canEditSelectedWorkspace,
+      canEditSelectedWorkspace: canManageSelectedWorkspaceMembers,
       selectedWorkspaceType,
     })) {
       return;

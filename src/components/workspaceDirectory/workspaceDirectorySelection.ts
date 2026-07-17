@@ -26,6 +26,10 @@ export const buildWorkspaceDirectorySelection = ({
   const selectedCurrentMembership = selectedAllMembers.find((membership) => membership.accountId === currentAccount?.id);
   const selectedCurrentMembershipIsActive = selectedCurrentMembership?.status === "active";
   const canEditSelectedWorkspace = Boolean(selectedCurrentMembershipIsActive);
+  const canManageSelectedWorkspaceMembers = Boolean(
+    selectedCurrentMembershipIsActive &&
+    (selectedCurrentMembership?.role === "owner" || selectedCurrentMembership?.role === "admin"),
+  );
   const canChangeSelectedWorkspaceType = Boolean(
     selectedCurrentMembershipIsActive && selectedCurrentMembership?.role === "owner" && selectedWorkspaceType !== "private",
   );
@@ -44,6 +48,7 @@ export const buildWorkspaceDirectorySelection = ({
     selectedOwnerAccountId,
     selectedMemberDraft,
     canEditSelectedWorkspace,
+    canManageSelectedWorkspaceMembers,
     canChangeSelectedWorkspaceType,
     canChangeSelectedWorkspaceOwner,
   };

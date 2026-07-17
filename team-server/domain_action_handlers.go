@@ -97,18 +97,25 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
+	reviewMemberID := ""
+	if action == "submit-review" || action == "accept-review" || action == "return-review" {
+		memberID, canSubmit, canReview, accessErr := taskReviewPermissions(r.Context(), tx, auth, task)
+		if accessErr != nil {
+			writeError(w, http.StatusInternalServerError, "review permission check failed")
+			return
+		}
+		reviewMemberID = memberID
+		if (action == "submit-review" && !canSubmit) || (action != "submit-review" && !canReview) {
+			writeError(w, http.StatusForbidden, "task review denied")
+			return
+		}
+	}
 	switch action {
-	case "submit-review":
-		payload["status"] = "pending_review"
-		payload["reviewSubmittedAt"] = now
-	case "accept-review":
-		payload["status"] = "completed"
-		payload["progressPercent"] = 100
-		payload["reviewAcceptedAt"] = now
-	case "return-review":
-		payload["status"] = "in_progress"
-		payload["reviewReturnedAt"] = now
-		payload["reviewReturnReason"] = strings.TrimSpace(req.Reason)
+	case "submit-review", "accept-review", "return-review":
+		if failure := applyTaskReviewActionInTx(r.Context(), tx, task, payload, action, req.Reason, reviewMemberID, now); failure != nil {
+			writeError(w, failure.status, failure.message)
+			return
+		}
 	case "archive":
 		payload["status"] = "archived"
 	case "restore":
@@ -157,9 +164,11 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 	nextRaw, _ := json.Marshal(payload)
 	nextTask := task
 	nextTask.Payload = nextRaw
-	if allowed, err := businessRowMutationAllowed(r.Context(), tx, auth, task, nextTask, false); err != nil || !allowed {
-		writeError(w, http.StatusForbidden, "task action denied")
-		return
+	if action != "submit-review" && action != "accept-review" && action != "return-review" {
+		if allowed, err := businessRowMutationAllowed(r.Context(), tx, auth, task, nextTask, false); err != nil || !allowed {
+			writeError(w, http.StatusForbidden, "task action denied")
+			return
+		}
 	}
 	if err := savePayloadObject(r.Context(), tx, task, payload, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")

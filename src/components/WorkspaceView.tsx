@@ -33,6 +33,7 @@ export function WorkspaceView(props: {
   reorderProjects: (projectIds: string[]) => void;
   openProjectCreate: () => void;
   openProjectDetail: (projectId: string) => void;
+  backendError?: string;
 }) {
   const {
     model,
@@ -63,6 +64,10 @@ export function WorkspaceView(props: {
     poolWorkbenchTasks,
     projectOverviewCards,
   } = model;
+
+  if (props.backendError) {
+    return <p className="empty" role="alert">{props.backendError}</p>;
+  }
 
   if (props.mode === "board") {
     return (

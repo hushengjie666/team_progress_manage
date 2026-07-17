@@ -34,6 +34,19 @@ const resourcePathByEntity: Record<BusinessEntity, string> = {
 const withWorkspace = (path: string, workspaceId?: string) =>
   workspaceId ? `${path}?workspace_id=${encodeURIComponent(workspaceId)}` : path;
 
+export function normalizeIdempotencyKey(value: string) {
+  if (/^[\x21-\x7e]{1,191}$/.test(value)) return value;
+
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+  return `tm-${(first >>> 0).toString(16).padStart(8, "0")}-${(second >>> 0).toString(16).padStart(8, "0")}`;
+}
+
 export async function submitTeamDomainCommand(
   backend: BackendConnectionState,
   token: string,
@@ -53,7 +66,7 @@ export async function submitTeamDomainCommand(
         method: "POST",
         headers: {
           ...authHeaders(token),
-          ...(command.idempotencyKey ? { "Idempotency-Key": command.idempotencyKey } : {}),
+          ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
         },
         body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId }),
       },

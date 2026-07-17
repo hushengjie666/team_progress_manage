@@ -61,7 +61,6 @@ export const applyTeamStateLoadFailure = (state: AppState, error: unknown): AppS
   const failed = applyAuthStatusFailure(state, error);
   return {
     ...failed,
-    auth: { ...failed.auth, status: "error", message: failed.backend.message },
     projects: [],
     projectMembers: [],
     tasks: [],

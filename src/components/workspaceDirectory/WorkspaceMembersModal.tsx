@@ -11,7 +11,7 @@ type WorkspaceMembersModalProps = {
   selectedWorkspaceType: WorkspaceType;
   selectedOwnerAccountId: string;
   selectedMemberDraft: { email: string };
-  canEditSelectedWorkspace: boolean;
+  canManageSelectedWorkspaceMembers: boolean;
   canChangeSelectedWorkspaceOwner: boolean;
   updateWorkspaceMemberRole: (member: WorkspaceMembership, checked: boolean) => Promise<void>;
   updateWorkspaceMemberDraft: (workspaceId: string, patch: Partial<{ email: string }>) => void;
@@ -27,7 +27,7 @@ export function WorkspaceMembersModal({
   selectedWorkspaceType,
   selectedOwnerAccountId,
   selectedMemberDraft,
-  canEditSelectedWorkspace,
+  canManageSelectedWorkspaceMembers,
   canChangeSelectedWorkspaceOwner,
   updateWorkspaceMemberRole,
   updateWorkspaceMemberDraft,
@@ -63,7 +63,7 @@ export function WorkspaceMembersModal({
             selectedWorkspaceType={selectedWorkspaceType}
             selectedOwnerAccountId={selectedOwnerAccountId}
             selectedMemberDraft={selectedMemberDraft}
-            canEditSelectedWorkspace={canEditSelectedWorkspace}
+            canManageSelectedWorkspaceMembers={canManageSelectedWorkspaceMembers}
             canChangeSelectedWorkspaceOwner={canChangeSelectedWorkspaceOwner}
             updateWorkspaceMemberRole={updateWorkspaceMemberRole}
             updateWorkspaceMemberDraft={updateWorkspaceMemberDraft}

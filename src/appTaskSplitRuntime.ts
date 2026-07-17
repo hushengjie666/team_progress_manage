@@ -25,8 +25,8 @@ export function createAppTaskSplitRuntime({
     setPendingSplit({ task, text: buildSplitTaskText(task) });
   };
 
-  const confirmSplitTask = () => {
-    const pendingSplit = getPendingSplit();
+  const confirmSplitTask = (draft?: Parameters<AppTaskActionsRuntime["confirmSplitTask"]>[0]) => {
+    const pendingSplit = draft ?? getPendingSplit();
     if (!pendingSplit) return;
     const task = pendingSplit.task;
     const titles = pendingSplit.text

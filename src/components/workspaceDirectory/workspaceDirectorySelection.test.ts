@@ -60,6 +60,7 @@ describe("workspace directory selection", () => {
 
     expect(selection.selectedOwnerAccountId).toBe("account_owner");
     expect(selection.canEditSelectedWorkspace).toBe(true);
+    expect(selection.canManageSelectedWorkspaceMembers).toBe(true);
     expect(selection.canChangeSelectedWorkspaceType).toBe(true);
     expect(selection.canChangeSelectedWorkspaceOwner).toBe(true);
   });
@@ -83,6 +84,32 @@ describe("workspace directory selection", () => {
     });
 
     expect(selection.canEditSelectedWorkspace).toBe(true);
+    expect(selection.canManageSelectedWorkspaceMembers).toBe(true);
+    expect(selection.canChangeSelectedWorkspaceType).toBe(false);
+    expect(selection.canChangeSelectedWorkspaceOwner).toBe(false);
+  });
+
+  it("allows an active member to rename a workspace without exposing member management", () => {
+    const selection = buildWorkspaceDirectorySelection({
+      activeModal: { workspaceId: "workspace_shared", kind: "members" },
+      directoryCards: [card(workspace())],
+      workspaceMemberships: [
+        member({ id: "membership_owner", accountId: "account_owner", role: "owner" }),
+        member({ id: "membership_member", accountId: "account_member", role: "member" }),
+      ],
+      currentAccount: {
+        id: "account_member",
+        workspaceId: "workspace_shared",
+        name: "普通成员",
+        email: "member@example.com",
+        createdAt: now,
+        updatedAt: now,
+      },
+      workspaceMemberDrafts: {},
+    });
+
+    expect(selection.canEditSelectedWorkspace).toBe(true);
+    expect(selection.canManageSelectedWorkspaceMembers).toBe(false);
     expect(selection.canChangeSelectedWorkspaceType).toBe(false);
     expect(selection.canChangeSelectedWorkspaceOwner).toBe(false);
   });

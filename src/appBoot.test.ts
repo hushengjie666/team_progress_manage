@@ -54,7 +54,8 @@ describe("app boot fallback", () => {
     const state = signedInState();
     const next = applyTeamStateLoadFailure(state, new Error("Load failed"));
 
-    expect(next.auth.status).toBe("error");
+    expect(next.auth.status).toBe("authenticated");
+    expect(next.auth.account).toEqual(state.auth.account);
     expect(next.projects).toEqual([]);
     expect(next.tasks).toEqual([]);
     expect(next.backend.status).toBe("error");
@@ -90,7 +91,7 @@ describe("app boot fallback", () => {
     const state = signedInState();
     const next = applyTeamStateLoadFailure(state, new Error("unauthorized upstream response"));
 
-    expect(next.auth.status).toBe("error");
+    expect(next.auth.status).toBe("authenticated");
     expect(next.auth.token).toBe("token_cached");
     expect(next.backend.status).toBe("error");
   });

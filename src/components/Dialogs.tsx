@@ -41,7 +41,7 @@ export function SplitTaskDialog(props: {
   draft: SplitDraft | null;
   setDraft: (draft: SplitDraft | null) => void;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: (draft: SplitDraft) => void;
 }) {
   if (!props.draft) return null;
   return (
@@ -65,7 +65,7 @@ export function SplitTaskDialog(props: {
           <button className="secondary-button" onClick={props.onCancel}>
             取消
           </button>
-          <button className="primary-button" onClick={props.onConfirm}>
+          <button className="primary-button" onClick={() => props.onConfirm(props.draft!)}>
             拆分任务
           </button>
         </div>

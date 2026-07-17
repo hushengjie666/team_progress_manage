@@ -92,6 +92,7 @@ export function useWorkspaceDirectoryController({
     selectedMemberDraft: modal.selectedMemberDraft,
     activeModal: modal.activeModal,
     canEditSelectedWorkspace: modal.canEditSelectedWorkspace,
+    canManageSelectedWorkspaceMembers: modal.canManageSelectedWorkspaceMembers,
     canChangeSelectedWorkspaceType: modal.canChangeSelectedWorkspaceType,
     canChangeSelectedWorkspaceOwner: modal.canChangeSelectedWorkspaceOwner,
     openWorkspaceModal,

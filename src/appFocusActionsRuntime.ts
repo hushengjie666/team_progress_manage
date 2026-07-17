@@ -52,9 +52,9 @@ export function createAppFocusActionsRuntime({
       const saved = await runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "start", workspaceId: task.workspaceId, idempotencyKey: `start:${taskId}:${sessionId}` });
       if (!saved) return;
       const activeWork = saved.workSessions.find((item) => item.taskId === taskId && item.status === "active");
-      updateState((value) => {
-        const projected = startTimerInState(value, mode, taskId, timestamp, sessionId);
-        return { ...value, activeTimer: projected.activeTimer ? { ...projected.activeTimer, workSessionId: activeWork?.id } : undefined };
+      updateState(() => {
+        const projected = startTimerInState(saved, mode, taskId, timestamp, sessionId);
+        return { ...projected, activeTimer: projected.activeTimer ? { ...projected.activeTimer, workSessionId: activeWork?.id } : undefined };
       });
     } else {
       updateState((value) => {

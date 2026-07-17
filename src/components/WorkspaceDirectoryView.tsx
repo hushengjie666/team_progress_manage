@@ -49,7 +49,7 @@ export function WorkspaceDirectoryView(props: WorkspaceDirectoryViewProps) {
           selectedWorkspaceType={directory.selectedWorkspaceType}
           selectedOwnerAccountId={directory.selectedOwnerAccountId}
           selectedMemberDraft={directory.selectedMemberDraft}
-          canEditSelectedWorkspace={directory.canEditSelectedWorkspace}
+          canManageSelectedWorkspaceMembers={directory.canManageSelectedWorkspaceMembers}
           canChangeSelectedWorkspaceOwner={directory.canChangeSelectedWorkspaceOwner}
           updateWorkspaceMemberRole={directory.updateWorkspaceMemberRole}
           updateWorkspaceMemberDraft={directory.updateWorkspaceMemberDraft}
