@@ -61,6 +61,7 @@ fi
 node scripts/verify-release-contract.mjs
 npm run verify:database-migrations
 npm run audit:data-safety
+npm run verify:ios:release
 
 git tag -a "${TAG}" -m "${MESSAGE}"
 

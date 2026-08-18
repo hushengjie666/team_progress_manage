@@ -1,5 +1,7 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
 
 const root = join(import.meta.dirname, "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
@@ -15,7 +17,7 @@ const iosEnvironment = read(".env.ios-production");
 
 const expected = {
   version: releaseContract.release_version,
-  build: "2026081801",
+  build: "2026081802",
   bundleId: "xyz.hudashuai.timemanage",
   extensionBundleId: "xyz.hudashuai.timemanage.TimerLiveActivity",
   teamId: "2P3ULGHFM8",
@@ -43,6 +45,22 @@ for (const [value, label] of [
 requireText(xcodeProject, `MARKETING_VERSION = ${expected.version}`, "Xcode marketing version");
 requireText(appInfoPlist, `<string>${expected.version}</string>`, "iOS app Info.plist version");
 requireText(extensionInfoPlist, `<string>${expected.version}</string>`, "iOS extension Info.plist version");
+
+const xcodegenOutput = mkdtempSync(join(tmpdir(), "timemanage-xcodegen-"));
+const xcodegen = spawnSync("xcodegen", [
+  "generate",
+  "--spec",
+  "project.yml",
+  "--project",
+  xcodegenOutput,
+], {
+  cwd: join(root, "src-tauri", "gen", "apple"),
+  encoding: "utf8",
+});
+rmSync(xcodegenOutput, { recursive: true, force: true });
+if (xcodegen.status !== 0) {
+  throw new Error(xcodegen.stderr || xcodegen.stdout || "iOS XcodeGen project specification is invalid.");
+}
 
 if (project.includes("UISupportedInterfaceOrientations~ipad")) {
   throw new Error("The iPhone-only release must not declare iPad orientations.");

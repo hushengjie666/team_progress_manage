@@ -17,8 +17,8 @@ settingGroups:
       PRODUCT_BUNDLE_IDENTIFIER: xyz.hudashuai.timemanage
       DEVELOPMENT_TEAM: 2P3ULGHFM8
       CODE_SIGN_STYLE: Automatic
-      MARKETING_VERSION: 0.2.5
-      CURRENT_PROJECT_VERSION: 2026081801
+      MARKETING_VERSION: 0.2.6
+      CURRENT_PROJECT_VERSION: 2026081802
       TARGETED_DEVICE_FAMILY: 1
 targetTemplates:
   app:
@@ -59,8 +59,8 @@ targets:
           - UIInterfaceOrientationPortrait
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.2.5
-        CFBundleVersion: "2026081801"
+        CFBundleShortVersionString: 0.2.6
+        CFBundleVersion: "2026081802"
     entitlements:
       path: timemanage-desktop_iOS/timemanage-desktop_iOS.entitlements
     scheme:
@@ -106,8 +106,8 @@ targets:
       path: TimerLiveActivity/Info.plist
       properties:
         CFBundleDisplayName: TimeManage Timer
-        CFBundleShortVersionString: 0.2.5
-        CFBundleVersion: "2026081801"
+        CFBundleShortVersionString: 0.2.6
+        CFBundleVersion: "2026081802"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
@@ -115,8 +115,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: xyz.hudashuai.timemanage.TimerLiveActivity
         DEVELOPMENT_TEAM: 2P3ULGHFM8
         CODE_SIGN_STYLE: Automatic
-        MARKETING_VERSION: 0.2.5
-      CURRENT_PROJECT_VERSION: 2026081801
+        MARKETING_VERSION: 0.2.6
+        CURRENT_PROJECT_VERSION: 2026081802
         TARGETED_DEVICE_FAMILY: 1
         SKIP_INSTALL: true
         APPLICATION_EXTENSION_API_ONLY: true

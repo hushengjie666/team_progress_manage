@@ -9,21 +9,21 @@
 创建 tag 前先完成提交，并确保工作区干净：
 
 ```sh
-git switch -c release/v0.2.5
-git push -u origin release/v0.2.5
-bash scripts/create-timemanage-release-tag.sh v0.2.5 "TimeManage Team v0.2.5"
-git push origin v0.2.5
+git switch -c release/v0.2.6
+git push -u origin release/v0.2.6
+bash scripts/create-timemanage-release-tag.sh v0.2.6 "TimeManage Team v0.2.6"
+git push origin v0.2.6
 git switch main
-git merge --ff-only release/v0.2.5
+git merge --ff-only release/v0.2.6
 git push origin main
-git branch -d release/v0.2.5
-git push origin --delete release/v0.2.5
+git branch -d release/v0.2.6
+git push origin --delete release/v0.2.6
 ```
 
 从指定 tag 打包：
 
 ```sh
-npm run release:team:tag -- v0.2.5
+npm run release:team:tag -- v0.2.6
 ```
 
 临时测试包才使用：
@@ -60,8 +60,8 @@ desktop/dmg/TimeManage_<version>_aarch64.dmg
 这个压缩包必须带外层版本根目录。压缩包文件名和解压后的根目录同名，例如：
 
 ```text
-timemanageTeam-v0.2.5-20260818-153000.zip
-timemanageTeam-v0.2.5-20260818-153000/
+timemanageTeam-v0.2.6-20260818-153000.zip
+timemanageTeam-v0.2.6-20260818-153000/
 ```
 
 服务器上的正式运行目录固定为：
@@ -74,7 +74,7 @@ C:/Users/Administrator/Desktop/timemanageTeam/
 
 ```text
 C:/Users/Administrator/Desktop/timemanageTeam/
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/
 ```
 
 正式目录结构为：
@@ -90,12 +90,12 @@ C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe
 版本包目录里应包含：
 
 ```text
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/desktop/
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/RELEASE.txt
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/web/index.html
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/server/timemanage-team.exe
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/server/backend.example.json
-C:/Users/Administrator/Desktop/timemanageTeam-v0.2.5-20260818-153000/server/start-backend.bat
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/desktop/
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/RELEASE.txt
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/web/index.html
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/server/timemanage-team.exe
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/server/backend.example.json
+C:/Users/Administrator/Desktop/timemanageTeam-v0.2.6-20260818-153000/server/start-backend.bat
 ```
 
 正式运行目录仍然是 `C:/Users/Administrator/Desktop/timemanageTeam/web/` 和 `C:/Users/Administrator/Desktop/timemanageTeam/server/timemanage-team.exe`。首次部署时从 `server/backend.example.json` 创建 `server/backend.json` 并编辑数据库、端口和密钥。
@@ -221,7 +221,7 @@ location ^~ /timemanage-team/ {
 
 1. 本地运行 `npm run deploy:team`。
 2. 上传 `deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip` 到服务器的 `C:/Users/Administrator/Desktop/`。
-3. 在 Desktop 下解压，确认出现同名版本目录，例如 `timemanageTeam-v0.2.5-20260818-153000/`。
+3. 在 Desktop 下解压，确认出现同名版本目录，例如 `timemanageTeam-v0.2.6-20260818-153000/`。
 4. 如果正式目录还没有 `timemanageTeam/server/backend.json`，复制 `server/backend.example.json` 为 `server/backend.json` 并编辑数据库、端口或密钥。
 5. 运行 `timemanageTeam/server/start-backend.bat`，或用 `install-windows-service.ps1` 安装 Windows Service。
 6. 重载 Nginx。
