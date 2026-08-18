@@ -1,6 +1,6 @@
 # TimeManage Database Operations
 
-TimeManage `v0.2.6` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported. The `v0.2.6` patch release is schema 9 (a no-op migration after the `v0.2.4` domain API) and requires the server, Web frontend, and desktop client to be upgraded together.
+TimeManage `v0.2.7` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported. The `v0.2.7` patch release is schema 10 (a no-op migration after the `v0.2.4` domain API) and requires the server, Web frontend, and desktop client to be upgraded together.
 
 Before an upgrade, run the read-only integrity audit and review every non-zero result:
 
@@ -39,7 +39,7 @@ For a controlled deployment:
 1. Stop the backend service.
 2. Run `backup-database.bat`.
 3. Run `migrate-database.bat` and then `database-status.bat`.
-4. Start the backend service and verify `/health` returns `release_version: 0.2.6`, `api_protocol_version: 1`, `database_schema_version: 9`, and `minimum_client_release: 0.2.6`.
+4. Start the backend service and verify `/health` returns `release_version: 0.2.7`, `api_protocol_version: 1`, `database_schema_version: 10`, and `minimum_client_release: 0.2.7`.
 
 ## Rollback And Restore
 

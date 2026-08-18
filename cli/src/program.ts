@@ -19,7 +19,7 @@ export function createCliProgram(options: CliProgramOptions = {}) {
   program
     .name("timemanage")
     .description("TimeManage CLI：一次命令一次连接，不启动常驻服务。")
-    .version("0.2.6")
+    .version("0.2.7")
     .option("--config <path>", "配置文件路径")
     .option("--server-url <url>", "覆盖服务器地址")
     .option("--email <account>", "覆盖登录账号")

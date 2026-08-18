@@ -1,8 +1,8 @@
 export const releaseContract = {
-  releaseVersion: "0.2.6",
+  releaseVersion: "0.2.7",
   apiProtocolVersion: 1,
-  databaseSchemaVersion: 9,
-  minimumClientRelease: "0.2.6",
+  databaseSchemaVersion: 10,
+  minimumClientRelease: "0.2.7",
 } as const;
 
 export type ReleaseContract = typeof releaseContract;

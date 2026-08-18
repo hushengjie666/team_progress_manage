@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -17,7 +17,7 @@ const iosEnvironment = read(".env.ios-production");
 
 const expected = {
   version: releaseContract.release_version,
-  build: "2026081802",
+  build: "2026081803",
   bundleId: "xyz.hudashuai.timemanage",
   extensionBundleId: "xyz.hudashuai.timemanage.TimerLiveActivity",
   teamId: "2P3ULGHFM8",
@@ -46,18 +46,32 @@ requireText(xcodeProject, `MARKETING_VERSION = ${expected.version}`, "Xcode mark
 requireText(appInfoPlist, `<string>${expected.version}</string>`, "iOS app Info.plist version");
 requireText(extensionInfoPlist, `<string>${expected.version}</string>`, "iOS extension Info.plist version");
 
+const appleRoot = join(root, "src-tauri", "gen", "apple");
+const validationAssets = mkdtempSync(join(tmpdir(), "timemanage-ios-assets-"));
+const validationSpecPath = join(appleRoot, ".timemanage-verify-project.yml");
+const validationProject = project.replace(
+  "      - path: assets\n",
+  `      - path: ${validationAssets}\n`,
+);
+writeFileSync(validationSpecPath, validationProject, "utf8");
 const xcodegenOutput = mkdtempSync(join(tmpdir(), "timemanage-xcodegen-"));
-const xcodegen = spawnSync("xcodegen", [
-  "generate",
-  "--spec",
-  "project.yml",
-  "--project",
-  xcodegenOutput,
-], {
-  cwd: join(root, "src-tauri", "gen", "apple"),
-  encoding: "utf8",
-});
-rmSync(xcodegenOutput, { recursive: true, force: true });
+let xcodegen;
+try {
+  xcodegen = spawnSync("xcodegen", [
+    "generate",
+    "--spec",
+    validationSpecPath,
+    "--project",
+    xcodegenOutput,
+  ], {
+    cwd: appleRoot,
+    encoding: "utf8",
+  });
+} finally {
+  rmSync(validationSpecPath, { force: true });
+  rmSync(validationAssets, { recursive: true, force: true });
+  rmSync(xcodegenOutput, { recursive: true, force: true });
+}
 if (xcodegen.status !== 0) {
   throw new Error(xcodegen.stderr || xcodegen.stdout || "iOS XcodeGen project specification is invalid.");
 }

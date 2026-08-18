@@ -118,7 +118,8 @@ if (pluginBundleSource.includes("/team/data")) {
 if (!migrationCatalog.includes(`SchemaVersion: ${databaseSchemaVersion}, ReleaseVersion: serverReleaseVersion`)) {
   throw new Error(`Migration catalog does not end at database schema ${databaseSchemaVersion}.`);
 }
-if (!migrationCatalog.includes(`FileName: "0000${databaseSchemaVersion}_v${releaseVersion.replaceAll(".", "_")}_`)) {
+const migrationFilePrefix = String(databaseSchemaVersion).padStart(5, "0");
+if (!migrationCatalog.includes(`FileName: "${migrationFilePrefix}_v${releaseVersion.replaceAll(".", "_")}_`)) {
   throw new Error(`Migration catalog is missing the release migration for v${releaseVersion}.`);
 }
 
