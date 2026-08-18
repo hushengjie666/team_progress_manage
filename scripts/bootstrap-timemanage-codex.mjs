@@ -5,13 +5,13 @@ import { spawnSync } from "node:child_process";
 import readline from "node:readline/promises";
 
 const defaultRepo = "hushengjie666/team_progress_manage";
-const defaultRef = "v0.2.4";
+const defaultRef = "v0.2.5";
 const defaultMarketplace = "timemanage-team";
 const defaultServerUrl = "https://www.hudashuai.xyz/timemanage-team/api/";
-const defaultPluginVersion = "0.2.4";
+const defaultPluginVersion = "0.2.5";
 const defaultApiProtocolVersion = 1;
-const defaultDatabaseSchemaVersion = 7;
-const defaultMinimumClientRelease = "0.2.4";
+const defaultDatabaseSchemaVersion = 8;
+const defaultMinimumClientRelease = "0.2.5";
 
 const args = process.argv.slice(2);
 

@@ -57,7 +57,7 @@ APP_PLIST="${ARCHIVE_PATH}/Products/Applications/TimeManage.app/Info.plist"
 APP_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP_PLIST}")"
 APP_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${APP_PLIST}")"
 APP_BUNDLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "${APP_PLIST}")"
-if [ "${APP_VERSION}" != "${VERSION}" ] || [ "${APP_BUILD}" != "2026071201" ] || [ "${APP_BUNDLE}" != "xyz.hudashuai.timemanage" ]; then
+if [ "${APP_VERSION}" != "${VERSION}" ] || [ "${APP_BUILD}" != "2026081801" ] || [ "${APP_BUNDLE}" != "xyz.hudashuai.timemanage" ]; then
   echo "Unexpected archived app identity: ${APP_BUNDLE} ${APP_VERSION} (${APP_BUILD})" >&2
   exit 1
 fi
@@ -75,7 +75,7 @@ COMMIT="$(git rev-parse HEAD)"
 cat > "${OUTPUT}/RELEASE-IOS.txt" <<EOF
 TimeManage iOS release preparation
 Version: ${VERSION}
-Build: 2026071201
+Build: 2026081801
 Bundle ID: xyz.hudashuai.timemanage
 Extension Bundle ID: xyz.hudashuai.timemanage.TimerLiveActivity
 Production API: https://www.hudashuai.xyz/timemanage-team/api/

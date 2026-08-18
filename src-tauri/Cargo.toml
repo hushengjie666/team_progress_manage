@@ -1,6 +1,6 @@
 [package]
 name = "timemanage-desktop"
-version = "0.2.4"
+version = "0.2.5"
 description = "TimeManage desktop shell"
 authors = ["hushengjie666"]
 license = ""

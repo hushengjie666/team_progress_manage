@@ -1,7 +1,10 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { platform } from "node:os";
+
+const releaseContract = JSON.parse(readFileSync(new URL("../release-contract.json", import.meta.url), "utf8"));
 
 let backendUrl = process.env.TM_TAURI_SMOKE_BACKEND_URL ?? "http://127.0.0.1:18787";
 const smokeEmail = process.env.TM_TAURI_SMOKE_EMAIL ?? "admin";
@@ -135,10 +138,10 @@ const startMockBackend = async () => {
         response.end(JSON.stringify({
           status: "ok",
           service: "timemanage-team",
-          release_version: "0.2.4",
-          api_protocol_version: 1,
-          database_schema_version: 7,
-          minimum_client_release: "0.2.4",
+          release_version: releaseContract.release_version,
+          api_protocol_version: releaseContract.api_protocol_version,
+          database_schema_version: releaseContract.database_schema_version,
+          minimum_client_release: releaseContract.minimum_client_release,
         }));
         return;
       }

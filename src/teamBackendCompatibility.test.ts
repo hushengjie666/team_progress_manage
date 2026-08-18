@@ -1,19 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { releaseContract } from "./releaseContract";
 import {
+  checkBackendCompatibility,
   TeamBackendCompatibilityError,
   validateBackendHealth,
 } from "./teamBackendCompatibility";
 
 describe("team backend release compatibility", () => {
-  it("accepts the exact v0.2.4 contract", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts the exact release contract", () => {
     const result = validateBackendHealth({
       status: "ok",
       service: "timemanage-team",
-      release_version: "0.2.4",
-      api_protocol_version: 1,
-      database_schema_version: 7,
-      minimum_client_release: "0.2.4",
+      release_version: releaseContract.releaseVersion,
+      api_protocol_version: releaseContract.apiProtocolVersion,
+      database_schema_version: releaseContract.databaseSchemaVersion,
+      minimum_client_release: releaseContract.minimumClientRelease,
     });
 
     expect(result.code).toBe("compatible");
@@ -27,27 +32,37 @@ describe("team backend release compatibility", () => {
     expect(result.message).toContain("版本过旧");
   });
 
+  it("reads legacy health without business compatibility headers", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ status: "ok", service: "timemanage-team" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(checkBackendCompatibility("https://example.test/api")).rejects.toMatchObject({
+      details: { code: "server_version_contract_missing" },
+    });
+    expect(fetchMock.mock.calls[0]?.[1]?.headers).toBeUndefined();
+  });
+
   it("rejects protocol and database mismatches separately", () => {
     expect(validateBackendHealth({
       status: "ok",
-      release_version: "0.2.4",
-      api_protocol_version: 2,
-      database_schema_version: 7,
-      minimum_client_release: "0.2.4",
+      release_version: releaseContract.releaseVersion,
+      api_protocol_version: releaseContract.apiProtocolVersion + 1,
+      database_schema_version: releaseContract.databaseSchemaVersion,
+      minimum_client_release: releaseContract.minimumClientRelease,
     }).code).toBe("api_protocol_mismatch");
     expect(validateBackendHealth({
       status: "ok",
-      release_version: "0.2.4",
-      api_protocol_version: 1,
-      database_schema_version: 6,
-      minimum_client_release: "0.2.4",
+      release_version: releaseContract.releaseVersion,
+      api_protocol_version: releaseContract.apiProtocolVersion,
+      database_schema_version: releaseContract.databaseSchemaVersion - 1,
+      minimum_client_release: releaseContract.minimumClientRelease,
     }).code).toBe("database_schema_behind");
     expect(validateBackendHealth({
       status: "ok",
-      release_version: "0.2.4",
-      api_protocol_version: 1,
-      database_schema_version: 8,
-      minimum_client_release: "0.2.4",
+      release_version: releaseContract.releaseVersion,
+      api_protocol_version: releaseContract.apiProtocolVersion,
+      database_schema_version: releaseContract.databaseSchemaVersion + 1,
+      minimum_client_release: releaseContract.minimumClientRelease,
     }).code).toBe("database_schema_ahead");
   });
 

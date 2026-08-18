@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -72,10 +73,10 @@ func TestHealthHandler(t *testing.T) {
 	}
 	for _, expected := range []string{
 		`"service":"timemanage-team"`,
-		`"release_version":"0.2.4"`,
-		`"api_protocol_version":1`,
-		`"database_schema_version":7`,
-		`"minimum_client_release":"0.2.4"`,
+		`"release_version":"` + releaseVersion + `"`,
+		`"api_protocol_version":` + strconv.FormatInt(apiProtocolVersion, 10),
+		`"database_schema_version":` + strconv.FormatInt(databaseSchemaVersion, 10),
+		`"minimum_client_release":"` + minimumClientRelease + `"`,
 	} {
 		if !strings.Contains(recorder.Body.String(), expected) {
 			t.Fatalf("health response missing %s: %s", expected, recorder.Body.String())
@@ -92,7 +93,7 @@ func TestLegacyTeamDataReturnsUpgradeRequired(t *testing.T) {
 	if recorder.Code != http.StatusUpgradeRequired {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
 	}
-	for _, expected := range []string{`"code":"client_upgrade_required"`, `"server_release":"0.2.4"`, `"required_client_release":"0.2.4"`} {
+	for _, expected := range []string{`"code":"client_upgrade_required"`, `"server_release":"` + releaseVersion + `"`, `"required_client_release":"` + minimumClientRelease + `"`} {
 		if !strings.Contains(recorder.Body.String(), expected) {
 			t.Fatalf("upgrade response missing %s: %s", expected, recorder.Body.String())
 		}
@@ -105,8 +106,8 @@ func TestClientRequestCompatibilityRequiresCurrentHeaders(t *testing.T) {
 		t.Fatal("missing compatibility headers were accepted")
 	}
 	current := httptest.NewRequest(http.MethodPost, "/tasks/task-1", nil)
-	current.Header.Set("X-TimeManage-Client-Release", "0.2.4")
-	current.Header.Set("X-TimeManage-API-Protocol", "1")
+	current.Header.Set("X-TimeManage-Client-Release", releaseVersion)
+	current.Header.Set("X-TimeManage-API-Protocol", strconv.FormatInt(apiProtocolVersion, 10))
 	if !clientRequestCompatible(current) {
 		t.Fatal("current compatibility headers were rejected")
 	}

@@ -1,5 +1,5 @@
 import { releaseContract } from "./releaseContract";
-import { apiUrl, clientHeaders, requestJson, TeamHttpError } from "./teamBackendHttp";
+import { apiUrl, requestJson, TeamHttpError } from "./teamBackendHttp";
 
 export type BackendCompatibilityCode =
   | "compatible"
@@ -120,9 +120,7 @@ export const validateBackendHealth = (health: BackendHealthResponse): BackendCom
 export async function checkBackendCompatibility(serverUrl: string): Promise<BackendCompatibilityState> {
   let health: BackendHealthResponse;
   try {
-    health = await requestJson<BackendHealthResponse>(apiUrl(serverUrl, "/health"), {
-      headers: clientHeaders(),
-    });
+    health = await requestJson<BackendHealthResponse>(apiUrl(serverUrl, "/health"));
   } catch (error) {
     if (error instanceof TeamHttpError && error.status === 426) {
       throw new TeamBackendCompatibilityError(compatibilityStateForHttpError(error));

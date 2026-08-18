@@ -15,7 +15,7 @@ const iosEnvironment = read(".env.ios-production");
 
 const expected = {
   version: releaseContract.release_version,
-  build: "2026071201",
+  build: "2026081801",
   bundleId: "xyz.hudashuai.timemanage",
   extensionBundleId: "xyz.hudashuai.timemanage.TimerLiveActivity",
   teamId: "2P3ULGHFM8",
