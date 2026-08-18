@@ -17,7 +17,7 @@ export function useTeamBusinessRefresh({
 }: Pick<AppLifecycleHooksOptions, "state" | "loaded" | "stateRef" | "setState">) {
   useEffect(() => {
     const token = state?.auth.token ?? state?.backend.token;
-    if (!loaded || !state || !token) return;
+    if (!loaded || !state || !token || state.backend.status === "incompatible") return;
     let cancelled = false;
     let inFlight = false;
     let failureCount = 0;
@@ -30,7 +30,7 @@ export function useTeamBusinessRefresh({
       if (cancelled || inFlight) return;
       const current = stateRef.current;
       const currentToken = current?.auth.token ?? current?.backend.token;
-      if (!current || !currentToken) return;
+      if (!current || !currentToken || current.backend.status === "incompatible") return;
       if (current.backend.status === "saving") {
         scheduleRefresh(TEAM_BUSINESS_REFRESH_MS);
         return;

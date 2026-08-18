@@ -174,6 +174,7 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
       status: "ready",
       message: "团队在线数据已加载",
       lastLoadedAt: loadedAt,
+      failureKind: undefined,
     },
     projects: [],
     projectMembers: [],

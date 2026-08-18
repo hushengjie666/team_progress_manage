@@ -1,4 +1,4 @@
-import { applyAuthStatusFailure, applyTeamStateLoadFailure } from "./appBoot";
+import { applyAuthStatusFailure, applyBackendCompatibilityFailure, applyTeamStateLoadFailure } from "./appBoot";
 import { bindAccountToMembers } from "./authModel";
 import { mergeDemoDataIntoState } from "./demoData";
 import { defaultBackendServerUrl } from "./seed";
@@ -6,6 +6,7 @@ import { loadState } from "./storage";
 import { fetchWorkspaces, getAuthStatus } from "./teamBackend";
 import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
 import { importTeamBusinessData, loadTeamData } from "./teamBusinessApi";
+import { checkBackendCompatibility } from "./teamBackendCompatibility";
 import { businessRowsFromState } from "./teamBusinessRows";
 import type { Account, AppState, ProjectInvitation, WorkspaceInvitation } from "./types";
 import { loadWorkspaceAccountMetadata } from "./workspaceAccountRuntime";
@@ -103,6 +104,23 @@ export async function loadInitialAppState(): Promise<AppBootResult> {
         message: "请使用管理员分配的账号登录",
       },
     };
+  }
+
+  try {
+    const compatibility = await checkBackendCompatibility(next.backend.serverUrl);
+    next = {
+      ...next,
+      backend: {
+        ...next.backend,
+        status: "idle",
+        message: compatibility.message,
+        compatibility,
+        failureKind: undefined,
+      },
+    };
+  } catch (error) {
+    next = applyBackendCompatibilityFailure(next, error);
+    return { state: next, platformAccounts, workspaceInvitations, projectInvitations };
   }
 
   try {

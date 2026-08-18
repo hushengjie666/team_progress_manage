@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { applyAuthStatusFailure, applyTeamStateLoadFailure, applyTeamStateSaveFailure, normalizeAuthMessage } from "./appBoot";
+import { applyAuthStatusFailure, applyBackendCompatibilityFailure, applyTeamStateLoadFailure, applyTeamStateSaveFailure, normalizeAuthMessage } from "./appBoot";
 import { shouldResetSignedOutLocalBackendUrl } from "./appBootRuntime";
 import { defaultBackendServerUrl } from "./defaultBackendServerUrl";
 import { createInitialState } from "./seed";
 import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
 import { TeamHttpError } from "./teamBackendHttp";
+import { TeamBackendCompatibilityError, validateBackendHealth } from "./teamBackendCompatibility";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -48,6 +49,7 @@ describe("app boot fallback", () => {
     expect(next.auth.message).toBe("已登录");
     expect(next.backend.status).toBe("error");
     expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
+    expect(next.backend.failureKind).toBe("network");
   });
 
   it("clears cached business data when team state cannot be loaded", () => {
@@ -59,7 +61,8 @@ describe("app boot fallback", () => {
     expect(next.projects).toEqual([]);
     expect(next.tasks).toEqual([]);
     expect(next.backend.status).toBe("error");
-    expect(next.backend.message).toBe("团队后台不可用，请启动后台服务或检查地址：http://127.0.0.1:8787：Load failed");
+    expect(next.backend.message).toBe("团队业务数据加载失败，请检查网络后重试：Load failed");
+    expect(next.backend.failureKind).toBe("load");
   });
 
   it("clears cached sign-in when auth status says the current workspace can no longer be accessed", () => {
@@ -85,6 +88,18 @@ describe("app boot fallback", () => {
     expect(next.backend.token).toBe("token_cached");
     expect(next.backend.status).toBe("error");
     expect(next.backend.message).toContain("business row write denied");
+  });
+
+  it("blocks the application without clearing confirmed data when versions are incompatible", () => {
+    const state = signedInState();
+    const error = new TeamBackendCompatibilityError(validateBackendHealth({ status: "ok" }));
+    const next = applyBackendCompatibilityFailure(state, error);
+
+    expect(next.backend.status).toBe("incompatible");
+    expect(next.backend.compatibility?.code).toBe("server_version_contract_missing");
+    expect(next.projects).toEqual(state.projects);
+    expect(next.tasks).toEqual(state.tasks);
+    expect(applyTeamStateLoadFailure(state, error).dailyPlans).toEqual(state.dailyPlans);
   });
 
   it("does not infer session expiry from an untyped error message", () => {

@@ -1,4 +1,4 @@
-import type { AppState, ProjectInvitation } from "../../../src/types";
+import type { AppState, BackendHealthResponse, ProjectInvitation } from "../../../src/types";
 
 export type MockProjectInvitation = {
   id: string;
@@ -21,4 +21,5 @@ export type MockProjectInvitation = {
 export type MockTeamBackendOptions = {
   projectInvitations?: MockProjectInvitation[];
   acceptedProjectInvitationState?: AppState;
+  health?: Partial<BackendHealthResponse>;
 };

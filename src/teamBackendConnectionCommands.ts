@@ -1,7 +1,9 @@
 import { nowIso } from "./appModel";
+import { applyBackendCompatibilityFailure } from "./appBoot";
 import { loginToBackend } from "./teamBackend";
 import type { SetBackendConnectionStatus, BackendCommandRuntimeOptions, BackendConnectionCommands } from "./teamBackendCommandTypes";
 import type { BackendConnectionState } from "./types";
+import { checkBackendCompatibility, isTeamBackendCompatibilityError } from "./teamBackendCompatibility";
 
 type BackendConnectionCommandOptions = Pick<
   BackendCommandRuntimeOptions,
@@ -49,14 +51,23 @@ export function createBackendConnectionCommands({
     if (!source) return;
     setBackendConnectionStatus({ status: "loading", message: "正在检查团队后台健康状态" });
     try {
-      const healthUrl = new URL("/health", source.backend.serverUrl.endsWith("/") ? source.backend.serverUrl : `${source.backend.serverUrl}/`).toString();
-      const response = await fetch(healthUrl);
-      if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
-      setBackendConnectionStatus({ status: source.backend.token ? "ready" : "idle", message: `团队后台可访问：${healthUrl}` });
+      const compatibility = await checkBackendCompatibility(source.backend.serverUrl);
+      setBackendConnectionStatus({
+        status: source.backend.token ? "ready" : "idle",
+        message: compatibility.message,
+        compatibility,
+        failureKind: undefined,
+      });
       setToast("团队后台健康检查通过");
     } catch (error) {
+      if (isTeamBackendCompatibilityError(error)) {
+        const failed = applyBackendCompatibilityFailure(source, error);
+        updateState(() => failed);
+        setToast(failed.backend.message);
+        return;
+      }
       const message = error instanceof Error ? error.message : "团队后台健康检查失败";
-      setBackendConnectionStatus({ status: "error", message });
+      setBackendConnectionStatus({ status: "error", message, failureKind: "health" });
       setToast(message);
     }
   };

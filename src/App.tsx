@@ -6,6 +6,7 @@ import { useAppViewModelHooks } from "./appViewModelHooks";
 import { createAppRootRuntimes } from "./appRootRuntimes";
 import { AppAuthenticatedShellContainer } from "./AppAuthenticatedShellContainer";
 import { BootScreen } from "./components/BootScreen";
+import { AppCompatibilityGate } from "./components/AppCompatibilityGate";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
 import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
@@ -104,20 +105,29 @@ export function App() {
   useNativeTimerSync(state, appViewModel.currentTask);
   useIOSDeepLinks(appShell.setTab);
 
-  if (!state || !todayPlan || !workspaceModel) {
+  if (!state) {
     loadedRuntimesRef.current = null;
     return <BootScreen />;
   }
 
-  const loadedRuntimes = createAppLoadedRuntimes({
-    shell: appShell,
-    state,
-    viewModel: appViewModel,
-    updateState,
-    runTeamCommand,
-  });
-  loadedRuntimesRef.current = loadedRuntimes;
+  if (state.backend.status === "incompatible") {
+    loadedRuntimesRef.current = null;
+    return (
+      <AppCompatibilityGate
+        serverUrl={state.backend.serverUrl}
+        compatibility={state.backend.compatibility}
+        retry={() => window.location.reload()}
+      />
+    );
+  }
+
+  if (!todayPlan || !workspaceModel) {
+    loadedRuntimesRef.current = null;
+    return <BootScreen />;
+  }
+
   if (state.auth.status !== "authenticated" || !state.auth.token) {
+    loadedRuntimesRef.current = null;
     return (
       <AppUnauthenticatedGate
         status={state.auth.status}
@@ -129,6 +139,15 @@ export function App() {
       />
     );
   }
+
+  const loadedRuntimes = createAppLoadedRuntimes({
+    shell: appShell,
+    state,
+    viewModel: appViewModel,
+    updateState,
+    runTeamCommand,
+  });
+  loadedRuntimesRef.current = loadedRuntimes;
 
   return (
     <AppAuthenticatedShellContainer

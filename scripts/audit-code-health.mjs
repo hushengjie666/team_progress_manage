@@ -43,6 +43,19 @@ const oldBusinessDataPatterns = [
   "同" + "步",
 ];
 const oldBusinessDataPattern = new RegExp(`(?:${oldBusinessDataPatterns.join("|")})`, "i");
+const compatibilityPaths = new Set([
+  "src/App.tsx",
+  "src/appBoot.ts",
+  "src/appBootRuntime.ts",
+  "src/appStateTypes.ts",
+  "src/components/AppCompatibilityGate.tsx",
+  "src/styles/boot-auth.css",
+  "src/teamBackendCompatibility.ts",
+  "src/teamBackendConnectionCommands.ts",
+  "team-server/release_contract.go",
+  "team-server/server_routes.go",
+  "team-server/domain_resource_handlers.go",
+]);
 
 const isTestFile = (relativePath) =>
   relativePath.startsWith("tests/") ||
@@ -53,6 +66,7 @@ const isRiskAllowed = (relativePath, line, rule) => {
   if (rule === "stale-code" && isTestFile(relativePath)) return true;
   if (rule === "stale-code" && /^src\/demoData/.test(relativePath)) return true;
   if (rule === "stale-code" && line.includes("版本不兼容")) return true;
+  if (rule === "stale-code" && compatibilityPaths.has(relativePath) && /compat|兼容|过旧|旧快照/i.test(line)) return true;
   return false;
 };
 

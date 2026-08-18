@@ -71,7 +71,7 @@ Windows 部署包包含：
 - `POST /work-sessions/{id}/pause|resume|finish`
 - `GET /settings`、`PATCH /settings`
 
-业务数据只以后端数据库为准。接口不接受客户端版本号；字段修改在事务内合并，跨实体动作原子提交，命令重试可使用 `Idempotency-Key`。
+业务数据只以后端数据库为准。正式客户端业务请求必须携带 `X-TimeManage-Client-Release` 和 `X-TimeManage-API-Protocol`；旧客户端或缺少请求头的写请求会收到结构化 `426 Upgrade Required`。字段修改在事务内合并，跨实体动作原子提交，命令重试可使用 `Idempotency-Key`。
 
 The React app defaults to `http://127.0.0.1:8787`, username `admin`, password `hu626699`.
 

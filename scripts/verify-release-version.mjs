@@ -25,8 +25,9 @@ if (cargoMetadata.status !== 0) {
 const cargoPackage = JSON.parse(cargoMetadata.stdout).packages
   .find((item) => item.name === "timemanage-desktop");
 const cliSource = readFileSync(join(rootDir, "cli", "src", "program.ts"), "utf8");
+const pluginBundleSource = readFileSync(join(rootDir, "plugins", "timemanage", "scripts", "timemanage.mjs"), "utf8");
 const bootstrapSource = readFileSync(join(rootDir, "scripts", "bootstrap-timemanage-codex.mjs"), "utf8");
-const backendCatalogSource = readFileSync(join(rootDir, "team-server", "mysql_migration_catalog.go"), "utf8");
+const backendContractSource = readFileSync(join(rootDir, "team-server", "release_contract.go"), "utf8");
 
 const extract = (source, pattern, label) => {
   const value = source.match(pattern)?.[1];
@@ -39,10 +40,11 @@ const versions = {
   "src-tauri/tauri.conf.json": readJson("src-tauri/tauri.conf.json").version,
   "src-tauri/Cargo.toml": cargoPackage?.version,
   "cli/src/program.ts": extract(cliSource, /\.version\("([^"\n]+)"\)/, "CLI version"),
+  "plugins/timemanage/scripts/timemanage.mjs": extract(pluginBundleSource, /\.version\("([^"\n]+)"\)/, "bundled plugin CLI version"),
   "plugins/timemanage/.codex-plugin/plugin.json": readJson("plugins/timemanage/.codex-plugin/plugin.json").version,
   "scripts/bootstrap-timemanage-codex.mjs default ref": extract(bootstrapSource, /defaultRef = "v([^"\n]+)"/, "bootstrap default ref"),
   "scripts/bootstrap-timemanage-codex.mjs plugin version": extract(bootstrapSource, /defaultPluginVersion = "([^"\n]+)"/, "bootstrap plugin version"),
-  "team-server/mysql_migration_catalog.go": extract(backendCatalogSource, /serverReleaseVersion\s+= "v([^"\n]+)"/, "backend release version"),
+  "team-server/release_contract.go": extract(backendContractSource, /releaseVersion\s+=\s+"([^"\n]+)"/, "backend release version"),
 };
 
 const mismatches = Object.entries(versions).filter(([, version]) => version !== expectedVersion);

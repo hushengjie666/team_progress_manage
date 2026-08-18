@@ -72,14 +72,7 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 		return
 	}
 	defer mysqlRollback(tx)
-	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if !claimed {
-		_ = tx.Rollback()
-		a.writeBootstrapRows(w, r, auth)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
 	task, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "task", taskID)
@@ -396,6 +389,9 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
 	row, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "daily_plan", planID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "daily plan not found")

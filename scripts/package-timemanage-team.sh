@@ -22,6 +22,7 @@ fi
 
 cd "${ROOT_DIR}"
 node scripts/verify-release-version.mjs "${PACKAGE_VERSION}"
+node scripts/verify-release-contract.mjs
 node scripts/verify-database-migrations.mjs
 npm run verify:desktop:release
 mkdir -p "${DEPLOY_ROOT}"
@@ -41,6 +42,7 @@ npm run build -- --base=/timemanage-team/
 
 rm -rf "${PACKAGE_DIR}"
 mkdir -p "${PACKAGE_DIR}/desktop" "${PACKAGE_DIR}/web" "${PACKAGE_DIR}/server"
+cp release-contract.json "${PACKAGE_DIR}/release-contract.json"
 
 TAURI_BUNDLE_COUNT=0
 copy_tauri_bundles() {
@@ -116,11 +118,16 @@ rm -f "${PACKAGE_DIR}/server/backend.json"
 cat >"${PACKAGE_DIR}/RELEASE.txt" <<EOF
 TimeManage Team ${PACKAGE_VERSION}
 Build: ${PACKAGE_STAMP}
+Release version: ${PACKAGE_VERSION}
+API protocol version: $(node -p "require('./release-contract.json').api_protocol_version")
+Database schema version: $(node -p "require('./release-contract.json').database_schema_version")
+Minimum client release: $(node -p "require('./release-contract.json').minimum_client_release")
 Git tag: ${GIT_TAG:-none}
 Git commit: ${GIT_COMMIT:-unknown}
 Git tree: ${GIT_DIRTY}
 
 Contents:
+  release-contract.json  release version, API protocol, and database schema contract
   desktop\              Tauri desktop application and installers
   web\                  frontend files built for /timemanage-team/
   server\timemanage-team.exe

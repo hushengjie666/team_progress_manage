@@ -9,6 +9,8 @@ const backendStatusLabel = (backend: BackendConnectionState) => (
       ? "保存中"
       : backend.status === "authenticating"
         ? "登录中"
+        : backend.status === "incompatible"
+          ? "版本不兼容"
         : backend.status === "error"
           ? "异常"
           : backend.token

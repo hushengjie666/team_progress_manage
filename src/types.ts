@@ -75,4 +75,6 @@ export type {
   BackendServerConfig,
   BackendConnectionState,
   BackendConnectionStatus,
+  BackendFailureKind,
 } from "./appStateTypes";
+export type { BackendCompatibilityCode, BackendCompatibilityState, BackendHealthResponse } from "./teamBackendCompatibility";

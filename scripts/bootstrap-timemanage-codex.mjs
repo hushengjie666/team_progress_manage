@@ -9,6 +9,9 @@ const defaultRef = "v0.2.4";
 const defaultMarketplace = "timemanage-team";
 const defaultServerUrl = "https://www.hudashuai.xyz/timemanage-team/api/";
 const defaultPluginVersion = "0.2.4";
+const defaultApiProtocolVersion = 1;
+const defaultDatabaseSchemaVersion = 7;
+const defaultMinimumClientRelease = "0.2.4";
 
 const args = process.argv.slice(2);
 
@@ -132,7 +135,15 @@ const requestJson = async (url, init) => {
 };
 
 const verifyConnection = async ({ serverUrl, email, password, deviceId }) => {
-  await requestJson(endpoint(serverUrl, "/health"));
+  const health = await requestJson(endpoint(serverUrl, "/health"));
+  if (
+    health?.release_version !== defaultPluginVersion ||
+    health?.api_protocol_version !== defaultApiProtocolVersion ||
+    health?.database_schema_version !== defaultDatabaseSchemaVersion ||
+    health?.minimum_client_release !== defaultMinimumClientRelease
+  ) {
+    throw new Error("TimeManage backend release contract is incompatible; upgrade the backend before installing the CLI plugin.");
+  }
   await requestJson(endpoint(serverUrl, "/auth/status"));
   await requestJson(endpoint(serverUrl, "/auth/login"), {
     method: "POST",

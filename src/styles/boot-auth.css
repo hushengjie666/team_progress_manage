@@ -42,6 +42,53 @@
   font-size: 28px;
 }
 
+.compatibility-panel {
+  width: min(620px, 100%);
+}
+
+.compatibility-mark {
+  color: #8a4b22;
+  background: #f5e1c8;
+}
+
+.compatibility-details {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 14px 16px;
+  border: 1px solid #dfd5c8;
+  border-radius: 8px;
+  background: #fffdf9;
+}
+
+.compatibility-details div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: baseline;
+}
+
+.compatibility-details span {
+  color: #687377;
+}
+
+.compatibility-details strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.compatibility-message {
+  color: #8a4b22;
+  font-weight: 700;
+}
+
+.compatibility-panel .primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .auth-mark {
   width: 52px;
   height: 52px;

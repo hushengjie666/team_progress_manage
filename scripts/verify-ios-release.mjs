@@ -5,12 +5,16 @@ const root = join(import.meta.dirname, "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 const tauri = JSON.parse(read("src-tauri/tauri.conf.json"));
 const iosConfig = JSON.parse(read("src-tauri/tauri.ios.conf.json"));
+const releaseContract = JSON.parse(read("release-contract.json"));
 const project = read("src-tauri/gen/apple/project.yml");
+const xcodeProject = read("src-tauri/gen/apple/timemanage-desktop.xcodeproj/project.pbxproj");
+const appInfoPlist = read("src-tauri/gen/apple/timemanage-desktop_iOS/Info.plist");
+const extensionInfoPlist = read("src-tauri/gen/apple/TimerLiveActivity/Info.plist");
 const exportOptions = read("src-tauri/gen/apple/ExportOptions.plist");
 const iosEnvironment = read(".env.ios-production");
 
 const expected = {
-  version: "0.2.4",
+  version: releaseContract.release_version,
   build: "2026071201",
   bundleId: "xyz.hudashuai.timemanage",
   extensionBundleId: "xyz.hudashuai.timemanage.TimerLiveActivity",
@@ -36,6 +40,9 @@ for (const [value, label] of [
   [`DEVELOPMENT_TEAM: ${expected.teamId}`, "development team"],
   ["TARGETED_DEVICE_FAMILY: 1", "iPhone-only device family"],
 ]) requireText(project, value, label);
+requireText(xcodeProject, `MARKETING_VERSION = ${expected.version}`, "Xcode marketing version");
+requireText(appInfoPlist, `<string>${expected.version}</string>`, "iOS app Info.plist version");
+requireText(extensionInfoPlist, `<string>${expected.version}</string>`, "iOS extension Info.plist version");
 
 if (project.includes("UISupportedInterfaceOrientations~ipad")) {
   throw new Error("The iPhone-only release must not declare iPad orientations.");

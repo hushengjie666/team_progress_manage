@@ -30,8 +30,9 @@ for (const file of requiredFiles) {
 }
 
 const manifest = readJson(join(pluginRoot, ".codex-plugin", "plugin.json"));
+const releaseContract = readJson(join(repoRoot, "release-contract.json"));
 if (manifest.name !== "timemanage") fail("Plugin manifest name must be timemanage.");
-if (manifest.version !== "0.2.3") fail("Plugin manifest version must be 0.2.3.");
+if (manifest.version !== releaseContract.release_version) fail(`Plugin manifest version must be ${releaseContract.release_version}.`);
 if (manifest.skills !== "./skills/") fail("Plugin manifest must point skills to ./skills/.");
 const retiredServerField = `${String.fromCharCode(109, 99, 112)}Servers`;
 if (retiredServerField in manifest) fail("CLI plugin manifest must not register server integrations.");

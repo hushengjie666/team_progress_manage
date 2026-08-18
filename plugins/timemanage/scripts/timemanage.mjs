@@ -3488,11 +3488,11 @@ var mountedApiBaseFromBuiltAssets = (origin) => {
 };
 var defaultBackendServerUrl = () => {
   const env = import.meta.env ?? {};
-  if (env.VITE_TM_BACKEND_SERVER_URL) {
-    return env.VITE_TM_BACKEND_SERVER_URL;
-  }
   if (env.VITE_WDIO_TAURI === "1" && env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL) {
     return env.VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL;
+  }
+  if (env.VITE_TM_BACKEND_SERVER_URL) {
+    return env.VITE_TM_BACKEND_SERVER_URL;
   }
   if (typeof window === "undefined") return "http://127.0.0.1:8787";
   const { protocol, hostname: hostname2, origin } = window.location;
@@ -3526,54 +3526,6 @@ var starterProjectMember = {
   createdAt: now(),
   updatedAt: now()
 };
-var defaultTaskTemplates = [
-  {
-    id: "template_morning_plan",
-    name: "\u6668\u95F4\u8BA1\u5212",
-    description: "\u542F\u52A8\u5F53\u5929\u627F\u8BFA\u3001\u68C0\u67E5\u63D0\u9192\u3001\u7559\u51FA\u7F13\u51B2\u3002",
-    project: "\u4E2A\u4EBA\u8282\u594F",
-    tags: ["\u8BA1\u5212", "\u6668\u95F4"],
-    priority: "high",
-    severity: "medium",
-    estimatePomodoros: 1,
-    subtasks: ["\u67E5\u770B\u6628\u65E5\u8FDB\u5C55", "\u9009\u62E9\u4ECA\u65E5 1-3 \u4E2A\u627F\u8BFA", "\u5F00\u542F\u7B2C\u4E00\u9897\u756A\u8304"],
-    repeatRule: "daily"
-  },
-  {
-    id: "template_weekly_sync",
-    name: "\u5468\u8BA1\u5212\u534F\u4F5C",
-    description: "\u6574\u7406\u672C\u5468\u8FDB\u5C55\u3001\u98CE\u9669\u548C\u4E0B\u5468\u5B89\u6392\u3002",
-    project: "\u534F\u4F5C",
-    tags: ["\u5468\u4F1A", "\u8BA1\u5212"],
-    priority: "high",
-    severity: "high",
-    estimatePomodoros: 2,
-    subtasks: ["\u6574\u7406\u5DF2\u5B8C\u6210\u4E8B\u9879", "\u5217\u51FA\u4E3B\u8981\u98CE\u9669", "\u786E\u8BA4\u4E0B\u5468\u5B89\u6392"],
-    repeatRule: "weekly"
-  },
-  {
-    id: "template_deep_dev",
-    name: "\u5F00\u53D1\u4E13\u6CE8",
-    description: "\u7528\u4E8E\u9700\u8981\u8FDE\u7EED\u63A8\u8FDB\u7684\u5F00\u53D1\u4EFB\u52A1\u3002",
-    project: "\u5F00\u53D1",
-    tags: ["\u5F00\u53D1", "\u6DF1\u5EA6\u5DE5\u4F5C"],
-    priority: "high",
-    severity: "high",
-    estimatePomodoros: 4,
-    subtasks: ["\u660E\u786E\u9A8C\u6536\u70B9", "\u5B9E\u73B0\u6700\u5C0F\u95ED\u73AF", "\u8FD0\u884C\u6D4B\u8BD5", "\u8BB0\u5F55\u9057\u7559\u95EE\u9898"]
-  },
-  {
-    id: "template_learning",
-    name: "\u5B66\u4E60\u8BA1\u5212",
-    description: "\u8BFB\u8D44\u6599\u3001\u505A\u7B14\u8BB0\u3001\u8F93\u51FA\u7EC3\u4E60\u3002",
-    project: "\u5B66\u4E60",
-    tags: ["\u5B66\u4E60", "\u8F93\u5165"],
-    priority: "medium",
-    severity: "medium",
-    estimatePomodoros: 3,
-    subtasks: ["\u9605\u8BFB\u8D44\u6599", "\u6574\u7406\u7B14\u8BB0", "\u505A\u4E00\u6B21\u8F93\u51FA\u7EC3\u4E60"]
-  }
-];
 
 // src/seed.ts
 var padDatePart = (value) => String(value).padStart(2, "0");
@@ -3611,8 +3563,8 @@ var createInitialState = () => ({
     bootstrapped: void 0,
     message: "\u8BF7\u4F7F\u7528\u7BA1\u7406\u5458\u5206\u914D\u7684\u8D26\u53F7\u767B\u5F55"
   },
-  projects: [starterProject],
-  projectMembers: [starterProjectMember],
+  projects: [],
+  projectMembers: [],
   tasks: [],
   dailyPlans: [],
   focusSessions: [],
@@ -3633,7 +3585,7 @@ var createInitialState = () => ({
     status: "idle",
     message: "\u672C\u5730\u56E2\u961F\u540E\u53F0\u672A\u8FDE\u63A5"
   },
-  taskTemplates: defaultTaskTemplates,
+  taskTemplates: [],
   templateInstances: [],
   updatedAt: now2()
 });
@@ -3675,20 +3627,7 @@ var emptyTaskDefaults = (timestamp, sortOrder) => ({
 });
 
 // src/workSessionSignals.ts
-var createExecutionSignal = (workSession, type, timestamp, payload, idFactory = uid) => ({
-  id: idFactory("signal"),
-  workspaceId: workSession.workspaceId,
-  workSessionId: workSession.id,
-  taskId: workSession.taskId,
-  executorMemberId: workSession.executorMemberId,
-  type,
-  createdAt: timestamp,
-  payload
-});
 var sortedByUpdatedAt = (items) => [...items].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-
-// src/workSessionQueries.ts
-var latestActiveOrPausedWorkSession = (state, taskId, workSessionId) => sortedByUpdatedAt(state.workSessions).filter((session) => session.status === "active" || session.status === "paused").find((session) => (workSessionId ? session.id === workSessionId : true) && (taskId ? session.taskId === taskId : true));
 
 // src/memberIdentity.ts
 var normalizedEmail = (email) => email?.trim().toLowerCase();
@@ -3736,10 +3675,6 @@ var projectMemberIdentityIds = (state, currentMember = resolveCurrentMember(stat
 // src/teamProgressUtils.ts
 var cleanRoles = (roles) => roles.filter((role, index) => roles.indexOf(role) === index);
 var normalizedEmail2 = (email) => email?.trim().toLowerCase();
-var clampProgressPercent = (value) => {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(100, Math.round(value ?? 0)));
-};
 
 // src/projectMemberState.ts
 function addProjectMemberToState(state, projectId, name, email, roles, timestamp = (/* @__PURE__ */ new Date()).toISOString(), idFactory = uid, identity = {}) {
@@ -3796,9 +3731,6 @@ function updateProjectMemberInState(state, member, timestamp = (/* @__PURE__ */ 
     updatedAt: timestamp
   };
 }
-function projectMembersForProject(state, projectId) {
-  return state.projectMembers.filter((member) => member.projectId === projectId && member.status !== "disabled");
-}
 
 // src/dailyPlanScope.ts
 var currentDailyPlanOwnerAccountId = (state) => state.auth.account?.id;
@@ -3853,6 +3785,27 @@ var defaultReview = () => ({
   tomorrowFocus: ""
 });
 var planForDate = (state, date) => combinedCurrentAccountDailyPlanForDate(state, date) ?? currentAccountDailyPlanForDate(state, date);
+
+// src/timerSpeed.ts
+var normalizeTimerSpeedMultiplier = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 1 ? numeric : 1;
+};
+
+// src/timerCalculations.ts
+var calculateRemaining = (timer, now3 = /* @__PURE__ */ new Date()) => {
+  if (!timer.isRunning || timer.pendingSettlement === "pending") return Math.max(0, timer.remaining);
+  const speedMultiplier = normalizeTimerSpeedMultiplier(timer.speedMultiplier);
+  const remaining = Math.ceil((new Date(timer.plannedEndAt).getTime() - now3.getTime()) / 1e3 * speedMultiplier);
+  return Math.max(0, Math.min(timer.duration, remaining));
+};
+var restoreTimer = (timer, now3 = /* @__PURE__ */ new Date()) => {
+  if (!timer) return void 0;
+  if (!timer.isRunning) return timer;
+  const remaining = calculateRemaining(timer, now3);
+  if (remaining > 0) return { ...timer, remaining };
+  return { ...timer, remaining: 0, isRunning: false, pendingSettlement: void 0 };
+};
 
 // src/planningDomain.ts
 var taskPriorityScore = (task) => task.priority === "urgent" ? 40 : task.priority === "high" ? 30 : task.priority === "medium" ? 20 : 10;
@@ -4054,470 +4007,6 @@ var getTodayPlan = (state) => {
   if (existing) return existing;
   return createDailyPlanForDate(state, todayDate);
 };
-
-// src/workSessionTodayPlan.ts
-var ensurePlanInState = (state, date, timestamp, workspaceId = currentDailyPlanWorkspaceId(state)) => {
-  const existing = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date);
-  if (existing) return { state, plan: existing };
-  const plan = createDailyPlanForDate(state, date, timestamp, workspaceId);
-  return { state: { ...state, dailyPlans: [plan, ...state.dailyPlans], updatedAt: timestamp }, plan };
-};
-var ensureTodayPlanInState = (state, timestamp, workspaceId = currentDailyPlanWorkspaceId(state)) => ensurePlanInState(state, todayKey(), timestamp, workspaceId);
-var currentProjectMemberIdForTask = (state, task) => {
-  return resolveMemberIdForProject(state, task.projectId);
-};
-var taskHasAssignee = (task) => Boolean(task.primaryExecutorMemberId || (task.collaboratorMemberIds ?? []).length > 0);
-var currentWorkspaceMembershipForTask = (state, task) => {
-  const account = state.auth.account;
-  if (!account) return void 0;
-  const project = state.projects.find((item) => item.id === task.projectId);
-  const workspaceId = project?.workspaceId ?? task.workspaceId ?? currentDailyPlanWorkspaceId(state);
-  return state.auth.workspaceMemberships?.find(
-    (membership) => membership.status === "active" && membership.accountId === account.id && (!workspaceId || membership.workspaceId === workspaceId)
-  ) ?? (state.auth.membership?.status === "active" && state.auth.membership.accountId === account.id && (!workspaceId || state.auth.membership.workspaceId === workspaceId) ? state.auth.membership : void 0);
-};
-var ensureCurrentProjectMemberForTask = (state, task, timestamp) => {
-  const currentMemberId = currentProjectMemberIdForTask(state, task);
-  if (currentMemberId) return { state, memberId: currentMemberId };
-  const account = state.auth.account;
-  const membership = currentWorkspaceMembershipForTask(state, task);
-  if (!account || !membership) return { state, memberId: void 0 };
-  const project = state.projects.find((item) => item.id === task.projectId);
-  const nextState = addProjectMemberToState(
-    state,
-    task.projectId,
-    account.name || membership.name,
-    account.email || membership.email,
-    ["executor"],
-    timestamp,
-    uid,
-    {
-      accountId: account.id,
-      workspaceId: project?.workspaceId ?? task.workspaceId ?? membership.workspaceId
-    }
-  );
-  return { state: nextState, memberId: currentProjectMemberIdForTask(nextState, task) };
-};
-var claimTaskForCurrentMemberIfUnassigned = (state, task) => {
-  if (taskHasAssignee(task)) return task.primaryExecutorMemberId;
-  return currentProjectMemberIdForTask(state, task);
-};
-var addTaskToTodayInState = (state, taskId, timestamp) => {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) throw new Error(`Task not found: ${taskId}`);
-  const stateWithMember = taskHasAssignee(task) ? state : ensureCurrentProjectMemberForTask(state, task, timestamp).state;
-  const taskForPlan = stateWithMember.tasks.find((item) => item.id === taskId) ?? task;
-  const { state: withPlan, plan } = ensureTodayPlanInState(stateWithMember, timestamp, workspaceIdForTask(stateWithMember, taskForPlan));
-  const committedTaskIds = Array.from(/* @__PURE__ */ new Set([...plan.committedTaskIds, taskId]));
-  return {
-    ...withPlan,
-    tasks: withPlan.tasks.map(
-      (item) => item.id === taskId ? {
-        ...item,
-        primaryExecutorMemberId: claimTaskForCurrentMemberIfUnassigned(withPlan, item),
-        status: item.status === "pool" ? "committed" : item.status,
-        updatedAt: timestamp
-      } : item
-    ),
-    dailyPlans: withPlan.dailyPlans.map((item) => item.id === plan.id ? { ...item, committedTaskIds, updatedAt: timestamp } : item),
-    updatedAt: timestamp
-  };
-};
-var claimTodayPlanTasksForCurrentMemberInState = (state, plan, timestamp) => {
-  let nextState = state;
-  let changed = false;
-  for (const taskId of plan.committedTaskIds) {
-    const task = nextState.tasks.find((item) => item.id === taskId);
-    if (!task || taskHasAssignee(task)) continue;
-    const withMember = ensureCurrentProjectMemberForTask(nextState, task, timestamp);
-    if (!withMember.memberId) continue;
-    nextState = {
-      ...withMember.state,
-      tasks: withMember.state.tasks.map(
-        (item) => item.id === task.id ? { ...item, primaryExecutorMemberId: withMember.memberId, updatedAt: timestamp } : item
-      ),
-      updatedAt: timestamp
-    };
-    changed = true;
-  }
-  return changed ? nextState : state;
-};
-
-// src/workSessionTermination.ts
-var endActiveWorkSessionsForTaskInState = (state, taskId, timestamp, options = {}) => {
-  const sessionsToEnd = state.workSessions.filter(
-    (session) => session.taskId === taskId && (session.status === "active" || session.status === "paused")
-  );
-  const shouldClearActiveTimer = options.clearActiveTimer && state.activeTimer?.taskId === taskId;
-  if (sessionsToEnd.length === 0 && !shouldClearActiveTimer) return state;
-  const endedSessionIds = new Set(sessionsToEnd.map((session) => session.id));
-  const endedFocusSessionIds = new Set(sessionsToEnd.map((session) => session.focusSessionId).filter(Boolean));
-  const nextWorkSessions = state.workSessions.map(
-    (session) => endedSessionIds.has(session.id) ? {
-      ...session,
-      status: "ended",
-      pausedAt: void 0,
-      endedAt: timestamp,
-      totalPausedSeconds: options.activeTimerWorkSessionId === session.id && options.activeTimerTotalPausedSeconds !== void 0 ? options.activeTimerTotalPausedSeconds : session.totalPausedSeconds,
-      updatedAt: timestamp
-    } : session
-  );
-  const endedWorkSessions = nextWorkSessions.filter((session) => endedSessionIds.has(session.id));
-  const reason = options.reason ?? "removed_from_today";
-  return {
-    ...state,
-    focusSessions: state.focusSessions.map(
-      (session) => endedFocusSessionIds.has(session.id) && !session.endedAt ? { ...session, endedAt: timestamp, outcome: "skipped" } : session
-    ),
-    workSessions: nextWorkSessions,
-    executionSignals: [
-      ...endedWorkSessions.map(
-        (session) => createExecutionSignal(
-          session,
-          "work_ended",
-          timestamp,
-          { outcome: "skipped", reason, ...options.source ? { source: options.source } : {} },
-          options.idFactory
-        )
-      ),
-      ...state.executionSignals
-    ],
-    activeTimer: shouldClearActiveTimer ? void 0 : state.activeTimer,
-    updatedAt: timestamp
-  };
-};
-
-// src/workSessionStart.ts
-var startWorkSessionInState = (state, taskId, timestamp, options = {}) => {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) throw new Error(`Task not found: ${taskId}`);
-  if (task.status === "pending_review" || task.status === "completed" || task.status === "archived" || task.status === "split") {
-    throw new Error(`Task ${taskId} cannot be started from status ${task.status}.`);
-  }
-  const next = addTaskToTodayInState(state, taskId, timestamp);
-  const currentTask = next.tasks.find((item) => item.id === taskId);
-  const executorMemberId = currentTask.primaryExecutorMemberId ?? resolveMemberIdForProject(next, currentTask.projectId);
-  const activeForExecutor = executorMemberId ? next.workSessions.find((session) => session.status === "active" && session.executorMemberId === executorMemberId) : void 0;
-  if (activeForExecutor?.taskId === taskId) return next;
-  const endedSession = activeForExecutor ? {
-    ...activeForExecutor,
-    status: "ended",
-    pausedAt: void 0,
-    endedAt: timestamp,
-    updatedAt: timestamp
-  } : void 0;
-  const idFactory = options.idFactory ?? uid;
-  const workspaceId = currentTask.workspaceId ?? state.projects.find((project) => project.id === currentTask.projectId)?.workspaceId ?? next.auth.workspace?.id;
-  const focusSession = {
-    id: idFactory("session"),
-    workspaceId,
-    taskId,
-    mode: "focus",
-    duration: next.settings.focusMinutes * 60,
-    startedAt: timestamp,
-    interruptionCounts: { internal: 0, external: 0 }
-  };
-  const workSession = {
-    id: idFactory("work_session"),
-    workspaceId,
-    taskId,
-    executorMemberId,
-    focusSessionId: focusSession.id,
-    status: "active",
-    startedAt: timestamp,
-    totalPausedSeconds: 0,
-    createdAt: timestamp,
-    updatedAt: timestamp
-  };
-  const signals = [
-    createExecutionSignal(workSession, "work_started", timestamp, options.source ? { source: options.source } : void 0, idFactory),
-    ...endedSession ? [createExecutionSignal(endedSession, "work_ended", timestamp, { outcome: "skipped", reason: "task_switch" }, idFactory)] : []
-  ];
-  return {
-    ...next,
-    focusSessions: [focusSession, ...next.focusSessions],
-    workSessions: [
-      workSession,
-      ...next.workSessions.map((session) => endedSession && session.id === endedSession.id ? endedSession : session)
-    ],
-    executionSignals: [...signals, ...next.executionSignals],
-    tasks: next.tasks.map((item) => item.id === taskId ? { ...item, status: "in_progress", updatedAt: timestamp } : item),
-    updatedAt: timestamp
-  };
-};
-
-// src/workSessionPauseResume.ts
-var pauseWorkSessionInState = (state, timestamp, taskId, workSessionId, options = {}) => {
-  const session = latestActiveOrPausedWorkSession(state, taskId, workSessionId);
-  if (!session) throw new Error("No active or paused work session found.");
-  if (session.status === "paused") return state;
-  const nextSession = { ...session, status: "paused", pausedAt: timestamp, updatedAt: timestamp };
-  return {
-    ...state,
-    workSessions: state.workSessions.map((item) => item.id === session.id ? nextSession : item),
-    executionSignals: [
-      createExecutionSignal(nextSession, "work_paused", timestamp, options.source ? { source: options.source } : void 0, options.idFactory),
-      ...state.executionSignals
-    ],
-    updatedAt: timestamp
-  };
-};
-var resumeWorkSessionInState = (state, timestamp, taskId, workSessionId, options = {}) => {
-  const session = latestActiveOrPausedWorkSession(state, taskId, workSessionId);
-  if (!session) throw new Error("No active or paused work session found.");
-  if (session.status === "active") return state;
-  const pausedSeconds = session.pausedAt ? Math.max(0, Math.round((new Date(timestamp).getTime() - new Date(session.pausedAt).getTime()) / 1e3)) : 0;
-  const nextSession = {
-    ...session,
-    status: "active",
-    pausedAt: void 0,
-    totalPausedSeconds: (session.totalPausedSeconds ?? 0) + pausedSeconds,
-    updatedAt: timestamp
-  };
-  return {
-    ...state,
-    workSessions: state.workSessions.map((item) => item.id === session.id ? nextSession : item),
-    executionSignals: [
-      createExecutionSignal(nextSession, "work_resumed", timestamp, options.source ? { source: options.source } : void 0, options.idFactory),
-      ...state.executionSignals
-    ],
-    updatedAt: timestamp
-  };
-};
-
-// src/workSessionFinish.ts
-var finishWorkSessionInState = (state, timestamp, taskId, workSessionId, options = {}) => {
-  const session = latestActiveOrPausedWorkSession(state, taskId, workSessionId);
-  if (!session) throw new Error("No active or paused work session found.");
-  const outcome = options.outcome ?? "completed";
-  const nextSession = { ...session, status: "ended", pausedAt: void 0, endedAt: timestamp, updatedAt: timestamp };
-  return {
-    ...state,
-    workSessions: state.workSessions.map((item) => item.id === session.id ? nextSession : item),
-    focusSessions: state.focusSessions.map(
-      (item) => item.id === session.focusSessionId ? { ...item, endedAt: timestamp, outcome } : item
-    ),
-    tasks: state.tasks.map(
-      (task) => task.id === session.taskId ? {
-        ...task,
-        status: task.status === "pending_review" ? task.status : "in_progress",
-        actualPomodoros: outcome === "completed" ? (task.actualPomodoros ?? 0) + 1 : task.actualPomodoros,
-        updatedAt: timestamp
-      } : task
-    ),
-    executionSignals: [
-      createExecutionSignal(
-        nextSession,
-        "work_ended",
-        timestamp,
-        { outcome, ...options.source ? { source: options.source } : {} },
-        options.idFactory
-      ),
-      ...state.executionSignals
-    ],
-    updatedAt: timestamp
-  };
-};
-
-// src/appTimerWorkSession.ts
-var endActiveWorkSessionsForTaskInState2 = (state, taskId, timestamp, reason = "removed_from_today") => endActiveWorkSessionsForTaskInState(state, taskId, timestamp, {
-  reason,
-  activeTimerWorkSessionId: state.activeTimer?.workSessionId,
-  activeTimerTotalPausedSeconds: state.activeTimer?.totalPausedSeconds,
-  clearActiveTimer: true
-});
-
-// src/appTodayPlanState.ts
-var removeTaskFromTodayInState = (state, taskId, timestamp) => {
-  const endedState = endActiveWorkSessionsForTaskInState2(state, taskId, timestamp);
-  return {
-    ...endedState,
-    dailyPlans: endedState.dailyPlans.map(
-      (item) => item.date === today() && dailyPlanBelongsToCurrentAccount(endedState, item) && item.committedTaskIds.includes(taskId) ? {
-        ...item,
-        committedTaskIds: item.committedTaskIds.filter((id) => id !== taskId),
-        updatedAt: timestamp
-      } : item
-    ),
-    tasks: endedState.tasks.map(
-      (task) => task.id === taskId && task.status === "committed" ? { ...task, status: "pool", updatedAt: timestamp } : task
-    ),
-    updatedAt: timestamp
-  };
-};
-var claimCurrentAccountTodayPlans = (state, date, timestamp) => currentAccountDailyPlansForDate(state, date).reduce(
-  (current, plan) => claimTodayPlanTasksForCurrentMemberInState(current, plan, timestamp),
-  state
-);
-var ensureTodayPlan = (state) => {
-  const todayDate = today();
-  const timestamp = nowIso();
-  const activeTimer = state.activeTimer;
-  const activeTimerTask = activeTimer?.mode === "focus" && activeTimer.taskId ? state.tasks.find((task) => task.id === activeTimer.taskId) : void 0;
-  const hasActiveTimerWorkSession = Boolean(
-    activeTimer && state.workSessions.some(
-      (session) => activeTimer.workSessionId ? session.id === activeTimer.workSessionId : session.focusSessionId === activeTimer.sessionId
-    )
-  );
-  const repairedState = activeTimer && activeTimerTask && !hasActiveTimerWorkSession ? (() => {
-    const workSession = {
-      id: activeTimer.workSessionId ?? uid("work_session"),
-      taskId: activeTimerTask.id,
-      executorMemberId: activeTimerTask.primaryExecutorMemberId ?? resolveMemberIdForProject(state, activeTimerTask.projectId),
-      focusSessionId: activeTimer.sessionId,
-      status: activeTimer.isRunning ? "active" : "paused",
-      startedAt: activeTimer.startedAt,
-      pausedAt: activeTimer.pausedAt,
-      totalPausedSeconds: activeTimer.totalPausedSeconds,
-      createdAt: activeTimer.startedAt,
-      updatedAt: timestamp
-    };
-    return {
-      ...state,
-      workSessions: [workSession, ...state.workSessions],
-      executionSignals: [createExecutionSignal(workSession, "work_started", timestamp, { source: "active_timer_repair" }), ...state.executionSignals],
-      activeTimer: { ...activeTimer, workSessionId: workSession.id },
-      updatedAt: timestamp
-    };
-  })() : state;
-  const staleActiveTaskIds = repairedState.workSessions.filter((session) => (session.status === "active" || session.status === "paused") && todayKey(new Date(session.startedAt)) !== todayDate).map((session) => session.taskId);
-  const normalizedState = staleActiveTaskIds.reduce(
-    (current, taskId) => endActiveWorkSessionsForTaskInState2(current, taskId, timestamp, "stale_active_session"),
-    repairedState
-  );
-  const activeTaskIds = normalizedState.workSessions.filter((session) => session.status === "active" || session.status === "paused").map((session) => session.taskId).filter(
-    (taskId) => normalizedState.tasks.some(
-      (task) => task.id === taskId && task.status !== "completed" && task.status !== "split" && task.status !== "archived"
-    )
-  );
-  let withActiveTasks = normalizedState;
-  for (const taskId of activeTaskIds) {
-    const task = withActiveTasks.tasks.find((item) => item.id === taskId);
-    const { state: withPlan, plan } = ensurePlanInState(withActiveTasks, todayDate, timestamp, task ? workspaceIdForTask(withActiveTasks, task) : void 0);
-    withActiveTasks = plan.committedTaskIds.includes(taskId) ? withPlan : {
-      ...withPlan,
-      dailyPlans: withPlan.dailyPlans.map(
-        (item) => item.id === plan.id ? {
-          ...item,
-          committedTaskIds: Array.from(/* @__PURE__ */ new Set([...item.committedTaskIds, taskId])),
-          updatedAt: timestamp
-        } : item
-      ),
-      updatedAt: timestamp
-    };
-  }
-  if (currentAccountDailyPlansForDate(withActiveTasks, todayDate).length === 0) {
-    withActiveTasks = ensurePlanInState(withActiveTasks, todayDate, timestamp).state;
-  }
-  return claimCurrentAccountTodayPlans(withActiveTasks, todayDate, timestamp);
-};
-
-// src/appTaskDeletionState.ts
-function deleteTaskFromState(state, task, timestamp) {
-  const committedPlanIds = state.dailyPlans.filter((plan) => plan.committedTaskIds.includes(task.id)).map((plan) => plan.id);
-  const snapshot = { task, committedPlanIds, deletedAt: timestamp };
-  return {
-    snapshot,
-    state: {
-      ...state,
-      tasks: state.tasks.filter((item) => item.id !== task.id),
-      dailyPlans: state.dailyPlans.map((plan) => ({
-        ...plan,
-        committedTaskIds: plan.committedTaskIds.filter((id) => id !== task.id)
-      })),
-      updatedAt: timestamp
-    }
-  };
-}
-
-// src/appTaskSplitState.ts
-function splitTaskInState(state, task, titles, timestamp, createTaskId) {
-  const currentPlan = getTodayPlan(state);
-  const committed = task.status === "committed" || currentPlan.committedTaskIds.includes(task.id);
-  const workspaceId = workspaceIdForTask(state, task);
-  const estimatePerTask = Math.max(1, Math.ceil(task.estimatePomodoros / titles.length));
-  const newTasks = titles.map((title, index) => ({
-    id: createTaskId(),
-    workspaceId,
-    title,
-    notes: `\u7531\u300C${task.title}\u300D\u62C6\u5206\u800C\u6765\u3002`,
-    tags: task.tags,
-    projectId: task.projectId,
-    project: task.project,
-    creatorMemberId: resolveMemberIdForProject(state, task.projectId) ?? task.creatorMemberId,
-    primaryExecutorMemberId: task.primaryExecutorMemberId,
-    collaboratorMemberIds: task.collaboratorMemberIds ?? [],
-    expectedStartAt: task.expectedStartAt,
-    expectedFinishAt: task.expectedFinishAt,
-    progressPercent: 0,
-    progressNote: "",
-    priority: task.priority,
-    severity: task.severity,
-    stage: task.stage,
-    estimatePomodoros: estimatePerTask,
-    status: committed ? "committed" : "pool",
-    ...emptyTaskDefaults(timestamp, task.sortOrder + index + 1),
-    dueAt: task.dueAt,
-    reminderAt: index === 0 ? task.reminderAt : void 0,
-    repeatRule: task.repeatRule,
-    repeatIntervalDays: task.repeatIntervalDays
-  }));
-  return {
-    newTasks,
-    state: {
-      ...state,
-      tasks: [
-        ...newTasks,
-        ...state.tasks.map(
-          (item) => item.id === task.id ? {
-            ...item,
-            status: "split",
-            notes: [
-              item.notes,
-              `\u5DF2\u62C6\u5206\u4E3A\uFF1A${titles.join("\u3001")}\u3002`
-            ].filter(Boolean).join("\n"),
-            updatedAt: timestamp
-          } : item
-        )
-      ],
-      dailyPlans: state.dailyPlans.map((plan) => ({
-        ...plan,
-        committedTaskIds: plan.committedTaskIds.flatMap((id) => id === task.id ? newTasks.map((item) => item.id) : [id]),
-        updatedAt: plan.committedTaskIds.includes(task.id) ? timestamp : plan.updatedAt
-      })),
-      updatedAt: timestamp
-    }
-  };
-}
-
-// src/appTaskState.ts
-function updateTaskInState(state, taskId, updater, timestamp) {
-  return {
-    ...state,
-    tasks: state.tasks.map((task) => {
-      if (task.id !== taskId) return task;
-      const nextTask = typeof updater === "function" ? updater(task) : { ...task, ...updater };
-      return { ...nextTask, updatedAt: timestamp };
-    }),
-    updatedAt: timestamp
-  };
-}
-function moveCommittedTaskInState(state, taskId, direction, timestamp) {
-  const plan = currentAccountDailyPlansForDate(state, today()).find((item) => item.committedTaskIds.includes(taskId));
-  if (!plan) return state;
-  const index = plan.committedTaskIds.indexOf(taskId);
-  const nextIndex = index + direction;
-  if (index < 0 || nextIndex < 0 || nextIndex >= plan.committedTaskIds.length) return state;
-  const committedTaskIds = [...plan.committedTaskIds];
-  [committedTaskIds[index], committedTaskIds[nextIndex]] = [committedTaskIds[nextIndex], committedTaskIds[index]];
-  return {
-    ...state,
-    dailyPlans: state.dailyPlans.map(
-      (item) => item.id === plan.id ? { ...item, committedTaskIds, updatedAt: timestamp } : item
-    ),
-    updatedAt: timestamp
-  };
-}
 
 // src/accessIdentity.ts
 var normalizedEmail3 = (email) => email?.trim().toLowerCase();
@@ -4762,234 +4251,14 @@ function updateProjectInState(state, project, timestamp = (/* @__PURE__ */ new D
   };
 }
 
-// src/taskAssignmentState.ts
-function assignTaskInState(state, taskId, assignment, timestamp = (/* @__PURE__ */ new Date()).toISOString()) {
-  const currentTask = state.tasks.find((task) => task.id === taskId);
-  if (!currentTask) return state;
-  const projectId = assignment.projectId ?? currentTask.projectId;
-  const project = state.projects.find((item) => item.id === projectId) ?? state.projects[0];
-  if (!project) return state;
-  const projectMembers = projectMembersForProject(state, project.id);
-  const executorIds = new Set(projectMembers.filter((member) => member.roles.includes("executor")).map((member) => member.id));
-  const memberIds = new Set(projectMembers.map((member) => member.id));
-  const primaryExecutorMemberId = assignment.primaryExecutorMemberId && executorIds.has(assignment.primaryExecutorMemberId) ? assignment.primaryExecutorMemberId : assignment.primaryExecutorMemberId === void 0 ? currentTask.primaryExecutorMemberId && executorIds.has(currentTask.primaryExecutorMemberId) ? currentTask.primaryExecutorMemberId : void 0 : void 0;
-  const collaboratorMemberIds = Array.from(new Set(assignment.collaboratorMemberIds ?? currentTask.collaboratorMemberIds ?? [])).filter((memberId) => memberIds.has(memberId)).filter((memberId) => memberId !== primaryExecutorMemberId);
-  return {
-    ...state,
-    tasks: state.tasks.map(
-      (task) => task.id === taskId ? {
-        ...task,
-        workspaceId: project.workspaceId ?? task.workspaceId,
-        projectId: project.id,
-        project: project.name,
-        primaryExecutorMemberId,
-        collaboratorMemberIds,
-        updatedAt: timestamp
-      } : task
-    ),
-    updatedAt: timestamp
-  };
-}
-
-// src/taskProgressUpdateState.ts
-function updateTaskProgressInState(state, taskId, progressPercent, progressNote, timestamp = (/* @__PURE__ */ new Date()).toISOString()) {
-  return {
-    ...state,
-    tasks: state.tasks.map(
-      (task) => task.id === taskId ? {
-        ...task,
-        progressPercent: clampProgressPercent(progressPercent),
-        progressNote,
-        updatedAt: timestamp
-      } : task
-    ),
-    updatedAt: timestamp
-  };
-}
-
-// src/taskReviewState.ts
-var actualPomodorosForTask = (state, task) => state.focusSessions.filter((session) => session.taskId === task.id && session.outcome === "completed").length || task.actualPomodoros || 0;
-function submitTaskForReviewInState(state, taskId, submitterMemberId, timestamp = (/* @__PURE__ */ new Date()).toISOString()) {
-  const canSubmitForReview = (task) => task.status === "committed" || task.status === "in_progress";
-  const shouldEndActiveWork = state.tasks.some((task) => task.id === taskId && canSubmitForReview(task));
-  const submitted = {
-    ...state,
-    tasks: state.tasks.map(
-      (task) => task.id === taskId && canSubmitForReview(task) ? {
-        ...task,
-        status: "pending_review",
-        progressPercent: 100,
-        actualPomodoros: actualPomodorosForTask(state, task),
-        reviewSubmittedAt: timestamp,
-        reviewSubmittedByMemberId: submitterMemberId,
-        reviewAcceptedAt: void 0,
-        reviewAcceptedByMemberId: void 0,
-        reviewReturnedAt: void 0,
-        reviewReturnedByMemberId: void 0,
-        reviewReturnReason: void 0,
-        updatedAt: timestamp
-      } : task
-    ),
-    updatedAt: timestamp
-  };
-  if (!shouldEndActiveWork) return submitted;
-  return endActiveWorkSessionsForTaskInState(submitted, taskId, timestamp, {
-    reason: "submitted_for_review",
-    activeTimerWorkSessionId: state.activeTimer?.workSessionId,
-    activeTimerTotalPausedSeconds: state.activeTimer?.totalPausedSeconds,
-    clearActiveTimer: true
-  });
-}
-function acceptTaskInState(state, taskId, accepterMemberId, timestamp = (/* @__PURE__ */ new Date()).toISOString()) {
-  return {
-    ...state,
-    tasks: state.tasks.map((task) => {
-      if (task.id !== taskId || task.status !== "pending_review") return task;
-      const actualPomodoros = actualPomodorosForTask(state, task);
-      return {
-        ...task,
-        status: "completed",
-        progressPercent: 100,
-        actualPomodoros,
-        reviewAcceptedAt: timestamp,
-        reviewAcceptedByMemberId: accepterMemberId,
-        completedAt: timestamp,
-        updatedAt: timestamp,
-        estimateHistory: [
-          ...task.estimateHistory ?? [],
-          {
-            id: uid("estimate"),
-            estimatedPomodoros: task.estimatePomodoros,
-            actualPomodoros,
-            recordedAt: timestamp,
-            source: "completion"
-          }
-        ]
-      };
-    }),
-    updatedAt: timestamp
-  };
-}
-function returnTaskForReviewInState(state, taskId, reason, reviewerMemberId, timestamp = (/* @__PURE__ */ new Date()).toISOString()) {
-  return {
-    ...state,
-    tasks: state.tasks.map(
-      (task) => task.id === taskId && task.status === "pending_review" ? {
-        ...task,
-        status: "in_progress",
-        progressPercent: Math.min(task.progressPercent ?? 0, 99),
-        reviewReturnedAt: timestamp,
-        reviewReturnedByMemberId: reviewerMemberId,
-        reviewReturnReason: reason.trim(),
-        updatedAt: timestamp
-      } : task
-    ),
-    updatedAt: timestamp
-  };
-}
-
 // cli/src/businessGuards.ts
 var requireProject = (state, projectId) => {
   const project = state.projects.find((item) => item.id === projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
   return project;
 };
-var requireTask = (state, taskId) => {
-  const task = state.tasks.find((item) => item.id === taskId);
-  if (!task) throw new Error(`Task not found: ${taskId}`);
-  return task;
-};
-var requireMember = (state, projectMemberId) => {
-  const member = state.projectMembers.find((item) => item.id === projectMemberId);
-  if (!member) throw new Error(`Project member not found: ${projectMemberId}`);
-  return member;
-};
-
-// cli/src/businessTaskOperations.ts
-var createTaskInTeamState = (state, input, timestamp) => {
-  requireProject(state, input.projectId);
-  return createProjectTaskInState(state, input.projectId, input, timestamp, uid);
-};
-var updateTaskInTeamState = (state, taskId, input, timestamp) => {
-  requireTask(state, taskId);
-  return updateTaskInState(state, taskId, (task) => ({
-    ...task,
-    title: input.title?.trim() || task.title,
-    notes: input.notes === void 0 ? task.notes : input.notes.trim(),
-    tags: input.tags ?? task.tags,
-    priority: input.priority ?? task.priority,
-    severity: input.severity ?? task.severity,
-    stage: input.stage ?? task.stage,
-    estimatePomodoros: input.estimateHours === void 0 ? Math.max(1, Math.round(input.estimatePomodoros ?? task.estimatePomodoros)) : Math.max(1, Math.ceil(Math.max(0, input.estimateHours) * 60 / Math.max(1, state.settings.focusMinutes))),
-    expectedStartAt: input.expectedStartAt === void 0 ? task.expectedStartAt : input.expectedStartAt,
-    expectedFinishAt: input.expectedFinishAt === void 0 ? task.expectedFinishAt : input.expectedFinishAt,
-    dueAt: input.dueAt === void 0 ? task.dueAt : input.dueAt,
-    reminderAt: input.reminderAt === void 0 ? task.reminderAt : input.reminderAt,
-    repeatRule: input.repeatRule ?? task.repeatRule,
-    repeatIntervalDays: input.repeatIntervalDays === void 0 ? task.repeatIntervalDays : input.repeatIntervalDays,
-    subtasks: input.subtasks === void 0 ? task.subtasks : input.subtasks.map((title) => title.trim()).filter(Boolean).map((title) => ({ id: uid("subtask"), title, completed: false, createdAt: timestamp }))
-  }), timestamp);
-};
-var deleteTaskInTeamState = (state, taskId, timestamp) => deleteTaskFromState(state, requireTask(state, taskId), timestamp).state;
-var assignTaskInTeamState = (state, taskId, assignment, timestamp) => assignTaskInState(state, taskId, assignment, timestamp);
-var setTaskStatusInTeamState = (state, taskId, status, timestamp) => updateTaskInState(state, taskId, (task) => ({
-  ...task,
-  status,
-  completedAt: status === "completed" ? task.completedAt ?? timestamp : task.completedAt
-}), timestamp);
-var updateTaskProgressInTeamState = (state, taskId, progressPercent, progressNote, timestamp) => updateTaskProgressInState(state, taskId, progressPercent, progressNote, timestamp);
-var splitTaskInTeamState = (state, taskId, childTitles, timestamp) => {
-  const task = requireTask(state, taskId);
-  const titles = childTitles.map((title) => title.trim()).filter(Boolean);
-  if (titles.length < 2) throw new Error("split_task requires at least two child titles.");
-  return splitTaskInState(state, task, titles, timestamp, () => uid("task")).state;
-};
-var addTaskToTodayInTeamState = (state, taskId, timestamp) => addTaskToTodayInState(state, taskId, timestamp);
-var batchAddTasksToTodayInTeamState = (state, taskIds, timestamp) => taskIds.reduce((current, taskId) => addTaskToTodayInState(current, taskId, timestamp), state);
-var removeTaskFromTodayInTeamState = (state, taskId, timestamp) => removeTaskFromTodayInState(state, taskId, timestamp);
-var moveTodayTaskInTeamState = (state, taskId, direction, timestamp) => moveCommittedTaskInState(state, taskId, direction, timestamp);
-var scheduleTaskForDateInState = (state, taskId, date, timestamp) => {
-  const task = requireTask(state, taskId);
-  if (date === today()) return addTaskToTodayInState(state, taskId, timestamp);
-  const workspaceId = workspaceIdForTask(state, task) ?? currentDailyPlanWorkspaceId(state);
-  const existing = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date);
-  const plan = existing ?? {
-    ...createDailyPlanForDate(state, date, timestamp, workspaceId),
-    capacityPomodoros: state.rewardState.dailyGoal,
-    recommendedCapacityPomodoros: state.rewardState.dailyGoal,
-    suggestedCapacityPomodoros: state.rewardState.dailyGoal,
-    overloadAcknowledged: false
-  };
-  const nextPlan = {
-    ...plan,
-    committedTaskIds: Array.from(/* @__PURE__ */ new Set([...plan.committedTaskIds, taskId])),
-    updatedAt: timestamp
-  };
-  return {
-    ...state,
-    tasks: state.tasks.map((item) => item.id === taskId && item.status === "pool" ? { ...item, status: "committed", updatedAt: timestamp } : item),
-    dailyPlans: existing ? state.dailyPlans.map((item) => item.id === nextPlan.id ? nextPlan : item) : [nextPlan, ...state.dailyPlans],
-    updatedAt: timestamp
-  };
-};
-var startTaskInTeamState = (state, taskId, timestamp) => startWorkSessionInState(state, taskId, timestamp, { source: "cli", idFactory: uid });
-var pauseWorkSessionInTeamState = (state, input, timestamp) => pauseWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
-var resumeWorkSessionInTeamState = (state, input, timestamp) => resumeWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { source: "cli", idFactory: uid });
-var finishWorkSessionInTeamState = (state, input, timestamp) => finishWorkSessionInState(state, timestamp, input.taskId, input.workSessionId, { outcome: input.outcome, source: "cli", idFactory: uid });
 
 // cli/src/businessReviewSettingsOperations.ts
-var submitTaskReviewInTeamState = (state, taskId, timestamp) => {
-  const task = requireTask(state, taskId);
-  return submitTaskForReviewInState(state, taskId, resolveMemberIdForProject(state, task.projectId), timestamp);
-};
-var acceptTaskReviewInTeamState = (state, taskId, timestamp) => {
-  const task = requireTask(state, taskId);
-  return acceptTaskInState(state, taskId, resolveMemberIdForProject(state, task.projectId), timestamp);
-};
-var returnTaskReviewInTeamState = (state, taskId, reason, timestamp) => {
-  const task = requireTask(state, taskId);
-  return returnTaskForReviewInState(state, taskId, reason, resolveMemberIdForProject(state, task.projectId), timestamp);
-};
 var recordInterruptionInTeamState = (state, input, timestamp) => {
   const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : void 0;
   const taskId = input.taskId ?? session?.taskId;
@@ -5038,19 +4307,6 @@ var updateDailyReviewInTeamState = (state, input, timestamp) => {
     updatedAt: timestamp
   };
 };
-var updateSettingsInTeamState = (state, input, timestamp) => ({
-  ...state,
-  settings: {
-    ...state.settings,
-    ...input,
-    focusMinutes: input.focusMinutes === void 0 ? state.settings.focusMinutes : Math.max(1, Math.round(input.focusMinutes)),
-    shortBreakMinutes: input.shortBreakMinutes === void 0 ? state.settings.shortBreakMinutes : Math.max(1, Math.round(input.shortBreakMinutes)),
-    longBreakMinutes: input.longBreakMinutes === void 0 ? state.settings.longBreakMinutes : Math.max(1, Math.round(input.longBreakMinutes)),
-    longBreakEvery: input.longBreakEvery === void 0 ? state.settings.longBreakEvery : Math.max(1, Math.round(input.longBreakEvery)),
-    whiteNoiseVolume: input.whiteNoiseVolume === void 0 ? state.settings.whiteNoiseVolume : Math.min(100, Math.max(0, Math.round(input.whiteNoiseVolume)))
-  },
-  updatedAt: timestamp
-});
 var saveTaskTemplateInTeamState = (state, input, timestamp) => {
   const template = {
     id: input.id?.trim() || uid("template"),
@@ -5071,12 +4327,6 @@ var saveTaskTemplateInTeamState = (state, input, timestamp) => {
     updatedAt: timestamp
   };
 };
-var deleteTaskTemplateInTeamState = (state, templateId, timestamp) => ({
-  ...state,
-  taskTemplates: state.taskTemplates.filter((item) => item.id !== templateId),
-  templateInstances: state.templateInstances.filter((item) => item.templateId !== templateId),
-  updatedAt: timestamp
-});
 var instantiateTaskTemplateInTeamState = (state, templateId, projectId, timestamp) => {
   const template = state.taskTemplates.find((item) => item.id === templateId);
   if (!template) throw new Error(`Task template not found: ${templateId}`);
@@ -5101,6 +4351,12 @@ var instantiateTaskTemplateInTeamState = (state, templateId, projectId, timestam
   };
 };
 
+// cli/src/businessTaskOperations.ts
+var createTaskInTeamState = (state, input, timestamp) => {
+  requireProject(state, input.projectId);
+  return createProjectTaskInState(state, input.projectId, input, timestamp, uid);
+};
+
 // cli/src/businessProjectMemberOperations.ts
 var createProjectInTeamState = (state, input, timestamp) => {
   const next = createProjectInState(state, input.name, input.description ?? "", timestamp, uid, {
@@ -5118,24 +4374,6 @@ var createProjectInTeamState = (state, input, timestamp) => {
   };
   return updateProjectInState(next, project, timestamp);
 };
-var updateProjectInTeamState = (state, projectId, input, timestamp) => {
-  const project = requireProject(state, projectId);
-  return updateProjectInState(state, {
-    ...project,
-    name: input.name?.trim() || project.name,
-    description: input.description ?? project.description,
-    defaultExpectedStartHours: input.defaultExpectedStartHours === void 0 ? project.defaultExpectedStartHours : Math.max(0, Math.round(input.defaultExpectedStartHours)),
-    taskStageMode: input.taskStageMode ?? project.taskStageMode
-  }, timestamp);
-};
-var archiveProjectInTeamState = (state, projectId, timestamp) => {
-  const project = requireProject(state, projectId);
-  return updateProjectInState(state, { ...project, archivedAt: timestamp }, timestamp);
-};
-var restoreProjectInTeamState = (state, projectId, timestamp) => {
-  const project = requireProject(state, projectId);
-  return updateProjectInState(state, { ...project, archivedAt: void 0 }, timestamp);
-};
 var createProjectMemberInTeamState = (state, input, timestamp) => {
   const project = requireProject(state, input.projectId);
   return addProjectMemberToState(
@@ -5149,16 +4387,6 @@ var createProjectMemberInTeamState = (state, input, timestamp) => {
     { accountId: input.accountId, workspaceId: project.workspaceId }
   );
 };
-var updateProjectMemberInTeamState = (state, projectMemberId, input, timestamp) => {
-  const member = requireMember(state, projectMemberId);
-  return updateProjectMemberInState(state, {
-    ...member,
-    name: input.name?.trim() || member.name,
-    email: input.email === void 0 ? member.email : input.email.trim() || void 0,
-    roles: input.roles ?? member.roles,
-    status: input.status ?? member.status ?? "active"
-  }, timestamp);
-};
 var bindMemberToProjectInTeamState = (state, projectId, memberRef, roles, timestamp) => {
   const project = requireProject(state, projectId);
   const normalized = memberRef.trim().toLowerCase();
@@ -5171,7 +4399,6 @@ var bindMemberToProjectInTeamState = (state, projectId, memberRef, roles, timest
     workspaceId: project.workspaceId ?? source.workspaceId
   });
 };
-var unbindProjectMemberInTeamState = (state, projectMemberId, timestamp) => updateProjectMemberInTeamState(state, projectMemberId, { status: "disabled" }, timestamp);
 
 // src/authModel.ts
 var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()).toISOString()) => {
@@ -5214,30 +4441,50 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
   };
 };
 
+// src/releaseContract.ts
+var releaseContract = {
+  releaseVersion: "0.2.4",
+  apiProtocolVersion: 1,
+  databaseSchemaVersion: 7,
+  minimumClientRelease: "0.2.4"
+};
+
 // src/teamBackendHttp.ts
 var apiUrl = (serverUrl, path) => `${serverUrl.replace(/\/+$/, "")}${path}`;
-var authHeaders = (token) => ({
+var clientHeaders = () => ({
   "Content-Type": "application/json",
+  "X-TimeManage-Client-Release": releaseContract.releaseVersion,
+  "X-TimeManage-API-Protocol": String(releaseContract.apiProtocolVersion)
+});
+var authHeaders = (token) => ({
+  ...clientHeaders(),
   ...token ? { Authorization: `Bearer ${token}` } : {}
 });
 var REQUEST_TIMEOUT_MS = 8e3;
 var TeamHttpError = class extends Error {
-  constructor(status, message) {
+  constructor(status, message, code, details) {
     super(message);
     this.status = status;
+    this.code = code;
+    this.details = details;
   }
 };
 var readResponse = async (response) => {
-  if (response.ok) return response.json();
+  if (response.ok) {
+    if (response.status === 204 || response.headers?.get?.("Content-Length") === "0") return void 0;
+    return response.json();
+  }
   let message = `${response.status} ${response.statusText}`;
+  let details;
   try {
     const body = await response.json();
-    if (body.error) message = body.error;
+    details = body;
+    if (typeof body.error === "string") message = body.error;
   } catch {
     const text = await response.text().catch(() => "");
     if (text) message = text;
   }
-  throw new TeamHttpError(response.status, message);
+  throw new TeamHttpError(response.status, message, typeof details?.code === "string" ? details.code : void 0, details);
 };
 var requestJson = async (input, init) => {
   const timeoutController = init?.signal ? void 0 : new AbortController();
@@ -5266,8 +4513,7 @@ var mapAccount = (account) => ({
   email: account.email,
   disabledAt: account.disabled_at || void 0,
   createdAt: account.created_at,
-  updatedAt: account.updated_at,
-  ...account.revision ? { revision: account.revision } : {}
+  updatedAt: account.updated_at
 });
 var mapWorkspace = (workspace) => ({
   id: workspace.id,
@@ -5275,8 +4521,7 @@ var mapWorkspace = (workspace) => ({
   type: workspace.type === "private" ? "private" : "shared",
   ownerAccountId: workspace.owner_account_id || void 0,
   createdAt: workspace.created_at,
-  updatedAt: workspace.updated_at,
-  ...workspace.revision ? { revision: workspace.revision } : {}
+  updatedAt: workspace.updated_at
 });
 var mapWorkspaceMembership = (membership) => ({
   id: membership.id,
@@ -5287,8 +4532,7 @@ var mapWorkspaceMembership = (membership) => ({
   role: membership.role,
   status: membership.status,
   createdAt: membership.created_at,
-  updatedAt: membership.updated_at,
-  ...membership.revision ? { revision: membership.revision } : {}
+  updatedAt: membership.updated_at
 });
 var mapWorkspaceInvitation = (invitation) => ({
   id: invitation.id,
@@ -5303,8 +4547,7 @@ var mapWorkspaceInvitation = (invitation) => ({
   status: invitation.status,
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
-  acceptedAt: invitation.accepted_at || void 0,
-  ...invitation.revision ? { revision: invitation.revision } : {}
+  acceptedAt: invitation.accepted_at || void 0
 });
 var mapProjectInvitation = (invitation) => ({
   id: invitation.id,
@@ -5321,8 +4564,7 @@ var mapProjectInvitation = (invitation) => ({
   status: invitation.status,
   createdAt: invitation.created_at,
   updatedAt: invitation.updated_at,
-  acceptedAt: invitation.accepted_at || void 0,
-  ...invitation.revision ? { revision: invitation.revision } : {}
+  acceptedAt: invitation.accepted_at || void 0
 });
 var sessionFromLogin = (payload) => ({
   token: payload.token,
@@ -5349,14 +4591,13 @@ async function loginToWorkspace(backend, email, password) {
   });
   return sessionFromLogin(payload);
 }
-async function switchWorkspace(backend, token, workspaceId, expectedRevision) {
+async function switchWorkspace(backend, token, workspaceId) {
   const payload = await requestJson(apiUrl(backend.serverUrl, "/auth/switch-workspace"), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({
       workspace_id: workspaceId,
-      device_id: backend.deviceId,
-      expected_revision: expectedRevision
+      device_id: backend.deviceId
     })
   });
   return sessionFromLogin(payload);
@@ -5392,7 +4633,6 @@ async function updateWorkspace(backend, token, workspaceId, input) {
       name: input.name,
       type: input.type ?? "shared",
       owner_account_id: input.ownerAccountId,
-      expected_revision: input.expectedRevision,
       confirm_restrict_members: input.confirmRestrictMembers
     })
   });
@@ -5406,8 +4646,7 @@ async function updateWorkspaceMembership(backend, token, workspaceId, membership
       headers: authHeaders(token),
       body: JSON.stringify({
         status: input.status,
-        role: input.role,
-        expected_revision: input.expectedRevision
+        role: input.role
       })
     }
   );
@@ -5432,28 +4671,24 @@ async function inviteWorkspaceMember(backend, token, workspaceId, email) {
   });
   return mapWorkspaceInvitation(payload.invitation);
 }
-async function acceptWorkspaceInvitation(backend, token, invitationId, expectedRevision) {
-  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
-  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
+async function acceptWorkspaceInvitation(backend, token, invitationId) {
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
       headers: authHeaders(token),
-      body: JSON.stringify({ expected_revision: revision })
+      body: JSON.stringify({})
     }
   );
   return mapWorkspaceInvitation(payload.invitation);
 }
-async function deleteWorkspaceInvitation(backend, token, invitationId, expectedRevision) {
-  const revision = expectedRevision ?? (await fetchWorkspaceInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
-  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
+async function deleteWorkspaceInvitation(backend, token, invitationId) {
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/workspace-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
       headers: authHeaders(token),
-      body: JSON.stringify({ expected_revision: revision })
+      body: JSON.stringify({})
     }
   );
   return mapWorkspaceInvitation(payload.invitation);
@@ -5477,28 +4712,24 @@ async function inviteProjectMember(backend, token, input) {
   });
   return mapProjectInvitation(payload.invitation);
 }
-async function deleteProjectInvitation(backend, token, invitationId, expectedRevision) {
-  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
-  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
+async function deleteProjectInvitation(backend, token, invitationId) {
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}`),
     {
       method: "DELETE",
       headers: authHeaders(token),
-      body: JSON.stringify({ expected_revision: revision })
+      body: JSON.stringify({})
     }
   );
   return mapProjectInvitation(payload.invitation);
 }
-async function acceptProjectInvitation(backend, token, invitationId, expectedRevision) {
-  const revision = expectedRevision ?? (await fetchProjectInvitations(backend, token)).find((item) => item.id === invitationId)?.revision;
-  if (!revision) throw new Error("\u9080\u8BF7\u7248\u672C\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5");
+async function acceptProjectInvitation(backend, token, invitationId) {
   const payload = await requestJson(
     apiUrl(backend.serverUrl, `/project-invitations/${encodeURIComponent(invitationId)}/accept`),
     {
       method: "POST",
       headers: authHeaders(token),
-      body: JSON.stringify({ expected_revision: revision })
+      body: JSON.stringify({})
     }
   );
   return mapProjectInvitation(payload.invitation);
@@ -5532,8 +4763,7 @@ async function updatePlatformAccount(backend, token, accountId, payload) {
       name: payload.name,
       email: payload.email,
       password: payload.password,
-      status: payload.status,
-      expected_revision: payload.expectedRevision
+      status: payload.status
     })
   });
   return mapAccount(result.account);
@@ -5562,12 +4792,39 @@ async function updateMemberAccount(backend, token, memberId, payload) {
       workspace_id: payload.workspaceId,
       email: payload.email,
       password: payload.password,
-      roles: payload.roles,
-      expected_revision: payload.expectedRevision
+      roles: payload.roles
     })
   });
   return result.member.payload;
 }
+
+// src/teamBackendCompatibility.ts
+var TeamBackendCompatibilityError = class extends Error {
+  constructor(details) {
+    super(details.message);
+    this.details = details;
+    this.name = "TeamBackendCompatibilityError";
+  }
+};
+var compatibilityState = (code, message, health = {}) => ({
+  code,
+  message,
+  clientReleaseVersion: releaseContract.releaseVersion,
+  clientApiProtocolVersion: releaseContract.apiProtocolVersion,
+  serverReleaseVersion: health.release_version,
+  serverApiProtocolVersion: health.api_protocol_version,
+  serverDatabaseSchemaVersion: health.database_schema_version,
+  minimumClientRelease: health.minimum_client_release
+});
+var compatibilityStateForHttpError = (error) => compatibilityState(
+  error.code === "client_upgrade_required" ? "client_upgrade_required" : "bootstrap_endpoint_missing",
+  error.code === "client_upgrade_required" ? "\u670D\u52A1\u5668\u62D2\u7EDD\u4E86\u5F53\u524D\u5BA2\u6237\u7AEF\u534F\u8BAE\uFF0C\u8BF7\u5347\u7EA7 TimeManage \u684C\u9762\u7AEF" : "\u670D\u52A1\u5668\u7F3A\u5C11\u65B0\u7248\u4E1A\u52A1\u63A5\u53E3\uFF0C\u8BF7\u540C\u65F6\u5347\u7EA7\u540E\u53F0\u548C\u684C\u9762\u7AEF",
+  {
+    release_version: typeof error.details?.server_release === "string" ? error.details.server_release : void 0,
+    api_protocol_version: typeof error.details?.api_protocol_version === "number" ? error.details.api_protocol_version : void 0,
+    minimum_client_release: typeof error.details?.required_client_release === "string" ? error.details.required_client_release : void 0
+  }
+);
 
 // src/projectMemberDeduplication.ts
 var projectMemberIdentityScope = (member) => `${member.workspaceId ?? ""}:${member.projectId}`;
@@ -5591,142 +4848,24 @@ var dedupeProjectMembersByIdentity = (members) => {
   return members.filter((member) => canonicalIds.has(member.id));
 };
 
-// src/businessStateWorkspace.ts
-var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-function buildTeamDataWorkspace(state) {
-  const currentWorkspaceId = state.auth.workspace?.id;
-  const projectWorkspaceIds = new Map(state.projects.map((project) => [project.id, project.workspaceId ?? currentWorkspaceId]));
-  const taskWorkspaceIds = new Map(
-    state.tasks.map((task) => [task.id, task.workspaceId ?? projectWorkspaceIds.get(task.projectId) ?? currentWorkspaceId])
-  );
-  const workspaceIdForPayload = (payload, fallback) => {
-    if (isObject(payload) && typeof payload.workspaceId === "string" && payload.workspaceId.trim()) {
-      return payload.workspaceId;
-    }
-    return fallback;
-  };
-  return {
-    currentWorkspaceId,
-    projectWorkspaceId: (projectId) => projectWorkspaceIds.get(projectId),
-    taskWorkspaceId: (taskId) => taskWorkspaceIds.get(taskId),
-    workspaceIdForPayload
-  };
-}
-
 // src/teamBusinessRows.ts
-var templateInstanceId = (instance) => `${instance.templateId}_${instance.taskId}`;
-var rewardStateId = (state) => `reward_state_${state.auth.account?.id ?? "local"}`;
-function businessRowsFromState(state) {
-  const workspace = buildTeamDataWorkspace(state);
-  const currentWorkspaceId = workspace.currentWorkspaceId;
-  const ownerAccountId = state.auth.account?.id;
-  return [
-    ...state.projects.map((project) => ({
-      workspace_id: workspace.workspaceIdForPayload(project, currentWorkspaceId),
-      entity: "project",
-      id: project.id,
-      updated_at: project.updatedAt,
-      payload: project
-    })),
-    ...state.projectMembers.map((member) => ({
-      workspace_id: workspace.workspaceIdForPayload(member, workspace.projectWorkspaceId(member.projectId) ?? currentWorkspaceId),
-      entity: "project_member",
-      id: member.id,
-      updated_at: member.updatedAt,
-      payload: member
-    })),
-    ...state.tasks.map((task) => {
-      const workspaceId = workspace.projectWorkspaceId(task.projectId) ?? workspace.workspaceIdForPayload(task, currentWorkspaceId);
-      return {
-        workspace_id: workspaceId,
-        entity: "task",
-        id: task.id,
-        updated_at: task.updatedAt,
-        payload: workspaceId && task.workspaceId !== workspaceId ? { ...task, workspaceId } : task
-      };
-    }),
-    ...state.dailyPlans.map((plan) => {
-      const workspaceId = workspace.workspaceIdForPayload(plan, currentWorkspaceId);
-      return {
-        workspace_id: workspaceId,
-        account_id: plan.ownerAccountId ?? ownerAccountId,
-        entity: "daily_plan",
-        id: plan.id,
-        updated_at: plan.updatedAt,
-        payload: workspaceId && plan.workspaceId !== workspaceId ? { ...plan, workspaceId } : plan
-      };
-    }),
-    ...state.focusSessions.map((session) => ({
-      workspace_id: workspace.workspaceIdForPayload(
-        session,
-        session.taskId ? workspace.taskWorkspaceId(session.taskId) : currentWorkspaceId
-      ),
-      entity: "focus_session",
-      id: session.id,
-      updated_at: session.endedAt ?? session.startedAt,
-      payload: session
-    })),
-    ...state.workSessions.map((session) => ({
-      workspace_id: workspace.workspaceIdForPayload(session, workspace.taskWorkspaceId(session.taskId) ?? currentWorkspaceId),
-      entity: "work_session",
-      id: session.id,
-      updated_at: session.updatedAt,
-      payload: session
-    })),
-    ...state.executionSignals.map((signal) => ({
-      workspace_id: workspace.workspaceIdForPayload(signal, workspace.taskWorkspaceId(signal.taskId) ?? currentWorkspaceId),
-      entity: "execution_signal",
-      id: signal.id,
-      updated_at: signal.createdAt,
-      payload: signal
-    })),
-    ...state.interruptions.map((interruption) => ({
-      workspace_id: workspace.workspaceIdForPayload(
-        interruption,
-        interruption.taskId ? workspace.taskWorkspaceId(interruption.taskId) : currentWorkspaceId
-      ),
-      entity: "interruption",
-      id: interruption.id,
-      updated_at: interruption.resolvedAt ?? interruption.createdAt,
-      payload: interruption
-    })),
-    {
-      workspace_id: currentWorkspaceId,
-      account_id: ownerAccountId,
-      entity: "reward_state",
-      id: rewardStateId(state),
-      updated_at: state.updatedAt,
-      payload: state.rewardState
-    },
-    ...state.taskTemplates.map((template) => ({
-      workspace_id: currentWorkspaceId,
-      entity: "task_template",
-      id: template.id,
-      updated_at: state.updatedAt,
-      payload: template
-    })),
-    ...state.templateInstances.map((instance) => ({
-      workspace_id: currentWorkspaceId,
-      entity: "template_instance",
-      id: templateInstanceId(instance),
-      updated_at: instance.createdAt,
-      payload: instance
-    }))
-  ];
-}
 function mergeBusinessRowsIntoState(local, rows) {
   const loadedAt = (/* @__PURE__ */ new Date()).toISOString();
   const base = createInitialState();
   const next = {
     ...base,
-    auth: local.auth,
+    auth: local.auth.token ? {
+      ...local.auth,
+      status: "authenticated",
+      message: "\u5DF2\u767B\u5F55"
+    } : local.auth,
     settings: local.settings,
     backend: {
       ...local.backend,
       status: "ready",
       message: "\u56E2\u961F\u5728\u7EBF\u6570\u636E\u5DF2\u52A0\u8F7D",
       lastLoadedAt: loadedAt,
-      businessRowRevisions: Object.fromEntries(rows.map((row) => [businessRowKey(row), row.revision ?? 0]))
+      failureKind: void 0
     },
     projects: [],
     projectMembers: [],
@@ -5761,144 +4900,141 @@ function mergeBusinessRowsIntoState(local, rows) {
     projectMembers: dedupeProjectMembersByIdentity(next.projectMembers)
   };
 }
-var businessRowKey = (row) => `${row.workspace_id ?? ""}:${row.entity}:${row.id}`;
-
-// src/teamBusinessMutations.ts
-var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-var mergePatchBetween = (before, after) => {
-  if (Object.is(before, after)) return void 0;
-  if (!isObject2(before) || !isObject2(after)) return after;
-  const patch = {};
-  const keys = /* @__PURE__ */ new Set([...Object.keys(before), ...Object.keys(after)]);
-  for (const key of keys) {
-    if (!(key in after)) {
-      patch[key] = null;
-      continue;
-    }
-    const change = mergePatchBetween(before[key], after[key]);
-    if (change !== void 0) patch[key] = change;
-  }
-  return Object.keys(patch).length ? patch : void 0;
-};
-function businessOperationsBetween(before, after) {
-  const beforeRows = new Map(businessRowsFromState(before).map((row) => [businessRowKey(row), row]));
-  const afterRows = new Map(businessRowsFromState(after).map((row) => [businessRowKey(row), row]));
-  const revisions = before.backend.businessRowRevisions ?? {};
-  const operations = [];
-  for (const [key, row] of afterRows) {
-    const current = beforeRows.get(key);
-    if (!current) {
-      operations.push({ operation: "create", row });
-      continue;
-    }
-    const patch = mergePatchBetween(current.payload, row.payload);
-    if (patch === void 0) continue;
-    const expectedRevision = revisions[key];
-    if (!expectedRevision) throw new Error(`\u7F3A\u5C11\u4E1A\u52A1\u6570\u636E\u7248\u672C\uFF0C\u8BF7\u5148\u5237\u65B0\uFF1A${row.entity}/${row.id}`);
-    operations.push({
-      operation: "patch",
-      workspace_id: row.workspace_id ?? "",
-      entity: row.entity,
-      id: row.id,
-      expected_revision: expectedRevision,
-      updated_at: row.updated_at,
-      patch
-    });
-  }
-  for (const [key, row] of beforeRows) {
-    if (afterRows.has(key)) continue;
-    const expectedRevision = revisions[key];
-    if (!expectedRevision) throw new Error(`\u7F3A\u5C11\u4E1A\u52A1\u6570\u636E\u7248\u672C\uFF0C\u65E0\u6CD5\u5220\u9664\uFF1A${row.entity}/${row.id}`);
-    operations.push({
-      operation: "delete",
-      workspace_id: row.workspace_id ?? "",
-      entity: row.entity,
-      id: row.id,
-      expected_revision: expectedRevision
-    });
-  }
-  return operations;
-}
-var operationsCanRetry = (operations) => operations.length > 0 && operations.every((operation) => operation.operation === "patch");
-var operationsWithLatestRevisions = (operations, latest) => {
-  const revisions = latest.backend.businessRowRevisions ?? {};
-  return operations.map((operation) => {
-    if (operation.operation !== "patch") return operation;
-    const key = businessRowKey({
-      workspace_id: operation.workspace_id,
-      entity: operation.entity,
-      id: operation.id
-    });
-    const expectedRevision = revisions[key];
-    if (!expectedRevision) throw new Error(`\u6570\u636E\u5DF2\u88AB\u5220\u9664\uFF0C\u65E0\u6CD5\u81EA\u52A8\u91CD\u8BD5\uFF1A${operation.entity}/${operation.id}`);
-    return { ...operation, expected_revision: expectedRevision };
-  });
-};
-
-// src/teamActiveRuntimePreservation.ts
-var upsertById = (items, incoming) => items.some((item) => item.id === incoming.id) ? items.map((item) => item.id === incoming.id ? incoming : item) : [incoming, ...items];
-var localIsNewerOrMissing = (local, remote) => !remote || (local.updatedAt ?? local.startedAt ?? "") >= (remote.updatedAt ?? remote.startedAt ?? "");
-var preserveLocalActiveRuntime = (remote, local) => {
-  const active = local.activeTimer;
-  if (!active) return remote;
-  let next = { ...remote, activeTimer: active };
-  const localTask = active.taskId ? local.tasks.find((task) => task.id === active.taskId) : void 0;
-  if (localTask && localIsNewerOrMissing(localTask, next.tasks.find((task) => task.id === localTask.id))) {
-    next = { ...next, tasks: upsertById(next.tasks, localTask) };
-  }
-  const localFocusSession = local.focusSessions.find((session) => session.id === active.sessionId);
-  if (localFocusSession && localIsNewerOrMissing(localFocusSession, next.focusSessions.find((session) => session.id === localFocusSession.id))) {
-    next = { ...next, focusSessions: upsertById(next.focusSessions, localFocusSession) };
-  }
-  const localWorkSession = local.workSessions.find(
-    (session) => active.workSessionId ? session.id === active.workSessionId : session.focusSessionId === active.sessionId
-  );
-  if (localWorkSession && (localWorkSession.status === "active" || localWorkSession.status === "paused") && localIsNewerOrMissing(localWorkSession, next.workSessions.find((session) => session.id === localWorkSession.id))) {
-    next = { ...next, workSessions: upsertById(next.workSessions, localWorkSession) };
-  }
-  const localSignals = localWorkSession ? local.executionSignals.filter((signal) => signal.workSessionId === localWorkSession.id) : [];
-  if (localSignals.length) {
-    const existingSignalIds = new Set(next.executionSignals.map((signal) => signal.id));
-    const missingSignals = localSignals.filter((signal) => !existingSignalIds.has(signal.id));
-    if (missingSignals.length) {
-      next = { ...next, executionSignals: [...missingSignals, ...next.executionSignals] };
-    }
-  }
-  return ensureTodayPlan(next);
-};
 
 // src/teamBusinessApi.ts
 async function loadTeamData(local) {
   const token = local.auth.token ?? local.backend.token;
   if (!token) return local;
-  const payload = await requestJson(apiUrl(local.backend.serverUrl, "/team/data"), {
-    headers: authHeaders(token)
-  });
-  return preserveLocalActiveRuntime(mergeBusinessRowsIntoState(local, payload.rows), local);
-}
-var submitTeamOperations = async (backend, token, operations) => requestJson(apiUrl(backend.serverUrl, "/team/data"), {
-  method: "PUT",
-  headers: authHeaders(token),
-  body: JSON.stringify({ protocol_version: 2, operations })
-});
-async function saveTeamDataChanges(backend, token, before, state) {
-  const savedAt = (/* @__PURE__ */ new Date()).toISOString();
-  const operations = businessOperationsBetween(before, state);
   let payload;
   try {
-    payload = await submitTeamOperations(backend, token, operations);
+    payload = await requestJson(apiUrl(local.backend.serverUrl, "/app/bootstrap"), {
+      headers: authHeaders(token)
+    });
   } catch (error) {
-    if (!(error instanceof TeamHttpError) || error.status !== 409 || !operationsCanRetry(operations)) throw error;
-    const latest = await loadTeamData(before);
-    payload = await submitTeamOperations(backend, token, operationsWithLatestRevisions(operations, latest));
-  }
-  return preserveLocalActiveRuntime(mergeBusinessRowsIntoState({
-    ...state,
-    backend: {
-      ...state.backend,
-      lastSavedAt: savedAt
+    if (error instanceof TeamHttpError && error.status === 404) {
+      throw new TeamBackendCompatibilityError(compatibilityStateForHttpError(error));
     }
-  }, payload.rows), state);
+    throw error;
+  }
+  const merged = mergeBusinessRowsIntoState(local, payload.rows);
+  const settings = { ...merged.settings, ...payload.settings ?? {} };
+  const activeWork = merged.workSessions.find((session) => session.status === "active" || session.status === "paused");
+  const activeFocus = activeWork ? merged.focusSessions.find((session) => session.id === activeWork.focusSessionId) : void 0;
+  const duration = activeFocus?.duration ?? settings.focusMinutes * 60;
+  const recoveredTimer = activeWork && activeFocus ? restoreTimer({
+    sessionId: activeFocus.id,
+    taskId: activeWork.taskId,
+    workSessionId: activeWork.id,
+    mode: activeFocus.mode,
+    duration,
+    remaining: duration,
+    isRunning: activeWork.status === "active",
+    startedAt: activeWork.startedAt,
+    plannedEndAt: new Date(new Date(activeWork.startedAt).getTime() + (duration + activeWork.totalPausedSeconds) * 1e3).toISOString(),
+    pausedAt: activeWork.pausedAt,
+    totalPausedSeconds: activeWork.totalPausedSeconds,
+    cycleIndex: 1
+  }) : void 0;
+  return {
+    ...merged,
+    settings,
+    auth: {
+      ...merged.auth,
+      status: "authenticated",
+      account: mapAccount(payload.account),
+      workspace: mapWorkspace(payload.workspace),
+      membership: mapWorkspaceMembership(payload.membership),
+      workspaces: payload.workspaces.map(mapWorkspace),
+      workspaceMemberships: payload.workspace_memberships.map(mapWorkspaceMembership),
+      message: "\u5DF2\u767B\u5F55"
+    },
+    backend: {
+      ...merged.backend,
+      status: "ready",
+      message: "\u56E2\u961F\u5728\u7EBF\u6570\u636E\u5DF2\u52A0\u8F7D",
+      lastLoadedAt: payload.loaded_at,
+      failureKind: void 0
+    },
+    activeTimer: recoveredTimer
+  };
+}
+
+// src/teamDomainCommands.ts
+var resourcePathByEntity = {
+  project: "projects",
+  project_member: "project-members",
+  task: "tasks",
+  daily_plan: "daily-plans",
+  focus_session: "focus-sessions",
+  work_session: "work-sessions",
+  execution_signal: "execution-signals",
+  interruption: "interruptions",
+  reward_state: "reward-state",
+  task_template: "task-templates",
+  template_instance: "template-instances"
+};
+var withWorkspace = (path, workspaceId) => workspaceId ? `${path}?workspace_id=${encodeURIComponent(workspaceId)}` : path;
+function normalizeIdempotencyKey(value) {
+  if (/^[\x21-\x7e]{1,191}$/.test(value)) return value;
+  let first = 2166136261;
+  let second = 2654435769;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 16777619);
+    second = Math.imul(second ^ code, 2246822507);
+  }
+  return `tm-${(first >>> 0).toString(16).padStart(8, "0")}-${(second >>> 0).toString(16).padStart(8, "0")}`;
+}
+async function submitTeamDomainCommand(backend, token, command) {
+  if (command.kind === "settings") {
+    return requestJson(apiUrl(backend.serverUrl, "/settings"), {
+      method: "PATCH",
+      headers: authHeaders(token),
+      body: JSON.stringify(command.patch)
+    });
+  }
+  if (command.kind === "action") {
+    return requestJson(
+      apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
+      {
+        method: "POST",
+        headers: {
+          ...authHeaders(token),
+          ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
+        },
+        body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId })
+      }
+    );
+  }
+  const resource = resourcePathByEntity[command.entity];
+  if (command.kind === "create") {
+    return requestJson(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
+      method: "POST",
+      headers: {
+        ...authHeaders(token),
+        ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
+      },
+      body: JSON.stringify(command.payload)
+    });
+  }
+  const url = apiUrl(backend.serverUrl, withWorkspace(`/${resource}/${encodeURIComponent(command.id)}`, command.workspaceId));
+  if (command.kind === "patch") {
+    return requestJson(url, {
+      method: "PATCH",
+      headers: {
+        ...authHeaders(token),
+        ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
+      },
+      body: JSON.stringify(command.patch)
+    });
+  }
+  return requestJson(url, {
+    method: "DELETE",
+    headers: {
+      ...authHeaders(token),
+      ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
+    }
+  });
 }
 
 // cli/src/clientBase.ts
@@ -5959,40 +5095,20 @@ var TimeManageBaseClient = class {
     const local = bindAccountToMembers({ ...base, auth }, auth);
     return bindAccountToMembers(await loadTeamData(local), auth);
   }
-  async writeState(before, nextState) {
+  async runBusinessCommand(command) {
     const session = await this.ensureSession();
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
-    const stateToSave = {
-      ...nextState,
-      auth: {
-        ...nextState.auth,
-        status: "authenticated",
-        token: session.token,
-        expiresAt: session.expiresAt,
-        account: session.account,
-        workspace: session.workspace,
-        membership: session.membership
-      },
-      backend: {
-        ...nextState.backend,
-        serverUrl: this.config.serverUrl,
-        username: session.account.email,
-        deviceId: this.config.deviceId,
-        token: session.token,
-        lastSavedAt: timestamp,
-        status: "ready",
-        message: "CLI \u5DF2\u5199\u5165\u56E2\u961F\u540E\u53F0"
-      },
-      updatedAt: timestamp
-    };
-    return saveTeamDataChanges(stateToSave.backend, session.token, before, stateToSave);
-  }
-  async mutate(_preferredProjectId, fn) {
-    const timestamp = (/* @__PURE__ */ new Date()).toISOString();
     const before = await this.authenticatedState();
-    const output = fn(before, timestamp);
-    const saved = await this.writeState(before, output.state);
-    return { state: saved, result: output.result, savedAt: saved.backend.lastSavedAt };
+    await submitTeamDomainCommand(before.backend, session.token, command);
+    const savedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const state = await loadTeamData({
+      ...before,
+      backend: { ...before.backend, lastSavedAt: savedAt }
+    });
+    return { state, savedAt };
+  }
+  async prepareMutation(fn) {
+    const before = await this.authenticatedState();
+    return { before, output: fn(before, (/* @__PURE__ */ new Date()).toISOString()) };
   }
   async backendAndToken() {
     const session = await this.ensureSession();
@@ -6056,8 +5172,8 @@ var TimeManageBaseClient = class {
     return fetchWorkspaces(backend, token);
   }
   async switchWorkspace(workspaceId) {
-    const { backend, token, session } = await this.backendAndToken();
-    this.setSession(await switchWorkspace(backend, token, workspaceId, session.account.revision));
+    const { backend, token } = await this.backendAndToken();
+    this.setSession(await switchWorkspace(backend, token, workspaceId));
     return this.getCurrentAccount();
   }
   async createWorkspace(name) {
@@ -6067,13 +5183,11 @@ var TimeManageBaseClient = class {
   }
   async updateWorkspace(workspaceId, input) {
     const { backend, token } = await this.backendAndToken();
-    const workspace = (await fetchWorkspaces(backend, token)).workspaces.find((item) => item.id === workspaceId);
-    return updateWorkspace(backend, token, workspaceId, { ...input, expectedRevision: input.expectedRevision ?? workspace?.revision });
+    return updateWorkspace(backend, token, workspaceId, input);
   }
   async updateWorkspaceMembership(workspaceId, membershipId, input) {
     const { backend, token } = await this.backendAndToken();
-    const membership = (await fetchWorkspaces(backend, token)).memberships.find((item) => item.id === membershipId);
-    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, { ...input, expectedRevision: input.expectedRevision ?? membership?.revision });
+    return updateWorkspaceMembership(backend, token, workspaceId, membershipId, input);
   }
   async listPlatformAccounts() {
     const { backend, token } = await this.backendAndToken();
@@ -6085,8 +5199,7 @@ var TimeManageBaseClient = class {
   }
   async updatePlatformAccount(accountId, input) {
     const { backend, token } = await this.backendAndToken();
-    const account = (await fetchPlatformAccounts(backend, token)).find((item) => item.id === accountId);
-    return updatePlatformAccount(backend, token, accountId, { ...input, expectedRevision: input.expectedRevision ?? account?.revision });
+    return updatePlatformAccount(backend, token, accountId, input);
   }
   async disablePlatformAccount(accountId) {
     return this.updatePlatformAccount(accountId, { status: "disabled" });
@@ -6135,11 +5248,9 @@ var TimeManageBaseClient = class {
     const member = state.projectMembers.find((item) => item.id === memberId);
     const project = member ? state.projects.find((item) => item.id === member.projectId) : void 0;
     const workspaceId = input.workspaceId ?? project?.workspaceId ?? state.auth.workspace?.id ?? "";
-    const revision = state.backend.businessRowRevisions?.[`${workspaceId}:project_member:${memberId}`];
     return updateMemberAccount(state.backend, state.auth.token ?? state.backend.token ?? "", memberId, {
       ...input,
-      workspaceId,
-      expectedRevision: input.expectedRevision ?? revision
+      workspaceId
     });
   }
 };
@@ -6541,33 +5652,37 @@ var TimeManageProjectClient = class extends TimeManageBaseClient {
     return projectOverviewView(await this.authenticatedState(), projectId);
   }
   async createProject(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = createProjectInTeamState(state, input, timestamp);
-      const project = next.projects.find((item) => !state.projects.some((existing) => existing.id === item.id));
-      return { state: next, result: project?.id };
+      const project2 = next.projects.find((item) => !state.projects.some((existing) => existing.id === item.id));
+      return { state: next, result: project2?.id };
     });
-    return compactProject(saved.state, saved.state.projects.find((project) => project.id === saved.result));
+    const project = prepared.output.state.projects.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project", workspaceId: project.workspaceId, payload: project });
+    return compactProject(saved.state, saved.state.projects.find((item) => item.id === project.id));
   }
   async updateProject(projectId, input) {
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: updateProjectInTeamState(state, projectId, input, timestamp),
-      result: projectId
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId);
+    const saved = await this.runBusinessCommand(input.workspaceId && current.workspaceId && input.workspaceId !== current.workspaceId ? {
+      kind: "action",
+      resource: "projects",
+      id: projectId,
+      action: "move",
+      workspaceId: current.workspaceId,
+      payload: { target_workspace_id: input.workspaceId, patch: input },
+      idempotencyKey: `cli-project-move-${projectId}-${input.workspaceId}`
+    } : { kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: input });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId));
   }
   async archiveProject(projectId, confirmed) {
     requireConfirmation(confirmed, "archive_project");
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: archiveProjectInTeamState(state, projectId, timestamp),
-      result: projectId
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: { archivedAt: (/* @__PURE__ */ new Date()).toISOString() } });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId));
   }
   async restoreProject(projectId) {
-    const saved = await this.mutate(projectId, (state, timestamp) => ({
-      state: restoreProjectInTeamState(state, projectId, timestamp),
-      result: projectId
-    }));
+    const current = (await this.authenticatedState()).projects.find((project) => project.id === projectId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project", id: projectId, workspaceId: current.workspaceId, patch: { archivedAt: null } });
     return compactProject(saved.state, saved.state.projects.find((project) => project.id === projectId));
   }
   async listMembers(projectId, includeDisabled = false) {
@@ -6575,38 +5690,39 @@ var TimeManageProjectClient = class extends TimeManageBaseClient {
     return state.projectMembers.filter((member) => (!projectId || member.projectId === projectId) && (includeDisabled || member.status !== "disabled")).map((member) => compactMember(state, member));
   }
   async createMember(input) {
-    const saved = await this.mutate(input.projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = createProjectMemberInTeamState(state, input, timestamp);
       const created = next.projectMembers.find((item) => !state.projectMembers.some((existing) => existing.id === item.id));
       const matched = created ?? next.projectMembers.find(
-        (member) => member.projectId === input.projectId && (input.accountId && member.accountId === input.accountId || input.email && member.email?.toLowerCase() === input.email.toLowerCase() || member.name === (input.name.trim() || "\u65B0\u6210\u5458"))
+        (member2) => member2.projectId === input.projectId && (input.accountId && member2.accountId === input.accountId || input.email && member2.email?.toLowerCase() === input.email.toLowerCase() || member2.name === (input.name.trim() || "\u65B0\u6210\u5458"))
       );
       return { state: next, result: matched?.id };
     });
-    return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === saved.result));
+    const member = prepared.output.state.projectMembers.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member });
+    return compactMember(saved.state, saved.state.projectMembers.find((item) => item.id === member.id));
   }
   async updateMember(projectMemberId, input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: updateProjectMemberInTeamState(state, projectMemberId, input, timestamp),
-      result: projectMemberId
-    }));
+    const current = (await this.authenticatedState()).projectMembers.find((member) => member.id === projectMemberId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "project_member", id: projectMemberId, workspaceId: current.workspaceId, patch: input });
     return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === projectMemberId));
   }
   async deleteMember(projectMemberId, confirmed) {
     requireConfirmation(confirmed, "delete_member");
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: unbindProjectMemberInTeamState(state, projectMemberId, timestamp),
-      result: projectMemberId
-    }));
-    return compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === projectMemberId));
+    const current = (await this.authenticatedState()).projectMembers.find((member) => member.id === projectMemberId);
+    const saved = await this.runBusinessCommand({ kind: "delete", entity: "project_member", id: projectMemberId, workspaceId: current.workspaceId });
+    return { deletedMemberId: projectMemberId, savedAt: saved.savedAt };
   }
   async bindMemberToProject(projectId, memberRef, roles) {
-    const saved = await this.mutate(projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = bindMemberToProjectInTeamState(state, projectId, memberRef, roles, timestamp);
-      const member = next.projectMembers.find((item) => !state.projectMembers.some((existing) => existing.id === item.id));
-      return { state: next, result: member?.id };
+      const member2 = next.projectMembers.find((item) => !state.projectMembers.some((existing) => existing.id === item.id));
+      return { state: next, result: member2?.id };
     });
-    return saved.result ? compactMember(saved.state, saved.state.projectMembers.find((member) => member.id === saved.result)) : void 0;
+    if (!prepared.output.result) return void 0;
+    const member = prepared.output.state.projectMembers.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member });
+    return compactMember(saved.state, saved.state.projectMembers.find((item) => item.id === member.id));
   }
   async updateProjectMember(projectMemberId, input) {
     return this.updateMember(projectMemberId, input);
@@ -6629,78 +5745,59 @@ var TimeManageTaskClient = class extends TimeManageProjectClient {
     return taskDetailView(await this.authenticatedState(), taskId);
   }
   async createTask(input) {
-    const saved = await this.mutate(input.projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = createTaskInTeamState(state, input, timestamp);
-      const task = next.tasks.find((item) => !state.tasks.some((existing) => existing.id === item.id));
-      return { state: next, result: task?.id };
+      const task2 = next.tasks.find((item) => !state.tasks.some((existing) => existing.id === item.id));
+      return { state: next, result: task2?.id };
     });
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === saved.result));
+    const task = prepared.output.state.tasks.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task });
+    return compactTask(saved.state, saved.state.tasks.find((item) => item.id === task.id));
   }
   async batchCreateTasks(projectId, tasks) {
-    const saved = await this.mutate(projectId, (state, timestamp) => {
-      let next = state;
-      const createdIds = [];
-      for (const task of tasks) {
-        const beforeIds = new Set(next.tasks.map((item) => item.id));
-        next = createTaskInTeamState(next, { ...task, projectId }, timestamp);
-        const created = next.tasks.find((item) => !beforeIds.has(item.id));
-        if (created) createdIds.push(created.id);
-      }
-      return { state: next, result: createdIds };
-    });
-    return saved.result.map((taskId) => compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId)));
+    const created = [];
+    for (const task of tasks) created.push(await this.createTask({ ...task, projectId }));
+    return created;
   }
   async updateTask(taskId, input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: updateTaskInTeamState(state, taskId, input, timestamp),
-      result: taskId
-    }));
+    const current = (await this.authenticatedState()).tasks.find((task) => task.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: input });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
   }
   async deleteTask(taskId, confirmed) {
     requireConfirmation(confirmed, "delete_task");
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: deleteTaskInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
+    const current = (await this.authenticatedState()).tasks.find((task) => task.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "delete", entity: "task", id: taskId, workspaceId: current.workspaceId });
     return { deletedTaskId: taskId, savedAt: saved.savedAt };
   }
   async assignTask(taskId, assignment) {
-    const saved = await this.mutate(assignment.projectId, (state, timestamp) => ({
-      state: assignTaskInTeamState(state, taskId, assignment, timestamp),
-      result: taskId
-    }));
+    const current = (await this.authenticatedState()).tasks.find((task) => task.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: assignment });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
   }
   async batchAssignTasks(taskIds, assignment) {
-    const saved = await this.mutate(assignment.projectId, (state, timestamp) => ({
-      state: taskIds.reduce((current, taskId) => assignTaskInTeamState(current, taskId, assignment, timestamp), state),
-      result: taskIds
-    }));
-    return saved.result.map((taskId) => compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId)));
+    const updated = [];
+    for (const taskId of taskIds) updated.push(await this.assignTask(taskId, assignment));
+    return updated;
   }
   async setTaskStatus(taskId, status, confirmed) {
     if (status === "completed" || status === "split" || status === "archived") requireConfirmation(confirmed, "set_task_status");
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: setTaskStatusInTeamState(state, taskId, status, timestamp),
-      result: taskId
-    }));
+    const current = (await this.authenticatedState()).tasks.find((task) => task.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: { status } });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
   }
   async updateTaskProgress(taskId, progressPercent, progressNote = "") {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: updateTaskProgressInTeamState(state, taskId, progressPercent, progressNote, timestamp),
-      result: taskId
-    }));
+    const current = (await this.authenticatedState()).tasks.find((task) => task.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: { progressPercent, progressNote } });
     return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
   }
   async splitTask(taskId, childTitles, confirmed) {
     requireConfirmation(confirmed, "split_task");
-    const saved = await this.mutate(void 0, (state, timestamp) => {
-      const next = splitTaskInTeamState(state, taskId, childTitles, timestamp);
-      return { state: next, result: next.tasks.filter((task) => !state.tasks.some((existing) => existing.id === task.id)).map((task) => task.id) };
-    });
-    return saved.result.map((id) => compactTask(saved.state, saved.state.tasks.find((task) => task.id === id)));
+    const state = await this.authenticatedState();
+    const current = state.tasks.find((task) => task.id === taskId);
+    const beforeIds = new Set(state.tasks.map((task) => task.id));
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "split", workspaceId: current.workspaceId, payload: { child_titles: childTitles }, idempotencyKey: `cli-split-${taskId}-${Date.now()}` });
+    return saved.state.tasks.filter((task) => !beforeIds.has(task.id)).map((task) => compactTask(saved.state, task));
   }
 };
 
@@ -6713,99 +5810,101 @@ var TimeManageWorkflowClient = class extends TimeManageTaskClient {
     return todayWorkbenchView(await this.authenticatedState(), projectId, date);
   }
   async addTaskToToday(taskId) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: addTaskToTodayInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const workspaceId = workspaceIdForTask(state, task);
+    const date = today();
+    const planId = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date)?.id ?? dailyPlanIdForDate(state, date, workspaceId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: planId, action: "add-task", workspaceId, payload: { task_id: taskId, date } });
     return dailyPlanView(saved.state);
   }
   async batchAddTasksToToday(taskIds) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: batchAddTasksToTodayInTeamState(state, taskIds, timestamp),
-      result: taskIds
-    }));
-    return dailyPlanView(saved.state);
+    for (const taskId of taskIds) await this.addTaskToToday(taskId);
+    return dailyPlanView(await this.authenticatedState());
   }
   async removeTaskFromToday(taskId) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: removeTaskFromTodayInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const workspaceId = workspaceIdForTask(state, task);
+    const plan = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, today());
+    if (!plan) return dailyPlanView(state);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId } });
     return dailyPlanView(saved.state);
   }
   async moveTodayTask(taskId, direction) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: moveTodayTaskInTeamState(state, taskId, direction, timestamp),
-      result: taskId
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const workspaceId = workspaceIdForTask(state, task);
+    const plan = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, today());
+    if (!plan) return dailyPlanView(state);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction } });
     return dailyPlanView(saved.state);
   }
   async scheduleTaskForDate(taskId, date) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: scheduleTaskForDateInState(state, taskId, date, timestamp),
-      result: taskId
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const workspaceId = workspaceIdForTask(state, task);
+    const planId = currentAccountDailyPlanForWorkspaceDate(state, workspaceId, date)?.id ?? dailyPlanIdForDate(state, date, workspaceId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "daily-plans", id: planId, action: "add-task", workspaceId, payload: { task_id: taskId, date } });
     return dailyPlanView(saved.state, date);
   }
   async startTask(taskId) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: startTaskInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "start", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-start-${taskId}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
   async pauseWorkSession(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: pauseWorkSessionInTeamState(state, input, timestamp),
-      result: input
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "active");
+    if (!session) throw new Error("Active work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "pause", workspaceId: session.workspaceId, idempotencyKey: `cli-pause-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
   async resumeWorkSession(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: resumeWorkSessionInTeamState(state, input, timestamp),
-      result: input
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "paused");
+    if (!session) throw new Error("Paused work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "resume", workspaceId: session.workspaceId, idempotencyKey: `cli-resume-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
   async finishWorkSession(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: finishWorkSessionInTeamState(state, input, timestamp),
-      result: input
-    }));
+    const state = await this.authenticatedState();
+    const session = input.workSessionId ? state.workSessions.find((item) => item.id === input.workSessionId) : state.workSessions.find((item) => item.status === "active" || item.status === "paused");
+    if (!session) throw new Error("Active work session not found.");
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "work-sessions", id: session.id, action: "finish", workspaceId: session.workspaceId, payload: { outcome: input.outcome }, idempotencyKey: `cli-finish-${session.id}-${Date.now()}` });
     return activeWorkView(saved.state);
   }
   async getActiveWork(projectId) {
     return activeWorkView(await this.authenticatedState(), projectId);
   }
   async recordInterruption(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = recordInterruptionInTeamState(state, input, timestamp);
       return { state: next, result: next.interruptions[0]?.id };
     });
-    return saved.state.interruptions.find((item) => item.id === saved.result);
+    const interruption = prepared.output.state.interruptions.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({ kind: "create", entity: "interruption", workspaceId: interruption.workspaceId, payload: interruption });
+    return saved.state.interruptions.find((item) => item.id === interruption.id);
   }
   async submitTaskReview(taskId) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: submitTaskReviewInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-submit-review-${taskId}-${Date.now()}` });
+    return compactTask(saved.state, saved.state.tasks.find((task2) => task2.id === taskId));
   }
   async acceptTaskReview(taskId, confirmed) {
     requireConfirmation(confirmed, "accept_task_review");
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: acceptTaskReviewInTeamState(state, taskId, timestamp),
-      result: taskId
-    }));
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "accept-review", workspaceId: workspaceIdForTask(state, task), idempotencyKey: `cli-accept-review-${taskId}-${Date.now()}` });
+    return compactTask(saved.state, saved.state.tasks.find((task2) => task2.id === taskId));
   }
   async returnTaskReview(taskId, reason) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: returnTaskReviewInTeamState(state, taskId, reason, timestamp),
-      result: taskId
-    }));
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === taskId));
+    const state = await this.authenticatedState();
+    const task = state.tasks.find((item) => item.id === taskId);
+    const saved = await this.runBusinessCommand({ kind: "action", resource: "tasks", id: taskId, action: "return-review", workspaceId: workspaceIdForTask(state, task), payload: { reason }, idempotencyKey: `cli-return-review-${taskId}-${Date.now()}` });
+    return compactTask(saved.state, saved.state.tasks.find((task2) => task2.id === taskId));
   }
   async listPendingReviews(projectId) {
     return this.listTasks({ projectId, status: "pending_review", includeArchived: false, includeSplit: false });
@@ -6817,20 +5916,20 @@ var TimeManageWorkflowClient = class extends TimeManageTaskClient {
     return dailySummaryView(await this.authenticatedState(), date);
   }
   async updateDailyReview(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
+    const prepared = await this.prepareMutation((state, timestamp) => ({
       state: updateDailyReviewInTeamState(state, input, timestamp),
-      result: input.date
+      result: input.date ?? today()
     }));
-    return dailySummaryView(saved.state, input.date);
+    const plan = currentAccountDailyPlanForWorkspaceDate(prepared.output.state, input.workspaceId ?? prepared.before.auth.workspace?.id, prepared.output.result);
+    const existing = prepared.before.dailyPlans.some((item) => item.id === plan.id);
+    const saved = await this.runBusinessCommand(existing ? { kind: "patch", entity: "daily_plan", id: plan.id, workspaceId: plan.workspaceId, patch: plan } : { kind: "create", entity: "daily_plan", workspaceId: plan.workspaceId, payload: plan });
+    return dailySummaryView(saved.state, prepared.output.result);
   }
   async getSettings() {
     return (await this.authenticatedState()).settings;
   }
   async updateSettings(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: updateSettingsInTeamState(state, input, timestamp),
-      result: void 0
-    }));
+    const saved = await this.runBusinessCommand({ kind: "settings", patch: input });
     return saved.state.settings;
   }
   async listTaskTemplates() {
@@ -6838,27 +5937,38 @@ var TimeManageWorkflowClient = class extends TimeManageTaskClient {
     return state.taskTemplates;
   }
   async saveTaskTemplate(input) {
-    const saved = await this.mutate(void 0, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = saveTaskTemplateInTeamState(state, input, timestamp);
       return { state: next, result: input.id ?? next.taskTemplates[0]?.id };
     });
-    return saved.state.taskTemplates.find((template) => template.id === saved.result);
+    const template = prepared.output.state.taskTemplates.find((item) => item.id === prepared.output.result);
+    const exists = prepared.before.taskTemplates.some((item) => item.id === template.id);
+    const saved = await this.runBusinessCommand(exists ? { kind: "patch", entity: "task_template", id: template.id, workspaceId: prepared.before.auth.workspace?.id, patch: template } : { kind: "create", entity: "task_template", workspaceId: prepared.before.auth.workspace?.id, payload: template });
+    return saved.state.taskTemplates.find((item) => item.id === template.id);
   }
   async deleteTaskTemplate(templateId, confirmed) {
     requireConfirmation(confirmed, "delete_task_template");
-    const saved = await this.mutate(void 0, (state, timestamp) => ({
-      state: deleteTaskTemplateInTeamState(state, templateId, timestamp),
-      result: templateId
-    }));
+    const state = await this.authenticatedState();
+    const saved = await this.runBusinessCommand({ kind: "delete", entity: "task_template", id: templateId, workspaceId: state.auth.workspace?.id });
     return { deletedTemplateId: templateId, savedAt: saved.savedAt };
   }
   async instantiateTaskTemplate(templateId, projectId) {
-    const saved = await this.mutate(projectId, (state, timestamp) => {
+    const prepared = await this.prepareMutation((state, timestamp) => {
       const next = instantiateTaskTemplateInTeamState(state, templateId, projectId, timestamp);
       const taskId = next.templateInstances[0]?.taskId;
       return { state: next, result: taskId };
     });
-    return compactTask(saved.state, saved.state.tasks.find((task) => task.id === saved.result));
+    const task = prepared.output.state.tasks.find((item) => item.id === prepared.output.result);
+    const saved = await this.runBusinessCommand({
+      kind: "action",
+      resource: "task-templates",
+      id: templateId,
+      action: "instantiate",
+      workspaceId: task.workspaceId,
+      payload: { task },
+      idempotencyKey: `cli-template-${templateId}-${task.id}`
+    });
+    return compactTask(saved.state, saved.state.tasks.find((item) => item.id === task.id));
   }
 };
 
@@ -7399,7 +6509,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.3").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.4").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {

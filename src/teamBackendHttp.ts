@@ -1,4 +1,5 @@
 import type { BackendConnectionState } from "./types";
+import { releaseContract } from "./releaseContract";
 
 export const apiUrl = (serverUrl: string, path: string) => `${serverUrl.replace(/\/+$/, "")}${path}`;
 
@@ -7,15 +8,26 @@ export const withStatus = (backend: BackendConnectionState, patch: Partial<Backe
   ...patch,
 });
 
-export const authHeaders = (token?: string) => ({
+export const clientHeaders = () => ({
   "Content-Type": "application/json",
+  "X-TimeManage-Client-Release": releaseContract.releaseVersion,
+  "X-TimeManage-API-Protocol": String(releaseContract.apiProtocolVersion),
+});
+
+export const authHeaders = (token?: string) => ({
+  ...clientHeaders(),
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 });
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
 export class TeamHttpError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code?: string,
+    public readonly details?: Record<string, unknown>,
+  ) {
     super(message);
   }
 }
@@ -26,14 +38,16 @@ const readResponse = async <T>(response: Response): Promise<T> => {
     return response.json() as Promise<T>;
   }
   let message = `${response.status} ${response.statusText}`;
+  let details: Record<string, unknown> | undefined;
   try {
-    const body = (await response.json()) as { error?: string };
-    if (body.error) message = body.error;
+    const body = (await response.json()) as Record<string, unknown>;
+    details = body;
+    if (typeof body.error === "string") message = body.error;
   } catch {
     const text = await response.text().catch(() => "");
     if (text) message = text;
   }
-  throw new TeamHttpError(response.status, message);
+  throw new TeamHttpError(response.status, message, typeof details?.code === "string" ? details.code : undefined, details);
 };
 
 export const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {

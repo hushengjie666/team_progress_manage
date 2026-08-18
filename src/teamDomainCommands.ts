@@ -4,9 +4,9 @@ import { apiUrl, authHeaders, requestJson } from "./teamBackendHttp";
 
 export type TeamDomainCommand =
   | { kind: "settings"; patch: Record<string, unknown> }
-  | { kind: "create"; entity: BusinessEntity; workspaceId?: string; payload: Record<string, unknown> }
-  | { kind: "patch"; entity: BusinessEntity; id: string; workspaceId?: string; patch: Record<string, unknown> }
-  | { kind: "delete"; entity: BusinessEntity; id: string; workspaceId?: string }
+  | { kind: "create"; entity: BusinessEntity; workspaceId?: string; payload: Record<string, unknown>; idempotencyKey?: string }
+  | { kind: "patch"; entity: BusinessEntity; id: string; workspaceId?: string; patch: Record<string, unknown>; idempotencyKey?: string }
+  | { kind: "delete"; entity: BusinessEntity; id: string; workspaceId?: string; idempotencyKey?: string }
   | {
       kind: "action";
       resource: "projects" | "tasks" | "daily-plans" | "work-sessions" | "task-templates";
@@ -76,7 +76,10 @@ export async function submitTeamDomainCommand(
   if (command.kind === "create") {
     return requestJson<{ row: BusinessRow }>(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
       method: "POST",
-      headers: authHeaders(token),
+      headers: {
+        ...authHeaders(token),
+        ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
+      },
       body: JSON.stringify(command.payload),
     });
   }
@@ -84,11 +87,20 @@ export async function submitTeamDomainCommand(
   if (command.kind === "patch") {
     return requestJson<{ row: BusinessRow }>(url, {
       method: "PATCH",
-      headers: authHeaders(token),
+      headers: {
+        ...authHeaders(token),
+        ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
+      },
       body: JSON.stringify(command.patch),
     });
   }
-  return requestJson<void>(url, { method: "DELETE", headers: authHeaders(token) });
+  return requestJson<void>(url, {
+    method: "DELETE",
+    headers: {
+      ...authHeaders(token),
+      ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
+    },
+  });
 }
 
 export type RunTeamDomainCommand = (command: TeamDomainCommand) => Promise<AppState | undefined>;

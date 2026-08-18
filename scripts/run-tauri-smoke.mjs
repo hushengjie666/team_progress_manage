@@ -120,7 +120,7 @@ const startMockBackend = async () => {
 
   backendServer = createServer(async (request, response) => {
     response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With");
+    response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, X-TimeManage-Client-Release, X-TimeManage-API-Protocol");
     response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
     response.setHeader("Content-Type", "application/json; charset=utf-8");
     if (request.method === "OPTIONS") {
@@ -132,7 +132,14 @@ const startMockBackend = async () => {
     const url = new URL(request.url ?? "/", backendUrl);
     try {
       if (request.method === "GET" && url.pathname === "/health") {
-        response.end(JSON.stringify({ status: "ok" }));
+        response.end(JSON.stringify({
+          status: "ok",
+          service: "timemanage-team",
+          release_version: "0.2.4",
+          api_protocol_version: 1,
+          database_schema_version: 7,
+          minimum_client_release: "0.2.4",
+        }));
         return;
       }
       if (request.method === "GET" && url.pathname === "/auth/status") {
@@ -153,14 +160,17 @@ const startMockBackend = async () => {
         response.end(JSON.stringify({ workspaces: [workspace], memberships: [membership] }));
         return;
       }
-      if (request.method === "GET" && url.pathname === "/team/data") {
-        response.end(JSON.stringify({ rows }));
-        return;
-      }
-      if (request.method === "PUT" && url.pathname === "/team/data") {
-        const body = await readRequestBody(request);
-        rows = Array.isArray(body.rows) ? body.rows : rows;
-        response.end(JSON.stringify({ rows }));
+      if (request.method === "GET" && url.pathname === "/app/bootstrap") {
+        response.end(JSON.stringify({
+          account: { id: account.id, workspace_id: account.workspace_id, name: account.name, email: account.email, created_at: account.created_at, updated_at: account.updated_at },
+          workspace: { id: workspace.id, name: workspace.name, type: workspace.type, owner_account_id: workspace.owner_account_id, created_at: workspace.created_at, updated_at: workspace.updated_at },
+          membership: { id: membership.id, workspace_id: membership.workspace_id, account_id: membership.account_id, name: membership.name, email: membership.email, role: membership.role, status: membership.status, created_at: membership.created_at, updated_at: membership.updated_at },
+          workspaces: [workspace],
+          workspace_memberships: [membership],
+          rows,
+          loaded_at: new Date().toISOString(),
+          settings: {},
+        }));
         return;
       }
       if (request.method === "GET" && (url.pathname === "/workspace-invitations" || url.pathname === "/project-invitations")) {

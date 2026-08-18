@@ -32,7 +32,7 @@ timemanage work active
 Codex 会拉取 bootstrap 脚本并执行。等价命令是：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hushengjie666/team_progress_manage/v0.2.3/scripts/bootstrap-timemanage-codex.mjs \
+curl -fsSL https://raw.githubusercontent.com/hushengjie666/team_progress_manage/v0.2.4/scripts/bootstrap-timemanage-codex.mjs \
   -o /tmp/bootstrap-timemanage-codex.mjs
 node /tmp/bootstrap-timemanage-codex.mjs --email "<你的账号>"
 ```
@@ -91,8 +91,8 @@ npm run plugin:test
 git checkout main
 git pull origin main
 npm run plugin:test
-bash scripts/create-timemanage-release-tag.sh v0.2.3 "TimeManage Codex plugin v0.2.3"
-git push origin v0.2.3
+bash scripts/create-timemanage-release-tag.sh v0.2.4 "TimeManage Codex plugin v0.2.4"
+git push origin v0.2.4
 ```
 
 `scripts/create-timemanage-release-tag.sh` 会拒绝以下情况：

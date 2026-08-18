@@ -27,8 +27,10 @@ import type {
 import type {
   Settings,
 } from "./appSettingsTypes";
+import type { BackendCompatibilityState } from "./teamBackendCompatibility";
 
-export type BackendConnectionStatus = "idle" | "authenticating" | "loading" | "saving" | "ready" | "error";
+export type BackendConnectionStatus = "idle" | "authenticating" | "loading" | "saving" | "ready" | "error" | "incompatible";
+export type BackendFailureKind = "network" | "auth" | "health" | "load" | "save" | "compatibility";
 
 export interface BackendServerConfig {
   addr: string;
@@ -62,6 +64,8 @@ export interface BackendConnectionState {
   lastSavedAt?: string;
   status: BackendConnectionStatus;
   message: string;
+  compatibility?: BackendCompatibilityState;
+  failureKind?: BackendFailureKind;
 }
 
 export interface AuthState {

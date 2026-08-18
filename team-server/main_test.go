@@ -70,6 +70,62 @@ func TestHealthHandler(t *testing.T) {
 	if !strings.Contains(recorder.Body.String(), `"status":"ok"`) {
 		t.Fatalf("unexpected body: %s", recorder.Body.String())
 	}
+	for _, expected := range []string{
+		`"service":"timemanage-team"`,
+		`"release_version":"0.2.4"`,
+		`"api_protocol_version":1`,
+		`"database_schema_version":7`,
+		`"minimum_client_release":"0.2.4"`,
+	} {
+		if !strings.Contains(recorder.Body.String(), expected) {
+			t.Fatalf("health response missing %s: %s", expected, recorder.Body.String())
+		}
+	}
+}
+
+func TestLegacyTeamDataReturnsUpgradeRequired(t *testing.T) {
+	api := testApp(t)
+	mux := http.NewServeMux()
+	api.registerRoutes(mux)
+	recorder := httptest.NewRecorder()
+	mux.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/team/data", nil))
+	if recorder.Code != http.StatusUpgradeRequired {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	for _, expected := range []string{`"code":"client_upgrade_required"`, `"server_release":"0.2.4"`, `"required_client_release":"0.2.4"`} {
+		if !strings.Contains(recorder.Body.String(), expected) {
+			t.Fatalf("upgrade response missing %s: %s", expected, recorder.Body.String())
+		}
+	}
+}
+
+func TestClientRequestCompatibilityRequiresCurrentHeaders(t *testing.T) {
+	legacy := httptest.NewRequest(http.MethodPost, "/tasks/task-1", nil)
+	if clientRequestCompatible(legacy) {
+		t.Fatal("missing compatibility headers were accepted")
+	}
+	current := httptest.NewRequest(http.MethodPost, "/tasks/task-1", nil)
+	current.Header.Set("X-TimeManage-Client-Release", "0.2.4")
+	current.Header.Set("X-TimeManage-API-Protocol", "1")
+	if !clientRequestCompatible(current) {
+		t.Fatal("current compatibility headers were rejected")
+	}
+	api := testApp(t)
+	compatibilityHandler := api.withClientCompatibility(func(w http.ResponseWriter, _ *http.Request, _ authContext) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+	recorder := httptest.NewRecorder()
+	compatibilityHandler.ServeHTTP(recorder, legacy)
+	if recorder.Code != http.StatusUpgradeRequired {
+		t.Fatalf("missing headers reached auth/business handler: %d", recorder.Code)
+	}
+	routeRecorder := httptest.NewRecorder()
+	mux := http.NewServeMux()
+	api.registerRoutes(mux)
+	mux.ServeHTTP(routeRecorder, httptest.NewRequest(http.MethodPost, "/workspaces", nil))
+	if routeRecorder.Code != http.StatusUpgradeRequired {
+		t.Fatalf("missing headers reached workspace write handler: %d", routeRecorder.Code)
+	}
 }
 
 func TestHealthHandlerIncludesMySQLStorageSummary(t *testing.T) {
@@ -125,7 +181,7 @@ func TestCORSAllowsIdempotencyKeyPreflight(t *testing.T) {
 	request := httptest.NewRequest(http.MethodOptions, "/tasks/task_test/start", nil)
 	request.Header.Set("Origin", "http://127.0.0.1:1420")
 	request.Header.Set("Access-Control-Request-Method", http.MethodPost)
-	request.Header.Set("Access-Control-Request-Headers", "authorization,content-type,idempotency-key")
+	request.Header.Set("Access-Control-Request-Headers", "authorization,content-type,idempotency-key,x-timemanage-client-release,x-timemanage-api-protocol")
 	recorder := httptest.NewRecorder()
 
 	handler.ServeHTTP(recorder, request)
@@ -136,5 +192,8 @@ func TestCORSAllowsIdempotencyKeyPreflight(t *testing.T) {
 	headers := strings.ToLower(recorder.Header().Get("Access-Control-Allow-Headers"))
 	if !strings.Contains(headers, "idempotency-key") {
 		t.Fatalf("Idempotency-Key missing from allowed headers: %q", headers)
+	}
+	if !strings.Contains(headers, "x-timemanage-client-release") || !strings.Contains(headers, "x-timemanage-api-protocol") {
+		t.Fatalf("TimeManage compatibility headers missing from allowed headers: %q", headers)
 	}
 }

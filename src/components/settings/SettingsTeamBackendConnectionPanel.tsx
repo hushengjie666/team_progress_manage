@@ -10,6 +10,8 @@ const backendActionStatusLabel = (status: BackendConnectionState["status"]) => (
       ? "保存中"
       : status === "authenticating"
         ? "登录中"
+        : status === "incompatible"
+          ? "版本不兼容"
         : status === "error"
           ? "异常"
           : "待连接"

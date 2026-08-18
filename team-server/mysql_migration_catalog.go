@@ -9,8 +9,7 @@ import (
 
 const (
 	baselineSchemaVersion int64 = 1
-	latestSchemaVersion   int64 = 7
-	serverReleaseVersion        = "v0.2.4"
+	latestSchemaVersion   int64 = databaseSchemaVersion
 )
 
 type migrationDefinition struct {

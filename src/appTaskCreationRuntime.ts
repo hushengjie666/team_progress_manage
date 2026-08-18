@@ -2,12 +2,12 @@ import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail
 import { uid } from "./seed";
 import { createTaskFromDraft } from "./appTaskState";
 import {
-  createDailyPlanForDate,
   initialDraft,
   nowIso,
   today,
 } from "./appModel";
 import { currentAccountDailyPlanForWorkspaceDate, workspaceIdForTask } from "./dailyPlanScope";
+import { ensureRemoteDailyPlan } from "./remoteDailyPlan";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 
 type AppTaskCreationRuntime = Pick<
@@ -67,8 +67,18 @@ export function createAppTaskCreationRuntime({
     const task = source.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
-    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today()) ?? createDailyPlanForDate(source, today(), nowIso(), workspaceId);
-    void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "add-task", workspaceId, payload: { task_id: taskId, date: today() } })
+    void ensureRemoteDailyPlan(source, workspaceId, today(), runTeamCommand).then((remote) => {
+      if (!remote) return undefined;
+      return runTeamCommand({
+        kind: "action",
+        resource: "daily-plans",
+        id: remote.plan.id,
+        action: "add-task",
+        workspaceId,
+        payload: { task_id: taskId, date: today() },
+        idempotencyKey: `daily-plan:add-task:${remote.plan.id}:${taskId}`,
+      });
+    })
       .then((saved) => saved && setToast("已加入工作队列"));
   };
 
@@ -78,7 +88,7 @@ export function createAppTaskCreationRuntime({
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
-    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId } });
+    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId }, idempotencyKey: `daily-plan:remove-task:${plan.id}:${taskId}` });
   };
 
   const moveCommittedTask = (taskId: string, direction: -1 | 1) => {
@@ -87,7 +97,7 @@ export function createAppTaskCreationRuntime({
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
-    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction } });
+    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction }, idempotencyKey: `daily-plan:move-task:${plan.id}:${taskId}:${direction}` });
   };
 
   const scheduleTaskForDate = (date: string, taskId: string) => {
@@ -95,8 +105,18 @@ export function createAppTaskCreationRuntime({
     const task = source.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
-    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, date) ?? createDailyPlanForDate(source, date, nowIso(), workspaceId);
-    void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "add-task", workspaceId, payload: { task_id: taskId, date } })
+    void ensureRemoteDailyPlan(source, workspaceId, date, runTeamCommand).then((remote) => {
+      if (!remote) return undefined;
+      return runTeamCommand({
+        kind: "action",
+        resource: "daily-plans",
+        id: remote.plan.id,
+        action: "add-task",
+        workspaceId,
+        payload: { task_id: taskId, date },
+        idempotencyKey: `daily-plan:add-task:${remote.plan.id}:${taskId}`,
+      });
+    })
       .then((saved) => saved && setToast(date === today() ? "已加入工作队列" : "任务已排入日历计划"));
   };
 

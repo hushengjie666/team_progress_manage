@@ -2,8 +2,9 @@ import { applyTeamStateLoadFailure } from "./appBoot";
 import { mergeBusinessRowsIntoState, type BusinessRow } from "./teamBusinessRows";
 import type { AppState } from "./types";
 import type { ServerAccount, ServerWorkspace, ServerWorkspaceMembership } from "./teamBackendCoreTypes";
-import { apiUrl, authHeaders, requestJson } from "./teamBackendHttp";
+import { apiUrl, authHeaders, requestJson, TeamHttpError } from "./teamBackendHttp";
 import { mapAccount, mapWorkspace, mapWorkspaceMembership } from "./teamBackendMappers";
+import { compatibilityStateForHttpError, TeamBackendCompatibilityError } from "./teamBackendCompatibility";
 import { restoreTimer } from "./timerCalculations";
 import type { Settings } from "./types";
 
@@ -21,9 +22,17 @@ type AppBootstrapResponse = {
 export async function loadTeamData(local: AppState): Promise<AppState> {
   const token = local.auth.token ?? local.backend.token;
   if (!token) return local;
-  const payload = await requestJson<AppBootstrapResponse>(apiUrl(local.backend.serverUrl, "/app/bootstrap"), {
-    headers: authHeaders(token),
-  });
+  let payload: AppBootstrapResponse;
+  try {
+    payload = await requestJson<AppBootstrapResponse>(apiUrl(local.backend.serverUrl, "/app/bootstrap"), {
+      headers: authHeaders(token),
+    });
+  } catch (error) {
+    if (error instanceof TeamHttpError && error.status === 404) {
+      throw new TeamBackendCompatibilityError(compatibilityStateForHttpError(error));
+    }
+    throw error;
+  }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
   const settings = { ...merged.settings, ...(payload.settings ?? {}) };
   const activeWork = merged.workSessions.find((session) => session.status === "active" || session.status === "paused");
@@ -65,6 +74,7 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
       status: "ready",
       message: "团队在线数据已加载",
       lastLoadedAt: payload.loaded_at,
+      failureKind: undefined,
     },
     activeTimer: recoveredTimer,
   };

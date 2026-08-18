@@ -48,12 +48,12 @@ export function useRunningTimerInterval({
   runTeamCommand,
 }: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
   useEffect(() => {
-    if (!state?.activeTimer?.isRunning) return;
+    if (!state?.activeTimer?.isRunning || state.backend.status === "incompatible") return;
     const intervalDelay = normalizeTimerSpeedMultiplier(state.activeTimer.speedMultiplier) > 1 ? 250 : 1000;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
       if (!current?.activeTimer?.isRunning) return;
-      if (current.backend.status === "saving") return;
+      if (current.backend.status === "saving" || current.backend.status === "incompatible") return;
       const nextRemaining = calculateRemaining(current.activeTimer);
       if (nextRemaining > 0) {
         setState({
@@ -87,7 +87,7 @@ export function useTimerRestoreListeners({
     const handle = () => {
       const current = stateRef.current;
       if (!current?.activeTimer) return;
-      if (current.backend.status === "saving") return;
+      if (current.backend.status === "saving" || current.backend.status === "incompatible") return;
       const timestamp = nowIso();
       const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
       const next = restoreTimerInState(current, timestamp);
@@ -141,10 +141,10 @@ export function useTaskReminderInterval({
   runTeamCommand,
 }: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "reminderSentRef" | "runTeamCommand">) {
   useEffect(() => {
-    if (!state?.settings.notificationsEnabled) return;
+    if (!state?.settings.notificationsEnabled || state.backend.status === "incompatible") return;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
-      if (!current) return;
+      if (!current || current.backend.status === "incompatible") return;
       runDueTaskReminders(current, reminderSentRef.current, (taskId, timestamp) => {
         const task = current.tasks.find((item) => item.id === taskId);
         if (task) void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: { lastReminderSentAt: timestamp } });

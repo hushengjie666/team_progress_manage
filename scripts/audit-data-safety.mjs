@@ -18,8 +18,8 @@ if (handler.includes("nextKeys") || handler.includes("businessDeleteRow(ctx")) {
 if (store.includes("row_version") || store.includes("expected_revision")) {
   failures.push("business storage still contains client revision concurrency");
 }
-if (routes.includes('"/team/data"') || !routes.includes('"/app/bootstrap"')) {
-  failures.push("server routes still expose the snapshot protocol or omit bootstrap");
+if ((routes.includes('"/team/data"') && !routes.includes("handleLegacyTeamData")) || !routes.includes('"/app/bootstrap"')) {
+  failures.push("server routes still expose a writable snapshot protocol or omit bootstrap");
 }
 if (!api.includes('"/app/bootstrap"') || !commands.includes("submitTeamDomainCommand")) {
   failures.push("frontend is not using bootstrap plus domain commands");

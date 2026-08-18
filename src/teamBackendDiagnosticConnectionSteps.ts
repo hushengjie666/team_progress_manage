@@ -1,5 +1,6 @@
 import { loginToWorkspace } from "./teamBackend";
 import { apiUrl, timed } from "./teamBackendDiagnosticHttp";
+import { clientHeaders } from "./teamBackendHttp";
 import type { DiagnosticStepResult } from "./teamBackendDiagnosticStepTypes";
 import type { AppState } from "./types";
 
@@ -28,7 +29,7 @@ const healthDetail = (payload: HealthResponse | undefined) => {
 export const runHealthDiagnosticStep = async (state: AppState): Promise<DiagnosticStepResult> => {
   try {
     const { result, latencyMs } = await timed(async () => {
-      const response = await fetch(apiUrl(state.backend.serverUrl, "/health"));
+      const response = await fetch(apiUrl(state.backend.serverUrl, "/health"), { headers: clientHeaders() });
       if (!response.ok) throw new Error(`健康检查返回 ${response.status}`);
       return response.json().catch(() => undefined) as Promise<HealthResponse | undefined>;
     });

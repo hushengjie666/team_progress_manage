@@ -8,6 +8,9 @@ import { createAppFocusInterruptionRuntime } from "./appFocusInterruptionRuntime
 import { uid } from "./seed";
 import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome } from "./types";
 import type { RunTeamDomainCommand } from "./teamDomainCommands";
+import { ensureRemoteDailyPlan } from "./remoteDailyPlan";
+import { currentAccountDailyPlanForWorkspaceDate, workspaceIdForTask } from "./dailyPlanScope";
+import { today } from "./appClock";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
 type Setter<T> = (value: T | ((current: T) => T)) => void;
@@ -46,8 +49,17 @@ export function createAppFocusActionsRuntime({
     const timestamp = nowIso();
     const sessionId = uid("session");
     if (mode === "focus" && taskId) {
-      const task = getState().tasks.find((item) => item.id === taskId);
+      let source = getState();
+      let task = source.tasks.find((item) => item.id === taskId);
       if (!task) return;
+      const taskWorkspaceId = workspaceIdForTask(source, task);
+      if (!currentAccountDailyPlanForWorkspaceDate(source, taskWorkspaceId, today())) {
+        const remote = await ensureRemoteDailyPlan(source, taskWorkspaceId, today(), runTeamCommand);
+        if (!remote) return;
+        source = remote.state;
+        task = source.tasks.find((item) => item.id === taskId);
+        if (!task) return;
+      }
       setPreferredFocusTaskId(taskId);
       const saved = await runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "start", workspaceId: task.workspaceId, idempotencyKey: `start:${taskId}:${sessionId}` });
       if (!saved) return;

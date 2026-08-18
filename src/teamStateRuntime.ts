@@ -32,7 +32,7 @@ export const createTeamDataRuntime = ({ getState, setState, setToast }: TeamData
         await submitTeamDomainCommand(current.backend, token, command);
         const latest = await loadTeamData({
           ...current,
-          backend: { ...current.backend, lastSavedAt: new Date().toISOString() },
+          backend: { ...current.backend, lastSavedAt: new Date().toISOString(), failureKind: undefined },
         });
         setState(latest);
         return latest;

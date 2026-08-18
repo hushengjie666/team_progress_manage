@@ -26,7 +26,7 @@ func withCORS(next http.Handler) http.Handler {
 		} else {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key, X-Requested-With, X-TimeManage-Client-Release, X-TimeManage-API-Protocol")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Private-Network", "true")
 		w.Header().Set("Access-Control-Max-Age", "86400")
@@ -40,8 +40,25 @@ func withCORS(next http.Handler) http.Handler {
 
 func (a *app) handleHealth(w http.ResponseWriter, r *http.Request) {
 	payload := map[string]any{
-		"status": "ok",
-		"time":   time.Now().UTC().Format(time.RFC3339),
+		"status":                  "ok",
+		"service":                 "timemanage-team",
+		"release_version":         releaseVersion,
+		"api_protocol_version":    apiProtocolVersion,
+		"database_schema_version": latestSchemaVersion,
+		"minimum_client_release":  minimumClientRelease,
+		"time":                    time.Now().UTC().Format(time.RFC3339),
+	}
+	if a.db != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		version, err := currentSchemaVersion(ctx, a.db)
+		cancel()
+		if err != nil {
+			payload["database_schema_version"] = nil
+			payload["database_status"] = "unknown"
+		} else {
+			payload["database_schema_version"] = version
+			payload["database_status"] = "ready"
+		}
 	}
 	if storage := a.healthStorageSummary(r.Context()); storage != nil {
 		payload["storage"] = storage

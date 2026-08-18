@@ -39,10 +39,10 @@ func fields(names ...string) map[string]bool {
 func (a *app) registerBusinessResourceRoutes(mux *http.ServeMux) {
 	for _, item := range domainResourceSpecs {
 		spec := item
-		mux.HandleFunc("/"+spec.path, a.withAuth(func(w http.ResponseWriter, r *http.Request, auth authContext) {
+		mux.HandleFunc("/"+spec.path, a.withClientCompatibility(func(w http.ResponseWriter, r *http.Request, auth authContext) {
 			a.handleBusinessResource(w, r, auth, spec)
 		}))
-		mux.HandleFunc("/"+spec.path+"/", a.withAuth(func(w http.ResponseWriter, r *http.Request, auth authContext) {
+		mux.HandleFunc("/"+spec.path+"/", a.withClientCompatibility(func(w http.ResponseWriter, r *http.Request, auth authContext) {
 			a.handleBusinessResource(w, r, auth, spec)
 		}))
 	}
@@ -245,6 +245,21 @@ func (a *app) createBusinessResource(w http.ResponseWriter, r *http.Request, aut
 		return
 	}
 	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
+	if existing, found, lookupErr := businessExistingRowForUpdate(r.Context(), tx, workspaceID, spec.entity, id); lookupErr != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	} else if found {
+		if existing.AccountID != "" && existing.AccountID != auth.AccountID {
+			writeError(w, http.StatusConflict, "business row id already belongs to another account")
+			return
+		}
+		_ = tx.Rollback()
+		writeJSON(w, http.StatusOK, map[string]any{"row": existing})
+		return
+	}
 	failure := applyBusinessOperation(r.Context(), tx, auth, businessOperation{Operation: "create", Row: &row})
 	if failure.status != 0 {
 		writeError(w, failure.status, failure.message)

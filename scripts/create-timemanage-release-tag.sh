@@ -15,9 +15,17 @@ MESSAGE="${2:-TimeManage Team release ${TAG}}"
 cd "${ROOT_DIR}"
 
 CURRENT_BRANCH="$(git branch --show-current)"
-if [ "${CURRENT_BRANCH}" != "main" ]; then
-  echo "[TimeManage] Release tags must be created from main. Current branch: ${CURRENT_BRANCH:-detached HEAD}" >&2
-  echo "[TimeManage] Merge your fix/feature branch into main before releasing." >&2
+
+CONTRACT_TAG="$(node --input-type=module -e 'import fs from "node:fs"; console.log(`v${JSON.parse(fs.readFileSync("release-contract.json", "utf8")).release_version}`)')"
+if [ "${TAG}" != "${CONTRACT_TAG}" ]; then
+  echo "[TimeManage] Tag ${TAG} does not match the release contract tag ${CONTRACT_TAG}." >&2
+  exit 1
+fi
+
+EXPECTED_BRANCH="release/${TAG}"
+if [ "${CURRENT_BRANCH}" != "${EXPECTED_BRANCH}" ]; then
+  echo "[TimeManage] Release tags must be created from ${EXPECTED_BRANCH}. Current branch: ${CURRENT_BRANCH:-detached HEAD}" >&2
+  echo "[TimeManage] Create the short-lived release branch from an up-to-date main first." >&2
   exit 1
 fi
 
@@ -28,14 +36,20 @@ if ! git diff --quiet --ignore-submodules -- || ! git diff --cached --quiet --ig
 fi
 
 git fetch origin main:refs/remotes/origin/main --tags
+git fetch origin "${CURRENT_BRANCH}:refs/remotes/origin/${CURRENT_BRANCH}"
 
-LOCAL_HEAD="$(git rev-parse main)"
-REMOTE_HEAD="$(git rev-parse origin/main)"
-if [ "${LOCAL_HEAD}" != "${REMOTE_HEAD}" ]; then
-  echo "[TimeManage] Local main is not identical to origin/main." >&2
-  echo "[TimeManage] Local main:  ${LOCAL_HEAD}" >&2
-  echo "[TimeManage] Origin main: ${REMOTE_HEAD}" >&2
-  echo "[TimeManage] Pull remote changes or push local main before creating a release tag." >&2
+LOCAL_HEAD="$(git rev-parse HEAD)"
+REMOTE_RELEASE_HEAD="$(git rev-parse "origin/${CURRENT_BRANCH}")"
+if [ "${LOCAL_HEAD}" != "${REMOTE_RELEASE_HEAD}" ]; then
+  echo "[TimeManage] Local release branch is not identical to origin/${CURRENT_BRANCH}." >&2
+  echo "[TimeManage] Local HEAD:  ${LOCAL_HEAD}" >&2
+  echo "[TimeManage] Remote HEAD: ${REMOTE_RELEASE_HEAD}" >&2
+  echo "[TimeManage] Push the reviewed release commit before creating the immutable tag." >&2
+  exit 1
+fi
+
+if ! git merge-base --is-ancestor origin/main HEAD; then
+  echo "[TimeManage] ${CURRENT_BRANCH} must be based on the current origin/main history." >&2
   exit 1
 fi
 
@@ -43,6 +57,10 @@ if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
   echo "[TimeManage] Tag already exists: ${TAG}" >&2
   exit 1
 fi
+
+node scripts/verify-release-contract.mjs
+npm run verify:database-migrations
+npm run audit:data-safety
 
 git tag -a "${TAG}" -m "${MESSAGE}"
 

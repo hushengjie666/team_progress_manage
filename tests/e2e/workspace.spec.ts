@@ -35,7 +35,7 @@ test("hides business data during a temporary backend outage", async ({ page }) =
 
   await failedRefresh;
   await expect(page.getByLabel("项目卡片总览")).toHaveCount(0);
-  await expect(page.getByText(/团队后台不可用/).first()).toBeVisible();
+  await expect(page.getByText(/团队业务数据加载失败/).first()).toBeVisible();
 
   await page.unroute(`${MOCK_SERVER}/app/bootstrap`, abortTeamData);
   await page.waitForResponse((response) =>
