@@ -1,4 +1,5 @@
 import type { AppState, ExecutionSignal, FocusSession, Task, WorkSession } from "./types";
+import { restoreTimer } from "./timerCalculations";
 
 const upsertById = <T extends { id: string }>(items: T[], incoming: T) =>
   items.some((item) => item.id === incoming.id)
@@ -49,4 +50,25 @@ export const preserveLocalActiveRuntime = (remote: AppState, local: AppState): A
   }
 
   return next;
+};
+
+export const preserveLocalUnpersistedTimer = (
+  remote: AppState,
+  local: AppState,
+  now = new Date(),
+): AppState => {
+  const active = local.activeTimer;
+  if (!active || active.workSessionId) return remote;
+
+  const restored = restoreTimer(active, now);
+  if (!restored) return remote;
+
+  const localFocusSession = local.focusSessions.find((session) => session.id === active.sessionId);
+  return {
+    ...remote,
+    activeTimer: restored,
+    focusSessions: localFocusSession
+      ? upsertById(remote.focusSessions, localFocusSession)
+      : remote.focusSessions,
+  };
 };

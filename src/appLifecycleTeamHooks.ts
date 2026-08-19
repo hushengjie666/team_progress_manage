@@ -2,12 +2,17 @@ import { useEffect } from "react";
 import { applyTeamStateLoadFailure } from "./appBoot";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
 import { loadTeamData } from "./teamBusinessApi";
+import { preserveLocalUnpersistedTimer } from "./teamActiveRuntimePreservation";
+import type { AppState } from "./types";
 
 const TEAM_BUSINESS_REFRESH_MS = 5000;
 const TEAM_BUSINESS_MAX_RETRY_MS = 60_000;
 
 export const teamBusinessRefreshDelay = (failureCount: number) =>
   Math.min(TEAM_BUSINESS_REFRESH_MS * (2 ** Math.max(0, failureCount)), TEAM_BUSINESS_MAX_RETRY_MS);
+
+export const mergeTeamBusinessRefreshState = (remote: AppState, current: AppState, now = new Date()) =>
+  preserveLocalUnpersistedTimer(remote, current, now);
 
 export function useTeamBusinessRefresh({
   state,
@@ -40,7 +45,9 @@ export function useTeamBusinessRefresh({
       try {
         const next = await loadTeamData(current);
         failureCount = 0;
-        if (!cancelled && sequence === refreshSequence && stateRef.current?.backend.status !== "saving") setState(next);
+        if (!cancelled && sequence === refreshSequence && stateRef.current?.backend.status !== "saving") {
+          setState((value) => value ? mergeTeamBusinessRefreshState(next, value) : next);
+        }
       } catch (error) {
         failureCount += 1;
         if (!cancelled) setState((value) => (value ? applyTeamStateLoadFailure(value, error) : value));

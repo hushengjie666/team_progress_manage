@@ -7,6 +7,8 @@ import { mapAccount, mapWorkspace, mapWorkspaceMembership } from "./teamBackendM
 import { compatibilityStateForHttpError, TeamBackendCompatibilityError } from "./teamBackendCompatibility";
 import { restoreTimer } from "./timerCalculations";
 import type { Settings } from "./types";
+import { preserveLocalUnpersistedTimer } from "./teamActiveRuntimePreservation";
+import { normalizeTimerSpeedMultiplier, timerSpeedMultiplierForSettings } from "./timerSpeed";
 
 type AppBootstrapResponse = {
   account: ServerAccount;
@@ -17,6 +19,51 @@ type AppBootstrapResponse = {
   rows: BusinessRow[];
   loaded_at: string;
   settings?: Partial<Settings>;
+};
+
+const recoverTeamActiveTimer = (
+  state: AppState,
+  settings: Settings,
+  local: AppState,
+  now = new Date(),
+) => {
+  const activeWork = state.workSessions.find((session) => session.status === "active" || session.status === "paused");
+  const activeFocus = activeWork
+    ? state.focusSessions.find((session) => session.id === activeWork.focusSessionId)
+    : undefined;
+  if (!activeWork || !activeFocus) return undefined;
+
+  const duration = activeFocus.duration ?? settings.focusMinutes * 60;
+  const localTimer = local.activeTimer?.workSessionId === activeWork.id ? local.activeTimer : undefined;
+  const speedMultiplier = normalizeTimerSpeedMultiplier(
+    localTimer?.speedMultiplier ?? timerSpeedMultiplierForSettings(settings),
+  );
+  const plannedEndAt = new Date(
+    new Date(activeWork.startedAt).getTime()
+      + (activeWork.totalPausedSeconds + duration / speedMultiplier) * 1000,
+  ).toISOString();
+  const referenceTime = activeWork.status === "paused"
+    ? new Date(activeWork.pausedAt ?? activeWork.updatedAt)
+    : now;
+  const restored = restoreTimer({
+    sessionId: activeFocus.id,
+    taskId: activeWork.taskId,
+    workSessionId: activeWork.id,
+    mode: activeFocus.mode,
+    duration,
+    remaining: duration,
+    isRunning: true,
+    startedAt: activeWork.startedAt,
+    plannedEndAt,
+    pausedAt: activeWork.pausedAt,
+    totalPausedSeconds: activeWork.totalPausedSeconds,
+    cycleIndex: localTimer?.cycleIndex ?? 1,
+    speedMultiplier: speedMultiplier > 1 ? speedMultiplier : undefined,
+  }, referenceTime);
+  if (!restored) return undefined;
+  return activeWork.status === "paused"
+    ? { ...restored, isRunning: false, pausedAt: activeWork.pausedAt }
+    : restored;
 };
 
 export async function loadTeamData(local: AppState): Promise<AppState> {
@@ -35,28 +82,8 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
   const settings = { ...merged.settings, ...(payload.settings ?? {}) };
-  const activeWork = merged.workSessions.find((session) => session.status === "active" || session.status === "paused");
-  const activeFocus = activeWork
-    ? merged.focusSessions.find((session) => session.id === activeWork.focusSessionId)
-    : undefined;
-  const duration = activeFocus?.duration ?? settings.focusMinutes * 60;
-  const recoveredTimer = activeWork && activeFocus
-    ? restoreTimer({
-        sessionId: activeFocus.id,
-        taskId: activeWork.taskId,
-        workSessionId: activeWork.id,
-        mode: activeFocus.mode,
-        duration,
-        remaining: duration,
-        isRunning: activeWork.status === "active",
-        startedAt: activeWork.startedAt,
-        plannedEndAt: new Date(new Date(activeWork.startedAt).getTime() + (duration + activeWork.totalPausedSeconds) * 1000).toISOString(),
-        pausedAt: activeWork.pausedAt,
-        totalPausedSeconds: activeWork.totalPausedSeconds,
-        cycleIndex: 1,
-      })
-    : undefined;
-  return {
+  const recoveredTimer = recoverTeamActiveTimer(merged, settings, local);
+  const remoteState: AppState = {
     ...merged,
     settings,
     auth: {
@@ -78,6 +105,7 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
     },
     activeTimer: recoveredTimer,
   };
+  return preserveLocalUnpersistedTimer(remoteState, local);
 }
 
 export const applyTeamBusinessFailure = (state: AppState, error: unknown) =>

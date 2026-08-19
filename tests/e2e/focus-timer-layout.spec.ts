@@ -92,3 +92,20 @@ test("keeps the focus timer geometry stable while the countdown changes", async 
     contentType: "image/png",
   });
 });
+
+test("keeps a short break running after the team data refresh interval", async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  await page.locator(".mode-switcher").getByRole("button", { name: "短休息" }).click();
+
+  const timerFace = page.locator(".timer-face");
+  const countdown = timerFace.locator(".timer-countdown");
+  await expect(timerFace).toContainText("短休息");
+  await expect(countdown).toHaveText(/04:5\d/);
+
+  await page.waitForTimeout(6_000);
+
+  await expect(timerFace).toContainText("短休息");
+  await expect(countdown).toHaveText(/04:[45]\d/);
+  await expect(countdown).not.toHaveText("25:00");
+});
