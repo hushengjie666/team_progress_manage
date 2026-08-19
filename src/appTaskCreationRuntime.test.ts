@@ -15,7 +15,14 @@ const createHarness = (initial: AppState, runTeamCommand: ReturnType<typeof vi.f
       title: "", notes: "", project: "", tags: "", priority: "medium", severity: "medium",
       stage: "planning", estimatePomodoros: 1, dueAt: "", reminderAt: "", repeatRule: "none", repeatIntervalDays: 1,
     }),
-    runTeamCommand,
+    runTeamCommand: (command, behavior) => {
+      const optimistic = behavior?.optimistic?.(current);
+      if (optimistic) current = optimistic.next;
+      return Promise.resolve(runTeamCommand(command, behavior)).then((saved) => {
+        if (!saved && optimistic) current = optimistic.rollback(current);
+        return saved;
+      });
+    },
     updateState: (updater) => { current = updater(current); },
     setDraft: vi.fn(),
     setToast: (message) => { toast = message; },
@@ -46,7 +53,7 @@ describe("createAppTaskCreationRuntime queue commits", () => {
       id: immediatePlan?.id,
       action: "add-task",
       payload: { task_id: task.id, date: today() },
-    }));
+    }), expect.objectContaining({ resourceKey: `daily-plan:${immediatePlan?.id}` }));
 
     finishRequest(immediate);
     await vi.waitFor(() => expect(getToast()).toBe("已加入工作队列"));

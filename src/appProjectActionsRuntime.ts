@@ -61,12 +61,25 @@ export function createAppProjectActionsRuntime({
     });
     const project = next.projects.find((item) => !source.projects.some((current) => current.id === item.id));
     if (!project) return;
-    void runTeamCommand({ kind: "create", entity: "project", workspaceId: project.workspaceId, payload: project as unknown as Record<string, unknown> })
+    const createdMemberIds = next.projectMembers.filter((member) => !source.projectMembers.some((current) => current.id === member.id)).map((member) => member.id);
+    void runTeamCommand({ kind: "create", entity: "project", workspaceId: project.workspaceId, payload: project as unknown as Record<string, unknown> }, {
+      resourceKey: `project:${project.id}`,
+      pendingMode: "background",
+      optimistic: () => ({
+        next,
+        rollback: (current) => ({
+          ...current,
+          projects: current.projects.filter((item) => item.id !== project.id || item.updatedAt !== project.updatedAt),
+          projectMembers: current.projectMembers.filter((member) => !createdMemberIds.includes(member.id)),
+        }),
+      }),
+    })
       .then((saved) => saved && setToast("项目已创建"));
   };
 
   const updateProject = (project: Project) => {
     const current = getState().projects.find((item) => item.id === project.id);
+    const nextProject = { ...project, updatedAt: nowIso() };
     if (current?.workspaceId && project.workspaceId && current.workspaceId !== project.workspaceId) {
       void runTeamCommand({
         kind: "action",
@@ -74,7 +87,7 @@ export function createAppProjectActionsRuntime({
         id: project.id,
         action: "move",
         workspaceId: current.workspaceId,
-        payload: { target_workspace_id: project.workspaceId, patch: project as unknown as Record<string, unknown> },
+        payload: { target_workspace_id: project.workspaceId, patch: nextProject as unknown as Record<string, unknown> },
         idempotencyKey: `project-move-${project.id}-${project.workspaceId}`,
       });
       return;
@@ -83,19 +96,58 @@ export function createAppProjectActionsRuntime({
       kind: "patch",
       entity: "project",
       id: project.id,
-      workspaceId: project.workspaceId,
-      patch: project as unknown as Record<string, unknown>,
+      workspaceId: nextProject.workspaceId,
+      patch: nextProject as unknown as Record<string, unknown>,
+    }, {
+      resourceKey: `project:${project.id}`,
+      pendingMode: "background",
+      optimistic: (state) => ({
+        next: { ...state, projects: state.projects.map((item) => item.id === project.id ? nextProject : item) },
+        rollback: (latest) => ({
+          ...latest,
+          projects: current
+            ? latest.projects.map((item) => item.id === project.id && item.updatedAt === nextProject.updatedAt ? current : item)
+            : latest.projects,
+        }),
+      }),
     });
   };
 
   const reorderProjects = (projectIds: string[]) => {
     const source = getState();
-    const reordered = reorderProjectsInState(source, projectIds, nowIso());
-    for (const project of reordered.projects) {
-      if (source.projects.find((item) => item.id === project.id)?.sortOrder !== project.sortOrder) {
-        void runTeamCommand({ kind: "patch", entity: "project", id: project.id, workspaceId: project.workspaceId, patch: { sortOrder: project.sortOrder } });
-      }
-    }
+    const timestamp = nowIso();
+    const reordered = reorderProjectsInState(source, projectIds, timestamp);
+    const changed = reordered.projects.filter((project) =>
+      source.projects.find((item) => item.id === project.id)?.sortOrder !== project.sortOrder,
+    );
+    if (changed.length === 0) return;
+    void runTeamCommand({
+      kind: "action",
+      resource: "projects",
+      id: "batch",
+      action: "reorder",
+      payload: {
+        items: changed.map((project) => ({
+          id: project.id,
+          workspace_id: project.workspaceId,
+          sort_order: project.sortOrder,
+        })),
+      },
+      idempotencyKey: `project-reorder:${timestamp}`,
+    }, {
+      resourceKey: "projects:order",
+      pendingMode: "background",
+      optimistic: () => ({
+        next: reordered,
+        rollback: (current) => ({
+          ...current,
+          projects: current.projects.map((project) => {
+            const previous = source.projects.find((item) => item.id === project.id);
+            return project.updatedAt === timestamp && previous ? previous : project;
+          }),
+        }),
+      }),
+    });
   };
 
   const canManageProjectMembersForProject = (source: AppState, projectId: string) => {
@@ -111,12 +163,37 @@ export function createAppProjectActionsRuntime({
     });
     const member = next.projectMembers.find((item) => !source.projectMembers.some((current) => current.id === item.id));
     if (!member) return;
-    void runTeamCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member as unknown as Record<string, unknown> })
+    void runTeamCommand({ kind: "create", entity: "project_member", workspaceId: member.workspaceId, payload: member as unknown as Record<string, unknown> }, {
+      resourceKey: `project-member:${member.id}`,
+      pendingMode: "background",
+      optimistic: () => ({
+        next,
+        rollback: (current) => ({
+          ...current,
+          projectMembers: current.projectMembers.filter((item) => item.id !== member.id || item.updatedAt !== member.updatedAt),
+        }),
+      }),
+    })
       .then((saved) => saved && setToast("项目成员绑定已更新"));
   };
 
   const updateProjectMember = (member: ProjectMember) => {
-    void runTeamCommand({ kind: "patch", entity: "project_member", id: member.id, workspaceId: member.workspaceId, patch: member as unknown as Record<string, unknown> });
+    const source = getState();
+    const previous = source.projectMembers.find((item) => item.id === member.id);
+    const next = { ...member, updatedAt: nowIso() };
+    void runTeamCommand({ kind: "patch", entity: "project_member", id: member.id, workspaceId: member.workspaceId, patch: next as unknown as Record<string, unknown> }, {
+      resourceKey: `project-member:${member.id}`,
+      pendingMode: "background",
+      optimistic: (state) => ({
+        next: { ...state, projectMembers: state.projectMembers.map((item) => item.id === member.id ? next : item) },
+        rollback: (current) => ({
+          ...current,
+          projectMembers: previous
+            ? current.projectMembers.map((item) => item.id === member.id && item.updatedAt === next.updatedAt ? previous : item)
+            : current.projectMembers,
+        }),
+      }),
+    });
   };
 
   return {

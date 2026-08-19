@@ -1,6 +1,6 @@
 {
   "name": "timemanage",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "description": "Use the TimeManage CLI to operate TimeManage team workspaces, projects, members, tasks, daily plans, reviews, settings, and templates without a long-running sidecar.",
   "author": {
     "name": "TimeManage Team",

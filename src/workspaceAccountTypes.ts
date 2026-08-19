@@ -24,6 +24,8 @@ export type WorkspaceAccountRuntimeOptions = {
   getPlatformAccounts?: () => Account[];
   setWorkspaceInvitations: (invitations: WorkspaceInvitation[]) => void;
   setProjectInvitations: (invitations: ProjectInvitation[]) => void;
+  getWorkspaceInvitations?: () => WorkspaceInvitation[];
+  getProjectInvitations?: () => ProjectInvitation[];
 };
 
 export type WorkspaceAccountRuntime = {

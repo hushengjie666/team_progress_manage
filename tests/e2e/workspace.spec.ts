@@ -1,4 +1,4 @@
-import { expect, test, type Route } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { releaseContract } from "../../src/releaseContract";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
@@ -78,22 +78,17 @@ test("signs out without writing the session change as business data", async ({ p
   expect(businessWrites).toEqual([]);
 });
 
-test("hides business data during a temporary backend outage", async ({ page }) => {
+test("does not poll or hide confirmed business data while realtime reconnects", async ({ page }) => {
+  let bootstrapRequests = 0;
+  page.on("request", (request) => {
+    if (request.url() === `${MOCK_SERVER}/app/bootstrap` && request.method() === "GET") bootstrapRequests += 1;
+  });
   await openApp(page);
-  const abortTeamData = (route: Route) => route.abort("failed");
-  await page.route(`${MOCK_SERVER}/app/bootstrap`, abortTeamData);
-  const failedRefresh = page.waitForRequest((request) =>
-    request.url() === `${MOCK_SERVER}/app/bootstrap` && request.method() === "GET",
-  );
-
-  await failedRefresh;
-  await expect(page.getByLabel("项目卡片总览")).toHaveCount(0);
-  await expect(page.getByText(/团队业务数据加载失败/).first()).toBeVisible();
-
-  await page.unroute(`${MOCK_SERVER}/app/bootstrap`, abortTeamData);
-  await page.waitForResponse((response) =>
-    response.url() === `${MOCK_SERVER}/app/bootstrap` && response.request().method() === "GET" && response.ok(),
-  );
+  await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
+  bootstrapRequests = 0;
+  await page.waitForTimeout(6_000);
+  expect(bootstrapRequests).toBe(0);
+  await expect(page.getByLabel("项目卡片总览")).toBeVisible();
   await expect(page.getByRole("button", { name: "退出登录：项目负责人" })).toBeVisible();
 });
 

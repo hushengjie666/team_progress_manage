@@ -1,4 +1,5 @@
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
+import { nowIso } from "./appModel";
 import type { Task } from "./types";
 
 type AppTaskUpdateRuntime = Pick<
@@ -13,8 +14,18 @@ export function createAppTaskUpdateRuntime({ getState, runTeamCommand }: AppTask
     const source = getState();
     const current = source.tasks.find((item) => item.id === taskId);
     if (!current) return;
-    const next = typeof updater === "function" ? updater(current) : { ...current, ...updater };
-    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: next as unknown as Record<string, unknown> });
+    const next = { ...(typeof updater === "function" ? updater(current) : { ...current, ...updater }), updatedAt: nowIso() };
+    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: next as unknown as Record<string, unknown> }, {
+      resourceKey: `task:${taskId}`,
+      pendingMode: "background",
+      optimistic: (state) => ({
+        next: { ...state, tasks: state.tasks.map((task) => task.id === taskId ? next : task) },
+        rollback: (latest) => ({
+          ...latest,
+          tasks: latest.tasks.map((task) => task.id === taskId && task.updatedAt === next.updatedAt ? current : task),
+        }),
+      }),
+    });
   };
 
   const updateTaskAssignment = (
@@ -23,13 +34,13 @@ export function createAppTaskUpdateRuntime({ getState, runTeamCommand }: AppTask
   ) => {
     const task = getState().tasks.find((item) => item.id === taskId);
     if (!task) return;
-    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: assignment });
+    updateTask(taskId, assignment);
   };
 
   const updateTaskProgress = (taskId: string, progressPercent: number, progressNote: string) => {
     const task = getState().tasks.find((item) => item.id === taskId);
     if (!task) return;
-    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: task.workspaceId, patch: { progressPercent, progressNote } });
+    updateTask(taskId, { progressPercent, progressNote });
   };
 
   return {

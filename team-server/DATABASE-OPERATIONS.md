@@ -1,6 +1,6 @@
 # TimeManage Database Operations
 
-TimeManage `v0.2.8` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported. The `v0.2.8` patch release is schema 11 (a no-op migration after the `v0.2.4` domain API) and requires the server, Web frontend, and desktop client to be upgraded together.
+TimeManage `v0.2.9` manages its MySQL schema with embedded, ordered SQL migrations. The permanent baseline is `v0.1.2`; rollback below that release is not supported. The `v0.2.9` patch release is schema 12 (a no-op migration after the `v0.2.4` domain API) and requires the server, Web frontend, and desktop client to be upgraded together.
 
 Before an upgrade, run the read-only integrity audit and review every non-zero result:
 

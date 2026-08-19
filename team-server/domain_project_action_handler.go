@@ -9,12 +9,16 @@ import (
 )
 
 func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth authContext, projectID string, action string) {
-	if r.Method != http.MethodPost || action != "move" {
+	if r.Method != http.MethodPost || (action != "move" && action != "reorder") {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	req, ok := decodeDomainAction(w, r)
 	if !ok {
+		return
+	}
+	if action == "reorder" {
+		a.handleProjectReorder(w, r, auth, req)
 		return
 	}
 	sourceWorkspaceID := domainWorkspaceID(auth, req)
@@ -27,20 +31,15 @@ func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth a
 		writeError(w, http.StatusForbidden, "target workspace access denied")
 		return
 	}
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
-	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if !claimed {
-		_ = tx.Rollback()
-		a.writeBootstrapRows(w, r, auth)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
 	project, found, err := businessExistingRowForUpdate(r.Context(), tx, sourceWorkspaceID, "project", projectID)
@@ -61,6 +60,16 @@ func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth a
 	taskIDs := make([]string, 0, len(taskRows))
 	for _, task := range taskRows {
 		taskIDs = append(taskIDs, task.ID)
+	}
+	sourceRows, err := businessLoadRowsForProjects(r.Context(), tx, sourceWorkspaceID, []string{projectID}, auth.AccountID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "load project rows failed")
+		return
+	}
+	for _, row := range sourceRows {
+		if row.Entity != "daily_plan" && row.Entity != "reward_state" {
+			recorder.recordDeleted(row)
+		}
 	}
 	payload, err := rowPayloadObject(project)
 	if err != nil {
@@ -98,11 +107,59 @@ func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth a
 			return
 		}
 	}
-	if err := tx.Commit(); err != nil {
+	targetRows, err := businessLoadRowsForProjects(r.Context(), tx, targetWorkspaceID, []string{projectID}, auth.AccountID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "load moved project rows failed")
+		return
+	}
+	for _, row := range targetRows {
+		if row.Entity != "reward_state" {
+			recorder.recordRow(row)
+		}
+	}
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
+}
+
+func (a *app) handleProjectReorder(w http.ResponseWriter, r *http.Request, auth authContext, req domainActionRequest) {
+	if len(req.Items) == 0 || len(req.Items) > 500 {
+		writeError(w, http.StatusBadRequest, "project order items are required")
+		return
+	}
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
+	tx, err := a.db.BeginTx(r.Context(), nil)
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	a.writeBootstrapRows(w, r, auth)
+	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	for _, item := range req.Items {
+		workspaceID := firstNonEmpty(item.WorkspaceID, auth.WorkspaceID)
+		project, found, lookupErr := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "project", strings.TrimSpace(item.ID))
+		if lookupErr != nil || !found {
+			writeError(w, http.StatusNotFound, "project not found")
+			return
+		}
+		if allowed, accessErr := businessRowMutationAllowed(r.Context(), tx, auth, project, project, false); accessErr != nil || !allowed {
+			writeError(w, http.StatusForbidden, "project write denied")
+			return
+		}
+		payload, decodeErr := rowPayloadObject(project)
+		if decodeErr != nil {
+			writeError(w, http.StatusBadRequest, "invalid project payload")
+			return
+		}
+		payload["sortOrder"] = item.SortOrder
+		if err := savePayloadObject(r.Context(), tx, project, payload, now); err != nil {
+			writeError(w, http.StatusInternalServerError, "save failed")
+			return
+		}
+	}
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }
 
 func moveProjectDailyPlans(r *http.Request, tx *sql.Tx, auth authContext, sourceWorkspaceID string, targetWorkspaceID string, taskIDs []string, now string) error {

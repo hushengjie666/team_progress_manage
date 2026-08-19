@@ -11,14 +11,14 @@ type WorkspacePlatformAccountRefresh = ReturnType<typeof createWorkspacePlatform
 
 type WorkspacePlatformAccountCommandOptions = Pick<
   WorkspaceAccountRuntimeOptions,
-  "getState" | "setToast" | "getPlatformAccounts"
+  "getState" | "setToast" | "getPlatformAccounts" | "setPlatformAccounts"
 > & WorkspacePlatformAccountRefresh;
 
 export function createWorkspacePlatformAccountCommands({
   getState,
   setToast,
+  setPlatformAccounts,
   getPlatformAccounts = () => [],
-  refreshPlatformAccounts,
 }: WorkspacePlatformAccountCommandOptions) {
   const createPlatformAccount = (name: string, email: string, password = "1234") => {
     const source = requirePlatformAccountAdminSource(getState(), setToast, "创建平台账号");
@@ -39,7 +39,7 @@ export function createWorkspacePlatformAccountCommands({
       password,
       status: "active",
     })
-      .then(() => refreshPlatformAccounts(source))
+      .then((account) => setPlatformAccounts([account, ...getPlatformAccounts().filter((item) => item.id !== account.id)]))
       .then(() => setToast("平台账号已创建，可在工作区或项目中授权使用"))
       .catch((error) => {
         setToast(error instanceof Error ? error.message : "平台账号创建失败");
@@ -69,7 +69,7 @@ export function createWorkspacePlatformAccountCommands({
       return;
     }
     void updatePlatformAccountRequest(source.backend, token, account.id, { name: normalizedName, email: normalizedEmail })
-      .then(() => refreshPlatformAccounts(source))
+      .then((updated) => setPlatformAccounts(getPlatformAccounts().map((item) => item.id === updated.id ? updated : item)))
       .then(() => setToast("平台账号资料已保存"))
       .catch((error) => {
         setToast(error instanceof Error ? error.message : "平台账号资料保存失败");
@@ -93,7 +93,7 @@ export function createWorkspacePlatformAccountCommands({
       return;
     }
     void updatePlatformAccountRequest(source.backend, token, account.id, { status: "disabled" })
-      .then(() => refreshPlatformAccounts(source))
+      .then((updated) => setPlatformAccounts(getPlatformAccounts().map((item) => item.id === updated.id ? updated : item)))
       .then(() => setToast("平台账号已停用"))
       .catch((error) => {
         setToast(error instanceof Error ? error.message : "平台账号停用失败");
@@ -113,7 +113,7 @@ export function createWorkspacePlatformAccountCommands({
       return;
     }
     void updatePlatformAccountRequest(source.backend, token, account.id, { password })
-      .then(() => refreshPlatformAccounts(source))
+      .then((updated) => setPlatformAccounts(getPlatformAccounts().map((item) => item.id === updated.id ? updated : item)))
       .then(() => setToast("平台账号密码已更新"))
       .catch((error) => {
         setToast(error instanceof Error ? error.message : "平台账号密码更新失败");

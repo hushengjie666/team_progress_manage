@@ -3792,7 +3792,10 @@ var normalizeTimerSpeedMultiplier = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 1 ? numeric : 1;
 };
-var timerSpeedMultiplierForSettings = (settings) => import.meta.env.DEV && settings.devTimerSpeed100xEnabled ? DEV_TIMER_SPEED_MULTIPLIER : 1;
+var isDevelopmentBuild = () => Boolean(
+  import.meta.env?.DEV
+);
+var timerSpeedMultiplierForSettings = (settings) => isDevelopmentBuild() && settings.devTimerSpeed100xEnabled ? DEV_TIMER_SPEED_MULTIPLIER : 1;
 
 // src/timerCalculations.ts
 var calculateRemaining = (timer, now3 = /* @__PURE__ */ new Date()) => {
@@ -4445,10 +4448,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.8",
-  apiProtocolVersion: 1,
-  databaseSchemaVersion: 11,
-  minimumClientRelease: "0.2.8"
+  releaseVersion: "0.2.9",
+  apiProtocolVersion: 2,
+  databaseSchemaVersion: 12,
+  minimumClientRelease: "0.2.9"
 };
 
 // src/teamBackendHttp.ts
@@ -4851,6 +4854,7 @@ var dedupeProjectMembersByIdentity = (members) => {
 };
 
 // src/teamBusinessRows.ts
+var templateInstanceId = (instance) => `${instance.templateId}_${instance.taskId}`;
 function mergeBusinessRowsIntoState(local, rows) {
   const loadedAt = (/* @__PURE__ */ new Date()).toISOString();
   const base = createInitialState();
@@ -4895,6 +4899,96 @@ function mergeBusinessRowsIntoState(local, rows) {
     if (row.entity === "template_instance") next.templateInstances.push(row.payload);
     if (row.entity === "reward_state" && (!row.account_id || row.account_id === local.auth.account?.id)) {
       next.rewardState = row.payload;
+    }
+  }
+  return {
+    ...next,
+    projectMembers: dedupeProjectMembersByIdentity(next.projectMembers)
+  };
+}
+var replacePayloadById = (items, row) => {
+  const payload = row.payload;
+  const index = items.findIndex((item) => item.id === row.id);
+  if (index < 0) return [...items, payload];
+  return items.map((item, itemIndex) => itemIndex === index ? payload : item);
+};
+var replaceTemplateInstance = (items, row) => {
+  const payload = row.payload;
+  const index = items.findIndex((item) => templateInstanceId(item) === row.id);
+  if (index < 0) return [...items, payload];
+  return items.map((item, itemIndex) => itemIndex === index ? payload : item);
+};
+var removePayloadByDeleted = (items, deleted) => items.filter((item) => item.id !== deleted.id || Boolean(
+  deleted.workspace_id && item.workspaceId && item.workspaceId !== deleted.workspace_id
+));
+function mergeBusinessRowChangesIntoState(local, rows, deleted = []) {
+  const confirmedAt = (/* @__PURE__ */ new Date()).toISOString();
+  let next = {
+    ...local,
+    backend: {
+      ...local.backend,
+      status: "ready",
+      message: "\u4E1A\u52A1\u64CD\u4F5C\u5DF2\u4FDD\u5B58",
+      lastSavedAt: confirmedAt,
+      failureKind: void 0
+    },
+    updatedAt: confirmedAt
+  };
+  for (const row of rows) {
+    if (row.entity === "project") next = { ...next, projects: replacePayloadById(next.projects, row) };
+    if (row.entity === "project_member") next = { ...next, projectMembers: replacePayloadById(next.projectMembers, row) };
+    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
+    if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
+    if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
+    if (row.entity === "work_session") next = { ...next, workSessions: replacePayloadById(next.workSessions, row) };
+    if (row.entity === "execution_signal") next = { ...next, executionSignals: replacePayloadById(next.executionSignals, row) };
+    if (row.entity === "interruption") next = { ...next, interruptions: replacePayloadById(next.interruptions, row) };
+    if (row.entity === "task_template") next = { ...next, taskTemplates: replacePayloadById(next.taskTemplates, row) };
+    if (row.entity === "template_instance") next = { ...next, templateInstances: replaceTemplateInstance(next.templateInstances, row) };
+    if (row.entity === "reward_state" && (!row.account_id || row.account_id === local.auth.account?.id)) {
+      next = { ...next, rewardState: row.payload };
+    }
+  }
+  for (const item of deleted) {
+    if (item.entity === "project") next = { ...next, projects: removePayloadByDeleted(next.projects, item) };
+    if (item.entity === "project_member") next = { ...next, projectMembers: removePayloadByDeleted(next.projectMembers, item) };
+    if (item.entity === "task") next = { ...next, tasks: removePayloadByDeleted(next.tasks, item) };
+    if (item.entity === "daily_plan") next = { ...next, dailyPlans: removePayloadByDeleted(next.dailyPlans, item) };
+    if (item.entity === "focus_session") next = { ...next, focusSessions: removePayloadByDeleted(next.focusSessions, item) };
+    if (item.entity === "work_session") next = { ...next, workSessions: removePayloadByDeleted(next.workSessions, item) };
+    if (item.entity === "execution_signal") next = { ...next, executionSignals: removePayloadByDeleted(next.executionSignals, item) };
+    if (item.entity === "interruption") next = { ...next, interruptions: removePayloadByDeleted(next.interruptions, item) };
+    if (item.entity === "task_template") next = { ...next, taskTemplates: removePayloadByDeleted(next.taskTemplates, item) };
+    if (item.entity === "template_instance") {
+      next = { ...next, templateInstances: next.templateInstances.filter((instance) => templateInstanceId(instance) !== item.id) };
+    }
+  }
+  const active = next.activeTimer;
+  if (active?.workSessionId) {
+    const workSession = next.workSessions.find((session) => session.id === active.workSessionId);
+    const focusSession = next.focusSessions.find((session) => session.id === active.sessionId);
+    if (workSession?.status === "ended") {
+      next = { ...next, activeTimer: void 0 };
+    } else if (workSession) {
+      const duration = focusSession?.duration ?? active.duration;
+      const speedMultiplier = active.speedMultiplier ?? 1;
+      const reference = workSession.status === "paused" && workSession.pausedAt ? new Date(workSession.pausedAt).getTime() : Date.now();
+      const startedAtMs = new Date(workSession.startedAt).getTime();
+      const activeElapsed = Math.max(0, (reference - startedAtMs) / 1e3 - workSession.totalPausedSeconds);
+      const remaining = Math.max(0, Math.ceil(duration - activeElapsed * speedMultiplier));
+      next = {
+        ...next,
+        activeTimer: {
+          ...active,
+          duration,
+          remaining,
+          isRunning: workSession.status === "active",
+          startedAt: workSession.startedAt,
+          pausedAt: workSession.pausedAt,
+          totalPausedSeconds: workSession.totalPausedSeconds,
+          plannedEndAt: new Date(startedAtMs + (duration / speedMultiplier + workSession.totalPausedSeconds) * 1e3).toISOString()
+        }
+      };
     }
   }
   return {
@@ -5018,57 +5112,63 @@ function normalizeIdempotencyKey(value) {
   }
   return `tm-${(first >>> 0).toString(16).padStart(8, "0")}-${(second >>> 0).toString(16).padStart(8, "0")}`;
 }
+var mutationSequence = 0;
+var commandMutationKey = (command) => normalizeIdempotencyKey(
+  command.kind !== "settings" && command.idempotencyKey ? command.idempotencyKey : `mutation:${Date.now()}:${mutationSequence += 1}:${Math.random().toString(36).slice(2)}`
+);
+var requireDeltaResponse = (value) => {
+  if (!value || value.delta !== true || !Array.isArray(value.rows) || !Array.isArray(value.deleted)) {
+    throw new Error("\u56E2\u961F\u540E\u53F0\u5199\u5165\u534F\u8BAE\u4E0D\u5339\u914D\uFF0C\u8BF7\u786E\u8BA4\u540E\u53F0\u5DF2\u5347\u7EA7\u5230 API 2");
+  }
+  return {
+    ...value,
+    settings: value.settings ?? {}
+  };
+};
 async function submitTeamDomainCommand(backend, token, command) {
+  const mutationKey = commandMutationKey(command);
+  const mutationHeaders = {
+    ...authHeaders(token),
+    "Idempotency-Key": mutationKey,
+    "X-TimeManage-Mutation-ID": mutationKey
+  };
   if (command.kind === "settings") {
-    return requestJson(apiUrl(backend.serverUrl, "/settings"), {
+    return requireDeltaResponse(await requestJson(apiUrl(backend.serverUrl, "/settings"), {
       method: "PATCH",
-      headers: authHeaders(token),
+      headers: mutationHeaders,
       body: JSON.stringify(command.patch)
-    });
+    }));
   }
   if (command.kind === "action") {
-    return requestJson(
+    return requireDeltaResponse(await requestJson(
       apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
       {
         method: "POST",
-        headers: {
-          ...authHeaders(token),
-          ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
-        },
-        body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId })
+        headers: mutationHeaders,
+        body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId, mutation_id: mutationKey })
       }
-    );
+    ));
   }
   const resource = resourcePathByEntity[command.entity];
   if (command.kind === "create") {
-    return requestJson(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
+    return requireDeltaResponse(await requestJson(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
       method: "POST",
-      headers: {
-        ...authHeaders(token),
-        ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
-      },
+      headers: mutationHeaders,
       body: JSON.stringify(command.payload)
-    });
+    }));
   }
   const url = apiUrl(backend.serverUrl, withWorkspace(`/${resource}/${encodeURIComponent(command.id)}`, command.workspaceId));
   if (command.kind === "patch") {
-    return requestJson(url, {
+    return requireDeltaResponse(await requestJson(url, {
       method: "PATCH",
-      headers: {
-        ...authHeaders(token),
-        ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
-      },
+      headers: mutationHeaders,
       body: JSON.stringify(command.patch)
-    });
+    }));
   }
-  await requestJson(url, {
+  return requireDeltaResponse(await requestJson(url, {
     method: "DELETE",
-    headers: {
-      ...authHeaders(token),
-      ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
-    }
-  });
-  return void 0;
+    headers: mutationHeaders
+  }));
 }
 
 // cli/src/clientBase.ts
@@ -5132,12 +5232,14 @@ var TimeManageBaseClient = class {
   async runBusinessCommand(command) {
     const session = await this.ensureSession();
     const before = await this.authenticatedState();
-    await submitTeamDomainCommand(before.backend, session.token, command);
+    const result = await submitTeamDomainCommand(before.backend, session.token, command);
     const savedAt = (/* @__PURE__ */ new Date()).toISOString();
-    const state = await loadTeamData({
-      ...before,
-      backend: { ...before.backend, lastSavedAt: savedAt }
-    });
+    const merged = mergeBusinessRowChangesIntoState(before, result.rows, result.deleted);
+    const state = {
+      ...merged,
+      settings: Object.keys(result.settings).length > 0 ? { ...merged.settings, ...result.settings } : merged.settings,
+      backend: { ...merged.backend, lastSavedAt: savedAt }
+    };
     return { state, savedAt };
   }
   async prepareMutation(fn) {
@@ -6543,7 +6645,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.8").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.9").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {

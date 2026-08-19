@@ -4,41 +4,20 @@ import { createTestState } from "./test/fixtures";
 import type { AppState } from "./types";
 
 describe("app focus actions runtime", () => {
-  it("projects a newly started timer from the server-confirmed task and daily plan", async () => {
+  it("projects a newly started timer before the server responds", async () => {
     const initial = createTestState();
     const task = { ...initial.tasks[0], status: "pool" as const };
     let state: AppState = { ...initial, tasks: [task], dailyPlans: [] };
-    const saved: AppState = {
-      ...state,
-      tasks: [{ ...task, status: "in_progress" }],
-      dailyPlans: [{
-        id: "plan_server",
-        ownerAccountId: state.auth.account?.id,
-        date: "2026-07-17",
-        capacityPomodoros: 8,
-        committedTaskIds: [task.id],
-        completedPomodoros: 0,
-        suggestedTaskIds: [],
-        reflection: "",
-        review: { mood: "normal", wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
-        createdAt: "2026-07-17T03:00:00.000Z",
-        updatedAt: "2026-07-17T03:00:00.000Z",
-      }],
-      workSessions: [{
-        id: "work_server",
-        taskId: task.id,
-        status: "active",
-        startedAt: "2026-07-17T03:00:00.000Z",
-        totalPausedSeconds: 0,
-        createdAt: "2026-07-17T03:00:00.000Z",
-        updatedAt: "2026-07-17T03:00:00.000Z",
-      }],
-    };
+    const runTeamCommand = vi.fn(async (_command, behavior) => {
+      const optimistic = behavior?.optimistic?.(state);
+      if (optimistic) state = optimistic.next;
+      return state;
+    });
     const runtime = createAppFocusActionsRuntime({
       getState: () => state,
       getQuickNote: () => "",
       updateState: (updater) => { state = updater(state); },
-      runTeamCommand: vi.fn(async () => saved),
+      runTeamCommand,
       setQuickNote: vi.fn(),
       setToast: vi.fn(),
       setPreferredFocusTaskId: vi.fn(),
@@ -50,7 +29,13 @@ describe("app focus actions runtime", () => {
     expect(state.tasks[0].status).toBe("in_progress");
     expect(state.dailyPlans[0].committedTaskIds).toContain(task.id);
     expect(state.activeTimer?.taskId).toBe(task.id);
-    expect(state.activeTimer?.workSessionId).toBe("work_server");
+    expect(state.activeTimer?.workSessionId).toBeTruthy();
+    expect(runTeamCommand.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      payload: expect.objectContaining({
+        focus_session_id: state.activeTimer?.sessionId,
+        work_session_id: state.activeTimer?.workSessionId,
+      }),
+    }));
   });
 
   it("pauses a newly started server session before the work-session list catches up", async () => {
@@ -73,7 +58,11 @@ describe("app focus actions runtime", () => {
         cycleIndex: 1,
       },
     };
-    const runTeamCommand = vi.fn(async () => state);
+    const runTeamCommand = vi.fn(async (_command, behavior) => {
+      const optimistic = behavior?.optimistic?.(state);
+      if (optimistic) state = optimistic.next;
+      return state;
+    });
     const runtime = createAppFocusActionsRuntime({
       getState: () => state,
       getQuickNote: () => "",
@@ -88,13 +77,13 @@ describe("app focus actions runtime", () => {
     runtime.toggleTimer();
     await vi.waitFor(() => expect(runTeamCommand).toHaveBeenCalledOnce());
 
-    expect(runTeamCommand).toHaveBeenCalledWith({
+    expect(runTeamCommand).toHaveBeenCalledWith(expect.objectContaining({
       kind: "action",
       resource: "work-sessions",
       id: "work_server",
       action: "pause",
       workspaceId: task.workspaceId,
-    });
+    }), expect.objectContaining({ resourceKey: "work-sessions:work_server", pendingMode: "background" }));
     expect(state.activeTimer?.isRunning).toBe(false);
   });
 

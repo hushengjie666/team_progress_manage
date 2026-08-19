@@ -1,5 +1,5 @@
 import type { AppState, BackendConnectionState } from "./types";
-import type { BusinessEntity, BusinessRow } from "./teamBusinessRows";
+import type { BusinessDeletedRow, BusinessEntity, BusinessRow } from "./teamBusinessRows";
 import { apiUrl, authHeaders, requestJson } from "./teamBackendHttp";
 
 export type TeamDomainCommand =
@@ -18,10 +18,12 @@ export type TeamDomainCommand =
     };
 
 export type TeamDomainCommandResult = {
-  delta?: boolean;
-  rows?: BusinessRow[];
-  row?: BusinessRow;
-  settings?: Record<string, unknown>;
+	mutation_id: string;
+	delta: true;
+	rows: BusinessRow[];
+	deleted: BusinessDeletedRow[];
+	settings: Record<string, unknown>;
+	server_time: string;
 };
 
 const resourcePathByEntity: Record<BusinessEntity, string> = {
@@ -54,61 +56,84 @@ export function normalizeIdempotencyKey(value: string) {
   return `tm-${(first >>> 0).toString(16).padStart(8, "0")}-${(second >>> 0).toString(16).padStart(8, "0")}`;
 }
 
+let mutationSequence = 0;
+
+const commandMutationKey = (command: TeamDomainCommand) => normalizeIdempotencyKey(
+	command.kind !== "settings" && command.idempotencyKey
+		? command.idempotencyKey
+		: `mutation:${Date.now()}:${mutationSequence += 1}:${Math.random().toString(36).slice(2)}`,
+);
+
+const requireDeltaResponse = (value: TeamDomainCommandResult | undefined): TeamDomainCommandResult => {
+	if (!value || value.delta !== true || !Array.isArray(value.rows) || !Array.isArray(value.deleted)) {
+		throw new Error("团队后台写入协议不匹配，请确认后台已升级到 API 2");
+	}
+	return {
+		...value,
+		settings: value.settings ?? {},
+	};
+};
+
 export async function submitTeamDomainCommand(
   backend: BackendConnectionState,
   token: string,
   command: TeamDomainCommand,
-): Promise<TeamDomainCommandResult | undefined> {
-  if (command.kind === "settings") {
-    return requestJson<{ settings: Record<string, unknown> }>(apiUrl(backend.serverUrl, "/settings"), {
-      method: "PATCH",
-      headers: authHeaders(token),
-      body: JSON.stringify(command.patch),
-    });
-  }
-  if (command.kind === "action") {
-    return requestJson<{ rows: BusinessRow[] }>(
-      apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
-      {
-        method: "POST",
-        headers: {
-          ...authHeaders(token),
-          ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
-        },
-        body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId }),
-      },
-    );
-  }
+): Promise<TeamDomainCommandResult> {
+	const mutationKey = commandMutationKey(command);
+	const mutationHeaders = {
+		...authHeaders(token),
+		"Idempotency-Key": mutationKey,
+		"X-TimeManage-Mutation-ID": mutationKey,
+	};
+	if (command.kind === "settings") {
+		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(apiUrl(backend.serverUrl, "/settings"), {
+			method: "PATCH",
+			headers: mutationHeaders,
+			body: JSON.stringify(command.patch),
+		}));
+	}
+	if (command.kind === "action") {
+		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(
+			apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
+			{
+				method: "POST",
+				headers: mutationHeaders,
+				body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId, mutation_id: mutationKey }),
+			},
+		));
+	}
   const resource = resourcePathByEntity[command.entity];
   if (command.kind === "create") {
-    return requestJson<{ row: BusinessRow }>(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
-      method: "POST",
-      headers: {
-        ...authHeaders(token),
-        ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
-      },
-      body: JSON.stringify(command.payload),
-    });
+		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
+			method: "POST",
+			headers: mutationHeaders,
+			body: JSON.stringify(command.payload),
+		}));
   }
   const url = apiUrl(backend.serverUrl, withWorkspace(`/${resource}/${encodeURIComponent(command.id)}`, command.workspaceId));
   if (command.kind === "patch") {
-    return requestJson<{ row: BusinessRow }>(url, {
-      method: "PATCH",
-      headers: {
-        ...authHeaders(token),
-        ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
-      },
-      body: JSON.stringify(command.patch),
-    });
-  }
-  await requestJson<void>(url, {
-    method: "DELETE",
-    headers: {
-      ...authHeaders(token),
-      ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
-    },
-  });
-  return undefined;
+		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(url, {
+			method: "PATCH",
+			headers: mutationHeaders,
+			body: JSON.stringify(command.patch),
+		}));
+	}
+	return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(url, {
+		method: "DELETE",
+		headers: mutationHeaders,
+	}));
 }
 
-export type RunTeamDomainCommand = (command: TeamDomainCommand) => Promise<AppState | undefined>;
+export type TeamMutationBehavior = {
+	resourceKey: string;
+	optimistic?: (state: AppState) => {
+		next: AppState;
+		rollback: (current: AppState) => AppState;
+	};
+	pendingMode: "background" | "blocking";
+};
+
+export type RunTeamDomainCommand = (
+	command: TeamDomainCommand,
+	behavior?: TeamMutationBehavior,
+) => Promise<AppState | undefined>;

@@ -25,6 +25,8 @@ export const mockTeamBackend = async (page: Page, initialState: AppState, option
           api_protocol_version: releaseContract.apiProtocolVersion,
           database_schema_version: releaseContract.databaseSchemaVersion,
           minimum_client_release: releaseContract.minimumClientRelease,
+          mutation_delta_version: 1,
+          realtime_transport: "websocket",
           ...runtime.options.health,
         }),
       });

@@ -210,6 +210,9 @@ func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 		row.UpdatedAt,
 		payload,
 	)
+	if err == nil {
+		mutationRecorderFromContext(ctx).recordRow(row)
+	}
 	return err
 }
 
@@ -235,6 +238,9 @@ func businessCreateRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 		row.UpdatedAt,
 		row.Payload,
 	)
+	if err == nil {
+		mutationRecorderFromContext(ctx).recordRow(row)
+	}
 	return err
 }
 
@@ -264,9 +270,15 @@ func businessUpdateRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, 
 	}
 	count, err := result.RowsAffected()
 	if err != nil || count == 1 {
+		if err == nil && count == 1 {
+			mutationRecorderFromContext(ctx).recordRow(row)
+		}
 		return count == 1, err
 	}
 	_, found, lookupErr := businessExistingRow(ctx, tx, row.WorkspaceID, row.Entity, row.ID)
+	if lookupErr == nil && found {
+		mutationRecorderFromContext(ctx).recordRow(row)
+	}
 	return found, lookupErr
 }
 
@@ -280,5 +292,8 @@ func businessDeleteRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, 
 		return false, err
 	}
 	count, err := result.RowsAffected()
+	if err == nil && count == 1 {
+		mutationRecorderFromContext(ctx).recordDeleted(row)
+	}
 	return count == 1, err
 }

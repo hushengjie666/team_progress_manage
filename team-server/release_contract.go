@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	releaseVersion          = "0.2.8"
+	releaseVersion              = "0.2.9"
 	serverReleaseVersion        = "v" + releaseVersion
-	apiProtocolVersion      int64 = 1
-	databaseSchemaVersion   int64 = 11
-	minimumClientRelease    = "0.2.8"
+	apiProtocolVersion    int64 = 2
+	databaseSchemaVersion int64 = 12
+	minimumClientRelease        = "0.2.9"
 )
 
 func parseReleaseVersion(value string) ([3]int, bool) {
@@ -69,6 +69,37 @@ func (a *app) withClientCompatibility(next func(http.ResponseWriter, *http.Reque
 		}
 		a.withAuth(next)(w, r)
 	}
+}
+
+type statusResponseWriter struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *statusResponseWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusResponseWriter) Write(body []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	return w.ResponseWriter.Write(body)
+}
+
+func (a *app) withClientCompatibilityMetadata(next func(http.ResponseWriter, *http.Request, authContext)) http.HandlerFunc {
+	return a.withClientCompatibility(func(w http.ResponseWriter, r *http.Request, auth authContext) {
+		tracked := &statusResponseWriter{ResponseWriter: w}
+		next(tracked, r, auth)
+		status := tracked.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		if r.Method != http.MethodGet && status >= 200 && status < 300 {
+			a.broadcastMetadataChanged(auth)
+		}
+	})
 }
 
 func (a *app) handleLegacyTeamData(w http.ResponseWriter, _ *http.Request) {

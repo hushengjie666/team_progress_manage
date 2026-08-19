@@ -7,8 +7,12 @@ export const normalizeTimerSpeedMultiplier = (value: unknown) => {
   return Number.isFinite(numeric) && numeric > 1 ? numeric : 1;
 };
 
+const isDevelopmentBuild = () => Boolean(
+  (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV,
+);
+
 export const timerSpeedMultiplierForSettings = (settings: Pick<Settings, "devTimerSpeed100xEnabled">) =>
-  import.meta.env.DEV && settings.devTimerSpeed100xEnabled ? DEV_TIMER_SPEED_MULTIPLIER : 1;
+  isDevelopmentBuild() && settings.devTimerSpeed100xEnabled ? DEV_TIMER_SPEED_MULTIPLIER : 1;
 
 export const plannedTimerEndAt = (timestamp: string, remainingSeconds: number, speedMultiplier?: number) =>
   new Date(

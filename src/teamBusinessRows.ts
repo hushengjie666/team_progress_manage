@@ -51,6 +51,8 @@ export type BusinessRow = {
   payload: BusinessPayload;
 };
 
+export type BusinessDeletedRow = Pick<BusinessRow, "workspace_id" | "account_id" | "entity" | "id">;
+
 const templateInstanceId = (instance: TemplateInstance) =>
   `${instance.templateId}_${instance.taskId}`;
 
@@ -226,7 +228,16 @@ const replaceTemplateInstance = (items: TemplateInstance[], row: BusinessRow) =>
   return items.map((item, itemIndex) => itemIndex === index ? payload : item);
 };
 
-export function mergeBusinessRowChangesIntoState(local: AppState, rows: BusinessRow[]): AppState {
+const removePayloadByDeleted = <T extends { id: string; workspaceId?: string }>(items: T[], deleted: BusinessDeletedRow) =>
+  items.filter((item) => item.id !== deleted.id || Boolean(
+    deleted.workspace_id && item.workspaceId && item.workspaceId !== deleted.workspace_id,
+  ));
+
+export function mergeBusinessRowChangesIntoState(
+	local: AppState,
+	rows: BusinessRow[],
+	deleted: BusinessDeletedRow[] = [],
+): AppState {
   const confirmedAt = new Date().toISOString();
   let next: AppState = {
     ...local,
@@ -240,7 +251,7 @@ export function mergeBusinessRowChangesIntoState(local: AppState, rows: Business
     updatedAt: confirmedAt,
   };
 
-  for (const row of rows) {
+	for (const row of rows) {
     if (row.entity === "project") next = { ...next, projects: replacePayloadById(next.projects, row) };
     if (row.entity === "project_member") next = { ...next, projectMembers: replacePayloadById(next.projectMembers, row) };
     if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
@@ -253,6 +264,52 @@ export function mergeBusinessRowChangesIntoState(local: AppState, rows: Business
     if (row.entity === "template_instance") next = { ...next, templateInstances: replaceTemplateInstance(next.templateInstances, row) };
     if (row.entity === "reward_state" && (!row.account_id || row.account_id === local.auth.account?.id)) {
       next = { ...next, rewardState: row.payload as RewardState };
+    }
+  }
+
+  for (const item of deleted) {
+		if (item.entity === "project") next = { ...next, projects: removePayloadByDeleted(next.projects, item) };
+		if (item.entity === "project_member") next = { ...next, projectMembers: removePayloadByDeleted(next.projectMembers, item) };
+		if (item.entity === "task") next = { ...next, tasks: removePayloadByDeleted(next.tasks, item) };
+		if (item.entity === "daily_plan") next = { ...next, dailyPlans: removePayloadByDeleted(next.dailyPlans, item) };
+		if (item.entity === "focus_session") next = { ...next, focusSessions: removePayloadByDeleted(next.focusSessions, item) };
+		if (item.entity === "work_session") next = { ...next, workSessions: removePayloadByDeleted(next.workSessions, item) };
+		if (item.entity === "execution_signal") next = { ...next, executionSignals: removePayloadByDeleted(next.executionSignals, item) };
+		if (item.entity === "interruption") next = { ...next, interruptions: removePayloadByDeleted(next.interruptions, item) };
+		if (item.entity === "task_template") next = { ...next, taskTemplates: removePayloadByDeleted(next.taskTemplates, item) };
+		if (item.entity === "template_instance") {
+			next = { ...next, templateInstances: next.templateInstances.filter((instance) => templateInstanceId(instance) !== item.id) };
+		}
+	}
+
+  const active = next.activeTimer;
+  if (active?.workSessionId) {
+    const workSession = next.workSessions.find((session) => session.id === active.workSessionId);
+    const focusSession = next.focusSessions.find((session) => session.id === active.sessionId);
+    if (workSession?.status === "ended") {
+      next = { ...next, activeTimer: undefined };
+    } else if (workSession) {
+      const duration = focusSession?.duration ?? active.duration;
+      const speedMultiplier = active.speedMultiplier ?? 1;
+      const reference = workSession.status === "paused" && workSession.pausedAt
+        ? new Date(workSession.pausedAt).getTime()
+        : Date.now();
+      const startedAtMs = new Date(workSession.startedAt).getTime();
+      const activeElapsed = Math.max(0, (reference - startedAtMs) / 1000 - workSession.totalPausedSeconds);
+      const remaining = Math.max(0, Math.ceil(duration - activeElapsed * speedMultiplier));
+      next = {
+        ...next,
+        activeTimer: {
+          ...active,
+          duration,
+          remaining,
+          isRunning: workSession.status === "active",
+          startedAt: workSession.startedAt,
+          pausedAt: workSession.pausedAt,
+          totalPausedSeconds: workSession.totalPausedSeconds,
+          plannedEndAt: new Date(startedAtMs + (duration / speedMultiplier + workSession.totalPausedSeconds) * 1000).toISOString(),
+        },
+      };
     }
   }
 

@@ -29,6 +29,7 @@ export function createWorkspacePlatformAccountRuntime({
   const commands = createWorkspacePlatformAccountCommands({
     getState,
     setToast,
+    setPlatformAccounts,
     getPlatformAccounts,
     ...refresh,
   });

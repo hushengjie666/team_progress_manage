@@ -25,7 +25,19 @@ export function createAppSettingsActionsRuntime({
 }: AppSettingsActionsRuntimeOptions): AppSettingsActionsRuntime {
   const updateSettings = <K extends keyof AppState["settings"]>(key: K, value: AppState["settings"][K]) => {
     if (key !== "devTimerSpeed100xEnabled") {
-      void runTeamCommand({ kind: "settings", patch: { [key]: value } });
+      void runTeamCommand({ kind: "settings", patch: { [key]: value } }, {
+        resourceKey: `settings:${String(key)}`,
+        pendingMode: "background",
+        optimistic: (current) => {
+          const previous = current.settings[key];
+          return {
+            next: { ...current, settings: { ...current.settings, [key]: value } },
+            rollback: (latest) => latest.settings[key] === value
+              ? { ...latest, settings: { ...latest.settings, [key]: previous } }
+              : latest,
+          };
+        },
+      });
       return;
     }
     updateState((current) => {

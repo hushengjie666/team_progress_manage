@@ -26,8 +26,9 @@ import {
   type PlatformAccountPayload,
 } from "../../src/teamBackend.js";
 import { loadTeamData } from "../../src/teamApi.js";
+import { mergeBusinessRowChangesIntoState } from "../../src/teamBusinessRows.js";
 import { submitTeamDomainCommand, type TeamDomainCommand } from "../../src/teamDomainCommands.js";
-import type { AppState, ProjectMemberRole, WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "../../src/types.js";
+import type { AppState, ProjectMemberRole, Settings, WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "../../src/types.js";
 import type { TimeManageCliConfig } from "./config.js";
 
 export type StateMutation<T> = (state: AppState, timestamp: string) => { state: AppState; result: T };
@@ -97,12 +98,16 @@ export class TimeManageBaseClient {
   protected async runBusinessCommand(command: TeamDomainCommand) {
     const session = await this.ensureSession();
     const before = await this.authenticatedState();
-    await submitTeamDomainCommand(before.backend, session.token, command);
+    const result = await submitTeamDomainCommand(before.backend, session.token, command);
     const savedAt = new Date().toISOString();
-    const state = await loadTeamData({
-      ...before,
-      backend: { ...before.backend, lastSavedAt: savedAt },
-    });
+    const merged = mergeBusinessRowChangesIntoState(before, result.rows, result.deleted);
+    const state = {
+      ...merged,
+      settings: Object.keys(result.settings).length > 0
+        ? { ...merged.settings, ...result.settings } as Settings
+        : merged.settings,
+      backend: { ...merged.backend, lastSavedAt: savedAt },
+    };
     return { state, savedAt };
   }
 

@@ -65,7 +65,9 @@ export interface BackendConnectionState {
   status: BackendConnectionStatus;
   message: string;
   compatibility?: BackendCompatibilityState;
-  failureKind?: BackendFailureKind;
+	failureKind?: BackendFailureKind;
+	realtimeStatus?: "connected" | "reconnecting" | "degraded";
+	pendingResourceKeys?: string[];
 }
 
 export interface AuthState {

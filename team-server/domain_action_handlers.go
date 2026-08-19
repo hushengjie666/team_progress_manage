@@ -9,19 +9,6 @@ import (
 	"time"
 )
 
-type domainActionRequest struct {
-	WorkspaceID       string         `json:"workspace_id"`
-	Date              string         `json:"date"`
-	TaskID            string         `json:"task_id"`
-	Direction         int            `json:"direction"`
-	Reason            string         `json:"reason"`
-	ChildTitles       []string       `json:"child_titles"`
-	Outcome           string         `json:"outcome"`
-	Task              map[string]any `json:"task"`
-	TargetWorkspaceID string         `json:"target_workspace_id"`
-	Patch             map[string]any `json:"patch"`
-}
-
 func decodeDomainAction(w http.ResponseWriter, r *http.Request) (domainActionRequest, bool) {
 	var req domainActionRequest
 	if err := decodeJSON(w, r, &req); err != nil {
@@ -66,6 +53,8 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 		return
 	}
 	workspaceID := domainWorkspaceID(auth, req)
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
@@ -146,7 +135,7 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 		}
 	case "start":
 		payload["status"] = "in_progress"
-		if err := a.startTaskInTx(r.Context(), tx, auth, task, payload, now); err != nil {
+		if err := a.startTaskInTx(r.Context(), tx, auth, task, payload, req, now); err != nil {
 			writeError(w, http.StatusInternalServerError, "start task failed")
 			return
 		}
@@ -167,15 +156,14 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	a.writeBootstrapRows(w, r, auth)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }
 
-func (a *app) startTaskInTx(ctx context.Context, tx *sql.Tx, auth authContext, task businessRow, taskPayload map[string]any, now string) error {
-	date := now[:10]
+func (a *app) startTaskInTx(ctx context.Context, tx *sql.Tx, auth authContext, task businessRow, taskPayload map[string]any, req domainActionRequest, now string) error {
+	date := strings.TrimSpace(req.Date)
+	if date == "" {
+		date = now[:10]
+	}
 	planID := "plan_" + auth.AccountID + "_" + task.WorkspaceID + "_" + date
 	plan, found, err := businessExistingRowForUpdate(ctx, tx, task.WorkspaceID, "daily_plan", planID)
 	if err != nil {
@@ -207,16 +195,20 @@ func (a *app) startTaskInTx(ctx context.Context, tx *sql.Tx, auth authContext, t
 			return err
 		}
 	}
-	focusID := newID("focus_session")
+	focusID := firstNonEmpty(req.FocusSessionID, newID("focus_session"))
+	duration := req.Duration
+	if duration <= 0 || duration > 24*60*60 {
+		duration = 1500
+	}
 	focusPayload := map[string]any{
 		"id": focusID, "workspaceId": task.WorkspaceID, "taskId": task.ID, "mode": "focus",
-		"duration": 1500, "startedAt": now, "interruptionCounts": map[string]any{"internal": 0, "external": 0},
+		"duration": duration, "startedAt": now, "interruptionCounts": map[string]any{"internal": 0, "external": 0},
 	}
 	focusRaw, _ := json.Marshal(focusPayload)
 	if err := businessCreateRow(ctx, tx, businessRow{WorkspaceID: task.WorkspaceID, AccountID: auth.AccountID, Entity: "focus_session", ID: focusID, UpdatedAt: now, Payload: focusRaw}); err != nil {
 		return err
 	}
-	sessionID := newID("work_session")
+	sessionID := firstNonEmpty(req.WorkSessionID, newID("work_session"))
 	sessionPayload := map[string]any{
 		"id": sessionID, "workspaceId": task.WorkspaceID, "taskId": task.ID, "status": "active",
 		"focusSessionId": focusID, "startedAt": now, "totalPausedSeconds": 0, "createdAt": now, "updatedAt": now,
@@ -272,20 +264,15 @@ func (a *app) handleWorkSessionAction(w http.ResponseWriter, r *http.Request, au
 		return
 	}
 	workspaceID := domainWorkspaceID(auth, req)
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
-	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if !claimed {
-		_ = tx.Rollback()
-		a.writeBootstrapRows(w, r, auth)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
 	row, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "work_session", sessionID)
@@ -327,11 +314,21 @@ func (a *app) handleWorkSessionAction(w http.ResponseWriter, r *http.Request, au
 		if strings.TrimSpace(req.Outcome) != "" {
 			payload["outcome"] = strings.TrimSpace(req.Outcome)
 		}
+	case "reset":
+		if status := stringField(row.Payload, "status"); status != "active" && status != "paused" {
+			writeError(w, http.StatusConflict, "work session is already ended")
+			return
+		}
+		payload["status"] = "paused"
+		payload["startedAt"] = now
+		payload["pausedAt"] = now
+		payload["totalPausedSeconds"] = 0
+		delete(payload, "resumedAt")
 	default:
 		writeError(w, http.StatusBadRequest, "unsupported work session action")
 		return
 	}
-	signalType := map[string]string{"pause": "work_paused", "resume": "work_resumed", "finish": "work_ended"}[action]
+	signalType := map[string]string{"pause": "work_paused", "resume": "work_resumed", "finish": "work_ended", "reset": "work_reset"}[action]
 	if err := createExecutionSignal(r.Context(), tx, auth, workspaceID, payload, signalType, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
@@ -366,11 +363,11 @@ func (a *app) handleWorkSessionAction(w http.ResponseWriter, r *http.Request, au
 			}
 		}
 	}
-	if err := savePayloadObject(r.Context(), tx, row, payload, now); err != nil || tx.Commit() != nil {
+	if err := savePayloadObject(r.Context(), tx, row, payload, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	a.writeBootstrapRows(w, r, auth)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }
 
 func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth authContext, planID string, action string) {
@@ -383,20 +380,15 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	workspaceID := domainWorkspaceID(auth, req)
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
-	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if !claimed {
-		_ = tx.Rollback()
-		a.writeDailyPlanActionDelta(w, r, auth, workspaceID, planID, req.TaskID)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
 	row, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "daily_plan", planID)
@@ -484,9 +476,9 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 			}
 		}
 	}
-	if err := savePayloadObject(r.Context(), tx, row, payload, now); err != nil || tx.Commit() != nil {
+	if err := savePayloadObject(r.Context(), tx, row, payload, now); err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	a.writeDailyPlanActionDelta(w, r, auth, workspaceID, planID, req.TaskID)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }

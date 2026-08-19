@@ -18,6 +18,16 @@ const backendStatusLabel = (backend: BackendConnectionState) => (
             : "未登录"
 );
 
+const realtimeStatusLabel = (backend: BackendConnectionState) => (
+  backend.realtimeStatus === "connected"
+    ? "已连接"
+    : backend.realtimeStatus === "degraded"
+      ? "备用刷新"
+      : backend.token
+        ? "重连中"
+        : "未连接"
+);
+
 export function SettingsTeamBackendStatusPanel({ backend }: { backend: BackendConnectionState }) {
   return (
     <>
@@ -33,6 +43,10 @@ export function SettingsTeamBackendStatusPanel({ backend }: { backend: BackendCo
         <div>
           <span>数据来源</span>
           <strong>团队后台</strong>
+        </div>
+        <div>
+          <span>实时连接</span>
+          <strong>{realtimeStatusLabel(backend)}</strong>
         </div>
         <div>
           <span>上次刷新</span>

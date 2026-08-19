@@ -93,9 +93,10 @@ mkdir -p "${BUILD_DIR}"
 rsync -a --delete team-server/ "${BUILD_DIR}/"
 docker run --rm -v "${BUILD_DIR}:/src" -w /src "${GO120_IMAGE}" sh -lc '
   /usr/local/go/bin/go mod edit -go=1.20
-  /usr/local/go/bin/go get github.com/go-sql-driver/mysql@v1.8.1 github.com/pressly/goose/v3@v3.20.0 golang.org/x/sys@v0.18.0 golang.org/x/crypto@v0.21.0
+  /usr/local/go/bin/go get github.com/go-sql-driver/mysql@v1.8.1 github.com/pressly/goose/v3@v3.20.0 github.com/gorilla/websocket@v1.5.3 golang.org/x/sys@v0.18.0 golang.org/x/crypto@v0.21.0
   /usr/local/go/bin/go mod tidy
   test "$(/usr/local/go/bin/go list -m -f {{.Version}} github.com/pressly/goose/v3)" = "v3.20.0"
+  test "$(/usr/local/go/bin/go list -m -f {{.Version}} github.com/gorilla/websocket)" = "v1.5.3"
   GOOS=windows GOARCH=amd64 /usr/local/go/bin/go build -trimpath -ldflags="-s -w" -o bin/timemanage-team-win2008.exe .
 '
 
@@ -110,6 +111,7 @@ cp team-server/backup-database.bat "${PACKAGE_DIR}/server/backup-database.bat"
 cp team-server/rollback-database.bat "${PACKAGE_DIR}/server/rollback-database.bat"
 cp team-server/restore-database.bat "${PACKAGE_DIR}/server/restore-database.bat"
 cp team-server/DATABASE-OPERATIONS.md "${PACKAGE_DIR}/server/DATABASE-OPERATIONS.md"
+cp team-server/nginx-websocket.conf "${PACKAGE_DIR}/server/nginx-websocket.conf"
 mkdir -p "${PACKAGE_DIR}/server/migrations"
 cp team-server/migrations/*.sql "${PACKAGE_DIR}/server/migrations/"
 
@@ -136,6 +138,7 @@ Contents:
   server\stop-backend.bat
   server\install-windows-service.ps1
   server\DATABASE-OPERATIONS.md
+  server\nginx-websocket.conf  Nginx WebSocket route; place before the generic API location
   server\migrations\       versioned MySQL migration SQL
   server\database-status.bat
   server\migrate-database.bat

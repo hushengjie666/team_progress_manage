@@ -14,6 +14,7 @@ import { normalizeTimerSpeedMultiplier, plannedTimerEndAt, timerSpeedMultiplierF
 
 type StartTimerOptions = {
   startPaused?: boolean;
+  workSessionId?: string;
 };
 
 export const startTimerInState = (
@@ -67,7 +68,7 @@ export const startTimerInState = (
   }
   const workSession: WorkSession | undefined = mode === "focus" && taskId
     ? {
-        id: uid("work_session"),
+        id: options.workSessionId ?? uid("work_session"),
         taskId,
         executorMemberId,
         focusSessionId: session.id,

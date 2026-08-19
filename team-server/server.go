@@ -36,5 +36,7 @@ func runHTTPServer(ctx context.Context, cfg config) error {
 }
 
 func newApp(cfg config, db *sql.DB) *app {
-	return &app{cfg: cfg, db: db}
+	api := &app{cfg: cfg, db: db}
+	api.realtime = newRealtimeHub(api)
+	return api
 }

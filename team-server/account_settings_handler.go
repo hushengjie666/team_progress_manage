@@ -45,13 +45,25 @@ func (a *app) handleAccountSettings(w http.ResponseWriter, r *http.Request, auth
 	for key, value := range patch {
 		current[key] = value
 	}
+	ctx, recorder := withMutationRecorder(r.Context(), mutationIDFromRequest(r))
+	r = r.WithContext(ctx)
+	tx, err := a.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "save settings failed")
+		return
+	}
+	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
 	raw, _ := json.Marshal(current)
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	_, err = a.db.ExecContext(r.Context(), `INSERT INTO account_settings (account_id, payload, updated_at) VALUES (?, ?, ?)
+	_, err = tx.ExecContext(r.Context(), `INSERT INTO account_settings (account_id, payload, updated_at) VALUES (?, ?, ?)
 		ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)`, auth.AccountID, raw, now)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save settings failed")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"settings": current, "updated_at": now})
+	recorder.recordSettings(current)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }

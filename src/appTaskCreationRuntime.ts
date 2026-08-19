@@ -13,7 +13,6 @@ import {
   today,
 } from "./appModel";
 import { currentAccountDailyPlanForWorkspaceDate, workspaceIdForTask } from "./dailyPlanScope";
-import { ensureRemoteDailyPlan } from "./remoteDailyPlan";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 
 type AppTaskCreationRuntime = Pick<
@@ -23,7 +22,7 @@ type AppTaskCreationRuntime = Pick<
 
 type AppTaskCreationRuntimeOptions = Pick<
   AppTaskActionsRuntimeOptions,
-  "getState" | "getCurrentProjectId" | "getDraft" | "runTeamCommand" | "updateState" | "setDraft" | "setToast"
+  "getState" | "getCurrentProjectId" | "getDraft" | "runTeamCommand" | "setDraft" | "setToast"
 >;
 
 export function createAppTaskCreationRuntime({
@@ -31,7 +30,6 @@ export function createAppTaskCreationRuntime({
   getCurrentProjectId,
   getDraft,
   runTeamCommand,
-  updateState,
   setDraft,
   setToast,
 }: AppTaskCreationRuntimeOptions): AppTaskCreationRuntime {
@@ -52,7 +50,17 @@ export function createAppTaskCreationRuntime({
       taskId: uid("task"),
       sortOrder: Date.now(),
     });
-    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> })
+    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> }, {
+      resourceKey: `task:${task.id}`,
+      pendingMode: "background",
+      optimistic: (state) => ({
+        next: { ...state, tasks: [task, ...state.tasks.filter((item) => item.id !== task.id)] },
+        rollback: (current) => ({
+          ...current,
+          tasks: current.tasks.filter((item) => item.id !== task.id || item.updatedAt !== task.updatedAt),
+        }),
+      }),
+    })
       .then((saved) => {
         if (!saved) return;
         setDraft(initialDraft);
@@ -65,7 +73,17 @@ export function createAppTaskCreationRuntime({
     const next = createProjectTaskInState(source, projectId, input, nowIso());
     const task = next.tasks.find((item) => !source.tasks.some((current) => current.id === item.id));
     if (!task) return;
-    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> })
+    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> }, {
+      resourceKey: `task:${task.id}`,
+      pendingMode: "background",
+      optimistic: (state) => ({
+        next: { ...state, tasks: [task, ...state.tasks.filter((item) => item.id !== task.id)] },
+        rollback: (current) => ({
+          ...current,
+          tasks: current.tasks.filter((item) => item.id !== task.id || item.updatedAt !== task.updatedAt),
+        }),
+      }),
+    })
       .then((saved) => saved && setToast("项目任务已创建"));
   };
 
@@ -80,7 +98,6 @@ export function createAppTaskCreationRuntime({
       ?? createDailyPlanForDate(source, date, timestamp, workspaceId);
     const snapshot = taskQueueCommitSnapshot(source, taskId, workspaceId, date);
     if (!snapshot) return;
-    updateState((current) => addTaskToDailyPlanInState(current, taskId, workspaceId, date, timestamp));
     void runTeamCommand({
       kind: "action",
       resource: "daily-plans",
@@ -89,12 +106,17 @@ export function createAppTaskCreationRuntime({
       workspaceId,
       payload: { task_id: taskId, date },
       idempotencyKey: `daily-plan:add-task:${plan.id}:${taskId}`,
+    }, {
+      resourceKey: `daily-plan:${plan.id}`,
+      pendingMode: "background",
+      optimistic: (current) => ({
+        next: addTaskToDailyPlanInState(current, taskId, workspaceId, date, timestamp),
+        rollback: (latest) => rollbackTaskQueueCommitInState(latest, taskId, workspaceId, date, snapshot),
+      }),
     }).then((saved) => {
       if (saved) {
         setToast("已加入工作队列");
-        return;
       }
-      updateState((current) => rollbackTaskQueueCommitInState(current, taskId, workspaceId, date, snapshot));
     });
   };
 
@@ -104,7 +126,29 @@ export function createAppTaskCreationRuntime({
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
-    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId }, idempotencyKey: `daily-plan:remove-task:${plan.id}:${taskId}` });
+    if (plan) {
+      const timestamp = nowIso();
+      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId }, idempotencyKey: `daily-plan:remove-task:${plan.id}:${taskId}` }, {
+        resourceKey: `daily-plan:${plan.id}`,
+        pendingMode: "background",
+        optimistic: (current) => ({
+          next: {
+            ...current,
+            dailyPlans: current.dailyPlans.map((item) => item.id === plan.id
+              ? { ...item, committedTaskIds: item.committedTaskIds.filter((id) => id !== taskId), updatedAt: timestamp }
+              : item),
+            tasks: current.tasks.map((item) => item.id === taskId && item.status === "committed"
+              ? { ...item, status: "pool", updatedAt: timestamp }
+              : item),
+          },
+          rollback: (latest) => ({
+            ...latest,
+            dailyPlans: latest.dailyPlans.map((item) => item.id === plan.id && item.updatedAt === timestamp ? plan : item),
+            tasks: latest.tasks.map((item) => item.id === taskId && item.updatedAt === timestamp ? task : item),
+          }),
+        }),
+      });
+    }
   };
 
   const moveCommittedTask = (taskId: string, direction: -1 | 1) => {
@@ -113,7 +157,22 @@ export function createAppTaskCreationRuntime({
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
-    if (plan) void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction }, idempotencyKey: `daily-plan:move-task:${plan.id}:${taskId}:${direction}` });
+    if (plan) {
+      const timestamp = nowIso();
+      const ids = [...plan.committedTaskIds];
+      const index = ids.indexOf(taskId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= ids.length) return;
+      [ids[index], ids[target]] = [ids[target], ids[index]];
+      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction }, idempotencyKey: `daily-plan:move-task:${plan.id}:${taskId}:${direction}` }, {
+        resourceKey: `daily-plan:${plan.id}`,
+        pendingMode: "background",
+        optimistic: (current) => ({
+          next: { ...current, dailyPlans: current.dailyPlans.map((item) => item.id === plan.id ? { ...item, committedTaskIds: ids, updatedAt: timestamp } : item) },
+          rollback: (latest) => ({ ...latest, dailyPlans: latest.dailyPlans.map((item) => item.id === plan.id && item.updatedAt === timestamp ? plan : item) }),
+        }),
+      });
+    }
   };
 
   const scheduleTaskForDate = (date: string, taskId: string) => {
@@ -121,17 +180,26 @@ export function createAppTaskCreationRuntime({
     const task = source.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
-    void ensureRemoteDailyPlan(source, workspaceId, date, runTeamCommand).then((remote) => {
-      if (!remote) return undefined;
-      return runTeamCommand({
-        kind: "action",
-        resource: "daily-plans",
-        id: remote.plan.id,
-        action: "add-task",
-        workspaceId,
-        payload: { task_id: taskId, date },
-        idempotencyKey: `daily-plan:add-task:${remote.plan.id}:${taskId}`,
-      });
+    const timestamp = nowIso();
+    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, date)
+      ?? createDailyPlanForDate(source, date, timestamp, workspaceId);
+    const snapshot = taskQueueCommitSnapshot(source, taskId, workspaceId, date);
+    if (!snapshot) return;
+    void runTeamCommand({
+      kind: "action",
+      resource: "daily-plans",
+      id: plan.id,
+      action: "add-task",
+      workspaceId,
+      payload: { task_id: taskId, date },
+      idempotencyKey: `daily-plan:add-task:${plan.id}:${taskId}`,
+    }, {
+      resourceKey: `daily-plan:${plan.id}`,
+      pendingMode: "background",
+      optimistic: (current) => ({
+        next: addTaskToDailyPlanInState(current, taskId, workspaceId, date, timestamp),
+        rollback: (latest) => rollbackTaskQueueCommitInState(latest, taskId, workspaceId, date, snapshot),
+      }),
     })
       .then((saved) => saved && setToast(date === today() ? "已加入工作队列" : "任务已排入日历计划"));
   };

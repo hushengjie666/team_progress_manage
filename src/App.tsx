@@ -33,7 +33,12 @@ export function App() {
   if (!teamDataRuntimeRef.current) {
     teamDataRuntimeRef.current = createTeamDataRuntime({
       getState: () => stateRef.current,
-      setState,
+      setState: (updater) => {
+        const current = stateRef.current;
+        const next = typeof updater === "function" ? updater(current) : updater;
+        stateRef.current = next;
+        setState(next);
+      },
       setToast,
     });
   }

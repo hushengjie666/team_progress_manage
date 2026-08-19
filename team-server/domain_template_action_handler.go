@@ -17,20 +17,15 @@ func (a *app) handleTaskTemplateAction(w http.ResponseWriter, r *http.Request, a
 		return
 	}
 	workspaceID := domainWorkspaceID(auth, req)
+	ctx, recorder := withMutationRecorder(r.Context(), firstNonEmpty(req.MutationID, mutationIDFromRequest(r)))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
-	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	if !claimed {
-		_ = tx.Rollback()
-		a.writeBootstrapRows(w, r, auth)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
 	template, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "task_template", templateID)
@@ -67,9 +62,5 @@ func (a *app) handleTaskTemplateAction(w http.ResponseWriter, r *http.Request, a
 		writeError(w, failure.status, failure.message)
 		return
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	a.writeBootstrapRows(w, r, auth)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }

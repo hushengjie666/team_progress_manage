@@ -16,13 +16,17 @@ type WorkspaceInvitationRefreshers = ReturnType<typeof createWorkspaceInvitation
 
 type WorkspaceInvitationCommandOptions = Pick<
   WorkspaceAccountRuntimeOptions,
-  "getState" | "setState" | "setToast"
+  "getState" | "setState" | "setToast" | "setWorkspaceInvitations" | "setProjectInvitations" | "getWorkspaceInvitations" | "getProjectInvitations"
 > & WorkspaceInvitationRefreshers;
 
 export function createWorkspaceInvitationCommands({
   getState,
   setState,
   setToast,
+  setWorkspaceInvitations,
+  setProjectInvitations,
+  getWorkspaceInvitations = () => [],
+  getProjectInvitations = () => [],
   refreshWorkspaceInvitations,
   refreshProjectInvitations,
 }: WorkspaceInvitationCommandOptions) {
@@ -42,6 +46,7 @@ export function createWorkspaceInvitationCommands({
     }
     void sendWorkspaceInvitation(source.backend, token, workspaceId, normalizedEmail)
       .then((invitation) => {
+        setWorkspaceInvitations([invitation, ...getWorkspaceInvitations().filter((item) => item.id !== invitation.id)]);
         setToast(`已向 ${invitation.inviteeEmail} 发送工作区邀请`);
       })
       .catch((error) => {
@@ -68,6 +73,7 @@ export function createWorkspaceInvitationCommands({
       roles: input.roles.length ? input.roles : ["executor"],
     })
       .then((invitation) => {
+        setProjectInvitations([invitation, ...getProjectInvitations().filter((item) => item.id !== invitation.id)]);
         setToast(`已向 ${invitation.inviteeEmail} 发送项目邀请`);
       })
       .catch((error) => {
@@ -135,20 +141,14 @@ export function createWorkspaceInvitationCommands({
       setToast("请先登录后台后再删除邀请");
       return;
     }
-    void (async () => {
-      try {
-        await deleteWorkspaceInvitation(source.backend, token, invitationId);
-      } catch (error) {
-        setToast(errorMessage(error, "工作区邀请删除失败"));
-        return;
-      }
-      try {
-        await refreshWorkspaceInvitations(source);
+    void deleteWorkspaceInvitation(source.backend, token, invitationId)
+      .then(() => {
+        setWorkspaceInvitations(getWorkspaceInvitations().filter((item) => item.id !== invitationId));
         setToast("已删除工作区邀请");
-      } catch {
-        setToast("已删除工作区邀请，刷新邀请失败，请刷新页面");
-      }
-    })();
+      })
+      .catch((error) => {
+        setToast(errorMessage(error, "工作区邀请删除失败"));
+      });
   };
 
   const deletePendingProjectInvitation = (invitationId: string) => {
@@ -158,20 +158,14 @@ export function createWorkspaceInvitationCommands({
       setToast("请先登录后台后再删除邀请");
       return;
     }
-    void (async () => {
-      try {
-        await deleteProjectInvitation(source.backend, token, invitationId);
-      } catch (error) {
-        setToast(errorMessage(error, "项目邀请删除失败"));
-        return;
-      }
-      try {
-        await refreshProjectInvitations(source);
+    void deleteProjectInvitation(source.backend, token, invitationId)
+      .then(() => {
+        setProjectInvitations(getProjectInvitations().filter((item) => item.id !== invitationId));
         setToast("已删除项目邀请");
-      } catch {
-        setToast("已删除项目邀请，刷新邀请失败，请刷新页面");
-      }
-    })();
+      })
+      .catch((error) => {
+        setToast(errorMessage(error, "项目邀请删除失败"));
+      });
   };
 
   return {

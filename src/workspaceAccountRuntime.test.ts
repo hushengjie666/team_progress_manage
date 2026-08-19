@@ -265,7 +265,6 @@ describe("workspace account runtime", () => {
 
     expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
       ["http://127.0.0.1:8787/workspace-invitations/invitation_1", "DELETE"],
-      ["http://127.0.0.1:8787/workspace-invitations", "GET"],
     ]);
     expect(getWorkspaceInvitationUpdateCounts()).toEqual([0]);
   });
@@ -297,7 +296,6 @@ describe("workspace account runtime", () => {
 
     expect(fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"])).toEqual([
       ["http://127.0.0.1:8787/project-invitations/project_invitation_1", "DELETE"],
-      ["http://127.0.0.1:8787/project-invitations", "GET"],
     ]);
     expect(getProjectInvitationUpdateCounts()).toEqual([0]);
   });

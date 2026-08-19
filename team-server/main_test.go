@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseCLIConfigPriority(t *testing.T) {
@@ -77,10 +78,31 @@ func TestHealthHandler(t *testing.T) {
 		`"api_protocol_version":` + strconv.FormatInt(apiProtocolVersion, 10),
 		`"database_schema_version":` + strconv.FormatInt(databaseSchemaVersion, 10),
 		`"minimum_client_release":"` + minimumClientRelease + `"`,
+		`"mutation_delta_version":1`,
+		`"realtime_transport":"websocket"`,
 	} {
 		if !strings.Contains(recorder.Body.String(), expected) {
 			t.Fatalf("health response missing %s: %s", expected, recorder.Body.String())
 		}
+	}
+}
+
+func TestRealtimeTicketIsSingleUseAndExpires(t *testing.T) {
+	api := testApp(t)
+	auth := authContext{AccountID: "account_test", WorkspaceID: "workspace_test"}
+	ticket, _ := api.realtime.issueTicket(auth)
+	consumed, ok := api.realtime.consumeTicket(ticket)
+	if !ok || consumed != auth {
+		t.Fatalf("ticket auth = %#v ok=%v", consumed, ok)
+	}
+	if _, ok := api.realtime.consumeTicket(ticket); ok {
+		t.Fatal("single-use realtime ticket was accepted twice")
+	}
+	api.realtime.mu.Lock()
+	api.realtime.tickets["expired"] = realtimeTicket{auth: auth, expiresAt: time.Now().Add(-time.Second)}
+	api.realtime.mu.Unlock()
+	if _, ok := api.realtime.consumeTicket("expired"); ok {
+		t.Fatal("expired realtime ticket was accepted")
 	}
 }
 

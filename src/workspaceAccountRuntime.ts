@@ -65,6 +65,8 @@ export function createWorkspaceAccountRuntime({
   getPlatformAccounts = () => [],
   setWorkspaceInvitations,
   setProjectInvitations,
+  getWorkspaceInvitations,
+  getProjectInvitations,
 }: WorkspaceAccountRuntimeOptions): WorkspaceAccountRuntime {
   const platformAccounts = createWorkspacePlatformAccountRuntime({
     getState,
@@ -78,6 +80,8 @@ export function createWorkspaceAccountRuntime({
     setToast,
     setWorkspaceInvitations,
     setProjectInvitations,
+    getWorkspaceInvitations,
+    getProjectInvitations,
   });
   const workspaceMutations = createWorkspaceMutationRuntime({
     getState,

@@ -121,12 +121,17 @@ func (a *app) handleBusinessImport(w http.ResponseWriter, r *http.Request, auth 
 		writeError(w, http.StatusBadRequest, "import rows are required")
 		return
 	}
+	ctx, recorder := withMutationRecorder(r.Context(), mutationIDFromRequest(r))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "import failed")
 		return
 	}
 	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
 	for _, row := range req.Rows {
 		row.WorkspaceID = businessWorkspaceIDForRow(auth, row)
 		row.AccountID = auth.AccountID
@@ -149,11 +154,7 @@ func (a *app) handleBusinessImport(w http.ResponseWriter, r *http.Request, auth 
 			return
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "import failed")
-		return
-	}
-	a.writeBootstrapRows(w, r, auth)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }
 
 func (a *app) handleBusinessResource(w http.ResponseWriter, r *http.Request, auth authContext, spec domainResourceSpec) {
@@ -239,6 +240,8 @@ func (a *app) createBusinessResource(w http.ResponseWriter, r *http.Request, aut
 	payload["updatedAt"] = now
 	raw, _ := json.Marshal(payload)
 	row := businessRow{WorkspaceID: workspaceID, AccountID: auth.AccountID, Entity: spec.entity, ID: id, UpdatedAt: now, Payload: raw}
+	ctx, recorder := withMutationRecorder(r.Context(), mutationIDFromRequest(r))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
@@ -257,7 +260,8 @@ func (a *app) createBusinessResource(w http.ResponseWriter, r *http.Request, aut
 			return
 		}
 		_ = tx.Rollback()
-		writeJSON(w, http.StatusOK, map[string]any{"row": existing})
+		recorder.recordRow(existing)
+		writeMutationDelta(w, http.StatusOK, recorder)
 		return
 	}
 	failure := applyBusinessOperation(r.Context(), tx, auth, businessOperation{Operation: "create", Row: &row})
@@ -278,11 +282,7 @@ func (a *app) createBusinessResource(w http.ResponseWriter, r *http.Request, aut
 			return
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"row": row})
+	a.commitMutation(w, r, tx, auth, http.StatusCreated, recorder)
 }
 
 func filteredPatch(payload map[string]any, allowed map[string]bool, now string) (json.RawMessage, bool) {
@@ -311,12 +311,17 @@ func (a *app) patchBusinessResource(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	workspaceID := workspaceIDFromRequest(auth, r, payload)
+	ctx, recorder := withMutationRecorder(r.Context(), mutationIDFromRequest(r))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
 	failure := applyBusinessOperation(r.Context(), tx, auth, businessOperation{Operation: "patch", WorkspaceID: workspaceID, Entity: spec.entity, ID: id, UpdatedAt: now, Patch: patch})
 	if failure.status != 0 {
 		writeError(w, failure.status, failure.message)
@@ -327,11 +332,8 @@ func (a *app) patchBusinessResource(w http.ResponseWriter, r *http.Request, auth
 		writeError(w, http.StatusInternalServerError, "reload failed")
 		return
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"row": row})
+	recorder.recordRow(row)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }
 
 func (a *app) deleteBusinessResource(w http.ResponseWriter, r *http.Request, auth authContext, spec domainResourceSpec, id string) {
@@ -339,20 +341,21 @@ func (a *app) deleteBusinessResource(w http.ResponseWriter, r *http.Request, aut
 	if workspaceID == "" {
 		workspaceID = auth.WorkspaceID
 	}
+	ctx, recorder := withMutationRecorder(r.Context(), mutationIDFromRequest(r))
+	r = r.WithContext(ctx)
 	tx, err := a.db.BeginTx(r.Context(), nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
 	defer mysqlRollback(tx)
+	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+		return
+	}
 	failure := applyBusinessOperation(r.Context(), tx, auth, businessOperation{Operation: "delete", WorkspaceID: workspaceID, Entity: spec.entity, ID: id})
 	if failure.status != 0 {
 		writeError(w, failure.status, failure.message)
 		return
 	}
-	if err := tx.Commit(); err != nil {
-		writeError(w, http.StatusInternalServerError, "save failed")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
 }

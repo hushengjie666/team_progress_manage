@@ -5,7 +5,6 @@ import {
 } from "./teamBackend";
 import { tokenForState } from "./workspaceAccountMetadata";
 import type { WorkspaceAccountRuntime, WorkspaceAccountRuntimeOptions } from "./workspaceAccountTypes";
-import { loadStateWithFreshWorkspaces } from "./workspaceRuntimeState";
 import type { WorkspaceMembershipUpdateInput, WorkspaceUpdateInput } from "./types";
 
 type WorkspaceMutationRuntime = Pick<
@@ -51,8 +50,21 @@ export function createWorkspaceMutationRuntime({
         ownerAccountId: input.ownerAccountId,
         confirmRestrictMembers,
       });
-      const loaded = await loadStateWithFreshWorkspaces(source, token, updatedWorkspace);
-      setState(loaded);
+      setState((current) => current ? {
+        ...current,
+        auth: {
+          ...current.auth,
+          workspace: current.auth.workspace?.id === workspaceId ? updatedWorkspace : current.auth.workspace,
+          workspaces: (current.auth.workspaces ?? []).map((workspace) => workspace.id === workspaceId ? updatedWorkspace : workspace),
+          workspaceMemberships: input.type === "private"
+            ? (current.auth.workspaceMemberships ?? []).map((membership) =>
+                membership.workspaceId === workspaceId && membership.accountId !== updatedWorkspace.ownerAccountId
+                  ? { ...membership, status: "disabled" as const }
+                  : membership,
+              )
+            : current.auth.workspaceMemberships,
+        },
+      } : current);
       setToast("工作区已更新");
       return true;
     } catch (error) {
@@ -73,9 +85,15 @@ export function createWorkspaceMutationRuntime({
       return false;
     }
     try {
-      await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, input);
-      const loaded = await loadStateWithFreshWorkspaces(source, token);
-      setState(loaded);
+      const updated = await updateWorkspaceMembershipDetails(source.backend, token, workspaceId, membershipId, input);
+      setState((current) => current ? {
+        ...current,
+        auth: {
+          ...current.auth,
+          membership: current.auth.membership?.id === updated.id ? updated : current.auth.membership,
+          workspaceMemberships: (current.auth.workspaceMemberships ?? []).map((membership) => membership.id === updated.id ? updated : membership),
+        },
+      } : current);
       setToast(input.status === "disabled" ? "工作区成员已解除绑定" : "工作区成员已更新");
       return true;
     } catch (error) {

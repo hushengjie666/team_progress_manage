@@ -16,7 +16,7 @@ type WorkspaceInvitationRuntime = Pick<
 
 type WorkspaceInvitationRuntimeOptions = Pick<
   WorkspaceAccountRuntimeOptions,
-  "getState" | "setState" | "setToast" | "setWorkspaceInvitations" | "setProjectInvitations"
+  "getState" | "setState" | "setToast" | "setWorkspaceInvitations" | "setProjectInvitations" | "getWorkspaceInvitations" | "getProjectInvitations"
 >;
 
 export function createWorkspaceInvitationRuntime({
@@ -25,6 +25,8 @@ export function createWorkspaceInvitationRuntime({
   setToast,
   setWorkspaceInvitations,
   setProjectInvitations,
+  getWorkspaceInvitations,
+  getProjectInvitations,
 }: WorkspaceInvitationRuntimeOptions): WorkspaceInvitationRuntime {
   const refreshers = createWorkspaceInvitationRefreshers({
     getState,
@@ -35,6 +37,10 @@ export function createWorkspaceInvitationRuntime({
     getState,
     setState,
     setToast,
+    setWorkspaceInvitations,
+    setProjectInvitations,
+    getWorkspaceInvitations,
+    getProjectInvitations,
     ...refreshers,
   });
 

@@ -21,9 +21,24 @@ func TestDeletingTaskCleansPlansAndActiveSessions(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodDelete, "/tasks/task_delete_test?workspace_id=workspace_test", nil)
+	request.Header.Set("Idempotency-Key", "delete-task-test")
 	api.deleteBusinessResource(recorder, request, ownerAuth(), domainResourceByEntity("task"), task.ID)
-	if recorder.Code != http.StatusNoContent {
+	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var delta mutationDeltaResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &delta); err != nil {
+		t.Fatal(err)
+	}
+	if !delta.Delta || len(delta.Deleted) != 1 || delta.Deleted[0].ID != task.ID || len(delta.Rows) < 3 {
+		t.Fatalf("incomplete delete delta: %s", recorder.Body.String())
+	}
+	replay := httptest.NewRecorder()
+	replayRequest := httptest.NewRequest(http.MethodDelete, "/tasks/task_delete_test?workspace_id=workspace_test", nil)
+	replayRequest.Header.Set("Idempotency-Key", "delete-task-test")
+	api.deleteBusinessResource(replay, replayRequest, ownerAuth(), domainResourceByEntity("task"), task.ID)
+	if replay.Code != recorder.Code || replay.Body.String() != recorder.Body.String() || replay.Header().Get("X-TimeManage-Idempotency-Replayed") != "true" {
+		t.Fatalf("idempotent replay differs: status=%d body=%s", replay.Code, replay.Body.String())
 	}
 	if _, found, err := businessExistingRow(context.Background(), api.db, task.WorkspaceID, task.Entity, task.ID); err != nil || found {
 		t.Fatalf("deleted task found=%v err=%v", found, err)

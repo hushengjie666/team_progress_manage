@@ -17,6 +17,8 @@ export function createAppRootRuntimes(shell: AppShellSource, teamDataRuntime: Te
     setPlatformAccounts,
     setWorkspaceInvitations,
     setProjectInvitations,
+    workspaceInvitations,
+    projectInvitations,
     setSuppressAutoLogin,
     setSelectedTaskId,
     setPreferredFocusTaskId,
@@ -34,6 +36,8 @@ export function createAppRootRuntimes(shell: AppShellSource, teamDataRuntime: Te
     getPlatformAccounts: () => platformAccounts,
     setWorkspaceInvitations,
     setProjectInvitations,
+    getWorkspaceInvitations: () => workspaceInvitations,
+    getProjectInvitations: () => projectInvitations,
   });
 
   const updateState = (updater: (value: AppState) => AppState) => {

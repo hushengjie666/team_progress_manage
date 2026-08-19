@@ -1,5 +1,5 @@
-import type { Route } from "@playwright/test";
-import type { BusinessEntity, BusinessRow } from "../../../src/teamBusinessRows";
+import type { Request, Route } from "@playwright/test";
+import type { BusinessDeletedRow, BusinessEntity, BusinessRow } from "../../../src/teamBusinessRows";
 import { businessRowKey } from "../../../src/teamBusinessRows";
 import { applyBusinessRow, rowsForRuntimeStates, rowsFromState } from "./mockTeamBackendState";
 import { fulfillJson } from "./mockTeamBackendResponses";
@@ -18,6 +18,20 @@ const entityByResource: Record<string, BusinessEntity> = {
   "task-templates": "task_template",
   "template-instances": "template_instance",
 };
+
+const mutationDelta = (
+  request: Request,
+  rows: BusinessRow[],
+  deleted: BusinessDeletedRow[] = [],
+  settings: Record<string, unknown> = {},
+) => ({
+  mutation_id: request.headers()["x-timemanage-mutation-id"] ?? request.headers()["idempotency-key"] ?? `mutation_${Date.now()}`,
+  delta: true,
+  rows,
+  deleted,
+  settings,
+  server_time: new Date().toISOString(),
+});
 
 const bootstrapPayload = (runtime: MockTeamBackendRuntime) => {
   const state = runtime.projectInvitationAccepted && runtime.options.acceptedProjectInvitationState
@@ -86,7 +100,7 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
   }
   if (url.pathname === "/settings" && request.method() === "PATCH") {
     runtime.initialState = { ...runtime.initialState, settings: { ...runtime.initialState.settings, ...request.postDataJSON() } };
-    await fulfillJson(route, { settings: runtime.initialState.settings });
+    await fulfillJson(route, mutationDelta(request, [], [], runtime.initialState.settings));
     return true;
   }
 
@@ -104,7 +118,7 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     };
     rowsByKey.set(businessRowKey(row), row);
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, { row });
+    await fulfillJson(route, mutationDelta(request, [row]));
     return true;
   }
   const currentEntry = [...rowsByKey.entries()].find(([, row]) => row.entity === entity && row.id === id);
@@ -170,7 +184,7 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
       changedRows.push(taskRow);
     }
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, { delta: true, rows: changedRows });
+    await fulfillJson(route, mutationDelta(request, changedRows));
     return true;
   }
   if (!currentEntry) {
@@ -184,6 +198,8 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     const taskIds = new Set([...rowsByKey.values()]
       .filter((row) => row.entity === "task" && (row.payload as { projectId?: string }).projectId === id)
       .map((row) => row.id));
+    const changedRows: BusinessRow[] = [];
+    const deleted: BusinessDeletedRow[] = [];
     for (const [key, row] of [...rowsByKey.entries()]) {
       const payload = row.payload as Record<string, unknown>;
       const belongsToProject = row.id === id && row.entity === "project"
@@ -193,17 +209,24 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
       const nextPayload = row.entity === "project" ? mergePayload(payload, projectPatch) : { ...payload };
       nextPayload.workspaceId = targetWorkspace;
       const moved = { ...row, workspace_id: targetWorkspace, payload: nextPayload as never };
+      deleted.push({ workspace_id: row.workspace_id, account_id: row.account_id, entity: row.entity, id: row.id });
+      changedRows.push(moved);
       rowsByKey.delete(key);
       rowsByKey.set(businessRowKey(moved), moved);
     }
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, { rows: [...rowsByKey.values()] });
+    await fulfillJson(route, mutationDelta(request, changedRows, deleted));
     return true;
   }
   if (request.method() === "DELETE") {
     rowsByKey.delete(currentKey);
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, {});
+    await fulfillJson(route, mutationDelta(request, [], [{
+      workspace_id: current.workspace_id,
+      account_id: current.account_id,
+      entity: current.entity,
+      id: current.id,
+    }]));
     return true;
   }
   if (request.method() === "PATCH") {
@@ -213,7 +236,7 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     rowsByKey.delete(currentKey);
     rowsByKey.set(businessRowKey(row), row);
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, { row });
+    await fulfillJson(route, mutationDelta(request, [row]));
     return true;
   }
   return false;

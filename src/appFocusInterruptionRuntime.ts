@@ -39,7 +39,17 @@ export function createAppFocusInterruptionRuntime({
       createdAt: timestamp,
     };
 
-    void runTeamCommand({ kind: "create", entity: "interruption", workspaceId: interruption.workspaceId, payload: interruption as unknown as Record<string, unknown> })
+    void runTeamCommand({ kind: "create", entity: "interruption", workspaceId: interruption.workspaceId, payload: interruption as unknown as Record<string, unknown> }, {
+      resourceKey: `interruption:${interruption.id}`,
+      pendingMode: "background",
+      optimistic: (current) => ({
+        next: { ...current, interruptions: [interruption, ...current.interruptions] },
+        rollback: (latest) => ({
+          ...latest,
+          interruptions: latest.interruptions.filter((item) => item.id !== interruption.id),
+        }),
+      }),
+    })
       .then((saved) => {
         if (!saved) return;
         setQuickNote("");
