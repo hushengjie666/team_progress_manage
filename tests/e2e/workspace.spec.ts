@@ -21,6 +21,46 @@ test("shows matching client and server versions from the top bar", async ({ page
   await expect(versionDialog.getByText("数据库结构").locator("..")).toContainText(`schema ${releaseContract.databaseSchemaVersion}`);
 });
 
+test("shows a queued task immediately and avoids a full reload after confirmation", async ({ page }) => {
+  const state = authenticatedState();
+  const title = "立即进入今日清单的任务";
+  state.tasks.push({
+    ...state.tasks[0],
+    id: "task_queue_immediate",
+    title,
+    status: "pool",
+    sortOrder: 20,
+  });
+  await openApp(page, state);
+  await page.getByLabel("页面导航").getByRole("button", { name: "我的任务" }).click();
+
+  let releaseWrite = () => undefined;
+  let markWriteStarted = () => undefined;
+  const writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+  const writeStarted = new Promise<void>((resolve) => { markWriteStarted = resolve; });
+  let bootstrapRequests = 0;
+  page.on("request", (request) => {
+    if (request.method() === "GET" && request.url() === `${MOCK_SERVER}/app/bootstrap`) bootstrapRequests += 1;
+  });
+  await page.route(`${MOCK_SERVER}/daily-plans/**`, async (route) => {
+    markWriteStarted();
+    await writeGate;
+    await route.fallback();
+  });
+
+  const activityColumn = page.locator("section.task-column").filter({ has: page.getByRole("heading", { name: "活动清单" }) });
+  const queueColumn = page.locator("section.task-column").filter({ has: page.getByRole("heading", { name: "工作队列" }) });
+  await activityColumn.locator("article").filter({ hasText: title }).getByRole("button", { name: "加入队列" }).click();
+  await writeStarted;
+
+  await expect(queueColumn.locator("article").filter({ hasText: title })).toBeVisible();
+  expect(bootstrapRequests).toBe(0);
+
+  releaseWrite();
+  await expect(page.getByText("已加入工作队列")).toBeVisible();
+  await expect.poll(() => bootstrapRequests).toBe(0);
+});
+
 test("signs out without writing the session change as business data", async ({ page }) => {
   const businessWrites: string[] = [];
   page.on("request", (request) => {

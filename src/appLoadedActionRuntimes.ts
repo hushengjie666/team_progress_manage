@@ -32,6 +32,7 @@ export function createAppLoadedActionRuntimes({
     getDeletedTaskSnapshot: () => shell.deletedTaskSnapshot,
     getPendingSplit: () => shell.pendingSplit,
     runTeamCommand,
+    updateState,
     setDraft: shell.setDraft,
     setToast: shell.setToast,
     setSelectedTaskId: shell.setSelectedTaskId,

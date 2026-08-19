@@ -212,5 +212,55 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
   };
 }
 
+const replacePayloadById = <T extends { id: string }>(items: T[], row: BusinessRow) => {
+  const payload = row.payload as unknown as T;
+  const index = items.findIndex((item) => item.id === row.id);
+  if (index < 0) return [...items, payload];
+  return items.map((item, itemIndex) => itemIndex === index ? payload : item);
+};
+
+const replaceTemplateInstance = (items: TemplateInstance[], row: BusinessRow) => {
+  const payload = row.payload as TemplateInstance;
+  const index = items.findIndex((item) => templateInstanceId(item) === row.id);
+  if (index < 0) return [...items, payload];
+  return items.map((item, itemIndex) => itemIndex === index ? payload : item);
+};
+
+export function mergeBusinessRowChangesIntoState(local: AppState, rows: BusinessRow[]): AppState {
+  const confirmedAt = new Date().toISOString();
+  let next: AppState = {
+    ...local,
+    backend: {
+      ...local.backend,
+      status: "ready",
+      message: "业务操作已保存",
+      lastSavedAt: confirmedAt,
+      failureKind: undefined,
+    },
+    updatedAt: confirmedAt,
+  };
+
+  for (const row of rows) {
+    if (row.entity === "project") next = { ...next, projects: replacePayloadById(next.projects, row) };
+    if (row.entity === "project_member") next = { ...next, projectMembers: replacePayloadById(next.projectMembers, row) };
+    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
+    if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
+    if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
+    if (row.entity === "work_session") next = { ...next, workSessions: replacePayloadById(next.workSessions, row) };
+    if (row.entity === "execution_signal") next = { ...next, executionSignals: replacePayloadById(next.executionSignals, row) };
+    if (row.entity === "interruption") next = { ...next, interruptions: replacePayloadById(next.interruptions, row) };
+    if (row.entity === "task_template") next = { ...next, taskTemplates: replacePayloadById(next.taskTemplates, row) };
+    if (row.entity === "template_instance") next = { ...next, templateInstances: replaceTemplateInstance(next.templateInstances, row) };
+    if (row.entity === "reward_state" && (!row.account_id || row.account_id === local.auth.account?.id)) {
+      next = { ...next, rewardState: row.payload as RewardState };
+    }
+  }
+
+  return {
+    ...next,
+    projectMembers: dedupeProjectMembersByIdentity(next.projectMembers),
+  };
+}
+
 export const businessRowKey = (row: Pick<BusinessRow, "workspace_id" | "entity" | "id">) =>
   `${row.workspace_id ?? ""}:${row.entity}:${row.id}`;

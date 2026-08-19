@@ -14,6 +14,7 @@ export type AppTaskActionsRuntimeOptions = {
   getDeletedTaskSnapshot: () => DeletedTaskSnapshot | null;
   getPendingSplit: () => SplitDraft | null;
   runTeamCommand: RunTeamDomainCommand;
+  updateState: (updater: (state: AppState) => AppState) => void;
   setDraft: AppTaskActionSetter<TaskDraft>;
   setToast: (message: string) => void;
   setSelectedTaskId: AppTaskActionSetter<string | null>;

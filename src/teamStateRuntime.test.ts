@@ -96,4 +96,30 @@ describe("team state runtime", () => {
     expect(getCurrent()?.projects).toEqual(before.projects);
     expect(getToast()).toContain("backend down");
   });
+
+  it("applies a delta response without downloading the full bootstrap again", async () => {
+    const before = signedInState();
+    const confirmedTask = { ...before.tasks[0], status: "committed" as const, updatedAt: "2026-08-19T03:00:00.000Z" };
+    const row = businessRowsFromState({ ...before, tasks: [confirmedTask, ...before.tasks.slice(1)] })
+      .find((item) => item.entity === "task" && item.id === confirmedTask.id)!;
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ delta: true, rows: [row] }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime, getCurrent } = createHarness(before);
+
+    const saved = await runtime.runTeamCommand({
+      kind: "action",
+      resource: "daily-plans",
+      id: before.dailyPlans[0].id,
+      action: "add-task",
+      payload: { task_id: confirmedTask.id },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("/daily-plans/");
+    expect(saved?.tasks.find((item) => item.id === confirmedTask.id)).toEqual(confirmedTask);
+    expect(getCurrent()?.backend.status).toBe("ready");
+  });
 });

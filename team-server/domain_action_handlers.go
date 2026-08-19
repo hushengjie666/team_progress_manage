@@ -389,7 +389,14 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	defer mysqlRollback(tx)
-	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
+	claimed, err := claimIdempotencyKey(r.Context(), tx, auth.AccountID, r.Header.Get("Idempotency-Key"), r.URL.Path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
+	if !claimed {
+		_ = tx.Rollback()
+		a.writeDailyPlanActionDelta(w, r, auth, workspaceID, planID, req.TaskID)
 		return
 	}
 	row, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "daily_plan", planID)
@@ -455,7 +462,15 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if strings.TrimSpace(req.TaskID) != "" {
 		task, taskFound, _ := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "task", req.TaskID)
+		if !taskFound && action == "add-task" {
+			writeError(w, http.StatusNotFound, "task not found")
+			return
+		}
 		if taskFound {
+			if allowed, accessErr := businessRowMutationAllowed(r.Context(), tx, auth, task, task, false); accessErr != nil || !allowed {
+				writeError(w, http.StatusForbidden, "task write denied")
+				return
+			}
 			taskPayload, _ := rowPayloadObject(task)
 			if action == "add-task" && stringField(task.Payload, "status") == "pool" {
 				taskPayload["status"] = "committed"
@@ -473,14 +488,5 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 		writeError(w, http.StatusInternalServerError, "save failed")
 		return
 	}
-	a.writeBootstrapRows(w, r, auth)
-}
-
-func (a *app) writeBootstrapRows(w http.ResponseWriter, r *http.Request, auth authContext) {
-	rows, err := a.businessRowsForAccount(r.Context(), auth)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "reload failed")
-		return
-	}
-	writeJSON(w, http.StatusOK, teamDataResponse{Rows: rows})
+	a.writeDailyPlanActionDelta(w, r, auth, workspaceID, planID, req.TaskID)
 }

@@ -108,6 +108,71 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     return true;
   }
   const currentEntry = [...rowsByKey.entries()].find(([, row]) => row.entity === entity && row.id === id);
+  if (request.method() === "POST" && entity === "daily_plan" && ["add-task", "remove-task", "move-task"].includes(parts[2] ?? "")) {
+    const timestamp = new Date().toISOString();
+    const taskId = String(body.task_id ?? "");
+    const action = parts[2];
+    const currentPayload = currentEntry?.[1].payload as Record<string, unknown> | undefined;
+    const committedTaskIds = Array.isArray(currentPayload?.committedTaskIds)
+      ? [...currentPayload.committedTaskIds] as string[]
+      : [];
+    if (action === "add-task" && !committedTaskIds.includes(taskId)) committedTaskIds.push(taskId);
+    if (action === "remove-task") {
+      const index = committedTaskIds.indexOf(taskId);
+      if (index >= 0) committedTaskIds.splice(index, 1);
+    }
+    if (action === "move-task") {
+      const index = committedTaskIds.indexOf(taskId);
+      const target = index + Number(body.direction ?? 0);
+      if (index >= 0 && target >= 0 && target < committedTaskIds.length) {
+        [committedTaskIds[index], committedTaskIds[target]] = [committedTaskIds[target], committedTaskIds[index]];
+      }
+    }
+    const planPayload = currentPayload
+      ? { ...currentPayload, committedTaskIds, updatedAt: timestamp }
+      : {
+          id,
+          workspaceId,
+          ownerAccountId: runtime.initialState.auth.account?.id,
+          date: String(body.date ?? ""),
+          capacityPomodoros: 8,
+          committedTaskIds,
+          completedPomodoros: 0,
+          suggestedTaskIds: [],
+          reflection: "",
+          review: { mood: "normal", wins: "", blockers: "", interruptionPattern: "", tomorrowFocus: "" },
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        };
+    const planRow: BusinessRow = {
+      workspace_id: workspaceId,
+      account_id: runtime.initialState.auth.account?.id,
+      entity: "daily_plan",
+      id,
+      updated_at: timestamp,
+      payload: planPayload as never,
+    };
+    if (currentEntry) rowsByKey.delete(currentEntry[0]);
+    rowsByKey.set(businessRowKey(planRow), planRow);
+    const changedRows: BusinessRow[] = [planRow];
+    const taskEntry = [...rowsByKey.entries()].find(([, row]) => row.entity === "task" && row.id === taskId);
+    if (taskEntry) {
+      const taskPayload = taskEntry[1].payload as Record<string, unknown>;
+      const nextStatus = action === "add-task" && taskPayload.status === "pool"
+        ? "committed"
+        : action === "remove-task" && taskPayload.status === "committed" ? "pool" : taskPayload.status;
+      const taskRow: BusinessRow = {
+        ...taskEntry[1],
+        updated_at: timestamp,
+        payload: { ...taskPayload, status: nextStatus, updatedAt: timestamp } as never,
+      };
+      rowsByKey.set(taskEntry[0], taskRow);
+      changedRows.push(taskRow);
+    }
+    rebuildStates(runtime, [...rowsByKey.values()]);
+    await fulfillJson(route, { delta: true, rows: changedRows });
+    return true;
+  }
   if (!currentEntry) {
     await fulfillJson(route, { error: `${entity} not found` }, 404);
     return true;

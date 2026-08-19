@@ -17,6 +17,13 @@ export type TeamDomainCommand =
       idempotencyKey?: string;
     };
 
+export type TeamDomainCommandResult = {
+  delta?: boolean;
+  rows?: BusinessRow[];
+  row?: BusinessRow;
+  settings?: Record<string, unknown>;
+};
+
 const resourcePathByEntity: Record<BusinessEntity, string> = {
   project: "projects",
   project_member: "project-members",
@@ -51,7 +58,7 @@ export async function submitTeamDomainCommand(
   backend: BackendConnectionState,
   token: string,
   command: TeamDomainCommand,
-) {
+): Promise<TeamDomainCommandResult | undefined> {
   if (command.kind === "settings") {
     return requestJson<{ settings: Record<string, unknown> }>(apiUrl(backend.serverUrl, "/settings"), {
       method: "PATCH",
@@ -94,13 +101,14 @@ export async function submitTeamDomainCommand(
       body: JSON.stringify(command.patch),
     });
   }
-  return requestJson<void>(url, {
+  await requestJson<void>(url, {
     method: "DELETE",
     headers: {
       ...authHeaders(token),
       ...(command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}),
     },
   });
+  return undefined;
 }
 
 export type RunTeamDomainCommand = (command: TeamDomainCommand) => Promise<AppState | undefined>;

@@ -1,6 +1,12 @@
 import { createProjectTaskInState, type ProjectTaskInput } from "./projectDetail";
+import { createDailyPlanForDate } from "./appTodayPlan";
 import { uid } from "./seed";
 import { createTaskFromDraft } from "./appTaskState";
+import {
+  addTaskToDailyPlanInState,
+  rollbackTaskQueueCommitInState,
+  taskQueueCommitSnapshot,
+} from "./dailyPlanQueueState";
 import {
   initialDraft,
   nowIso,
@@ -17,7 +23,7 @@ type AppTaskCreationRuntime = Pick<
 
 type AppTaskCreationRuntimeOptions = Pick<
   AppTaskActionsRuntimeOptions,
-  "getState" | "getCurrentProjectId" | "getDraft" | "runTeamCommand" | "setDraft" | "setToast"
+  "getState" | "getCurrentProjectId" | "getDraft" | "runTeamCommand" | "updateState" | "setDraft" | "setToast"
 >;
 
 export function createAppTaskCreationRuntime({
@@ -25,6 +31,7 @@ export function createAppTaskCreationRuntime({
   getCurrentProjectId,
   getDraft,
   runTeamCommand,
+  updateState,
   setDraft,
   setToast,
 }: AppTaskCreationRuntimeOptions): AppTaskCreationRuntime {
@@ -67,19 +74,28 @@ export function createAppTaskCreationRuntime({
     const task = source.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
-    void ensureRemoteDailyPlan(source, workspaceId, today(), runTeamCommand).then((remote) => {
-      if (!remote) return undefined;
-      return runTeamCommand({
-        kind: "action",
-        resource: "daily-plans",
-        id: remote.plan.id,
-        action: "add-task",
-        workspaceId,
-        payload: { task_id: taskId, date: today() },
-        idempotencyKey: `daily-plan:add-task:${remote.plan.id}:${taskId}`,
-      });
-    })
-      .then((saved) => saved && setToast("已加入工作队列"));
+    const date = today();
+    const timestamp = nowIso();
+    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, date)
+      ?? createDailyPlanForDate(source, date, timestamp, workspaceId);
+    const snapshot = taskQueueCommitSnapshot(source, taskId, workspaceId, date);
+    if (!snapshot) return;
+    updateState((current) => addTaskToDailyPlanInState(current, taskId, workspaceId, date, timestamp));
+    void runTeamCommand({
+      kind: "action",
+      resource: "daily-plans",
+      id: plan.id,
+      action: "add-task",
+      workspaceId,
+      payload: { task_id: taskId, date },
+      idempotencyKey: `daily-plan:add-task:${plan.id}:${taskId}`,
+    }).then((saved) => {
+      if (saved) {
+        setToast("已加入工作队列");
+        return;
+      }
+      updateState((current) => rollbackTaskQueueCommitInState(current, taskId, workspaceId, date, snapshot));
+    });
   };
 
   const removeCommittedTask = (taskId: string) => {

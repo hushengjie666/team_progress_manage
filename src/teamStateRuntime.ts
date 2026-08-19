@@ -1,5 +1,6 @@
 import { applyTeamStateSaveFailure } from "./appBoot";
 import { loadTeamData } from "./teamBusinessApi";
+import { mergeBusinessRowChangesIntoState } from "./teamBusinessRows";
 import { submitTeamDomainCommand, type RunTeamDomainCommand } from "./teamDomainCommands";
 import type { AppState } from "./types";
 
@@ -29,11 +30,17 @@ export const createTeamDataRuntime = ({ getState, setState, setToast }: TeamData
         backend: { ...current.backend, status: "saving", message: "正在执行业务操作" },
       });
       try {
-        await submitTeamDomainCommand(current.backend, token, command);
-        const latest = await loadTeamData({
-          ...current,
-          backend: { ...current.backend, lastSavedAt: new Date().toISOString(), failureKind: undefined },
-        });
+        const result = await submitTeamDomainCommand(current.backend, token, command);
+        const confirmedSource = getState() ?? current;
+        const savedSource = {
+          ...confirmedSource,
+          backend: { ...confirmedSource.backend, lastSavedAt: new Date().toISOString(), failureKind: undefined },
+        };
+        const latest = result?.delta && result.rows
+          ? mergeBusinessRowChangesIntoState(savedSource, result.rows)
+          : await loadTeamData({
+              ...savedSource,
+            });
         setState(latest);
         return latest;
       } catch (error) {

@@ -12,7 +12,8 @@ type businessRow struct {
 }
 
 type teamDataResponse struct {
-	Rows []businessRow `json:"rows"`
+	Rows  []businessRow `json:"rows"`
+	Delta bool          `json:"delta,omitempty"`
 }
 
 type businessOperation struct {
