@@ -4,6 +4,7 @@
 @import "./styles/app-shell.css";
 @import "./styles/topbar.css";
 @import "./styles/invitation-menu.css";
+@import "./styles/version-menu.css";
 @import "./styles/toast.css";
 @import "./styles/workspace.css";
 @import "./styles/workspace-workbench.css";

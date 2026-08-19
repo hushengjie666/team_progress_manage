@@ -1,4 +1,5 @@
 import { expect, test, type Route } from "@playwright/test";
+import { releaseContract } from "../../src/releaseContract";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
 import { authenticatedState } from "./support/authenticatedState";
@@ -6,6 +7,18 @@ import { workspaceMemberState } from "./support/scenarioStates";
 
 test.beforeEach(async ({ page }) => {
   await clearStoredApp(page);
+});
+
+test("shows matching client and server versions from the top bar", async ({ page }) => {
+  await openApp(page);
+
+  await page.getByRole("button", { name: `版本 v${releaseContract.releaseVersion}，版本匹配` }).click();
+  const versionDialog = page.getByRole("dialog", { name: "版本信息" });
+  await expect(versionDialog).toBeVisible();
+  await expect(versionDialog.getByText("本机客户端").locator("..")).toContainText(`v${releaseContract.releaseVersion}`);
+  await expect(versionDialog.getByText("服务器后台").locator("..")).toContainText(`v${releaseContract.releaseVersion}`);
+  await expect(versionDialog.getByText("API 协议").locator("..")).toContainText(String(releaseContract.apiProtocolVersion));
+  await expect(versionDialog.getByText("数据库结构").locator("..")).toContainText(`schema ${releaseContract.databaseSchemaVersion}`);
 });
 
 test("signs out without writing the session change as business data", async ({ page }) => {

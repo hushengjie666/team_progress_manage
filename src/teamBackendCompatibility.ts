@@ -33,6 +33,23 @@ export type BackendHealthResponse = {
   minimum_client_release?: string;
 };
 
+export type BackendVersionSummary = {
+  versionsMatch: boolean;
+  serverReleaseVersion?: string;
+  serverApiProtocolVersion?: number;
+  serverDatabaseSchemaVersion?: number;
+};
+
+export const backendVersionSummary = (backend: { compatibility?: BackendCompatibilityState }): BackendVersionSummary => {
+  const state = backend.compatibility;
+  return {
+    versionsMatch: state?.code === "compatible",
+    serverReleaseVersion: state?.serverReleaseVersion,
+    serverApiProtocolVersion: state?.serverApiProtocolVersion,
+    serverDatabaseSchemaVersion: state?.serverDatabaseSchemaVersion,
+  };
+};
+
 export class TeamBackendCompatibilityError extends Error {
   constructor(public readonly details: BackendCompatibilityState) {
     super(details.message);

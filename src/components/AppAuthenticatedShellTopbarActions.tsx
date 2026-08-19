@@ -1,5 +1,6 @@
 import { Search } from "lucide-react";
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
+import { AppVersionMenu } from "./AppVersionMenu";
 import { WorkspaceInvitationMenu } from "./WorkspaceInvitationMenu";
 import { WorkspaceScopeSelector } from "./WorkspaceScopeSelector";
 
@@ -41,6 +42,7 @@ export function AppAuthenticatedShellTopbarActions({
           ]);
         }}
       />
+      <AppVersionMenu backend={view.state.backend} />
       <button className="secondary-button" onClick={authActions.logout}>
         退出登录：{view.state.auth.account?.name ?? "当前账号"}
       </button>
