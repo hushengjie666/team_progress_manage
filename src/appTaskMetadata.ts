@@ -15,7 +15,7 @@ export type TaskDraft = {
   repeatIntervalDays: number;
 };
 
-export type TaskSort = "manual" | "dueAt" | "priority" | "estimate";
+export type TaskSort = "createdAt" | "manual" | "dueAt" | "priority" | "estimate";
 
 export type TaskFilters = {
   query: string;
@@ -83,7 +83,7 @@ export const defaultTaskStageForMode = (mode: TaskStageMode): TaskStage => (
 
 export const labelTaskStage: Record<TaskStage, string> = Object.fromEntries(taskStageOptions.map((option) => [option.value, option.label])) as Record<TaskStage, string>;
 
-export const initialFilters: TaskFilters = { query: "", project: "all", tag: "all", priority: "all", sort: "manual" };
+export const initialFilters: TaskFilters = { query: "", project: "all", tag: "all", priority: "all", sort: "createdAt" };
 
 export const emptyTaskDefaults = (timestamp: string, sortOrder: number) => ({
   subtasks: [] as Subtask[],

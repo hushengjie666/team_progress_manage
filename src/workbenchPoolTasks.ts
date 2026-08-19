@@ -24,6 +24,9 @@ export const poolTasksForFilters = (state: AppState, todayPlan: DailyPlan, taskF
   });
 
   return [...filtered].sort((left, right) => {
+    if (taskFilters.sort === "createdAt") {
+      return right.createdAt.localeCompare(left.createdAt) || right.sortOrder - left.sortOrder;
+    }
     if (taskFilters.sort === "dueAt") return (left.dueAt ?? "9999").localeCompare(right.dueAt ?? "9999");
     if (taskFilters.sort === "priority") return priorityWeight[right.priority] - priorityWeight[left.priority];
     if (taskFilters.sort === "estimate") return right.estimatePomodoros - left.estimatePomodoros;
