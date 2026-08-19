@@ -15,7 +15,7 @@ export const DESKTOP_TIMER_TOGGLE_EVENT = "desktop-timer:toggle";
 export const DESKTOP_TIMER_ABORT_EVENT = "desktop-timer:abort";
 export const DESKTOP_TIMER_ENDED_EVENT = "desktop-timer:ended";
 
-const DESKTOP_TIMER_WINDOW_WIDTH = 304;
+const DESKTOP_TIMER_WINDOW_WIDTH = 203;
 const DESKTOP_TIMER_WINDOW_HEIGHT = 138;
 const DESKTOP_TIMER_WINDOW_CREATE_TIMEOUT_MS = 2500;
 const DESKTOP_TIMER_WINDOW_CREATE_POLL_MS = 50;

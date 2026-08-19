@@ -90,11 +90,12 @@ body.timer-overlay-body #root {
 }
 
 .timer-overlay-panel {
+  position: relative;
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 8px;
   padding: 10px;
   border: 1px solid rgba(196, 187, 176, 0.7);
   border-radius: 12px;
@@ -105,6 +106,17 @@ body.timer-overlay-body #root {
 
 .timer-overlay-content {
   min-width: 0;
+}
+
+.timer-overlay-content > p {
+  padding-right: 78px;
+}
+
+.timer-overlay-content > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .timer-overlay-panel p,
@@ -123,6 +135,9 @@ body.timer-overlay-body #root {
 }
 
 .timer-overlay-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -136,7 +151,6 @@ body.timer-overlay-body #root {
 }
 
 .timer-overlay-progress {
-  grid-column: 1 / -1;
   height: 6px;
   overflow: hidden;
   border-radius: 8px;
