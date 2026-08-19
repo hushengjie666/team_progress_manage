@@ -59,6 +59,7 @@ replace("team-server/release_contract.go", /apiProtocolVersion\s+int64\s*=\s*\d+
 replace("team-server/release_contract.go", /databaseSchemaVersion\s+int64\s*=\s*\d+/, `databaseSchemaVersion   int64 = ${databaseSchemaVersion}`, "backend database schema");
 replace("team-server/release_contract.go", /minimumClientRelease\s*=\s*"[^"\n]+"/, `minimumClientRelease    = "${minimumClientRelease}"`, "backend minimum client");
 replace("src-tauri/gen/apple/project.yml", /MARKETING_VERSION:\s*[^\s\n]+/g, `MARKETING_VERSION: ${releaseVersion}`, "iOS marketing version");
+replace("src-tauri/gen/apple/project.yml", /CFBundleShortVersionString:\s*[^\s\n]+/g, `CFBundleShortVersionString: ${releaseVersion}`, "iOS bundle short version");
 replace("src-tauri/gen/apple/timemanage-desktop.xcodeproj/project.pbxproj", /MARKETING_VERSION\s*=\s*[^;\n]+/g, `MARKETING_VERSION = ${releaseVersion}`, "Xcode marketing version");
 replace("src-tauri/gen/apple/timemanage-desktop_iOS/Info.plist", /<key>CFBundleShortVersionString<\/key>\s*<string>[^<]+<\/string>/, `<key>CFBundleShortVersionString</key>\n\t<string>${releaseVersion}</string>`, "iOS app Info.plist version");
 replace("src-tauri/gen/apple/TimerLiveActivity/Info.plist", /<key>CFBundleShortVersionString<\/key>\s*<string>[^<]+<\/string>/, `<key>CFBundleShortVersionString</key>\n\t<string>${releaseVersion}</string>`, "iOS extension Info.plist version");

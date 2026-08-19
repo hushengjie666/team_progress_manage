@@ -3787,10 +3787,12 @@ var defaultReview = () => ({
 var planForDate = (state, date) => combinedCurrentAccountDailyPlanForDate(state, date) ?? currentAccountDailyPlanForDate(state, date);
 
 // src/timerSpeed.ts
+var DEV_TIMER_SPEED_MULTIPLIER = 100;
 var normalizeTimerSpeedMultiplier = (value) => {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 1 ? numeric : 1;
 };
+var timerSpeedMultiplierForSettings = (settings) => import.meta.env.DEV && settings.devTimerSpeed100xEnabled ? DEV_TIMER_SPEED_MULTIPLIER : 1;
 
 // src/timerCalculations.ts
 var calculateRemaining = (timer, now3 = /* @__PURE__ */ new Date()) => {
@@ -4443,10 +4445,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.7",
+  releaseVersion: "0.2.8",
   apiProtocolVersion: 1,
-  databaseSchemaVersion: 10,
-  minimumClientRelease: "0.2.7"
+  databaseSchemaVersion: 11,
+  minimumClientRelease: "0.2.8"
 };
 
 // src/teamBackendHttp.ts
@@ -4901,7 +4903,53 @@ function mergeBusinessRowsIntoState(local, rows) {
   };
 }
 
+// src/teamActiveRuntimePreservation.ts
+var upsertById = (items, incoming) => items.some((item) => item.id === incoming.id) ? items.map((item) => item.id === incoming.id ? incoming : item) : [incoming, ...items];
+var preserveLocalUnpersistedTimer = (remote, local, now3 = /* @__PURE__ */ new Date()) => {
+  const active = local.activeTimer;
+  if (!active || active.workSessionId) return remote;
+  const restored = restoreTimer(active, now3);
+  if (!restored) return remote;
+  const localFocusSession = local.focusSessions.find((session) => session.id === active.sessionId);
+  return {
+    ...remote,
+    activeTimer: restored,
+    focusSessions: localFocusSession ? upsertById(remote.focusSessions, localFocusSession) : remote.focusSessions
+  };
+};
+
 // src/teamBusinessApi.ts
+var recoverTeamActiveTimer = (state, settings, local, now3 = /* @__PURE__ */ new Date()) => {
+  const activeWork = state.workSessions.find((session) => session.status === "active" || session.status === "paused");
+  const activeFocus = activeWork ? state.focusSessions.find((session) => session.id === activeWork.focusSessionId) : void 0;
+  if (!activeWork || !activeFocus) return void 0;
+  const duration = activeFocus.duration ?? settings.focusMinutes * 60;
+  const localTimer = local.activeTimer?.workSessionId === activeWork.id ? local.activeTimer : void 0;
+  const speedMultiplier = normalizeTimerSpeedMultiplier(
+    localTimer?.speedMultiplier ?? timerSpeedMultiplierForSettings(settings)
+  );
+  const plannedEndAt = new Date(
+    new Date(activeWork.startedAt).getTime() + (activeWork.totalPausedSeconds + duration / speedMultiplier) * 1e3
+  ).toISOString();
+  const referenceTime = activeWork.status === "paused" ? new Date(activeWork.pausedAt ?? activeWork.updatedAt) : now3;
+  const restored = restoreTimer({
+    sessionId: activeFocus.id,
+    taskId: activeWork.taskId,
+    workSessionId: activeWork.id,
+    mode: activeFocus.mode,
+    duration,
+    remaining: duration,
+    isRunning: true,
+    startedAt: activeWork.startedAt,
+    plannedEndAt,
+    pausedAt: activeWork.pausedAt,
+    totalPausedSeconds: activeWork.totalPausedSeconds,
+    cycleIndex: localTimer?.cycleIndex ?? 1,
+    speedMultiplier: speedMultiplier > 1 ? speedMultiplier : void 0
+  }, referenceTime);
+  if (!restored) return void 0;
+  return activeWork.status === "paused" ? { ...restored, isRunning: false, pausedAt: activeWork.pausedAt } : restored;
+};
 async function loadTeamData(local) {
   const token = local.auth.token ?? local.backend.token;
   if (!token) return local;
@@ -4918,24 +4966,8 @@ async function loadTeamData(local) {
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
   const settings = { ...merged.settings, ...payload.settings ?? {} };
-  const activeWork = merged.workSessions.find((session) => session.status === "active" || session.status === "paused");
-  const activeFocus = activeWork ? merged.focusSessions.find((session) => session.id === activeWork.focusSessionId) : void 0;
-  const duration = activeFocus?.duration ?? settings.focusMinutes * 60;
-  const recoveredTimer = activeWork && activeFocus ? restoreTimer({
-    sessionId: activeFocus.id,
-    taskId: activeWork.taskId,
-    workSessionId: activeWork.id,
-    mode: activeFocus.mode,
-    duration,
-    remaining: duration,
-    isRunning: activeWork.status === "active",
-    startedAt: activeWork.startedAt,
-    plannedEndAt: new Date(new Date(activeWork.startedAt).getTime() + (duration + activeWork.totalPausedSeconds) * 1e3).toISOString(),
-    pausedAt: activeWork.pausedAt,
-    totalPausedSeconds: activeWork.totalPausedSeconds,
-    cycleIndex: 1
-  }) : void 0;
-  return {
+  const recoveredTimer = recoverTeamActiveTimer(merged, settings, local);
+  const remoteState = {
     ...merged,
     settings,
     auth: {
@@ -4957,6 +4989,7 @@ async function loadTeamData(local) {
     },
     activeTimer: recoveredTimer
   };
+  return preserveLocalUnpersistedTimer(remoteState, local);
 }
 
 // src/teamDomainCommands.ts
@@ -5028,13 +5061,14 @@ async function submitTeamDomainCommand(backend, token, command) {
       body: JSON.stringify(command.patch)
     });
   }
-  return requestJson(url, {
+  await requestJson(url, {
     method: "DELETE",
     headers: {
       ...authHeaders(token),
       ...command.idempotencyKey ? { "Idempotency-Key": normalizeIdempotencyKey(command.idempotencyKey) } : {}
     }
   });
+  return void 0;
 }
 
 // cli/src/clientBase.ts
@@ -6509,7 +6543,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.7").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.8").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {
