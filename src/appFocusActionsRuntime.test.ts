@@ -87,6 +87,94 @@ describe("app focus actions runtime", () => {
     expect(state.activeTimer?.isRunning).toBe(false);
   });
 
+  it("starts a prepared break locally when the user presses play", () => {
+    const initial = createTestState();
+    let state: AppState = {
+      ...initial,
+      activeTimer: {
+        sessionId: "prepared_break",
+        mode: "short_break",
+        duration: 300,
+        remaining: 300,
+        isRunning: false,
+        startedAt: "2026-07-17T03:25:00.000Z",
+        plannedEndAt: "2026-07-17T03:30:00.000Z",
+        pausedAt: "2026-07-17T03:25:00.000Z",
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+        prepared: true,
+      },
+    };
+    const runTeamCommand = vi.fn();
+    const runtime = createAppFocusActionsRuntime({
+      getState: () => state,
+      getQuickNote: () => "",
+      updateState: (updater) => { state = updater(state); },
+      runTeamCommand,
+      setQuickNote: vi.fn(),
+      setToast: vi.fn(),
+      setPreferredFocusTaskId: vi.fn(),
+      setPendingReset: vi.fn(),
+    });
+
+    runtime.toggleTimer();
+
+    expect(state.activeTimer).toMatchObject({ mode: "short_break", remaining: 300, isRunning: true });
+    expect(state.activeTimer?.prepared).toBeUndefined();
+    expect(state.focusSessions).toHaveLength(initial.focusSessions.length);
+    expect(runTeamCommand).not.toHaveBeenCalled();
+  });
+
+  it("starts a prepared focus stage through the atomic task start action", async () => {
+    const initial = createTestState();
+    const task = initial.tasks[0];
+    let state: AppState = {
+      ...initial,
+      activeTimer: {
+        sessionId: "prepared_focus",
+        taskId: task.id,
+        mode: "focus",
+        duration: 1500,
+        remaining: 1500,
+        isRunning: false,
+        startedAt: "2026-07-17T03:30:00.000Z",
+        plannedEndAt: "2026-07-17T03:55:00.000Z",
+        pausedAt: "2026-07-17T03:30:00.000Z",
+        totalPausedSeconds: 0,
+        cycleIndex: 2,
+        prepared: true,
+      },
+    };
+    const runTeamCommand = vi.fn(async (_command, behavior) => {
+      const optimistic = behavior?.optimistic?.(state);
+      if (optimistic) state = optimistic.next;
+      return state;
+    });
+    const runtime = createAppFocusActionsRuntime({
+      getState: () => state,
+      getQuickNote: () => "",
+      updateState: (updater) => { state = updater(state); },
+      runTeamCommand,
+      setQuickNote: vi.fn(),
+      setToast: vi.fn(),
+      setPreferredFocusTaskId: vi.fn(),
+      setPendingReset: vi.fn(),
+    });
+
+    runtime.toggleTimer();
+    await vi.waitFor(() => expect(runTeamCommand).toHaveBeenCalledOnce());
+
+    expect(runTeamCommand.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
+      kind: "action",
+      resource: "tasks",
+      id: task.id,
+      action: "start",
+    }));
+    expect(state.activeTimer).toMatchObject({ taskId: task.id, mode: "focus", isRunning: true });
+    expect(state.activeTimer?.prepared).toBeUndefined();
+    expect(state.activeTimer?.workSessionId).toBeTruthy();
+  });
+
   it("keeps server-confirmed pomodoro totals when a work segment finishes", async () => {
     const initial = createTestState();
     const task = initial.tasks[0];

@@ -39,7 +39,7 @@ export function MiniTimer(props: {
         <span style={{ width: `${Math.min(100, Math.max(0, progress))}%` }} />
       </div>
       <div className="mini-timer-actions">
-        <button className="icon-button small" title={active.isRunning ? "暂停" : "继续"} onClick={props.toggleTimer}>
+        <button className="icon-button small" title={active.isRunning ? "暂停" : active.prepared ? "开始" : "继续"} onClick={props.toggleTimer}>
           {active.isRunning ? <Pause size={15} /> : <Play size={15} />}
         </button>
         <button className="icon-button small danger" title="作废番茄" onClick={() => void props.finishTimer("aborted")}>

@@ -34,7 +34,10 @@ describe("timer app model", () => {
       remaining: state.settings.shortBreakMinutes * 60,
       isRunning: false,
       pausedAt: timestamp,
+      prepared: true,
     });
+    expect(finished.activeTimer?.workSessionId).toBeUndefined();
+    expect(finished.focusSessions).toHaveLength(started.focusSessions.length);
     expect(finishedTask?.actualPomodoros).toBe(1);
     expect(finishedTask?.status).toBe("in_progress");
     expect(finishedSession?.outcome).toBe("completed");
@@ -59,7 +62,10 @@ describe("timer app model", () => {
       remaining: state.settings.focusMinutes * 60,
       isRunning: false,
       pausedAt: timestamp,
+      prepared: true,
     });
+    expect(finished.activeTimer?.workSessionId).toBeUndefined();
+    expect(finished.focusSessions).toHaveLength(breakStarted.focusSessions.length);
   });
 
   it("records work session execution signals around a focus timer", () => {

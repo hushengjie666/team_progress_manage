@@ -73,7 +73,7 @@ export function FocusTimerPanel(props: {
           <>
             <button className="primary-button large" onClick={props.toggleTimer}>
               {active.isRunning ? <Pause size={18} /> : <Play size={18} />}
-              {active.isRunning ? "暂停" : "继续"}
+              {active.isRunning ? "暂停" : active.prepared ? "开始" : "继续"}
             </button>
             <button className="secondary-button large" onClick={props.resetTimer}>
               <RotateCcw size={18} />

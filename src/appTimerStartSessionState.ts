@@ -17,6 +17,46 @@ type StartTimerOptions = {
   workSessionId?: string;
 };
 
+const timerDurationSeconds = (state: AppState, mode: SessionMode) => {
+  const durationMinutes =
+    mode === "focus"
+      ? state.settings.focusMinutes
+      : mode === "short_break"
+        ? state.settings.shortBreakMinutes
+        : state.settings.longBreakMinutes;
+  return durationMinutes * 60;
+};
+
+export const prepareTimerStageInState = (
+  state: AppState,
+  mode: SessionMode,
+  taskId: string | undefined,
+  timestamp: string,
+): AppState => {
+  const speedMultiplier = timerSpeedMultiplierForSettings(state.settings);
+  const normalizedSpeedMultiplier = normalizeTimerSpeedMultiplier(speedMultiplier);
+  const duration = timerDurationSeconds(state, mode);
+  return {
+    ...state,
+    activeTimer: {
+      sessionId: uid("prepared_session"),
+      taskId,
+      mode,
+      duration,
+      remaining: duration,
+      isRunning: false,
+      startedAt: timestamp,
+      plannedEndAt: plannedTimerEndAt(timestamp, duration, normalizedSpeedMultiplier),
+      pausedAt: timestamp,
+      totalPausedSeconds: 0,
+      cycleIndex: completedFocusSessions(state).length + (mode === "focus" ? 1 : 0),
+      speedMultiplier: normalizedSpeedMultiplier > 1 ? normalizedSpeedMultiplier : undefined,
+      prepared: true,
+    },
+    updatedAt: timestamp,
+  };
+};
+
 export const startTimerInState = (
   state: AppState,
   mode: SessionMode,
@@ -28,17 +68,12 @@ export const startTimerInState = (
   const startPaused = Boolean(options.startPaused);
   const speedMultiplier = timerSpeedMultiplierForSettings(state.settings);
   const normalizedSpeedMultiplier = normalizeTimerSpeedMultiplier(speedMultiplier);
-  const durationMinutes =
-    mode === "focus"
-      ? state.settings.focusMinutes
-      : mode === "short_break"
-        ? state.settings.shortBreakMinutes
-        : state.settings.longBreakMinutes;
+  const duration = timerDurationSeconds(state, mode);
   const session: FocusSession = {
     id: sessionId,
     taskId,
     mode,
-    duration: durationMinutes * 60,
+    duration,
     startedAt: timestamp,
     interruptionCounts: { internal: 0, external: 0 },
   };

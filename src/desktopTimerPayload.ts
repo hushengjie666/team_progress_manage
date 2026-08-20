@@ -11,6 +11,7 @@ export type DesktopTimerPayload = {
   plannedEndAt: string;
   pendingSettlement?: TimerSettlement;
   speedMultiplier?: number;
+  prepared?: boolean;
   taskTitle?: string;
   actualPomodoros?: number;
   estimatePomodoros?: number;
@@ -45,6 +46,7 @@ export const buildDesktopTimerPayload = (
     plannedEndAt: active.plannedEndAt,
     pendingSettlement: active.pendingSettlement,
     speedMultiplier: active.speedMultiplier,
+    prepared: active.prepared,
     taskTitle: task?.title,
     actualPomodoros: task?.actualPomodoros,
     estimatePomodoros: task?.estimatePomodoros,

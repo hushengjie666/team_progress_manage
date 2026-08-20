@@ -47,6 +47,7 @@ describe("desktop timer payload", () => {
       plannedEndAt: "2026-07-08T01:25:00.000Z",
       pendingSettlement: undefined,
       speedMultiplier: undefined,
+      prepared: undefined,
       taskTitle: "适配 Tauri",
       actualPomodoros: 1,
       estimatePomodoros: 3,

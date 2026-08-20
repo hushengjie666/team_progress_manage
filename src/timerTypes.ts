@@ -60,4 +60,5 @@ export interface ActiveTimer {
   cycleIndex: number;
   pendingSettlement?: TimerSettlement;
   speedMultiplier?: number;
+  prepared?: boolean;
 }

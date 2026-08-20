@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import {
   modeLabel,
   nowIso,
+  finishExpiredTimerInState,
   restoreTimerInState,
   shouldFinishExpiredTimerInState,
 } from "./appModel";
@@ -48,7 +49,30 @@ export function useRunningTimerInterval({
   runTeamCommand,
 }: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
   useEffect(() => {
-    if (!state?.activeTimer?.isRunning || state.backend.status === "incompatible") return;
+    if (!state?.activeTimer || state.backend.status === "incompatible") return;
+    const settleExpiredTimer = () => {
+      const current = stateRef.current;
+      if (!current?.activeTimer || current.backend.status === "saving" || current.backend.status === "incompatible") return false;
+      const timestamp = nowIso();
+      if (!shouldFinishExpiredTimerInState(current, timestamp)) return false;
+      const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+      const next = finishExpiredTimerInState(current, timestamp);
+      const nextMode = next.activeTimer?.mode;
+      setToast(nextMode ? `${title}，${modeLabel[nextMode]}已准备` : title);
+      announceTimerEndForRuntime(current.settings, current.activeTimer, title);
+      const active = current.activeTimer;
+      if (active.workSessionId) {
+        const session = current.workSessions.find((item) => item.id === active.workSessionId);
+        void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
+      }
+      setState(next);
+      return true;
+    };
+    if (state.activeTimer.pendingSettlement === "pending") {
+      settleExpiredTimer();
+      return;
+    }
+    if (!state.activeTimer.isRunning) return;
     const intervalDelay = normalizeTimerSpeedMultiplier(state.activeTimer.speedMultiplier) > 1 ? 250 : 1000;
     const handle = window.setInterval(() => {
       const current = stateRef.current;
@@ -63,18 +87,16 @@ export function useRunningTimerInterval({
         });
         return;
       }
-      const title = `${modeLabel[current.activeTimer.mode]}已结束`;
-      setToast(title);
-      announceTimerEndForRuntime(current.settings, current.activeTimer, title);
-      const active = current.activeTimer;
-      if (active.workSessionId) {
-        const session = current.workSessions.find((item) => item.id === active.workSessionId);
-        void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
-      }
-      setState({ ...current, activeTimer: undefined });
+      settleExpiredTimer();
     }, intervalDelay);
     return () => window.clearInterval(handle);
-  }, [state?.activeTimer?.isRunning, state?.activeTimer?.speedMultiplier]);
+  }, [
+    state?.activeTimer?.sessionId,
+    state?.activeTimer?.isRunning,
+    state?.activeTimer?.pendingSettlement,
+    state?.activeTimer?.speedMultiplier,
+    state?.backend.status,
+  ]);
 }
 
 export function useTimerRestoreListeners({
@@ -94,12 +116,13 @@ export function useTimerRestoreListeners({
       if (shouldFinish) {
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         announceTimerEndForRuntime(current.settings, current.activeTimer, title);
-        setToast(`${title}，已自动记录`);
+        const nextMode = next.activeTimer?.mode;
+        setToast(nextMode ? `${title}，${modeLabel[nextMode]}已准备` : `${title}，已自动记录`);
         if (current.activeTimer.workSessionId) {
           const session = current.workSessions.find((item) => item.id === current.activeTimer?.workSessionId);
           void runTeamCommand({ kind: "action", resource: "work-sessions", id: current.activeTimer.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
         }
-        setState({ ...next, activeTimer: undefined });
+        setState(next);
         return;
       }
       setState(next);

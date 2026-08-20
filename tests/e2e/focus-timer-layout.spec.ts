@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { authenticatedState } from "./support/authenticatedState";
 import { openApp } from "./support/openApp";
+import { startTimerInState } from "../../src/appModel";
 
 test.use({ viewport: { width: 1280, height: 820 } });
 
@@ -108,4 +109,38 @@ test("keeps a short break running after the team data refresh interval", async (
   await expect(timerFace).toContainText("短休息");
   await expect(countdown).toHaveText(/04:[45]\d/);
   await expect(countdown).not.toHaveText("25:00");
+});
+
+test("prepares the next stage at full duration and waits for the user to start", async ({ page }) => {
+  const initial = authenticatedState();
+  initial.settings = {
+    ...initial.settings,
+    focusMinutes: 1,
+    devTimerSpeed100xEnabled: true,
+  };
+  const timestamp = new Date().toISOString();
+  const state = startTimerInState(
+    initial,
+    "focus",
+    initial.tasks[0].id,
+    timestamp,
+    "session_natural_finish",
+    { workSessionId: "work_natural_finish" },
+  );
+  await openApp(page, state);
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+
+  const timerFace = page.locator(".timer-face");
+  const countdown = timerFace.locator(".timer-countdown");
+  const startButton = page.locator(".timer-controls").getByRole("button", { name: "开始" });
+  await expect(timerFace).toContainText("短休息", { timeout: 5_000 });
+  await expect(countdown).toHaveText("05:00");
+  await expect(startButton).toBeVisible();
+
+  await page.waitForTimeout(1_200);
+  await expect(countdown).toHaveText("05:00");
+
+  await startButton.click();
+  await expect(page.locator(".timer-controls").getByRole("button", { name: "暂停" })).toBeVisible();
+  await expect(countdown).not.toHaveText("05:00", { timeout: 2_500 });
 });

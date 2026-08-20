@@ -9,7 +9,7 @@ import { iso } from "./test/fixtures";
 import type { ActiveTimer } from "./types";
 
 describe("timer domain", () => {
-  it("restores an expired running timer without opening settlement", () => {
+  it("marks an expired restored timer for immediate settlement", () => {
     const timer: ActiveTimer = {
       sessionId: "session_1",
       mode: "focus",
@@ -26,7 +26,7 @@ describe("timer domain", () => {
       remaining: 0,
       isRunning: false,
     });
-    expect(restored?.pendingSettlement).toBeUndefined();
+    expect(restored?.pendingSettlement).toBe("pending");
   });
 
   it("extends planned end time after pause and resume", () => {

@@ -2,7 +2,7 @@ import { calculateRemaining, nextBreakMode, restoreTimer } from "./domain";
 import type { AppState } from "./types";
 import { nowIso } from "./appClock";
 import { endSessionInState } from "./appTimerEndSessionState";
-import { startTimerInState } from "./appTimerStartSessionState";
+import { prepareTimerStageInState } from "./appTimerStartSessionState";
 
 export const shouldFinishExpiredTimerInState = (state: AppState, timestamp = nowIso()) => {
   const active = state.activeTimer;
@@ -14,10 +14,10 @@ export const finishExpiredTimerInState = (state: AppState, timestamp = nowIso())
   if (!active) return state;
   const ended = endSessionInState(state, "completed", timestamp);
   if (active.mode === "focus") {
-    return startTimerInState(ended, nextBreakMode(ended), undefined, timestamp, undefined, { startPaused: true });
+    return prepareTimerStageInState(ended, nextBreakMode(ended), undefined, timestamp);
   }
   const nextTask = ended.tasks.find((task) => task.status === "committed" || task.status === "in_progress");
-  return startTimerInState(ended, "focus", nextTask?.id, timestamp, undefined, { startPaused: true });
+  return prepareTimerStageInState(ended, "focus", nextTask?.id, timestamp);
 };
 
 export const restoreTimerInState = (state: AppState, timestamp = nowIso()): AppState => {

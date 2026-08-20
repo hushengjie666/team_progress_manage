@@ -19,7 +19,7 @@ export const restoreTimer = (timer?: ActiveTimer, now = new Date()): ActiveTimer
   if (!timer.isRunning) return timer;
   const remaining = calculateRemaining(timer, now);
   if (remaining > 0) return { ...timer, remaining };
-  return { ...timer, remaining: 0, isRunning: false, pendingSettlement: undefined };
+  return { ...timer, remaining: 0, isRunning: false, pendingSettlement: "pending" };
 };
 
 export const pauseTimer = (timer: ActiveTimer, nowIso: string): ActiveTimer => ({

@@ -107,13 +107,22 @@ export function createAppFocusActionsRuntime({
   const toggleTimer = () => {
     const source = getState();
     const active = source.activeTimer;
-    if (!active?.workSessionId) return;
+    if (!active) return;
+    if (active.prepared) {
+      void beginTimer(active.mode, active.taskId);
+      return;
+    }
+    const timestamp = nowIso();
+    if (!active.workSessionId) {
+      updateState((value) => toggleTimerInState(value, timestamp));
+      setToast(active.isRunning ? "计时已暂停" : "计时已继续");
+      return;
+    }
     const session = source.workSessions.find((item) => item.id === active.workSessionId);
     const taskId = session?.taskId ?? active.taskId;
     const action = active.isRunning ? "pause" : "resume";
     const resourceKey = `work-sessions:${active.workSessionId}`;
     if (source.backend.pendingResourceKeys?.includes(resourceKey)) return;
-    const timestamp = nowIso();
     const previousTimer = active;
     const previousWorkSession = session;
     setToast(active.isRunning ? "番茄已暂停" : "番茄已继续");
