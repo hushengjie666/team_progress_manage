@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { getTodayPlan, type TaskFilters } from "./appModel";
 import type { AppState } from "./types";
 import { workspacesForState } from "./accessControl";
@@ -11,6 +11,7 @@ import {
   poolTasksForFilters,
 } from "./workbenchModel";
 import { filterProjectItemsForWorkspace, projectIdsForWorkspace, validWorkspaceSelection } from "./workspaceScope";
+import { loadWorkspaceScopePreference, saveWorkspaceScopePreference } from "./workspaceScopePreference";
 
 type Setter<T> = (value: T | ((current: T) => T)) => void;
 
@@ -35,6 +36,7 @@ export function useAppWorkspaceViewModelHooks({
   preferredFocusTaskId,
   setPreferredFocusTaskId,
 }: AppWorkspaceViewModelHooksOptions) {
+  const restoredWorkspaceAccountRef = useRef<string | null>(null);
   const todayPlan = state ? getTodayPlan(state) : null;
 
   const committedTasks = useMemo(() => {
@@ -90,13 +92,31 @@ export function useAppWorkspaceViewModelHooks({
   }, [state, todayPlan, totalCommittedEstimate, committedTasks, poolTasks, selectedWorkbenchProjectIds, selectedWorkspaceId]);
 
   useEffect(() => {
-    setSelectedWorkspaceId(null);
-  }, [state?.auth.account?.id]);
-
-  useEffect(() => {
-    if (!state) return;
-    setSelectedWorkspaceId((current) => validWorkspaceSelection(workspacesForState(state), current));
-  }, [state?.auth.workspaces, state?.auth.workspace]);
+    const accountId = state?.auth.account?.id;
+    if (!state || !accountId) {
+      restoredWorkspaceAccountRef.current = null;
+      setSelectedWorkspaceId(null);
+      return;
+    }
+    const workspaces = workspacesForState(state);
+    if (!workspaces.length) {
+      setSelectedWorkspaceId(null);
+      return;
+    }
+    if (restoredWorkspaceAccountRef.current !== accountId) {
+      const preferredWorkspaceId = loadWorkspaceScopePreference(accountId);
+      const nextWorkspaceId = validWorkspaceSelection(workspaces, preferredWorkspaceId);
+      if (preferredWorkspaceId && !nextWorkspaceId) saveWorkspaceScopePreference(accountId, null);
+      restoredWorkspaceAccountRef.current = accountId;
+      setSelectedWorkspaceId(nextWorkspaceId);
+      return;
+    }
+    setSelectedWorkspaceId((current) => {
+      const nextWorkspaceId = validWorkspaceSelection(workspaces, current);
+      if (current && !nextWorkspaceId) saveWorkspaceScopePreference(accountId, null);
+      return nextWorkspaceId;
+    });
+  }, [state?.auth.account?.id, state?.auth.workspaces, state?.auth.workspace]);
 
   useEffect(() => {
     setSelectedWorkbenchProjectIds([]);

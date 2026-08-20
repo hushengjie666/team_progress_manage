@@ -4,10 +4,14 @@ import { STORAGE_KEY } from "./constants";
 import { mockTeamBackend } from "./mockTeamBackend";
 import type { MockTeamBackendOptions } from "./mockTypes";
 import type { AppState } from "../../../src/types";
+import { WORKSPACE_SCOPE_PREFERENCES_KEY } from "../../../src/workspaceScopePreference";
 
 export const clearStoredApp = async (page: Page) => {
   await page.goto("/");
-  await page.evaluate((key) => localStorage.removeItem(key), STORAGE_KEY);
+  await page.evaluate(([stateKey, workspaceScopeKey]) => {
+    localStorage.removeItem(stateKey);
+    localStorage.removeItem(workspaceScopeKey);
+  }, [STORAGE_KEY, WORKSPACE_SCOPE_PREFERENCES_KEY]);
 };
 
 const storedRuntimeForState = (state: AppState) => ({

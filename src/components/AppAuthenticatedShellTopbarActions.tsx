@@ -3,6 +3,7 @@ import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { AppVersionMenu } from "./AppVersionMenu";
 import { WorkspaceInvitationMenu } from "./WorkspaceInvitationMenu";
 import { WorkspaceScopeSelector } from "./WorkspaceScopeSelector";
+import { saveWorkspaceScopePreference } from "../workspaceScopePreference";
 
 type AppAuthenticatedShellTopbarActionsProps = Pick<
   AppAuthenticatedShellProps,
@@ -23,7 +24,11 @@ export function AppAuthenticatedShellTopbarActions({
           workspaces={view.visibleWorkspaces}
           selectedWorkspaceId={shellState.selectedWorkspaceId}
           selectWorkspace={(workspaceId) => {
-            shellState.setSelectedWorkspaceId((current) => current === workspaceId ? null : workspaceId);
+            shellState.setSelectedWorkspaceId((current) => {
+              const nextWorkspaceId = current === workspaceId ? null : workspaceId;
+              saveWorkspaceScopePreference(view.state.auth.account?.id ?? "", nextWorkspaceId);
+              return nextWorkspaceId;
+            });
             shellState.setSelectedTaskId(null);
           }}
         />

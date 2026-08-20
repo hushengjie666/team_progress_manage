@@ -162,6 +162,11 @@ test("filters business pages with the global workspace selector", async ({ page 
   await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
   await expect(page.getByLabel("项目卡片总览")).not.toContainText("TimeManage 团队进度");
 
+  await page.reload();
+  await expect(privateOption).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("项目卡片总览")).toContainText(privateProject.name);
+  await expect(page.getByLabel("项目卡片总览")).not.toContainText("TimeManage 团队进度");
+
   await page.getByRole("button", { name: "新增项目" }).click();
   const createDialog = page.getByRole("dialog", { name: "新增项目" });
   await expect(createDialog.getByLabel("所属工作区")).toHaveValue("workspace_private_account_owner");
