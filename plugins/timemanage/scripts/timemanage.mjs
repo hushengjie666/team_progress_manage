@@ -3809,7 +3809,7 @@ var restoreTimer = (timer, now3 = /* @__PURE__ */ new Date()) => {
   if (!timer.isRunning) return timer;
   const remaining = calculateRemaining(timer, now3);
   if (remaining > 0) return { ...timer, remaining };
-  return { ...timer, remaining: 0, isRunning: false, pendingSettlement: void 0 };
+  return { ...timer, remaining: 0, isRunning: false, pendingSettlement: "pending" };
 };
 
 // src/planningDomain.ts
@@ -4448,10 +4448,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.9",
+  releaseVersion: "0.2.10",
   apiProtocolVersion: 2,
-  databaseSchemaVersion: 12,
-  minimumClientRelease: "0.2.9"
+  databaseSchemaVersion: 13,
+  minimumClientRelease: "0.2.10"
 };
 
 // src/teamBackendHttp.ts
@@ -4853,6 +4853,75 @@ var dedupeProjectMembersByIdentity = (members) => {
   return members.filter((member) => canonicalIds.has(member.id));
 };
 
+// src/teamActiveTimerReconciliation.ts
+var parsedTime = (value, fallback) => {
+  const parsed = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+var runningStatus = (session) => session.status === "active";
+var activeWorkSessionsForAccount = (state) => {
+  const accountId = state.auth.account?.id;
+  return state.workSessions.filter(
+    (session) => (session.status === "active" || session.status === "paused") && (!accountId || session.ownerAccountId === accountId)
+  ).sort((left, right) => parsedTime(right.startedAt, 0) - parsedTime(left.startedAt, 0));
+};
+var timerFromWorkSession = (state, settings, session, local, serverTime, now3) => {
+  const focus = state.focusSessions.find((item) => item.id === session.focusSessionId);
+  if (!focus) return void 0;
+  const localTimer = local.activeTimer?.workSessionId === session.id ? local.activeTimer : void 0;
+  const localSession = local.workSessions.find((item) => item.id === session.id);
+  const isRunning = runningStatus(session);
+  const resetWhilePaused = Boolean(
+    localTimer && !isRunning && !localTimer.isRunning && localSession && localSession.startedAt !== session.startedAt
+  );
+  if (localTimer && localTimer.isRunning === isRunning && !resetWhilePaused) {
+    return isRunning ? restoreTimer(localTimer, now3) : localTimer;
+  }
+  const duration = focus.duration ?? settings.focusMinutes * 60;
+  const speedMultiplier = normalizeTimerSpeedMultiplier(
+    localTimer?.speedMultiplier ?? timerSpeedMultiplierForSettings(settings)
+  );
+  const nowMs = now3.getTime();
+  const serverNowMs = parsedTime(serverTime, nowMs);
+  const startedAtMs = parsedTime(session.startedAt, serverNowMs);
+  const referenceMs = session.status === "paused" ? parsedTime(session.pausedAt ?? session.updatedAt, serverNowMs) : serverNowMs;
+  const activeElapsed = Math.max(0, (referenceMs - startedAtMs) / 1e3 - session.totalPausedSeconds);
+  const remaining = resetWhilePaused ? duration : Math.max(0, Math.min(duration, Math.ceil(duration - activeElapsed * speedMultiplier)));
+  const plannedEndAt = new Date(nowMs + remaining / speedMultiplier * 1e3).toISOString();
+  return {
+    sessionId: focus.id,
+    taskId: session.taskId,
+    workSessionId: session.id,
+    mode: focus.mode,
+    duration,
+    remaining,
+    isRunning,
+    startedAt: session.startedAt,
+    plannedEndAt,
+    pausedAt: session.pausedAt,
+    totalPausedSeconds: session.totalPausedSeconds,
+    cycleIndex: localTimer?.cycleIndex ?? 1,
+    speedMultiplier: speedMultiplier > 1 ? speedMultiplier : void 0
+  };
+};
+var recoverTeamActiveTimer = (state, settings, local, serverTime, now3 = /* @__PURE__ */ new Date()) => {
+  const session = activeWorkSessionsForAccount(state)[0];
+  return session ? timerFromWorkSession(state, settings, session, local, serverTime, now3) : void 0;
+};
+var reconcileTeamActiveTimerAfterDelta = (local, merged, changedWorkSessionIds, serverTime, now3 = /* @__PURE__ */ new Date()) => {
+  const replacementSession = activeWorkSessionsForAccount(merged).find((session) => changedWorkSessionIds.has(session.id));
+  const recoverReplacement = () => replacementSession ? timerFromWorkSession(merged, merged.settings, replacementSession, local, serverTime, now3) : void 0;
+  const active = local.activeTimer;
+  if (active?.workSessionId) {
+    if (!changedWorkSessionIds.has(active.workSessionId)) return active;
+    const session = merged.workSessions.find((item) => item.id === active.workSessionId);
+    if (!session || session.status === "ended") return recoverReplacement();
+    return timerFromWorkSession(merged, merged.settings, session, local, serverTime, now3);
+  }
+  if (changedWorkSessionIds.size === 0) return active;
+  return recoverReplacement();
+};
+
 // src/teamBusinessRows.ts
 var templateInstanceId = (instance) => `${instance.templateId}_${instance.taskId}`;
 function mergeBusinessRowsIntoState(local, rows) {
@@ -4892,7 +4961,7 @@ function mergeBusinessRowsIntoState(local, rows) {
     if (row.entity === "task") next.tasks.push(row.payload);
     if (row.entity === "daily_plan") next.dailyPlans.push(row.payload);
     if (row.entity === "focus_session") next.focusSessions.push(row.payload);
-    if (row.entity === "work_session") next.workSessions.push(row.payload);
+    if (row.entity === "work_session") next.workSessions.push(workSessionFromRow(row));
     if (row.entity === "execution_signal") next.executionSignals.push(row.payload);
     if (row.entity === "interruption") next.interruptions.push(row.payload);
     if (row.entity === "task_template") next.taskTemplates.push(row.payload);
@@ -4912,6 +4981,10 @@ var replacePayloadById = (items, row) => {
   if (index < 0) return [...items, payload];
   return items.map((item, itemIndex) => itemIndex === index ? payload : item);
 };
+var workSessionFromRow = (row) => ({
+  ...row.payload,
+  ownerAccountId: row.account_id ?? row.payload.ownerAccountId
+});
 var replaceTemplateInstance = (items, row) => {
   const payload = row.payload;
   const index = items.findIndex((item) => templateInstanceId(item) === row.id);
@@ -4921,7 +4994,7 @@ var replaceTemplateInstance = (items, row) => {
 var removePayloadByDeleted = (items, deleted) => items.filter((item) => item.id !== deleted.id || Boolean(
   deleted.workspace_id && item.workspaceId && item.workspaceId !== deleted.workspace_id
 ));
-function mergeBusinessRowChangesIntoState(local, rows, deleted = []) {
+function mergeBusinessRowChangesIntoState(local, rows, deleted = [], serverTime) {
   const confirmedAt = (/* @__PURE__ */ new Date()).toISOString();
   let next = {
     ...local,
@@ -4940,7 +5013,12 @@ function mergeBusinessRowChangesIntoState(local, rows, deleted = []) {
     if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
     if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
     if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
-    if (row.entity === "work_session") next = { ...next, workSessions: replacePayloadById(next.workSessions, row) };
+    if (row.entity === "work_session") {
+      next = {
+        ...next,
+        workSessions: replacePayloadById(next.workSessions, { ...row, payload: workSessionFromRow(row) })
+      };
+    }
     if (row.entity === "execution_signal") next = { ...next, executionSignals: replacePayloadById(next.executionSignals, row) };
     if (row.entity === "interruption") next = { ...next, interruptions: replacePayloadById(next.interruptions, row) };
     if (row.entity === "task_template") next = { ...next, taskTemplates: replacePayloadById(next.taskTemplates, row) };
@@ -4963,34 +5041,14 @@ function mergeBusinessRowChangesIntoState(local, rows, deleted = []) {
       next = { ...next, templateInstances: next.templateInstances.filter((instance) => templateInstanceId(instance) !== item.id) };
     }
   }
-  const active = next.activeTimer;
-  if (active?.workSessionId) {
-    const workSession = next.workSessions.find((session) => session.id === active.workSessionId);
-    const focusSession = next.focusSessions.find((session) => session.id === active.sessionId);
-    if (workSession?.status === "ended") {
-      next = { ...next, activeTimer: void 0 };
-    } else if (workSession) {
-      const duration = focusSession?.duration ?? active.duration;
-      const speedMultiplier = active.speedMultiplier ?? 1;
-      const reference = workSession.status === "paused" && workSession.pausedAt ? new Date(workSession.pausedAt).getTime() : Date.now();
-      const startedAtMs = new Date(workSession.startedAt).getTime();
-      const activeElapsed = Math.max(0, (reference - startedAtMs) / 1e3 - workSession.totalPausedSeconds);
-      const remaining = Math.max(0, Math.ceil(duration - activeElapsed * speedMultiplier));
-      next = {
-        ...next,
-        activeTimer: {
-          ...active,
-          duration,
-          remaining,
-          isRunning: workSession.status === "active",
-          startedAt: workSession.startedAt,
-          pausedAt: workSession.pausedAt,
-          totalPausedSeconds: workSession.totalPausedSeconds,
-          plannedEndAt: new Date(startedAtMs + (duration / speedMultiplier + workSession.totalPausedSeconds) * 1e3).toISOString()
-        }
-      };
-    }
-  }
+  const changedWorkSessionIds = /* @__PURE__ */ new Set([
+    ...rows.filter((row) => row.entity === "work_session").map((row) => row.id),
+    ...deleted.filter((row) => row.entity === "work_session").map((row) => row.id)
+  ]);
+  next = {
+    ...next,
+    activeTimer: reconcileTeamActiveTimerAfterDelta(local, next, changedWorkSessionIds, serverTime)
+  };
   return {
     ...next,
     projectMembers: dedupeProjectMembersByIdentity(next.projectMembers)
@@ -5013,37 +5071,6 @@ var preserveLocalUnpersistedTimer = (remote, local, now3 = /* @__PURE__ */ new D
 };
 
 // src/teamBusinessApi.ts
-var recoverTeamActiveTimer = (state, settings, local, now3 = /* @__PURE__ */ new Date()) => {
-  const activeWork = state.workSessions.find((session) => session.status === "active" || session.status === "paused");
-  const activeFocus = activeWork ? state.focusSessions.find((session) => session.id === activeWork.focusSessionId) : void 0;
-  if (!activeWork || !activeFocus) return void 0;
-  const duration = activeFocus.duration ?? settings.focusMinutes * 60;
-  const localTimer = local.activeTimer?.workSessionId === activeWork.id ? local.activeTimer : void 0;
-  const speedMultiplier = normalizeTimerSpeedMultiplier(
-    localTimer?.speedMultiplier ?? timerSpeedMultiplierForSettings(settings)
-  );
-  const plannedEndAt = new Date(
-    new Date(activeWork.startedAt).getTime() + (activeWork.totalPausedSeconds + duration / speedMultiplier) * 1e3
-  ).toISOString();
-  const referenceTime = activeWork.status === "paused" ? new Date(activeWork.pausedAt ?? activeWork.updatedAt) : now3;
-  const restored = restoreTimer({
-    sessionId: activeFocus.id,
-    taskId: activeWork.taskId,
-    workSessionId: activeWork.id,
-    mode: activeFocus.mode,
-    duration,
-    remaining: duration,
-    isRunning: true,
-    startedAt: activeWork.startedAt,
-    plannedEndAt,
-    pausedAt: activeWork.pausedAt,
-    totalPausedSeconds: activeWork.totalPausedSeconds,
-    cycleIndex: localTimer?.cycleIndex ?? 1,
-    speedMultiplier: speedMultiplier > 1 ? speedMultiplier : void 0
-  }, referenceTime);
-  if (!restored) return void 0;
-  return activeWork.status === "paused" ? { ...restored, isRunning: false, pausedAt: activeWork.pausedAt } : restored;
-};
 async function loadTeamData(local) {
   const token = local.auth.token ?? local.backend.token;
   if (!token) return local;
@@ -5060,14 +5087,19 @@ async function loadTeamData(local) {
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
   const settings = { ...merged.settings, ...payload.settings ?? {} };
-  const recoveredTimer = recoverTeamActiveTimer(merged, settings, local);
-  const remoteState = {
+  const account = mapAccount(payload.account);
+  const mergedWithAccount = {
     ...merged,
+    auth: { ...merged.auth, account }
+  };
+  const recoveredTimer = recoverTeamActiveTimer(mergedWithAccount, settings, local, payload.loaded_at);
+  const remoteState = {
+    ...mergedWithAccount,
     settings,
     auth: {
       ...merged.auth,
       status: "authenticated",
-      account: mapAccount(payload.account),
+      account,
       workspace: mapWorkspace(payload.workspace),
       membership: mapWorkspaceMembership(payload.membership),
       workspaces: payload.workspaces.map(mapWorkspace),
@@ -6645,7 +6677,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.9").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.10").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {
