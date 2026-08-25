@@ -68,8 +68,8 @@ describe("focus task ordering", () => {
     expect(tasks.map((item) => item.id)).toEqual([committed.id, completed.id]);
   });
 
-  it("keeps the current timed task visible outside the filtered queue", () => {
-    const current = task("task_current_other_workspace", "project_other", "其他工作区", 10);
+  it("keeps a same-scope timed task visible outside the daily queue", () => {
+    const current = task("task_current", "project_scoped", "当前工作区", 10);
     const scoped = task("task_scoped", "project_scoped", "当前工作区", 20);
 
     expect(buildFocusTaskList(current, [scoped]).map((item) => item.id)).toEqual([

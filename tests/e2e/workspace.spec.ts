@@ -139,7 +139,19 @@ test("filters business pages with the global workspace selector", async ({ page 
     ...state,
     projects: [...state.projects, privateProject],
     projectMembers: [...state.projectMembers, privateMember],
-    tasks: [...state.tasks, privateTask],
+    tasks: [{ ...sharedTask, status: "in_progress" as const }, privateTask],
+    activeTimer: {
+      sessionId: "focus_shared_e2e",
+      taskId: sharedTask.id,
+      mode: "focus" as const,
+      duration: 25 * 60,
+      remaining: 20 * 60,
+      isRunning: true,
+      startedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      plannedEndAt: new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+      totalPausedSeconds: 0,
+      cycleIndex: 1,
+    },
     dailyPlans: state.dailyPlans.map((plan) => ({
       ...plan,
       committedTaskIds: [...plan.committedTaskIds, privateTask.id],
@@ -194,6 +206,10 @@ test("filters business pages with the global workspace selector", async ({ page 
   await nav.getByRole("button", { name: "开始工作" }).click();
   await expect(page.locator(".focus-todo-panel")).toContainText(privateTask.title);
   await expect(page.locator(".focus-todo-panel")).not.toContainText(sharedTask.title);
+  await expect(page.locator(".focus-current-panel")).toContainText(privateTask.title);
+  await expect(page.locator(".focus-current-panel")).not.toContainText(sharedTask.title);
+  await expect(page.locator(".focus-timer-panel")).toContainText("准备开始");
+  await expect(page.locator(".focus-timer-panel")).not.toContainText(sharedTask.title);
 
   await nav.getByRole("button", { name: "项目总览" }).click();
   await privateOption.click();

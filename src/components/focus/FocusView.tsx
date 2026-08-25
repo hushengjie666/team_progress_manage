@@ -1,4 +1,4 @@
-import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../../types";
+import type { ActiveTimer, AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../../types";
 import { FocusCurrentTaskPanel } from "./FocusCurrentTaskPanel";
 import { FocusTaskList } from "./FocusTaskList";
 import { FocusTimerPanel } from "./FocusTimerPanel";
@@ -6,9 +6,9 @@ import { buildFocusTaskList, focusProgressPercent, groupFocusTasksByProject, upc
 
 export function FocusView(props: {
   state: AppState;
+  activeTimer?: ActiveTimer;
   currentTask?: Task;
   committedTasks: Task[];
-  currentTaskWorkspaceLabel?: string;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   toggleTimer: () => void;
   resetTimer: () => void;
@@ -17,7 +17,7 @@ export function FocusView(props: {
   completeTask: (taskId: string) => void;
 }) {
   const { state, currentTask, committedTasks } = props;
-  const active = state.activeTimer;
+  const active = props.activeTimer;
   const activeTaskId = active?.taskId;
   const todayWorkTasks = buildFocusTaskList(currentTask, committedTasks, activeTaskId);
   const groupedWorkTasks = groupFocusTasksByProject(todayWorkTasks);
@@ -28,7 +28,6 @@ export function FocusView(props: {
         <div className="focus-stage-inner">
           <FocusCurrentTaskPanel
             currentTask={currentTask}
-            workspaceExceptionLabel={props.currentTaskWorkspaceLabel}
             completeTask={props.completeTask}
           />
           <FocusTimerPanel

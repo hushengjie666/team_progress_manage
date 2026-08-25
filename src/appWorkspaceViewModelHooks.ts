@@ -3,6 +3,7 @@ import { getTodayPlan, type TaskFilters } from "./appModel";
 import type { AppState } from "./types";
 import { workspacesForState } from "./accessControl";
 import {
+  activeTimerForFocus,
   committedTasksForPlan,
   currentMemberForState,
   currentTaskForFocus,
@@ -38,14 +39,18 @@ export function useAppWorkspaceViewModelHooks({
 }: AppWorkspaceViewModelHooksOptions) {
   const restoredWorkspaceAccountRef = useRef<string | null>(null);
   const todayPlan = state ? getTodayPlan(state) : null;
+  const selectedWorkspaceProjectIds = useMemo(() => {
+    if (!state || !selectedWorkspaceId) return undefined;
+    return projectIdsForWorkspace(state, selectedWorkspaceId);
+  }, [state, selectedWorkspaceId]);
 
   const committedTasks = useMemo(() => {
     if (!state || !todayPlan) return [];
     const tasks = committedTasksForPlan(state, todayPlan);
-    return selectedWorkspaceId
-      ? filterProjectItemsForWorkspace(tasks, projectIdsForWorkspace(state, selectedWorkspaceId))
+    return selectedWorkspaceProjectIds
+      ? filterProjectItemsForWorkspace(tasks, selectedWorkspaceProjectIds)
       : tasks;
-  }, [state, todayPlan, selectedWorkspaceId]);
+  }, [state, todayPlan, selectedWorkspaceProjectIds]);
 
   const totalCommittedEstimate = useMemo(
     () => committedTasks.reduce((sum, task) => sum + task.estimatePomodoros, 0),
@@ -140,8 +145,13 @@ export function useAppWorkspaceViewModelHooks({
 
   const currentTask = useMemo(() => {
     if (!state) return undefined;
-    return currentTaskForFocus(state, focusCommittedTasks, preferredFocusTaskId);
-  }, [state, focusCommittedTasks, preferredFocusTaskId]);
+    return currentTaskForFocus(state, focusCommittedTasks, preferredFocusTaskId, selectedWorkspaceProjectIds);
+  }, [state, focusCommittedTasks, preferredFocusTaskId, selectedWorkspaceProjectIds]);
+
+  const focusActiveTimer = useMemo(() => {
+    if (!state) return undefined;
+    return activeTimerForFocus(state, selectedWorkspaceProjectIds);
+  }, [state, selectedWorkspaceProjectIds]);
 
   return {
     todayPlan,
@@ -152,5 +162,6 @@ export function useAppWorkspaceViewModelHooks({
     workspaceModel,
     toggleWorkbenchProject,
     currentTask,
+    focusActiveTimer,
   };
 }

@@ -5,6 +5,7 @@ import { CommandPalette } from "./CommandPalette";
 import { ConfirmDialog, ShortcutHelpDialog, SplitTaskDialog } from "./Dialogs";
 import { isTauriRuntime } from "../tauriEnvironment";
 import { filterProjectItemsForWorkspace, projectIdsForWorkspace } from "../workspaceScope";
+import { taskById } from "../workbenchModel";
 
 type AppAuthenticatedShellDialogsProps = Pick<
   AppAuthenticatedShellProps,
@@ -31,7 +32,6 @@ export function AppAuthenticatedShellDialogs({
   const {
     state,
     tab,
-    currentTask,
     visibleWorkspaces,
   } = view;
   const {
@@ -55,6 +55,7 @@ export function AppAuthenticatedShellDialogs({
   const commandTasks = shellState.selectedWorkspaceId
     ? filterProjectItemsForWorkspace(state.tasks, projectIdsForWorkspace(state, shellState.selectedWorkspaceId))
     : state.tasks;
+  const activeTimerTask = taskById(state, state.activeTimer?.taskId);
 
   return (
     <>
@@ -72,7 +73,7 @@ export function AppAuthenticatedShellDialogs({
       {state.activeTimer && tab !== "focus" && !isTauriRuntime() && (
         <MiniTimer
           state={state}
-          task={currentTask}
+          task={activeTimerTask}
           toggleTimer={focusActions.toggleTimer}
           finishTimer={focusActions.finishTimer}
         />

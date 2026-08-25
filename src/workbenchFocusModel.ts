@@ -1,6 +1,6 @@
 import { resolveCurrentMember } from "./memberIdentity";
 import { filterTodayCommittedTasksForMember } from "./projectOverview";
-import type { AppState, DailyPlan, ProjectMember, Task } from "./types";
+import type { ActiveTimer, AppState, DailyPlan, ProjectMember, Task } from "./types";
 
 export const committedTasksForPlan = (state: AppState, todayPlan: DailyPlan): Task[] =>
   todayPlan.committedTaskIds
@@ -21,17 +21,35 @@ const focusTaskRank = (task: Task) => {
 
 const canShowAsFocusTask = (task: Task) => focusTaskRank(task) < 3;
 
-export const currentTaskForFocus = (state: AppState, focusCommittedTasks: Task[], preferredTaskId?: string | null): Task | undefined => {
-  if (!state.activeTimer?.taskId) {
-    const preferredTask = preferredTaskId
-      ? focusCommittedTasks.find((task) => task.id === preferredTaskId && canShowAsFocusTask(task))
-      : undefined;
-    if (preferredTask) return preferredTask;
-    return [...focusCommittedTasks]
-      .filter(canShowAsFocusTask)
-      .sort((left, right) => focusTaskRank(left) - focusTaskRank(right) || left.sortOrder - right.sortOrder)[0];
-  }
-  return state.tasks.find((task) => task.id === state.activeTimer?.taskId && canShowAsFocusTask(task));
+export const activeTimerForFocus = (
+  state: AppState,
+  allowedProjectIds?: ReadonlySet<string>,
+): ActiveTimer | undefined => {
+  const active = state.activeTimer;
+  if (!active?.taskId || !allowedProjectIds) return active;
+  const activeTask = state.tasks.find((task) => task.id === active.taskId);
+  return activeTask && allowedProjectIds.has(activeTask.projectId) ? active : undefined;
+};
+
+export const currentTaskForFocus = (
+  state: AppState,
+  focusCommittedTasks: Task[],
+  preferredTaskId?: string | null,
+  allowedProjectIds?: ReadonlySet<string>,
+): Task | undefined => {
+  const scopedActive = activeTimerForFocus(state, allowedProjectIds);
+  const activeTask = scopedActive?.taskId
+    ? state.tasks.find((task) => task.id === scopedActive.taskId && canShowAsFocusTask(task))
+    : undefined;
+  if (activeTask) return activeTask;
+
+  const preferredTask = preferredTaskId
+    ? focusCommittedTasks.find((task) => task.id === preferredTaskId && canShowAsFocusTask(task))
+    : undefined;
+  if (preferredTask) return preferredTask;
+  return [...focusCommittedTasks]
+    .filter(canShowAsFocusTask)
+    .sort((left, right) => focusTaskRank(left) - focusTaskRank(right) || left.sortOrder - right.sortOrder)[0];
 };
 
 export const taskById = (state: AppState, taskId?: string | null): Task | undefined => {

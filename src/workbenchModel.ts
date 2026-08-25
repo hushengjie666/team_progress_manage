@@ -13,7 +13,7 @@ import type { AppState, DailyPlan, Task } from "./types";
 import { currentMemberForState } from "./workbenchFocusModel";
 import { filterProjectItemsForWorkspace, projectIdsForWorkspace } from "./workspaceScope";
 
-export { committedTasksForPlan, currentMemberForState, currentTaskForFocus, focusTasksForMember, taskById } from "./workbenchFocusModel";
+export { activeTimerForFocus, committedTasksForPlan, currentMemberForState, currentTaskForFocus, focusTasksForMember, taskById } from "./workbenchFocusModel";
 export { poolTasksForFilters } from "./workbenchPoolTasks";
 
 export const deriveWorkspaceModel = (

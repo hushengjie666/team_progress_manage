@@ -14,6 +14,7 @@ import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
 import { createTeamDataRuntime } from "./teamStateRuntime";
 import { createDailyPlanForDate, nowIso, today } from "./appModel";
+import { taskById } from "./workbenchModel";
 
 export function App() {
   const appShell = useAppShellState();
@@ -94,6 +95,7 @@ export function App() {
     projectTaskFilters,
   });
   const { workspaceModel } = appViewModel;
+  const activeTimerTask = state ? taskById(state, state.activeTimer?.taskId) : undefined;
   const todayPlan = appViewModel.todayPlan ?? (state ? createDailyPlanForDate(state, today(), nowIso()) : undefined);
   const toggleDesktopTimer = useCallback(() => {
     loadedRuntimesRef.current?.focusActions.toggleTimer();
@@ -103,11 +105,11 @@ export function App() {
   }, []);
   useDesktopTimerOverlay({
     state,
-    currentTask: appViewModel.currentTask,
+    currentTask: activeTimerTask,
     toggleTimer: toggleDesktopTimer,
     abortTimer: abortDesktopTimer,
   });
-  useNativeTimerSync(state, appViewModel.currentTask);
+  useNativeTimerSync(state, activeTimerTask);
   useIOSDeepLinks(appShell.setTab);
 
   if (!state) {

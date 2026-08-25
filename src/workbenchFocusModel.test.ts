@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createInitialState } from "./seed";
-import { currentTaskForFocus } from "./workbenchModel";
+import { activeTimerForFocus, currentTaskForFocus } from "./workbenchModel";
 import type { Task } from "./types";
 
 const task = (id: string, status: Task["status"], sortOrder: number): Task => ({
@@ -61,5 +61,50 @@ describe("workbench focus model", () => {
     );
 
     expect(next?.id).toBe(pendingReviewTask.id);
+  });
+
+  it("does not let an active task from another workspace override the selected workspace", () => {
+    const state = createInitialState();
+    const sharedTask = { ...task("task_shared_running", "in_progress", 10), projectId: "project_shared" };
+    const privateTask = { ...task("task_private", "committed", 20), projectId: "project_private" };
+    const activeTimer = {
+      sessionId: "session_shared",
+      taskId: sharedTask.id,
+      mode: "focus" as const,
+      duration: 1500,
+      remaining: 900,
+      isRunning: true,
+      startedAt: "2026-06-30T08:00:00.000Z",
+      plannedEndAt: "2026-06-30T08:25:00.000Z",
+      totalPausedSeconds: 0,
+      cycleIndex: 1,
+    };
+    const scopedState = { ...state, tasks: [sharedTask, privateTask], activeTimer };
+    const privateProjectIds = new Set([privateTask.projectId]);
+
+    expect(activeTimerForFocus(scopedState, privateProjectIds)).toBeUndefined();
+    expect(currentTaskForFocus(scopedState, [privateTask], null, privateProjectIds)?.id).toBe(privateTask.id);
+  });
+
+  it("keeps a timed task visible when it belongs to the selected workspace", () => {
+    const state = createInitialState();
+    const runningTask = { ...task("task_private_running", "in_progress", 10), projectId: "project_private" };
+    const activeTimer = {
+      sessionId: "session_private",
+      taskId: runningTask.id,
+      mode: "focus" as const,
+      duration: 1500,
+      remaining: 900,
+      isRunning: true,
+      startedAt: "2026-06-30T08:00:00.000Z",
+      plannedEndAt: "2026-06-30T08:25:00.000Z",
+      totalPausedSeconds: 0,
+      cycleIndex: 1,
+    };
+    const scopedState = { ...state, tasks: [runningTask], activeTimer };
+    const privateProjectIds = new Set([runningTask.projectId]);
+
+    expect(activeTimerForFocus(scopedState, privateProjectIds)).toBe(activeTimer);
+    expect(currentTaskForFocus(scopedState, [], null, privateProjectIds)?.id).toBe(runningTask.id);
   });
 });
