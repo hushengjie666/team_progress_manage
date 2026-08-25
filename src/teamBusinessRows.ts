@@ -1,6 +1,7 @@
 import { createInitialState } from "./seed";
 import { dedupeProjectMembersByIdentity } from "./projectMemberDeduplication";
 import { buildTeamDataWorkspace } from "./businessStateWorkspace";
+import { reconcileTeamActiveTimerAfterDelta } from "./teamActiveTimerReconciliation";
 import type {
   AppState,
   DailyPlan,
@@ -111,6 +112,7 @@ export function businessRowsFromState(state: AppState): BusinessRow[] {
     })),
     ...state.workSessions.map((session) => ({
       workspace_id: workspace.workspaceIdForPayload(session, workspace.taskWorkspaceId(session.taskId) ?? currentWorkspaceId),
+      account_id: session.ownerAccountId ?? ownerAccountId,
       entity: "work_session" as const,
       id: session.id,
       updated_at: session.updatedAt,
@@ -198,7 +200,7 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
     if (row.entity === "task") next.tasks.push(row.payload as Task);
     if (row.entity === "daily_plan") next.dailyPlans.push(row.payload as DailyPlan);
     if (row.entity === "focus_session") next.focusSessions.push(row.payload as FocusSession);
-    if (row.entity === "work_session") next.workSessions.push(row.payload as WorkSession);
+    if (row.entity === "work_session") next.workSessions.push(workSessionFromRow(row));
     if (row.entity === "execution_signal") next.executionSignals.push(row.payload as ExecutionSignal);
     if (row.entity === "interruption") next.interruptions.push(row.payload as Interruption);
     if (row.entity === "task_template") next.taskTemplates.push(row.payload as TaskTemplate);
@@ -221,6 +223,11 @@ const replacePayloadById = <T extends { id: string }>(items: T[], row: BusinessR
   return items.map((item, itemIndex) => itemIndex === index ? payload : item);
 };
 
+const workSessionFromRow = (row: BusinessRow): WorkSession => ({
+  ...(row.payload as WorkSession),
+  ownerAccountId: row.account_id ?? (row.payload as WorkSession).ownerAccountId,
+});
+
 const replaceTemplateInstance = (items: TemplateInstance[], row: BusinessRow) => {
   const payload = row.payload as TemplateInstance;
   const index = items.findIndex((item) => templateInstanceId(item) === row.id);
@@ -237,6 +244,7 @@ export function mergeBusinessRowChangesIntoState(
 	local: AppState,
 	rows: BusinessRow[],
 	deleted: BusinessDeletedRow[] = [],
+	serverTime?: string,
 ): AppState {
   const confirmedAt = new Date().toISOString();
   let next: AppState = {
@@ -257,7 +265,12 @@ export function mergeBusinessRowChangesIntoState(
     if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
     if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
     if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
-    if (row.entity === "work_session") next = { ...next, workSessions: replacePayloadById(next.workSessions, row) };
+    if (row.entity === "work_session") {
+      next = {
+        ...next,
+        workSessions: replacePayloadById(next.workSessions, { ...row, payload: workSessionFromRow(row) }),
+      };
+    }
     if (row.entity === "execution_signal") next = { ...next, executionSignals: replacePayloadById(next.executionSignals, row) };
     if (row.entity === "interruption") next = { ...next, interruptions: replacePayloadById(next.interruptions, row) };
     if (row.entity === "task_template") next = { ...next, taskTemplates: replacePayloadById(next.taskTemplates, row) };
@@ -282,36 +295,14 @@ export function mergeBusinessRowChangesIntoState(
 		}
 	}
 
-  const active = next.activeTimer;
-  if (active?.workSessionId) {
-    const workSession = next.workSessions.find((session) => session.id === active.workSessionId);
-    const focusSession = next.focusSessions.find((session) => session.id === active.sessionId);
-    if (workSession?.status === "ended") {
-      next = { ...next, activeTimer: undefined };
-    } else if (workSession) {
-      const duration = focusSession?.duration ?? active.duration;
-      const speedMultiplier = active.speedMultiplier ?? 1;
-      const reference = workSession.status === "paused" && workSession.pausedAt
-        ? new Date(workSession.pausedAt).getTime()
-        : Date.now();
-      const startedAtMs = new Date(workSession.startedAt).getTime();
-      const activeElapsed = Math.max(0, (reference - startedAtMs) / 1000 - workSession.totalPausedSeconds);
-      const remaining = Math.max(0, Math.ceil(duration - activeElapsed * speedMultiplier));
-      next = {
-        ...next,
-        activeTimer: {
-          ...active,
-          duration,
-          remaining,
-          isRunning: workSession.status === "active",
-          startedAt: workSession.startedAt,
-          pausedAt: workSession.pausedAt,
-          totalPausedSeconds: workSession.totalPausedSeconds,
-          plannedEndAt: new Date(startedAtMs + (duration / speedMultiplier + workSession.totalPausedSeconds) * 1000).toISOString(),
-        },
-      };
-    }
-  }
+  const changedWorkSessionIds = new Set([
+    ...rows.filter((row) => row.entity === "work_session").map((row) => row.id),
+    ...deleted.filter((row) => row.entity === "work_session").map((row) => row.id),
+  ]);
+  next = {
+    ...next,
+    activeTimer: reconcileTeamActiveTimerAfterDelta(local, next, changedWorkSessionIds, serverTime),
+  };
 
   return {
     ...next,

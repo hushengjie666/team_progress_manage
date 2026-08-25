@@ -160,6 +160,9 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 }
 
 func (a *app) startTaskInTx(ctx context.Context, tx *sql.Tx, auth authContext, task businessRow, taskPayload map[string]any, req domainActionRequest, now string) error {
+	if err := endAccountActiveWorkSessionsForStart(ctx, tx, auth, now); err != nil {
+		return err
+	}
 	date := strings.TrimSpace(req.Date)
 	if date == "" {
 		date = now[:10]
@@ -275,13 +278,21 @@ func (a *app) handleWorkSessionAction(w http.ResponseWriter, r *http.Request, au
 	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if err := lockAccountWorkSessions(r.Context(), tx, auth.AccountID); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
 	row, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "work_session", sessionID)
 	if err != nil || !found || row.AccountID != auth.AccountID {
 		writeError(w, http.StatusNotFound, "work session not found")
 		return
 	}
 	payload, _ := rowPayloadObject(row)
-	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if err := endOtherAccountActiveWorkSessions(r.Context(), tx, auth, sessionID, now); err != nil {
+		writeError(w, http.StatusInternalServerError, "save failed")
+		return
+	}
 	switch action {
 	case "pause":
 		if stringField(row.Payload, "status") != "active" {

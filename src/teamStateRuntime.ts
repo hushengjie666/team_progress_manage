@@ -110,7 +110,7 @@ export const createTeamDataRuntime = ({ getState, setState, setToast }: TeamData
         const result = await submitTeamDomainCommand(current.backend, currentToken, command);
         const confirmedSource = getState();
         if (!confirmedSource) return undefined;
-        const merged = mergeBusinessRowChangesIntoState(confirmedSource, result.rows, result.deleted);
+        const merged = mergeBusinessRowChangesIntoState(confirmedSource, result.rows, result.deleted, result.server_time);
         const withSettings = Object.keys(result.settings).length > 0
           ? { ...merged, settings: { ...merged.settings, ...result.settings } as Settings }
           : merged;

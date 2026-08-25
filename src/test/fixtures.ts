@@ -186,7 +186,7 @@ export const teamBootstrapPayload = (
     workspaces: [workspace],
     workspace_memberships: [membership],
     rows,
-    loaded_at: timestamp,
+    loaded_at: new Date().toISOString(),
     settings: state.settings,
   };
 };
@@ -251,6 +251,7 @@ export const withWorkSession = (state: AppState, overrides: Partial<WorkSession>
     ...state,
     workSessions: [...state.workSessions, {
       id: overrides.id ?? "work_fixture",
+      ownerAccountId: overrides.ownerAccountId ?? state.auth.account?.id ?? "account_owner",
       taskId,
       executorMemberId: overrides.executorMemberId ?? state.projectMembers[0]?.id ?? "member_owner",
       focusSessionId: overrides.focusSessionId ?? "focus_fixture",

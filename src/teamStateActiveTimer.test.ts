@@ -144,4 +144,137 @@ describe("team backend active timer state loading", () => {
       pausedAt,
     });
   });
+
+  it("keeps the local monotonic countdown when the matching server session uses an older clock baseline", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-25T08:05:00.000Z"));
+    const base = createTestState();
+    const focusSessionId = "focus_clock_skew";
+    const workSessionId = "work_clock_skew";
+    const remote = withWorkSession({
+      ...base,
+      updatedAt: "2026-08-25T08:00:00.000Z",
+      focusSessions: [{
+        id: focusSessionId,
+        taskId: base.tasks[0].id,
+        mode: "focus",
+        duration: 1500,
+        startedAt: "2026-08-25T07:58:00.000Z",
+        interruptionCounts: { internal: 0, external: 0 },
+      }],
+      workSessions: [],
+    }, {
+      id: workSessionId,
+      focusSessionId,
+      taskId: base.tasks[0].id,
+      status: "active",
+      startedAt: "2026-08-25T07:58:00.000Z",
+      updatedAt: "2026-08-25T07:58:00.000Z",
+    });
+    const local = {
+      ...remote,
+      auth: { ...remote.auth, token: "token", status: "authenticated" as const },
+      backend: { ...remote.backend, token: "token" },
+      activeTimer: {
+        sessionId: focusSessionId,
+        workSessionId,
+        taskId: base.tasks[0].id,
+        mode: "focus" as const,
+        duration: 1500,
+        remaining: 1380,
+        isRunning: true,
+        startedAt: "2026-08-25T08:03:00.000Z",
+        plannedEndAt: "2026-08-25T08:28:00.000Z",
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+      },
+    };
+    const payload = {
+      ...teamBootstrapPayload(remote, businessRowsFromState(remote)),
+      loaded_at: "2026-08-25T08:00:00.000Z",
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+
+    const loaded = await loadTeamData(local);
+
+    expect(loaded.activeTimer).toMatchObject({
+      workSessionId,
+      remaining: 1380,
+      plannedEndAt: "2026-08-25T08:28:00.000Z",
+    });
+  });
+
+  it("recovers the newest active session owned by the current account", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-25T08:10:00.000Z"));
+    const base = createTestState();
+    const focusSessions = [
+      {
+        id: "focus_current_newest",
+        taskId: base.tasks[0].id,
+        mode: "focus" as const,
+        duration: 1500,
+        startedAt: "2026-08-25T08:07:00.000Z",
+        interruptionCounts: { internal: 0, external: 0 },
+      },
+      {
+        id: "focus_current_older",
+        taskId: base.tasks[0].id,
+        mode: "focus" as const,
+        duration: 1500,
+        startedAt: "2026-08-25T08:00:00.000Z",
+        interruptionCounts: { internal: 0, external: 0 },
+      },
+      {
+        id: "focus_other_account",
+        taskId: base.tasks[0].id,
+        mode: "focus" as const,
+        duration: 1500,
+        startedAt: "2026-08-25T08:09:00.000Z",
+        interruptionCounts: { internal: 0, external: 0 },
+      },
+    ];
+    let remote = { ...base, updatedAt: "2026-08-25T08:10:00.000Z", focusSessions, workSessions: [] };
+    remote = withWorkSession(remote, {
+      id: "work_current_older",
+      ownerAccountId: "account_owner",
+      focusSessionId: "focus_current_older",
+      status: "active",
+      startedAt: "2026-08-25T08:00:00.000Z",
+    });
+    remote = withWorkSession(remote, {
+      id: "work_current_newest",
+      ownerAccountId: "account_owner",
+      focusSessionId: "focus_current_newest",
+      status: "active",
+      startedAt: "2026-08-25T08:07:00.000Z",
+    });
+    remote = withWorkSession(remote, {
+      id: "work_other_account",
+      ownerAccountId: "account_other",
+      focusSessionId: "focus_other_account",
+      status: "active",
+      startedAt: "2026-08-25T08:09:00.000Z",
+    });
+    const local = {
+      ...base,
+      auth: { ...base.auth, token: "token", status: "authenticated" as const },
+      backend: { ...base.backend, token: "token" },
+      activeTimer: undefined,
+    };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(
+      teamBootstrapPayload(remote, businessRowsFromState(remote)),
+    ), { status: 200, headers: { "content-type": "application/json" } })));
+
+    const loaded = await loadTeamData(local);
+
+    expect(loaded.activeTimer).toMatchObject({
+      workSessionId: "work_current_newest",
+      sessionId: "focus_current_newest",
+      remaining: 1320,
+    });
+  });
 });

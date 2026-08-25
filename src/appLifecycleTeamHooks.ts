@@ -115,7 +115,7 @@ export function useTeamBusinessRefresh({
       }
       setState((value) => {
         if (!value) return value;
-        const merged = mergeBusinessRowChangesIntoState(value, delta.rows, delta.deleted);
+        const merged = mergeBusinessRowChangesIntoState(value, delta.rows, delta.deleted, delta.server_time);
         return Object.keys(delta.settings ?? {}).length > 0
           ? { ...merged, settings: { ...merged.settings, ...delta.settings } as Settings }
           : merged;

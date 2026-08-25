@@ -80,10 +80,51 @@ func TestTaskStartReturnsAndCreatesSingleWorkSession(t *testing.T) {
 		}
 	}
 
-	var workSessionID string
-	if err := api.db.QueryRow(`SELECT id FROM business_work_sessions WHERE workspace_id = ?`, "workspace_test").Scan(&workSessionID); err != nil {
+	secondStartRequest := httptest.NewRequest(
+		http.MethodPost,
+		"/tasks/task_start_test/start?workspace_id=workspace_test",
+		strings.NewReader(`{"workspace_id":"workspace_test","focus_session_id":"focus_start_second","work_session_id":"work_start_second"}`),
+	)
+	secondStartRecorder := httptest.NewRecorder()
+	api.handleTaskAction(secondStartRecorder, secondStartRequest, ownerAuth(), task.ID, "start")
+	if secondStartRecorder.Code != http.StatusOK {
+		t.Fatalf("second start status = %d, body = %s", secondStartRecorder.Code, secondStartRecorder.Body.String())
+	}
+
+	var activeWorkSessionCount int
+	if err := api.db.QueryRow(
+		`SELECT COUNT(*) FROM business_work_sessions WHERE account_id = ? AND status IN ('active', 'paused')`,
+		"account_owner",
+	).Scan(&activeWorkSessionCount); err != nil {
 		t.Fatal(err)
 	}
+	if activeWorkSessionCount != 1 {
+		t.Fatalf("active work session count = %d, want 1", activeWorkSessionCount)
+	}
+	var supersededWorkSessionCount int
+	if err := api.db.QueryRow(
+		`SELECT COUNT(*) FROM business_work_sessions WHERE account_id = ? AND status = 'ended' AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.outcome')) = 'superseded'`,
+		"account_owner",
+	).Scan(&supersededWorkSessionCount); err != nil {
+		t.Fatal(err)
+	}
+	if supersededWorkSessionCount != 1 {
+		t.Fatalf("superseded work session count = %d, want 1", supersededWorkSessionCount)
+	}
+
+	var workSessionID string
+	if err := api.db.QueryRow(`SELECT id FROM business_work_sessions WHERE workspace_id = ? AND status = 'active'`, "workspace_test").Scan(&workSessionID); err != nil {
+		t.Fatal(err)
+	}
+	legacySession := businessRow{
+		WorkspaceID: "workspace_test",
+		AccountID:   "account_owner",
+		Entity:      "work_session",
+		ID:          "work_legacy_duplicate",
+		UpdatedAt:   now,
+		Payload:     json.RawMessage(`{"id":"work_legacy_duplicate","workspaceId":"workspace_test","taskId":"task_start_test","focusSessionId":"focus_missing_legacy","status":"active","startedAt":"2026-07-17T01:50:00Z","totalPausedSeconds":0,"createdAt":"2026-07-17T01:50:00Z","updatedAt":"2026-07-17T01:50:00Z"}`),
+	}
+	saveRows(t, api, ownerAuth(), "", []businessRow{legacySession})
 	finishRequest := httptest.NewRequest(
 		http.MethodPost,
 		"/work-sessions/"+workSessionID+"/finish?workspace_id=workspace_test",
@@ -93,6 +134,15 @@ func TestTaskStartReturnsAndCreatesSingleWorkSession(t *testing.T) {
 	api.handleWorkSessionAction(finishRecorder, finishRequest, ownerAuth(), workSessionID, "finish")
 	if finishRecorder.Code != http.StatusOK {
 		t.Fatalf("finish status = %d, body = %s", finishRecorder.Code, finishRecorder.Body.String())
+	}
+	if err := api.db.QueryRow(
+		`SELECT COUNT(*) FROM business_work_sessions WHERE account_id = ? AND status IN ('active', 'paused')`,
+		"account_owner",
+	).Scan(&activeWorkSessionCount); err != nil {
+		t.Fatal(err)
+	}
+	if activeWorkSessionCount != 0 {
+		t.Fatalf("active work session count after finish = %d, want 0", activeWorkSessionCount)
 	}
 
 	completedTask, found, err := businessExistingRow(context.Background(), api.db, "workspace_test", "task", task.ID)

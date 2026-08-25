@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { businessRowsFromState, mergeBusinessRowChangesIntoState } from "./teamBusinessRows";
-import { createTestState } from "./test/fixtures";
+import { createTestState, withWorkSession } from "./test/fixtures";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("business delta merge", () => {
   it("is idempotent for repeated rows and deletion markers", () => {
@@ -26,5 +30,54 @@ describe("business delta merge", () => {
       id: task.id,
     }]);
     expect(deletedAgain.tasks.some((item) => item.id === task.id)).toBe(false);
+  });
+
+  it("does not recalculate a running timer for an unrelated business delta", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-25T08:08:00.000Z"));
+    const base = createTestState();
+    const workSessionId = "work_stable_timer";
+    const focusSessionId = "focus_stable_timer";
+    const withSession = withWorkSession({
+      ...base,
+      focusSessions: [{
+        id: focusSessionId,
+        taskId: base.tasks[0].id,
+        mode: "focus",
+        duration: 1500,
+        startedAt: "2026-08-25T08:00:00.000Z",
+        interruptionCounts: { internal: 0, external: 0 },
+      }],
+    }, {
+      id: workSessionId,
+      focusSessionId,
+      taskId: base.tasks[0].id,
+      status: "active",
+      startedAt: "2026-08-25T08:00:00.000Z",
+      updatedAt: "2026-08-25T08:00:00.000Z",
+    });
+    const local = {
+      ...withSession,
+      activeTimer: {
+        sessionId: focusSessionId,
+        workSessionId,
+        taskId: base.tasks[0].id,
+        mode: "focus" as const,
+        duration: 1500,
+        remaining: 1380,
+        isRunning: true,
+        startedAt: "2026-08-25T08:05:00.000Z",
+        plannedEndAt: "2026-08-25T08:31:00.000Z",
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+      },
+    };
+    const task = { ...local.tasks[0], notes: "无关增量", updatedAt: "2026-08-25T08:08:00.000Z" };
+    const row = businessRowsFromState({ ...local, tasks: [task, ...local.tasks.slice(1)] })
+      .find((item) => item.entity === "task" && item.id === task.id)!;
+
+    const merged = mergeBusinessRowChangesIntoState(local, [row], [], "2026-08-25T08:02:00.000Z");
+
+    expect(merged.activeTimer).toEqual(local.activeTimer);
   });
 });

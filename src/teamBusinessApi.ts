@@ -5,10 +5,9 @@ import type { ServerAccount, ServerWorkspace, ServerWorkspaceMembership } from "
 import { apiUrl, authHeaders, requestJson, TeamHttpError } from "./teamBackendHttp";
 import { mapAccount, mapWorkspace, mapWorkspaceMembership } from "./teamBackendMappers";
 import { compatibilityStateForHttpError, TeamBackendCompatibilityError } from "./teamBackendCompatibility";
-import { restoreTimer } from "./timerCalculations";
 import type { Settings } from "./types";
 import { preserveLocalUnpersistedTimer } from "./teamActiveRuntimePreservation";
-import { normalizeTimerSpeedMultiplier, timerSpeedMultiplierForSettings } from "./timerSpeed";
+import { recoverTeamActiveTimer } from "./teamActiveTimerReconciliation";
 
 type AppBootstrapResponse = {
   account: ServerAccount;
@@ -19,51 +18,6 @@ type AppBootstrapResponse = {
   rows: BusinessRow[];
   loaded_at: string;
   settings?: Partial<Settings>;
-};
-
-const recoverTeamActiveTimer = (
-  state: AppState,
-  settings: Settings,
-  local: AppState,
-  now = new Date(),
-) => {
-  const activeWork = state.workSessions.find((session) => session.status === "active" || session.status === "paused");
-  const activeFocus = activeWork
-    ? state.focusSessions.find((session) => session.id === activeWork.focusSessionId)
-    : undefined;
-  if (!activeWork || !activeFocus) return undefined;
-
-  const duration = activeFocus.duration ?? settings.focusMinutes * 60;
-  const localTimer = local.activeTimer?.workSessionId === activeWork.id ? local.activeTimer : undefined;
-  const speedMultiplier = normalizeTimerSpeedMultiplier(
-    localTimer?.speedMultiplier ?? timerSpeedMultiplierForSettings(settings),
-  );
-  const plannedEndAt = new Date(
-    new Date(activeWork.startedAt).getTime()
-      + (activeWork.totalPausedSeconds + duration / speedMultiplier) * 1000,
-  ).toISOString();
-  const referenceTime = activeWork.status === "paused"
-    ? new Date(activeWork.pausedAt ?? activeWork.updatedAt)
-    : now;
-  const restored = restoreTimer({
-    sessionId: activeFocus.id,
-    taskId: activeWork.taskId,
-    workSessionId: activeWork.id,
-    mode: activeFocus.mode,
-    duration,
-    remaining: duration,
-    isRunning: true,
-    startedAt: activeWork.startedAt,
-    plannedEndAt,
-    pausedAt: activeWork.pausedAt,
-    totalPausedSeconds: activeWork.totalPausedSeconds,
-    cycleIndex: localTimer?.cycleIndex ?? 1,
-    speedMultiplier: speedMultiplier > 1 ? speedMultiplier : undefined,
-  }, referenceTime);
-  if (!restored) return undefined;
-  return activeWork.status === "paused"
-    ? { ...restored, isRunning: false, pausedAt: activeWork.pausedAt }
-    : restored;
 };
 
 export async function loadTeamData(local: AppState): Promise<AppState> {
@@ -82,14 +36,19 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
   const settings = { ...merged.settings, ...(payload.settings ?? {}) };
-  const recoveredTimer = recoverTeamActiveTimer(merged, settings, local);
-  const remoteState: AppState = {
+  const account = mapAccount(payload.account);
+  const mergedWithAccount: AppState = {
     ...merged,
+    auth: { ...merged.auth, account },
+  };
+  const recoveredTimer = recoverTeamActiveTimer(mergedWithAccount, settings, local, payload.loaded_at);
+  const remoteState: AppState = {
+    ...mergedWithAccount,
     settings,
     auth: {
       ...merged.auth,
       status: "authenticated",
-      account: mapAccount(payload.account),
+      account,
       workspace: mapWorkspace(payload.workspace),
       membership: mapWorkspaceMembership(payload.membership),
       workspaces: payload.workspaces.map(mapWorkspace),

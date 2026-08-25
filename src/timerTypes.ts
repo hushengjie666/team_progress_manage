@@ -22,6 +22,7 @@ export interface FocusSession {
 export interface WorkSession {
   id: string;
   workspaceId?: string;
+  ownerAccountId?: string;
   taskId: string;
   executorMemberId?: string;
   focusSessionId: string;
