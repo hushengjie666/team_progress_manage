@@ -104,16 +104,15 @@ const switchToTimeManageWindow = async () => {
   });
 };
 
-const waitForDesktopTimerOverlayVisible = async () => {
+const waitForNoDesktopTimerOverlay = async () => {
   await browser.waitUntil(async () => {
     const handles = await browser.getWindowHandles();
-    return handles.includes("timer-overlay");
+    return !handles.includes("timer-overlay");
   }, {
-    timeout: 15000,
+    timeout: 10000,
     interval: 250,
-    timeoutMsg: "Desktop timer overlay window was not visible",
+    timeoutMsg: "Desktop timer overlay window should not be created",
   });
-  await browser.switchToWindow("main");
 };
 
 const currentAppDiagnostics = async () => {
@@ -139,64 +138,6 @@ const waitForNoInPageMiniTimer = async () => {
     interval: 250,
     timeoutMsg: "In-page mini timer should not render in Tauri mode",
   });
-};
-
-const withOverlayWindow = async (operation) => {
-  await browser.switchToWindow("timer-overlay");
-  try {
-    return await operation();
-  } finally {
-    await browser.switchToWindow("main").catch(() => undefined);
-  }
-};
-
-const overlayBodyText = async () => withOverlayWindow(() => bodyText());
-
-const waitForOverlayText = async (text, timeout = 10000) => {
-  await browser.waitUntil(async () => (await overlayBodyText()).includes(text), {
-    timeout,
-    interval: 250,
-    timeoutMsg: `Desktop timer overlay text not found: ${text}`,
-  });
-};
-
-const overlayWindowPosition = async () => withOverlayWindow(async () => {
-  const rect = await browser.getWindowRect();
-  return { x: rect.x, y: rect.y };
-});
-
-const overlayCanvasBackgrounds = async () => withOverlayWindow(() => browser.execute(() => {
-  const root = document.querySelector("#root");
-  const overlay = document.querySelector(".timer-overlay-root");
-  return {
-    document: getComputedStyle(document.documentElement).backgroundColor,
-    body: getComputedStyle(document.body).backgroundColor,
-    root: root ? getComputedStyle(root).backgroundColor : "missing",
-    overlay: overlay ? getComputedStyle(overlay).backgroundColor : "missing",
-  };
-}));
-
-const moveOverlayWindowBy = async (deltaX, deltaY) => withOverlayWindow(async () => {
-  const before = await browser.getWindowRect();
-  await browser.setWindowRect(before.x + deltaX, before.y + deltaY, before.width, before.height);
-  const after = await browser.getWindowRect();
-  return { x: after.x, y: after.y };
-});
-
-const clickOverlayButton = async (title) => {
-  await browser.waitUntil(() => withOverlayWindow(() => browser.execute((targetTitle) =>
-    Array.from(document.querySelectorAll("button"))
-      .some((element) => element.getAttribute("title") === targetTitle), title)), {
-    timeout: 10000,
-    interval: 250,
-    timeoutMsg: `Overlay button not found: ${title}`,
-  });
-  await withOverlayWindow(() => browser.execute((targetTitle) => {
-    const button = Array.from(document.querySelectorAll("button"))
-      .find((element) => element.getAttribute("title") === targetTitle);
-    if (!button) throw new Error(`Overlay button disappeared: ${targetTitle}`);
-    button.click();
-  }, title));
 };
 
 const clickButton = async (text, options = {}) => {
@@ -531,31 +472,17 @@ describe("TimeManage Tauri real database functional flow", () => {
     await clickButton("成员状况");
     await waitForText("今日任务总览");
     await waitForNoInPageMiniTimer();
-    await waitForDesktopTimerOverlayVisible();
-    await waitForOverlayText(taskTitle);
-    await waitForOverlayText("专注番茄");
-    assert.deepEqual(await overlayCanvasBackgrounds(), {
-      document: "rgba(0, 0, 0, 0)",
-      body: "rgba(0, 0, 0, 0)",
-      root: "rgba(0, 0, 0, 0)",
-      overlay: "rgba(0, 0, 0, 0)",
-    });
-    const overlayPositionBeforeMove = await overlayWindowPosition();
-    const overlayPositionAfterMove = await moveOverlayWindowBy(-80, -40);
-    assert.ok(
-      overlayPositionAfterMove.x < overlayPositionBeforeMove.x || overlayPositionAfterMove.y < overlayPositionBeforeMove.y,
-      "Expected desktop timer overlay window position to change",
-    );
+    await waitForNoDesktopTimerOverlay();
     await clickButton("开始工作");
     await waitForText("专注番茄", 20000);
     await waitForText(taskTitle);
-    await clickOverlayButton("暂停");
+    await clickButton("暂停", { exact: true });
     await waitForText("继续");
-    await clickOverlayButton("继续");
+    await clickButton("继续", { exact: true });
     await waitForText("暂停");
     await clickButton("内部中断");
     await waitForText("已记录内部中断", 20000);
-    await clickOverlayButton("作废番茄");
+    await clickButton("作废", { exact: true });
     await waitForText("当前番茄已作废", 20000);
 
     await clickButton("项目总览");

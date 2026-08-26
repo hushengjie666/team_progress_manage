@@ -1,5 +1,8 @@
 use tauri::Manager;
 
+#[cfg(desktop)]
+mod desktop_timer_tray;
+
 fn restore_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
@@ -11,7 +14,7 @@ fn restore_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     }
 }
 
-fn restore_main_window_on_main_thread<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+pub(crate) fn restore_main_window_on_main_thread<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     let app_handle = app.clone();
     let _ = app.run_on_main_thread(move || restore_main_window(&app_handle));
 }
@@ -19,6 +22,27 @@ fn restore_main_window_on_main_thread<R: tauri::Runtime>(app: &tauri::AppHandle<
 #[tauri::command]
 fn restore_main_window_command(app: tauri::AppHandle) {
     restore_main_window_on_main_thread(&app);
+}
+
+#[tauri::command]
+fn sync_desktop_timer_status_command(
+    app: tauri::AppHandle,
+    payload: Option<serde_json::Value>,
+) -> Result<(), String> {
+    #[cfg(desktop)]
+    {
+        let payload = payload
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|error| error.to_string())?;
+        return desktop_timer_tray::sync(&app, payload);
+    }
+
+    #[cfg(not(desktop))]
+    {
+        let _ = (app, payload);
+        Ok(())
+    }
 }
 
 fn hide_main_window_on_close<R: tauri::Runtime>(
@@ -99,9 +123,11 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            restore_main_window_on_main_thread(app);
-        }));
+        if std::env::var_os("WDIO_EMBEDDED_SERVER").is_none() {
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                restore_main_window_on_main_thread(app);
+            }));
+        }
     }
 
     builder = builder
@@ -117,7 +143,10 @@ pub fn run() {
     }
 
     let app = builder
-        .invoke_handler(tauri::generate_handler![restore_main_window_command])
+        .invoke_handler(tauri::generate_handler![
+            restore_main_window_command,
+            sync_desktop_timer_status_command
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) && std::env::var_os("WDIO_EMBEDDED_SERVER").is_none() {
                 app.handle().plugin(
@@ -132,6 +161,8 @@ pub fn run() {
                 .set_activation_policy(tauri::ActivationPolicy::Regular);
             #[cfg(target_os = "macos")]
             configure_macos_minimize_button(app.handle());
+            #[cfg(desktop)]
+            desktop_timer_tray::setup(app)?;
             Ok(())
         })
         .build(tauri::generate_context!())

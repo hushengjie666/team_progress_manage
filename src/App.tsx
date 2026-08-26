@@ -9,7 +9,7 @@ import { BootScreen } from "./components/BootScreen";
 import { AppCompatibilityGate } from "./components/AppCompatibilityGate";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
-import { useDesktopTimerOverlay } from "./desktopTimerOverlay";
+import { useDesktopTimerStatus } from "./desktopTimerStatus";
 import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
 import { createTeamDataRuntime } from "./teamStateRuntime";
@@ -97,17 +97,17 @@ export function App() {
   const { workspaceModel } = appViewModel;
   const activeTimerTask = state ? taskById(state, state.activeTimer?.taskId) : undefined;
   const todayPlan = appViewModel.todayPlan ?? (state ? createDailyPlanForDate(state, today(), nowIso()) : undefined);
-  const toggleDesktopTimer = useCallback(() => {
+  const toggleDesktopTimerStatus = useCallback(() => {
     loadedRuntimesRef.current?.focusActions.toggleTimer();
   }, []);
-  const abortDesktopTimer = useCallback(() => {
+  const abortDesktopTimerStatus = useCallback(() => {
     void loadedRuntimesRef.current?.focusActions.finishTimer("aborted");
   }, []);
-  useDesktopTimerOverlay({
+  useDesktopTimerStatus({
     state,
     currentTask: activeTimerTask,
-    toggleTimer: toggleDesktopTimer,
-    abortTimer: abortDesktopTimer,
+    toggleTimer: toggleDesktopTimerStatus,
+    abortTimer: abortDesktopTimerStatus,
   });
   useNativeTimerSync(state, activeTimerTask);
   useIOSDeepLinks(appShell.setTab);

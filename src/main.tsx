@@ -1,8 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
-import { TimerOverlayApp } from "./TimerOverlayApp";
-import { DESKTOP_TIMER_WINDOW_LABEL } from "./desktopTimerOverlay";
 import { scheduleTauriLaunchFocus } from "./tauriLaunchFocus";
 import "./styles.css";
 
@@ -12,20 +10,12 @@ const prepareTauriSmokeRuntime = async () => {
   }
 };
 
-const params = new URLSearchParams(window.location.search);
-const timerOverlayWindow = params.get("window") === DESKTOP_TIMER_WINDOW_LABEL;
-if (timerOverlayWindow) {
-  document.documentElement.classList.add("timer-overlay-document");
-  document.body.classList.add("timer-overlay-body");
-}
-
 void prepareTauriSmokeRuntime().then(() => {
-  const Root = timerOverlayWindow ? TimerOverlayApp : App;
-  if (Root === App) scheduleTauriLaunchFocus();
+  scheduleTauriLaunchFocus();
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <Root />
+      <App />
     </React.StrictMode>,
   );
 });
