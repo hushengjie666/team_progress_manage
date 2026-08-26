@@ -80,4 +80,40 @@ describe("business delta merge", () => {
 
     expect(merged.activeTimer).toEqual(local.activeTimer);
   });
+
+  it("preserves the prepared break when the completed work session is confirmed", () => {
+    const base = createTestState();
+    const completedAt = "2026-08-26T08:25:00.000Z";
+    const completed = withWorkSession(base, {
+      id: "work_completed_focus",
+      focusSessionId: "focus_completed",
+      taskId: base.tasks[0].id,
+      status: "ended",
+      startedAt: "2026-08-26T08:00:00.000Z",
+      endedAt: completedAt,
+      updatedAt: completedAt,
+    });
+    const local = {
+      ...completed,
+      activeTimer: {
+        sessionId: "prepared_break",
+        mode: "short_break" as const,
+        duration: 300,
+        remaining: 300,
+        isRunning: false,
+        prepared: true,
+        startedAt: completedAt,
+        plannedEndAt: "2026-08-26T08:30:00.000Z",
+        pausedAt: completedAt,
+        totalPausedSeconds: 0,
+        cycleIndex: 1,
+      },
+    };
+    const row = businessRowsFromState(completed)
+      .find((item) => item.entity === "work_session" && item.id === "work_completed_focus")!;
+
+    const merged = mergeBusinessRowChangesIntoState(local, [row], [], completedAt);
+
+    expect(merged.activeTimer).toEqual(local.activeTimer);
+  });
 });

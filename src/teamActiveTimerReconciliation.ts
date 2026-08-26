@@ -104,5 +104,5 @@ export const reconcileTeamActiveTimerAfterDelta = (
     return timerFromWorkSession(merged, merged.settings, session, local, serverTime, now);
   }
   if (changedWorkSessionIds.size === 0) return active;
-  return recoverReplacement();
+  return recoverReplacement() ?? active;
 };
