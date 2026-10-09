@@ -4,7 +4,7 @@
 
 Ubuntu 24.04 amd64 服务器沿用已有 Nginx HTTPS 网站和证书。TimeManage 使用旧站约定的 `/timemanage-team/` 前端和 `/timemanage-team/api/` API 路径，后端仅监听 `127.0.0.1:8787`。其他应用不在此次部署范围内。
 
-本次应用来自提交 `3bd767025a3d37c1f64dbe3c91a27d1fa908222c`。统一包由 `npm run deploy:team` 创建，版本目录为 `timemanageTeam-v0.2.10-20261009-162857`；Linux 后端使用同一提交交叉编译，并加入该目录的 `server/` 和同名 ZIP。此包是临时部署包，未创建新发布 tag。
+本次应用及修复工具来自提交 `22354eedd56e687472d2a1a43911a2833c1f5e96`。统一包由 `npm run deploy:team` 创建，最终版本目录为 `timemanageTeam-v0.2.10-20261009-165630`；Linux 后端使用同一提交交叉编译，并加入该目录的 `server/` 和同名 ZIP。此包是临时部署包，未创建新发布 tag。
 
 版本合同为 release `0.2.10`、API protocol `2`、database schema `13`。MySQL 8.0 已安装，仅监听本机；应用数据库用户和签名密钥在服务器生成，凭据不进入发布包或 Git。
 
@@ -36,7 +36,7 @@ Ubuntu 24.04 amd64 服务器沿用已有 Nginx HTTPS 网站和证书。TimeManag
 
 | 用途 | 路径 |
 | --- | --- |
-| 应用版本目录 | `/opt/timemanage-team/releases/timemanageTeam-v0.2.10-20261009-162857/` |
+| 应用版本目录 | `/opt/timemanage-team/releases/timemanageTeam-v0.2.10-20261009-165630/` |
 | 当前版本链接 | `/opt/timemanage-team/current` |
 | Linux 后端 | `/opt/timemanage-team/current/server/timemanage-team-linux-amd64` |
 | 前端静态文件 | `/opt/timemanage-team/current/web/` |
@@ -128,3 +128,21 @@ sudo ss -lnt
 ```
 
 服务重启和 Nginx 重载通过验证后才执行。后续升级继续从统一版本目录取 `web/` 和 `server/`，先备份数据库、准备新版本目录，再切换 `current`；跨版本回退遵守 `server/DATABASE-OPERATIONS.md`，不自动恢复数据库或降级程序。
+
+## 正式上线结果
+
+2026-10-09 已将修复 SQL 导入正式库 `timemanage_team`，启用 `timemanage-team.service` 开机启动，并在现有 HTTPS 站点加入 TimeManage 路由。临时本机 Nginx 验证站点已移除；候选库和原始导入材料保留，未替代原始 SQL 文件。
+
+部署时验证结果：
+
+- `/health` 返回 `status: ok`、`database_status: ready`、release `0.2.10`、API `2`、schema `13`；正式库有 16 个项目、111 个任务、807 条业务记录。
+- 375 条 JSON 与原缓存快照逐条一致；432 条缺失详情记录保留恢复标记。
+- 账号与工作区原数据、成员关系身份及权限保留；启动、登录正常刷新成员关系元数据时间。
+- 公网前端、API、旧首页与隐私页返回 200，登录成功，页面展示“历史数据待补全”。
+- Nginx WebSocket 返回 101，25 秒 ping/pong 及浏览器重连通过；后端与 MySQL 仅监听本机。
+- 前端 310 个单元测试、SQL 修复 8 个测试、浏览器流程 38 项通过（6 项跳过）；Go 后端、版本合同、迁移检查和质量检查通过。
+- 统一 ZIP 完整性、macOS DMG 校验和、签名 iOS Archive/IPA 构建及截图交付检查通过。
+
+正式库启用前的应用备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-165659-000.sql.gz`，其 SHA-256 为 `a00b7079f0bf0e7445574114f8c7288ebf4bb37664d46a18b219674b7b3c4dec`；同名 `.json` 清单保留。原始 SQL、修复 SQL、逐条恢复报告、部分导入备份、Nginx 修改前配置及旧版本链接记录位于 `/var/backups/timemanage-team/import-20261009/`。
+
+应用安装成功不等于所有历史详情完整恢复。后续业务整理应优先补全带恢复标记的项目、成员、任务和记录，报表中的默认数值不代表已找回的原始估时或工时。
