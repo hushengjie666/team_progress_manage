@@ -1,5 +1,5 @@
 import { Eye, UserRoundPen } from "lucide-react";
-import { labelPriority, taskStageOptionsForMode } from "../../appModel";
+import { labelPriority, taskStageOptionsForTasks } from "../../appModel";
 import {
   stageTaskCardClassName,
   stageTaskSortRank,
@@ -74,7 +74,7 @@ export function ProjectOverviewTaskBoard(props: {
 
   return (
     <section className="project-stage-overview">
-      {taskStageOptionsForMode(props.taskStageMode).map((stage) => {
+      {taskStageOptionsForTasks(props.taskStageMode, props.tasks).map((stage) => {
         const stageTasks = sortedTasks(props.tasks.filter((task) => task.stage === stage.value));
         return (
           <div className="project-stage-row" key={stage.value}>

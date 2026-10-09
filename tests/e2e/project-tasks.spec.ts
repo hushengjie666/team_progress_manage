@@ -1,10 +1,48 @@
 import { expect, test } from "@playwright/test";
 import { MOCK_SERVER } from "./support/constants";
 import { clearStoredApp, openApp } from "./support/openApp";
+import { authenticatedState } from "./support/authenticatedState";
+import { taskStageOptions } from "../../src/appTaskMetadata";
+import type { TaskStageMode } from "../../src/types";
 
 test.beforeEach(async ({ page }) => {
   await clearStoredApp(page);
 });
+
+for (const mode of ["regular", "software"] as TaskStageMode[]) {
+  test(`shows all task stages in overview and schedule for a ${mode} project`, async ({ page }) => {
+    const state = authenticatedState();
+    const now = new Date().toISOString();
+    state.projects = state.projects.map((project) => ({ ...project, taskStageMode: mode }));
+    state.tasks = taskStageOptions.map(({ value, label }, index) => ({
+      ...state.tasks[0],
+      id: `task_stage_${value}`,
+      title: `E2E ${label}阶段任务`,
+      stage: value,
+      status: "pool",
+      expectedStartAt: now,
+      expectedFinishAt: now,
+      sortOrder: index,
+    }));
+    await openApp(page, state);
+    await page.getByRole("button", { name: "进入项目" }).first().click();
+    const overview = page.locator(".project-stage-overview");
+    await expect(overview.getByRole("button")).toHaveCount(state.tasks.length);
+    for (const { label } of taskStageOptions) {
+      const row = overview.locator(".project-stage-row").filter({ has: page.locator(".project-stage-label strong", { hasText: label }) });
+      await expect(row.locator(".project-stage-label span")).toHaveText("1");
+      await expect(row.getByRole("button", { name: `E2E ${label}阶段任务` })).toBeVisible();
+    }
+    await page.getByRole("button", { name: "任务", exact: true }).click();
+    await expect(page.locator(".project-task-row")).toHaveCount(state.tasks.length);
+    await page.getByRole("button", { name: "排期日历" }).click();
+    const timeline = page.getByRole("region", { name: "项目排期时间轴" });
+    await expect(timeline.getByRole("button")).toHaveCount(state.tasks.length);
+    for (const { label } of taskStageOptions) {
+      await expect(timeline.getByRole("button", { name: `E2E ${label}阶段任务` })).toBeVisible();
+    }
+  });
+}
 
 test("opens a project and creates a task with the unified task form", async ({ page }) => {
   await openApp(page);

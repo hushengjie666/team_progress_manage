@@ -26,6 +26,7 @@ export {
   taskStageModeOptions,
   taskStageOptions,
   taskStageOptionsForMode,
+  taskStageOptionsForTasks,
 } from "./appTaskMetadata";
 export type { TaskDraft, TaskFilters, TaskSort } from "./appTaskMetadata";
 export {

@@ -1,4 +1,4 @@
-import type { Priority, RepeatRule, SessionMode, Severity, Subtask, TaskStage, TaskStageMode } from "./types";
+import type { Priority, RepeatRule, SessionMode, Severity, Subtask, Task, TaskStage, TaskStageMode } from "./types";
 
 export type TaskDraft = {
   title: string;
@@ -70,6 +70,16 @@ export const taskStageOptions: { value: TaskStage; label: string }[] = [
 
 export const taskStageOptionsForMode = (mode: TaskStageMode = "software") =>
   mode === "regular" ? regularTaskStageOptions : softwareTaskStageOptions;
+
+export const taskStageOptionsForTasks = (mode: TaskStageMode, tasks: readonly Pick<Task, "stage">[]) => {
+  const configuredOptions = taskStageOptionsForMode(mode);
+  const configuredStages = new Set(configuredOptions.map((option) => option.value));
+  const usedStages = new Set(tasks.map((task) => task.stage));
+  return [
+    ...configuredOptions,
+    ...taskStageOptions.filter((option) => usedStages.has(option.value) && !configuredStages.has(option.value)),
+  ];
+};
 
 const regularTaskStageValues = new Set<TaskStage>(regularTaskStageOptions.map((option) => option.value));
 

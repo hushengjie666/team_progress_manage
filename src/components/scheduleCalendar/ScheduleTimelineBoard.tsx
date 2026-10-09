@@ -1,5 +1,5 @@
 import { Eye } from "lucide-react";
-import { labelPriority, labelTaskStage, taskStageOptionsForMode } from "../../appModel";
+import { labelPriority, labelTaskStage, taskStageOptionsForTasks } from "../../appModel";
 import { buildScheduleItems, scheduleMemberName, SCHEDULE_WINDOW_DAYS, type ScheduleMonthGroup } from "../../scheduleCalendar";
 import { todayKey } from "../../seed";
 import type { ProjectMember, Task, TaskStageMode } from "../../types";
@@ -47,7 +47,7 @@ export function ScheduleTimelineBoard({
         ))}
       </div>
 
-      {taskStageOptionsForMode(taskStageMode ?? "software").map((stage) => {
+      {taskStageOptionsForTasks(taskStageMode ?? "software", scheduledTasks).map((stage) => {
         const stageTasks = scheduledTasks.filter((task) => task.stage === stage.value);
         const scheduleItems = buildScheduleItems(stageTasks, windowStart, SCHEDULE_WINDOW_DAYS);
         const laneCount = Math.max(1, scheduleItems.reduce((max, item) => Math.max(max, item.lane + 1), 0));
