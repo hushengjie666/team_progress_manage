@@ -1,5 +1,7 @@
 # TimeManage Team 部署记录
 
+Ubuntu + Nginx 部署和 Windows 历史数据迁移见 [Ubuntu 部署记录](deployment-timemanage-ubuntu.md)。下文保留旧 Windows 部署约定。
+
 这份记录固定 2026-07-01 晚上整理过的服务器部署约定，避免后续重新打包时忘记路径、base、Nginx 和 Windows Server 兼容构建方式。
 
 ## 固定部署入口

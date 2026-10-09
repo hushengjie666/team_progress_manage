@@ -7,6 +7,7 @@ import { AppAuthenticatedShellRoutes } from "./AppAuthenticatedShellRoutes";
 import { AppAuthenticatedShellTopbarActions } from "./AppAuthenticatedShellTopbarActions";
 import { platformRootClass } from "../platformCapabilities";
 import { useMobileNavigationScroll } from "../useMobileNavigationScroll";
+import { BusinessRecoveryNotice } from "./BusinessRecoveryNotice";
 
 export function AppAuthenticatedShell({
   view,
@@ -59,6 +60,7 @@ export function AppAuthenticatedShell({
             />
           )}
         />
+        <BusinessRecoveryNotice state={view.state} />
         {view.state.backend.status === "error" && (
           <div className="backend-error-banner" role="alert">
             <div>

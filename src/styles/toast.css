@@ -50,6 +50,11 @@
   color: #705326;
 }
 
+.data-recovery-banner {
+  background: #fff7e6;
+  border-color: #ddc493;
+}
+
 .backend-error-banner p {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
