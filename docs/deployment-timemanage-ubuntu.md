@@ -146,3 +146,27 @@ sudo ss -lnt
 正式库启用前的应用备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-165659-000.sql.gz`，其 SHA-256 为 `a00b7079f0bf0e7445574114f8c7288ebf4bb37664d46a18b219674b7b3c4dec`；同名 `.json` 清单保留。原始 SQL、修复 SQL、逐条恢复报告、部分导入备份、Nginx 修改前配置及旧版本链接记录位于 `/var/backups/timemanage-team/import-20261009/`。
 
 应用安装成功不等于所有历史详情完整恢复。后续业务整理应优先补全带恢复标记的项目、成员、任务和记录，报表中的默认数值不代表已找回的原始估时或工时。
+
+## 已上线记录的证据补全
+
+`scripts/enrich-navicat-recovery.py` 用原始 Navicat 导出和当前项目、任务的 JSONL 快照生成补全计划及 SQL，不重新导入整库。快照每行包含 `table`、`workspace_id`、`id`、`account_id`、`project_id`、`task_id`、`status`、`kind`、`row_date`、`updated_at` 和 JSON 对象 `payload`；`table` 只允许 `business_projects`、`business_tasks`。原始文件及输出均属于业务恢复资料，不进入 Git 或应用包。
+
+```sh
+python3 scripts/enrich-navicat-recovery.py \
+  --input <原SQL文件> --current <当前项目任务JSONL快照> \
+  --plan <新补全计划JSON> --sql <新补全SQL>
+python3 scripts/test_enrich_navicat_recovery.py
+python3 scripts/test_recover_navicat_sql.py
+```
+
+补全范围严格限制为：同一工作区、同一项目的完整任务快照中一致的项目名称，以及原 SQL 索引和关联记录可确认的上下文。项目说明、任务备注中的上下文是整理后的说明，不声称恢复了原始文字。所属账号不等于负责人；索引日期不等于完整创建时间；关联记录条数不等于工时。缺失的任务标题、负责人、权限、估时和实际工时不推断，`recovery.originalPayloadAvailable` 继续为 `false`。
+
+工具只处理未被编辑的原占位记录。导入后时间戳、文字或索引已有变化的记录会跳过或拒绝；完整快照保持原样。计划包含更新前、更新后的 JSON，输出权限为 `0600`，已有输出不覆盖。
+
+执行前必须制作并验证正式库备份，在隔离数据库中恢复备份、应用补全 SQL、逐条比较计划并运行 `db audit`。SQL 使用行锁、完整 JSON 和索引前像检查，所有检查先于更新；任何冲突必须中止整个事务。使用 MySQL 8 批处理客户端执行，**禁止 `--force`**，否则检查失败后继续执行会破坏事务保护。
+
+2026-10-09 的补全已应用到正式库：8 个项目名称由完整任务快照补回，12 个项目说明和 50 条缺失任务备注补充了可核实的信息；4 个项目原名和 50 条任务原题仍缺失。16 个项目、111 条任务、807 条业务记录数量保持不变，原来完整恢复的 4 个项目和 61 条任务及其他业务 JSON 保持原样。缺失详情的总数未减少，因为这些记录仍未完整恢复。
+
+此次验证包含 SQL 修复和补全的 17 项单元测试、真实 MySQL 备份恢复、62 条 JSON 逐条比较、最后一条记录模拟并发编辑时的整批回滚及数据库关联审计。本机客户端通过“管理中心 → 团队后台 → 刷新在线数据”读取更新；SQL 维护不会主动发送实时变更事件，其他已打开的客户端也应执行刷新。
+
+更新前备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-172809-000.sql.gz`，SHA-256 为 `d09676e6b9731a3de9d55a1bb209694c055da0c36c26e84137ec96c55dfe9646`，同名清单已核对。原计划、最终计划、执行 SQL 和日志保存在 `/var/backups/timemanage-team/enrichment-20261009-172808/`。本次为业务数据整理，未修改 schema、迁移文件或客户端二进制。
