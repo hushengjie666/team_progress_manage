@@ -79,49 +79,51 @@ export async function submitTeamDomainCommand(
   token: string,
   command: TeamDomainCommand,
 ): Promise<TeamDomainCommandResult> {
-	const mutationKey = commandMutationKey(command);
-	const mutationHeaders = {
-		...authHeaders(token),
-		"Idempotency-Key": mutationKey,
-		"X-TimeManage-Mutation-ID": mutationKey,
-	};
-	if (command.kind === "settings") {
-		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(apiUrl(backend.serverUrl, "/settings"), {
-			method: "PATCH",
-			headers: mutationHeaders,
-			body: JSON.stringify(command.patch),
-		}));
-	}
-	if (command.kind === "action") {
-		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(
-			apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
-			{
-				method: "POST",
-				headers: mutationHeaders,
-				body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId, mutation_id: mutationKey }),
-			},
-		));
-	}
+  const mutationKey = commandMutationKey(command);
+  const mutationHeaders = {
+    ...authHeaders(token),
+    "Idempotency-Key": mutationKey,
+    "X-TimeManage-Mutation-ID": mutationKey,
+  };
+  const requestCommand = (url: string, init: RequestInit) =>
+    requestJson<TeamDomainCommandResult>(url, init, { retry: true });
+  if (command.kind === "settings") {
+    return requireDeltaResponse(await requestCommand(apiUrl(backend.serverUrl, "/settings"), {
+      method: "PATCH",
+      headers: mutationHeaders,
+      body: JSON.stringify(command.patch),
+    }));
+  }
+  if (command.kind === "action") {
+    return requireDeltaResponse(await requestCommand(
+      apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
+      {
+        method: "POST",
+        headers: mutationHeaders,
+        body: JSON.stringify({ ...command.payload, workspace_id: command.workspaceId, mutation_id: mutationKey }),
+      },
+    ));
+  }
   const resource = resourcePathByEntity[command.entity];
   if (command.kind === "create") {
-		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
-			method: "POST",
-			headers: mutationHeaders,
-			body: JSON.stringify(command.payload),
-		}));
+    return requireDeltaResponse(await requestCommand(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
+      method: "POST",
+      headers: mutationHeaders,
+      body: JSON.stringify(command.payload),
+    }));
   }
   const url = apiUrl(backend.serverUrl, withWorkspace(`/${resource}/${encodeURIComponent(command.id)}`, command.workspaceId));
   if (command.kind === "patch") {
-		return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(url, {
-			method: "PATCH",
-			headers: mutationHeaders,
-			body: JSON.stringify(command.patch),
-		}));
-	}
-	return requireDeltaResponse(await requestJson<TeamDomainCommandResult>(url, {
-		method: "DELETE",
-		headers: mutationHeaders,
-	}));
+    return requireDeltaResponse(await requestCommand(url, {
+      method: "PATCH",
+      headers: mutationHeaders,
+      body: JSON.stringify(command.patch),
+    }));
+  }
+  return requireDeltaResponse(await requestCommand(url, {
+    method: "DELETE",
+    headers: mutationHeaders,
+  }));
 }
 
 export type TeamMutationBehavior = {

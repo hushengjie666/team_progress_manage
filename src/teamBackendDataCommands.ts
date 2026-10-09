@@ -32,8 +32,8 @@ export function createBackendDataCommands({
       setState(next);
       setToast("团队在线数据已刷新");
     } catch (error) {
-      const failed = applyTeamStateLoadFailure(current, error);
-      setState(failed);
+      const failed = applyTeamStateLoadFailure(getState() ?? current, error);
+      setState((latest) => latest ? applyTeamStateLoadFailure(latest, error) : latest);
       setToast(failed.backend.message);
     }
   };

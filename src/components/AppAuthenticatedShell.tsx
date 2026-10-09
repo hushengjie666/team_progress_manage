@@ -59,7 +59,16 @@ export function AppAuthenticatedShell({
             />
           )}
         />
-        {chrome.toast && chrome.toastVisible && (
+        {view.state.backend.status === "error" && (
+          <div className="backend-error-banner" role="alert">
+            <div>
+              <strong>{view.state.backend.failureKind === "save" ? "保存结果未确认" : "团队数据暂时无法刷新"}</strong>
+              <p>{view.state.backend.message}</p>
+            </div>
+            <button className="secondary-button" onClick={() => void backendActions.handleBackendRefresh()}>刷新数据</button>
+          </div>
+        )}
+        {chrome.toast && chrome.toastVisible && !(view.state.backend.status === "error" && chrome.toast === view.state.backend.message) && (
           <div className="global-toast" role="status" aria-live="polite">
             {chrome.toast}
           </div>

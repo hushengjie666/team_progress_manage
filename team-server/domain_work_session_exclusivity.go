@@ -10,6 +10,17 @@ func lockAccountWorkSessions(ctx context.Context, tx *sql.Tx, accountID string) 
 	return tx.QueryRowContext(ctx, `SELECT id FROM accounts WHERE id = ? FOR UPDATE`, accountID).Scan(&lockedAccountID)
 }
 
+func lockWorkSessionTask(ctx context.Context, tx *sql.Tx, auth authContext, workspaceID string, sessionID string) (bool, error) {
+	session, found, err := businessExistingRow(ctx, tx, workspaceID, "work_session", sessionID)
+	if err != nil || !found || session.AccountID != auth.AccountID {
+		return false, err
+	}
+	if taskID := businessTaskID(session); taskID != "" {
+		_, _, err = businessExistingRowForUpdate(ctx, tx, workspaceID, "task", taskID)
+	}
+	return err == nil, err
+}
+
 func endOtherAccountActiveWorkSessions(ctx context.Context, tx *sql.Tx, auth authContext, keepSessionID string, now string) error {
 	rows, err := tx.QueryContext(
 		ctx,

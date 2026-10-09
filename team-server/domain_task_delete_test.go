@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 )
 
@@ -37,7 +38,14 @@ func TestDeletingTaskCleansPlansAndActiveSessions(t *testing.T) {
 	replayRequest := httptest.NewRequest(http.MethodDelete, "/tasks/task_delete_test?workspace_id=workspace_test", nil)
 	replayRequest.Header.Set("Idempotency-Key", "delete-task-test")
 	api.deleteBusinessResource(replay, replayRequest, ownerAuth(), domainResourceByEntity("task"), task.ID)
-	if replay.Code != recorder.Code || replay.Body.String() != recorder.Body.String() || replay.Header().Get("X-TimeManage-Idempotency-Replayed") != "true" {
+	var originalJSON, replayJSON any
+	if err := json.Unmarshal(recorder.Body.Bytes(), &originalJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(replay.Body.Bytes(), &replayJSON); err != nil {
+		t.Fatal(err)
+	}
+	if replay.Code != recorder.Code || !reflect.DeepEqual(replayJSON, originalJSON) || replay.Header().Get("X-TimeManage-Idempotency-Replayed") != "true" {
 		t.Fatalf("idempotent replay differs: status=%d body=%s", replay.Code, replay.Body.String())
 	}
 	if _, found, err := businessExistingRow(context.Background(), api.db, task.WorkspaceID, task.Entity, task.ID); err != nil || found {

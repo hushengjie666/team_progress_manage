@@ -73,7 +73,6 @@ export function AppWorkspaceRoute({
       reorderProjects={reorderProjects}
       openProjectCreate={openQuickProjectCreate}
       openProjectDetail={(projectId) => openProjectDetail(projectId, "overview")}
-      backendError={state.backend.status === "error" ? state.backend.message : undefined}
     />
   );
 }

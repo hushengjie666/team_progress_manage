@@ -105,7 +105,6 @@ export function createAppTaskCreationRuntime({
       action: "add-task",
       workspaceId,
       payload: { task_id: taskId, date },
-      idempotencyKey: `daily-plan:add-task:${plan.id}:${taskId}`,
     }, {
       resourceKey: `daily-plan:${plan.id}`,
       pendingMode: "background",
@@ -128,7 +127,7 @@ export function createAppTaskCreationRuntime({
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
     if (plan) {
       const timestamp = nowIso();
-      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId }, idempotencyKey: `daily-plan:remove-task:${plan.id}:${taskId}` }, {
+      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId } }, {
         resourceKey: `daily-plan:${plan.id}`,
         pendingMode: "background",
         optimistic: (current) => ({
@@ -164,7 +163,7 @@ export function createAppTaskCreationRuntime({
       const target = index + direction;
       if (index < 0 || target < 0 || target >= ids.length) return;
       [ids[index], ids[target]] = [ids[target], ids[index]];
-      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction }, idempotencyKey: `daily-plan:move-task:${plan.id}:${taskId}:${direction}` }, {
+      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "move-task", workspaceId, payload: { task_id: taskId, direction } }, {
         resourceKey: `daily-plan:${plan.id}`,
         pendingMode: "background",
         optimistic: (current) => ({
@@ -192,7 +191,6 @@ export function createAppTaskCreationRuntime({
       action: "add-task",
       workspaceId,
       payload: { task_id: taskId, date },
-      idempotencyKey: `daily-plan:add-task:${plan.id}:${taskId}`,
     }, {
       resourceKey: `daily-plan:${plan.id}`,
       pendingMode: "background",

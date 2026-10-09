@@ -6,6 +6,7 @@ import { createInitialState } from "./seed";
 import { shouldUseRemoteOriginForBackend } from "./teamBackendModel";
 import { TeamHttpError } from "./teamBackendHttp";
 import { TeamBackendCompatibilityError, validateBackendHealth } from "./teamBackendCompatibility";
+import { createTestState } from "./test/fixtures";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -52,14 +53,15 @@ describe("app boot fallback", () => {
     expect(next.backend.failureKind).toBe("network");
   });
 
-  it("clears cached business data when team state cannot be loaded", () => {
-    const state = signedInState();
+  it("preserves confirmed business data when a refresh fails", () => {
+    const state = { ...createTestState(), auth: signedInState().auth, backend: signedInState().backend };
     const next = applyTeamStateLoadFailure(state, new Error("Load failed"));
 
     expect(next.auth.status).toBe("authenticated");
     expect(next.auth.account).toEqual(state.auth.account);
-    expect(next.projects).toEqual([]);
-    expect(next.tasks).toEqual([]);
+    expect(next.projects).toEqual(state.projects);
+    expect(next.tasks).toEqual(state.tasks);
+    expect(next.dailyPlans).toEqual(state.dailyPlans);
     expect(next.backend.status).toBe("error");
     expect(next.backend.message).toBe("团队业务数据加载失败，请检查网络后重试：Load failed");
     expect(next.backend.failureKind).toBe("load");

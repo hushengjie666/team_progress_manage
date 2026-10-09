@@ -27,7 +27,7 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
   try {
     payload = await requestJson<AppBootstrapResponse>(apiUrl(local.backend.serverUrl, "/app/bootstrap"), {
       headers: authHeaders(token),
-    });
+    }, { retry: true });
   } catch (error) {
     if (error instanceof TeamHttpError && error.status === 404) {
       throw new TeamBackendCompatibilityError(compatibilityStateForHttpError(error));

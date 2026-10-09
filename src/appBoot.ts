@@ -87,17 +87,6 @@ export const applyTeamStateLoadFailure = (state: AppState, error: unknown): AppS
   const failed = applyBackendUnavailable(state, error, "load");
   return {
     ...failed,
-    projects: [],
-    projectMembers: [],
-    tasks: [],
-    dailyPlans: [],
-    focusSessions: [],
-    workSessions: [],
-    executionSignals: [],
-    interruptions: [],
-    taskTemplates: [],
-    templateInstances: [],
-    activeTimer: undefined,
     backend: {
       ...failed.backend,
       message: withDetail("团队业务数据加载失败，请检查网络后重试", error),
@@ -116,7 +105,7 @@ export const applyTeamStateSaveFailure = (state: AppState, error: unknown): AppS
     ...failed,
     backend: {
       ...failed.backend,
-      message: withDetail("团队业务操作保存失败，请稍后重试", error),
+      message: withDetail("团队业务操作暂时未能确认，请刷新数据检查结果", error),
       failureKind: "save",
     },
   };

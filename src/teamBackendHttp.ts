@@ -21,6 +21,14 @@ export const authHeaders = (token?: string) => ({
 
 const REQUEST_TIMEOUT_MS = 8_000;
 
+export class TeamRequestError extends Error {
+  constructor(public readonly kind: "timeout" | "network") {
+    super(kind === "timeout"
+      ? "团队后台响应超时，请稍后重试或刷新数据确认操作结果"
+      : "与团队后台的连接暂时中断，请检查网络后重试或刷新数据确认操作结果");
+  }
+}
+
 export class TeamHttpError extends Error {
   constructor(
     public readonly status: number,
@@ -50,7 +58,7 @@ const readResponse = async <T>(response: Response): Promise<T> => {
   throw new TeamHttpError(response.status, message, typeof details?.code === "string" ? details.code : undefined, details);
 };
 
-export const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
+const requestJsonOnce = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
   const timeoutController = init?.signal ? undefined : new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -58,13 +66,32 @@ export const requestJson = async <T>(input: RequestInfo | URL, init?: RequestIni
       timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
     }
     const response = await fetch(input, timeoutController ? { ...init, signal: timeoutController.signal } : init);
-    return readResponse<T>(response);
+    return await readResponse<T>(response);
   } catch (error) {
+    if (timeoutController?.signal.aborted) throw new TeamRequestError("timeout");
     if (error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError")) {
-      throw new Error("无法连接团队后台，请检查服务地址是否正确，并确认后台服务已启动");
+      if (init?.signal?.aborted) throw error;
+      throw new TeamRequestError("network");
     }
     throw error;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
+export const requestJson = async <T>(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  options: { retry?: boolean } = {},
+): Promise<T> => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const safeToRetry = method === "GET" || method === "HEAD" || Boolean(new Headers(init?.headers).get("Idempotency-Key"));
+  try {
+    return await requestJsonOnce<T>(input, init);
+  } catch (error) {
+    const transient = error instanceof TeamRequestError || error instanceof TeamHttpError && [502, 503, 504].includes(error.status);
+    if (!options.retry || !safeToRetry || !transient || init?.signal?.aborted) throw error;
+    await new Promise<void>((resolve) => setTimeout(resolve, 400));
+    return requestJsonOnce<T>(input, init);
   }
 };

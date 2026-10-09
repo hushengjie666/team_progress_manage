@@ -4,8 +4,9 @@ import { createAppTaskCreationRuntime } from "./appTaskCreationRuntime";
 import { currentAccountDailyPlanForWorkspaceDate, workspaceIdForTask } from "./dailyPlanScope";
 import { createTestState } from "./test/fixtures";
 import type { AppState } from "./types";
+import type { RunTeamDomainCommand } from "./teamDomainCommands";
 
-const createHarness = (initial: AppState, runTeamCommand: ReturnType<typeof vi.fn>) => {
+const createHarness = (initial: AppState, runTeamCommand: RunTeamDomainCommand) => {
   let current = initial;
   let toast = "";
   const runtime = createAppTaskCreationRuntime({
@@ -23,7 +24,6 @@ const createHarness = (initial: AppState, runTeamCommand: ReturnType<typeof vi.f
         return saved;
       });
     },
-    updateState: (updater) => { current = updater(current); },
     setDraft: vi.fn(),
     setToast: (message) => { toast = message; },
   });
@@ -62,7 +62,7 @@ describe("createAppTaskCreationRuntime queue commits", () => {
   it("uses one atomic add action when today's plan is missing", () => {
     const source = createTestState({ dailyPlans: [] });
     const task = source.tasks.find((item) => item.status === "pool")!;
-    const runTeamCommand = vi.fn(() => new Promise<AppState | undefined>(() => undefined));
+    const runTeamCommand = vi.fn<RunTeamDomainCommand>(() => new Promise<AppState | undefined>(() => undefined));
     const { runtime, getCurrent } = createHarness(source, runTeamCommand);
 
     runtime.commitTask(task.id);
@@ -75,6 +75,7 @@ describe("createAppTaskCreationRuntime queue commits", () => {
       resource: "daily-plans",
       action: "add-task",
     }));
+    expect(runTeamCommand.mock.calls[0]?.[0]).not.toHaveProperty("idempotencyKey");
   });
 
   it("rolls back the visible queue change when the backend rejects it", async () => {

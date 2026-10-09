@@ -45,6 +45,9 @@ func TestTaskStartReturnsAndCreatesSingleWorkSession(t *testing.T) {
 		UpdatedAt:   now,
 		Payload:     json.RawMessage(`{"id":"task_start_test","workspaceId":"workspace_test","projectId":"project_start_test","title":"Start me","status":"committed","primaryExecutorMemberId":"member_start_test","createdAt":"2026-07-17T02:00:00Z","updatedAt":"2026-07-17T02:00:00Z"}`),
 	}
+	date := time.Now().UTC().Format("2006-01-02")
+	dailyPlan.ID = strings.ReplaceAll(dailyPlan.ID, "2026-07-17", date)
+	dailyPlan.Payload = json.RawMessage(strings.ReplaceAll(string(dailyPlan.Payload), "2026-07-17", date))
 	saveRows(t, api, ownerAuth(), "", []businessRow{project, projectMember, task, dailyPlan})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

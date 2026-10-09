@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestTaskReviewAllowsExecutorSubmissionAndRequiresReviewerForDecision(t *testing.T) {
@@ -102,7 +103,15 @@ func TestTaskReviewAllowsExecutorSubmissionAndRequiresReviewerForDecision(t *tes
 	if err := json.Unmarshal(nextPayloadRaw, &nextPayload); err != nil {
 		t.Fatal(err)
 	}
-	if nextPayload["status"] != "pool" || nextPayload["recurrenceParentId"] != task.ID || stringField(json.RawMessage(nextPayloadRaw), "dueAt")[:10] != "2026-07-19" {
+	completedAt, err := time.Parse(time.RFC3339Nano, acceptedPayload["completedAt"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextDueAt, err := time.Parse(time.RFC3339Nano, stringField(json.RawMessage(nextPayloadRaw), "dueAt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nextPayload["status"] != "pool" || nextPayload["recurrenceParentId"] != task.ID || !nextDueAt.Equal(completedAt.AddDate(0, 0, 2)) {
 		t.Fatalf("next recurring payload = %#v", nextPayload)
 	}
 }

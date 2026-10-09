@@ -36,3 +36,25 @@
     transform: translateY(0);
   }
 }
+
+.backend-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid #dec9a1;
+  border-radius: 8px;
+  background: #fff9ee;
+  color: #705326;
+}
+
+.backend-error-banner p {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.backend-error-banner button {
+  flex-shrink: 0;
+}
