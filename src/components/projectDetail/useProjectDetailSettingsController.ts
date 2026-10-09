@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProjectDetailModel } from "../../projectDetail";
 import type { Project, Workspace } from "../../types";
 import {
   currentProjectWorkspaceIdFor,
   editableProjectSettingsFor,
   projectSettingsDraftForModel,
+  reconcileProjectSettingsDraft,
   projectWorkspaceOptions,
   type ProjectSettingsDraft,
 } from "./projectDetailControllerModel";
@@ -30,10 +31,14 @@ export function useProjectDetailSettingsController({
   updateProject: (project: Project) => void;
 }): ProjectDetailSettingsController {
   const [settingsDraft, setSettingsDraft] = useState<ProjectSettingsDraft | null>(null);
+  const serverDraft = useRef(model ? projectSettingsDraftForModel(model) : null);
 
   useEffect(() => {
     if (!model) return;
-    setSettingsDraft(projectSettingsDraftForModel(model));
+    const incoming = projectSettingsDraftForModel(model);
+    const previous = serverDraft.current;
+    setSettingsDraft((current) => reconcileProjectSettingsDraft(current, previous, incoming));
+    serverDraft.current = incoming;
   }, [model?.project.id, model?.project.updatedAt, model?.workspace?.id]);
 
   if (!model) {

@@ -25,7 +25,6 @@ export const config = {
     captureBackendLogs: true,
     env: {
       ...process.env,
-      ...(process.env.TM_TAURI_TEST_HOME ? { HOME: process.env.TM_TAURI_TEST_HOME } : {}),
     },
   }]],
   capabilities: [{

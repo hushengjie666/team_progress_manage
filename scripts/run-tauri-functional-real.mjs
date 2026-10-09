@@ -1,12 +1,13 @@
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
 
 const repoRoot = resolve(import.meta.dirname, "..");
 const backendConfigPath = resolve(repoRoot, "team-server", "backend.local.json");
+const releaseContract = JSON.parse(readFileSync(resolve(repoRoot, "release-contract.json"), "utf8"));
 const goPathPrefix = "/Volumes/MacSSD/env/Go/bin";
 const pathWithGo = existsSync(goPathPrefix) ? `${goPathPrefix}:${process.env.PATH ?? ""}` : process.env.PATH;
 const runId = `autotest_${Date.now().toString(36)}`;
@@ -19,7 +20,8 @@ const testPassword = process.env.TM_TAURI_FUNCTIONAL_PASSWORD ?? "hu626699";
 
 let backendProcess;
 let tempDir;
-let tempHomeDir;
+const testAppName = "TimeManage Functional Test";
+const testAppIdentifier = `xyz.hudashuai.timemanage.functional.${runId.replaceAll("_", "")}`;
 let tempDbDsn;
 
 const tauriAppBinaryPath = () => {
@@ -31,7 +33,7 @@ const tauriAppBinaryPath = () => {
       "debug",
       "bundle",
       "macos",
-      "TimeManage.app",
+      `${testAppName}.app`,
       "Contents",
       "MacOS",
       "timemanage-desktop",
@@ -65,6 +67,8 @@ const requestJson = async (baseUrl, path, init = {}) => {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      "X-TimeManage-Client-Release": releaseContract.release_version,
+      "X-TimeManage-API-Protocol": String(releaseContract.api_protocol_version),
       ...init.headers,
     },
   });
@@ -159,7 +163,7 @@ const startBackend = async () => {
   ], {
     cwd: repoRoot,
     stdio: "inherit",
-    env: { ...process.env, PATH: pathWithGo },
+    env: { ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("TM_BACKEND_"))), PATH: pathWithGo },
   });
   backendProcess.once("exit", (code, signal) => {
     if (code !== null && code !== 0) console.error(`[tauri-functional] backend exited with ${signal ?? code}`);
@@ -168,10 +172,14 @@ const startBackend = async () => {
   return backendUrl;
 };
 
-const createIsolatedTauriHome = () => {
-  tempHomeDir = mkdtempSync(join(tmpdir(), "timemanage-tauri-home-"));
-  console.log(`[tauri-functional] Using isolated Tauri HOME ${tempHomeDir}`);
-  return tempHomeDir;
+const createIsolatedTauriConfig = () => {
+  const configPath = join(tempDir, "tauri-test.json");
+  writeFileSync(configPath, `${JSON.stringify({
+    productName: testAppName,
+    identifier: testAppIdentifier,
+  }, null, 2)}\n`);
+  console.log(`[tauri-functional] Using isolated application identifier ${testAppIdentifier}`);
+  return configPath;
 };
 
 const ensureAccount = async (backendUrl, token, { name, email, password }) => {
@@ -276,7 +284,11 @@ const cleanup = () => {
   if (backendProcess && !backendProcess.killed) backendProcess.kill("SIGTERM");
   dropTempDatabase();
   if (tempDir) rmSync(tempDir, { recursive: true, force: true });
-  if (tempHomeDir) rmSync(tempHomeDir, { recursive: true, force: true });
+  if (process.platform === "darwin") {
+    for (const folder of ["WebKit", "Application Support", "Caches"]) {
+      rmSync(join(homedir(), "Library", folder, testAppIdentifier), { recursive: true, force: true });
+    }
+  }
 };
 
 process.on("exit", cleanup);
@@ -294,18 +306,17 @@ try {
   const backendUrl = await startBackend();
   await prepareAccounts(backendUrl);
   await run("cargo", ["clean", "--manifest-path", "src-tauri/Cargo.toml", "-p", "timemanage-desktop"]);
-  await run("npx", ["tauri", "build", "--debug", "--bundles", "app", "--ci", "--no-sign"], {
+  const testConfig = createIsolatedTauriConfig();
+  await run("npx", ["tauri", "build", "--debug", "--bundles", "app", "--ci", "--no-sign", "--config", testConfig], {
     env: {
       VITE_WDIO_TAURI: "1",
       VITE_TM_TAURI_FUNCTIONAL_BACKEND_URL: backendUrl,
     },
   });
-  const tauriHome = createIsolatedTauriHome();
   await run("npx", ["wdio", "run", "tests/tauri/wdio.conf.mjs"], {
     env: {
       TM_TAURI_APP_BINARY: tauriAppBinaryPath(),
       TM_TAURI_WDIO_SPEC: resolve(repoRoot, "tests", "tauri", "functional-real.e2e.mjs"),
-      TM_TAURI_TEST_HOME: tauriHome,
       TM_TAURI_FUNCTIONAL_BACKEND_URL: backendUrl,
       TM_TAURI_FUNCTIONAL_RUN_ID: runId,
       TM_TAURI_FUNCTIONAL_OWNER_EMAIL: ownerEmail,

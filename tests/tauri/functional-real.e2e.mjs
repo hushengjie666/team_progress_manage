@@ -141,17 +141,16 @@ const waitForNoInPageMiniTimer = async () => {
 };
 
 const clickButton = async (text, options = {}) => {
+  await waitForEnabledButton(text, options);
   await browser.execute(({ text: targetText, exact = false, index = 0, withinText }) => {
     const normalize = (value) => (value ?? "").replace(/\s+/g, " ").trim();
     const visible = (element) => element.getClientRects().length > 0;
     const isWithinScope = (element) => {
       if (!withinText) return true;
-      let current = element;
-      while (current) {
-        if (normalize(current.textContent).includes(withinText)) return true;
-        current = current.parentElement;
-      }
-      return false;
+      const dialog = Array.from(document.querySelectorAll("[role='dialog'], .modal-panel"))
+        .find((panel) => visible(panel) && normalize(panel.textContent).toLowerCase().includes(withinText.toLowerCase()));
+      if (dialog) return dialog.contains(element);
+      return normalize(element.closest("section")?.textContent).toLowerCase().includes(withinText.toLowerCase());
     };
     const textMatchesButtons = Array.from(document.querySelectorAll("button"))
       .filter((button) => visible(button) && !button.disabled)
@@ -160,7 +159,7 @@ const clickButton = async (text, options = {}) => {
         return exact ? buttonText === targetText : buttonText.includes(targetText);
       });
     const scopedMatches = textMatchesButtons.filter((button) => isWithinScope(button));
-    const matches = scopedMatches.length ? scopedMatches : textMatchesButtons;
+    const matches = withinText ? scopedMatches : textMatchesButtons;
     const button = matches[index];
     if (!button) {
       throw new Error(`Button not found: ${targetText} within=${withinText ?? ""} index=${index}`);
@@ -176,12 +175,10 @@ const waitForEnabledButton = async (text, options = {}) => {
       const visible = (element) => element.getClientRects().length > 0;
       const isWithinScope = (element) => {
         if (!withinText) return true;
-        let current = element;
-        while (current) {
-          if (normalize(current.textContent).includes(withinText)) return true;
-          current = current.parentElement;
-        }
-        return false;
+        const dialog = Array.from(document.querySelectorAll("[role='dialog'], .modal-panel"))
+          .find((panel) => visible(panel) && normalize(panel.textContent).toLowerCase().includes(withinText.toLowerCase()));
+        if (dialog) return dialog.contains(element);
+        return normalize(element.closest("section")?.textContent).toLowerCase().includes(withinText.toLowerCase());
       };
       return Array.from(document.querySelectorAll("button"))
         .some((button) => {
@@ -211,12 +208,10 @@ const enabledButtonVisible = async (text, options = {}) => browser.execute(({ te
   const visible = (element) => element.getClientRects().length > 0;
   const isWithinScope = (element) => {
     if (!withinText) return true;
-    let current = element;
-    while (current) {
-      if (normalize(current.textContent).includes(withinText)) return true;
-      current = current.parentElement;
-    }
-    return false;
+    const dialog = Array.from(document.querySelectorAll("[role='dialog'], .modal-panel"))
+      .find((panel) => visible(panel) && normalize(panel.textContent).toLowerCase().includes(withinText.toLowerCase()));
+    if (dialog) return dialog.contains(element);
+    return normalize(element.closest("section")?.textContent).toLowerCase().includes(withinText.toLowerCase());
   };
   return Array.from(document.querySelectorAll("button"))
     .some((button) => {
@@ -252,12 +247,10 @@ const setFieldByLabel = async (labelText, value, options = {}) => {
     const visible = (element) => element.getClientRects().length > 0;
     const isWithinScope = (element) => {
       if (!withinText) return true;
-      let current = element;
-      while (current) {
-        if (normalize(current.textContent).includes(withinText)) return true;
-        current = current.parentElement;
-      }
-      return false;
+      const dialog = Array.from(document.querySelectorAll("[role='dialog'], .modal-panel"))
+        .find((panel) => visible(panel) && normalize(panel.textContent).toLowerCase().includes(withinText.toLowerCase()));
+      if (dialog) return dialog.contains(element);
+      return normalize(element.closest("section")?.textContent).toLowerCase().includes(withinText.toLowerCase());
     };
     const findControl = (label) => {
       const byChild = label.querySelector("input, textarea, select");
@@ -275,7 +268,7 @@ const setFieldByLabel = async (labelText, value, options = {}) => {
       const visibleControls = Array.from(document.querySelectorAll("input, textarea, select"))
         .filter((control) => visible(control));
       const scopedControls = visibleControls.filter((control) => isWithinScope(control));
-      const controls = scopedControls.length ? scopedControls : visibleControls;
+      const controls = withinText ? scopedControls : visibleControls;
       const nearby = controls.find((control) => {
         let current = control.parentElement;
         while (current && current !== document.body) {
@@ -296,7 +289,7 @@ const setFieldByLabel = async (labelText, value, options = {}) => {
     const allMatchingLabels = Array.from(document.querySelectorAll("label"))
       .filter((label) => normalize(label.textContent).includes(targetLabel));
     const labels = allMatchingLabels.filter((label) => isWithinScope(label));
-    const label = labels[0] ?? allMatchingLabels[0];
+    const label = withinText ? labels[0] : allMatchingLabels[0];
     const control = label ? (findControl(label) ?? findControlNearText()) : findControlNearText();
     if (control && !visible(control)) throw new Error(`Field is not visible for label: ${targetLabel} within=${withinText ?? ""}`);
     if (!control) {
@@ -320,16 +313,14 @@ const clickRadio = async (labelText, options = {}) => {
     const visible = (element) => element.getClientRects().length > 0;
     const isWithinScope = (element) => {
       if (!withinText) return true;
-      let current = element;
-      while (current) {
-        if (normalize(current.textContent).includes(withinText)) return true;
-        current = current.parentElement;
-      }
-      return false;
+      const dialog = Array.from(document.querySelectorAll("[role='dialog'], .modal-panel"))
+        .find((panel) => visible(panel) && normalize(panel.textContent).toLowerCase().includes(withinText.toLowerCase()));
+      if (dialog) return dialog.contains(element);
+      return normalize(element.closest("section")?.textContent).toLowerCase().includes(withinText.toLowerCase());
     };
     const visibleRadioButtons = Array.from(document.querySelectorAll("button[role='radio']"))
       .filter((button) => visible(button) && !button.disabled && normalize(button.textContent).includes(targetLabel));
-    const radioButton = visibleRadioButtons.find((button) => isWithinScope(button)) ?? visibleRadioButtons[0];
+    const radioButton = visibleRadioButtons.find((button) => isWithinScope(button));
     if (radioButton) {
       radioButton.click();
       return;

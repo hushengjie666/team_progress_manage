@@ -52,7 +52,14 @@ export function createAppProjectActionsRuntime({
     }
     const timestamp = nowIso();
     const source = getState();
-    const next = createProjectInState(source, projectName, description, timestamp, uid, {
+    const projectId = uid("project");
+    // Match the owner row created by POST /projects so tasks created before its
+    // acknowledgement never reference a member that only exists on this client.
+    const createId = (prefix: string) => prefix === "project" ? projectId
+      : prefix === "member" && source.auth.account?.id
+        ? `member_${projectId}_${source.auth.account.id}`
+        : uid(prefix);
+    const next = createProjectInState(source, projectName, description, timestamp, createId, {
       accountId: source.auth.account?.id,
       name: source.auth.account?.name,
       email: source.auth.account?.email,

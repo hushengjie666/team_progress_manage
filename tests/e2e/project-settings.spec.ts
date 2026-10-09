@@ -7,6 +7,36 @@ test.beforeEach(async ({ page }) => {
   await clearStoredApp(page);
 });
 
+test("keeps settings edits when a delayed project creation is acknowledged", async ({ page }) => {
+  await openApp(page);
+  let acknowledge = () => {};
+  const pending = new Promise<void>((resolve) => { acknowledge = resolve; });
+  await page.route(`${MOCK_SERVER}/projects?*`, async (route) => {
+    if (route.request().method() === "POST") await pending;
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: /新增项目/ }).click();
+  const dialog = page.getByRole("dialog", { name: "新增项目" });
+  await dialog.getByLabel("项目名称").fill("Delayed project");
+  await dialog.getByLabel("所属工作区").selectOption("workspace_e2e");
+  await dialog.getByRole("button", { name: "添加项目" }).click();
+  await page.locator("article").filter({ hasText: "Delayed project" }).getByRole("button", { name: "进入项目" }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  const panel = page.locator(".project-settings-panel");
+  await panel.getByLabel("项目名称").fill("Edited before acknowledgement");
+  const ack = page.waitForResponse((response) => response.url().startsWith(`${MOCK_SERVER}/projects?`) && response.request().method() === "POST");
+  acknowledge();
+  await ack;
+  await expect(page.getByText("项目已创建", { exact: true })).toBeVisible();
+  await panel.getByLabel("项目说明").fill("Edited after acknowledgement");
+  await expect(panel.getByLabel("项目名称")).toHaveValue("Edited before acknowledgement");
+  const saved = page.waitForRequest((request) => request.url().startsWith(`${MOCK_SERVER}/projects/`) && request.method() === "PATCH");
+  await panel.getByRole("button", { name: "保存项目资料" }).click();
+  expect((await saved).postDataJSON()).toEqual(expect.objectContaining({
+    name: "Edited before acknowledgement", description: "Edited after acknowledgement",
+  }));
+});
+
 test("saves project settings only after clicking save", async ({ page }) => {
   await openApp(page);
 

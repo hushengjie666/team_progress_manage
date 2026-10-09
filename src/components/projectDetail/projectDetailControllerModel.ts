@@ -45,6 +45,20 @@ export const projectSettingsDraftForModel = (model: ProjectDetailModel): Project
   workspaceId: model.project.workspaceId ?? model.workspace?.id ?? "",
 });
 
+export const reconcileProjectSettingsDraft = (
+  current: ProjectSettingsDraft | null,
+  previous: ProjectSettingsDraft | null,
+  incoming: ProjectSettingsDraft,
+): ProjectSettingsDraft => {
+  if (!current || current.projectId !== incoming.projectId) return incoming;
+  if (!previous || previous.projectId !== incoming.projectId) return current;
+  let result = incoming;
+  for (const field of ["name", "description", "taskStageMode", "workspaceId"] as const) {
+    if (current[field] !== previous[field]) result = { ...result, [field]: current[field] };
+  }
+  return result;
+};
+
 export const editableProjectSettingsFor = (
   project: Project,
   workspace: Workspace | undefined,

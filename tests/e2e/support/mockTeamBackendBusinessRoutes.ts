@@ -116,9 +116,20 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     const row: BusinessRow = {
       workspace_id: workspaceId, entity, id, updated_at: new Date().toISOString(), payload: body as never,
     };
-    rowsByKey.set(businessRowKey(row), row);
+    const created = [row];
+    if (entity === "project") {
+      const account = runtime.initialState.auth.account!;
+      const memberId = `member_${id}_${account.id}`;
+      row.payload = { ...body, createdAt: row.updated_at, updatedAt: row.updated_at } as never;
+      created.push({ workspace_id: workspaceId, entity: "project_member", id: memberId, updated_at: row.updated_at,
+        payload: { id: memberId, workspaceId, projectId: id, accountId: account.id, name: account.name,
+          email: account.email, roles: ["project_owner", "executor"], status: "active",
+          createdAt: row.updated_at, updatedAt: row.updated_at } as never,
+      });
+    }
+    created.forEach((item) => rowsByKey.set(businessRowKey(item), item));
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, mutationDelta(request, [row]));
+    await fulfillJson(route, mutationDelta(request, created));
     return true;
   }
   const currentEntry = [...rowsByKey.entries()].find(([, row]) => row.entity === entity && row.id === id);
