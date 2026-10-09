@@ -12,7 +12,7 @@ const value = (name, fallback) => {
   return index < 0 ? fallback : args[index + 1];
 };
 if (args.includes("--help") || !value("--host")) {
-  console.log("Usage: npm run server:ssh:prepare -- --host <server-ip> [--client-ip <your-public-ip>] [--user Administrator] [--port 22]");
+  console.log("Usage: npm run server:ssh:prepare -- --host <server-ip> [--client-ip <your-public-ip>] [--user Administrator] [--port 22] [--ssh-only]");
   process.exit(args.includes("--help") ? 0 : 1);
 }
 
@@ -47,9 +47,13 @@ try {
   const temporaryZip = `${bundle}-${Date.now()}.zip`;
   execFileSync("zip", ["-q", "-r", temporaryZip, "."], { cwd: bundle });
   renameSync(temporaryZip, zip);
-  const launcher = join(homedir(), "Desktop", "publish-timemanage.command");
-  const shellRoot = `'${root.replaceAll("'", "'\\''")}'`;
-  writeFileSync(launcher, `#!/bin/bash\ncd ${shellRoot} || exit 1\nnpm run server:ssh:check && npm run server:deploy -- --build\nresult=$?\nif [ "$result" -ne 0 ]; then echo "发布失败，请查看上面的错误信息。"; fi\nread -r -p "按回车关闭窗口。"\nexit "$result"\n`, { mode: 0o755 });
+  const sshOnly = args.includes("--ssh-only");
+  const launcher = join(homedir(), "Desktop", sshOnly ? "check-timemanage-ssh.command" : "publish-timemanage.command");
+  const shellQuote = (path) => `'${path.replaceAll("'", "'\\''")}'`;
+  const shellRoot = shellQuote(root);
+  const command = sshOnly ? `${shellQuote(process.execPath)} scripts/deploy-team-ssh.mjs --check` : "npm run server:ssh:check && npm run server:deploy -- --build";
+  const failure = sshOnly ? "SSH 连接检查失败，请查看上面的错误信息。" : "发布失败，请查看上面的错误信息。";
+  writeFileSync(launcher, `#!/bin/bash\ncd ${shellRoot} || exit 1\n${command}\nresult=$?\nif [ "$result" -ne 0 ]; then echo "${failure}"; fi\nread -r -p "按回车关闭窗口。"\nexit "$result"\n`, { mode: 0o755 });
   chmodSync(launcher, 0o755);
   console.log(`\nSSH setup: ${zip}\nClient IP: ${clientIp}/32\nPrivate key remains on this Mac: ${keyFile}\nAfter running enable-ssh.cmd on the server, double-click: ${launcher}`);
 } catch (error) {

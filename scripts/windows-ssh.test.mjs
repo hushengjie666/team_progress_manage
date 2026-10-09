@@ -67,6 +67,68 @@ test("dry-run validates the payload without calling SSH or changing the server",
 });
 
 const pwsh = process.env.TM_PWSH;
+test("SSH hash helpers work with legacy .NET objects without public Dispose", { skip: !pwsh }, () => {
+  const scriptPath = join(temp(), "legacy-hash.ps1");
+  writeFileSync(scriptPath, `
+$ErrorActionPreference = 'Stop'
+Add-Type @'
+public class LegacyHash {
+  public bool Cleared;
+  public bool Fail;
+  public byte[] ComputeHash(object input) {
+    if (Fail) throw new System.InvalidOperationException("hash failure");
+    return new byte[] { 0, 1, 254, 255 };
+  }
+  public void Clear() { Cleared = true; }
+}
+public class LegacyStream {
+  public bool Closed;
+  public void Close() { Closed = true; }
+}
+'@
+$tokens=$null; $errors=$null
+$ast=[System.Management.Automation.Language.Parser]::ParseFile(${psQuote(resolve("scripts/windows/setup-ssh.ps1"))},[ref]$tokens,[ref]$errors)
+foreach ($name in @('Get-Sha256','Get-SshFingerprint')) {
+  $function=$ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq $name},$true)
+  if (-not $function) { throw "Missing helper: $name" }
+  $source=$function.Extent.Text.Replace('[Security.Cryptography.SHA256]::Create()','$script:legacyHash').Replace('[IO.File]::OpenRead($Path)','$script:legacyStream')
+  Invoke-Expression $source
+}
+foreach ($fail in @($false,$true)) {
+  $script:legacyHash=New-Object LegacyHash
+  $script:legacyStream=New-Object LegacyStream
+  $script:legacyHash.Fail=$fail
+  try {
+    $result=Get-Sha256 'fixture'
+    if ($fail -or $result -ne '0001feff') { throw 'Unexpected file hash result' }
+  } catch { if (-not $fail -or $_.Exception.Message -notmatch 'hash failure') { throw } }
+  if (-not $script:legacyHash.Cleared -or -not $script:legacyStream.Closed) { throw 'File hash resources were not released' }
+  $script:legacyHash=New-Object LegacyHash
+  $script:legacyHash.Fail=$fail
+  try {
+    $result=Get-SshFingerprint 'ssh-ed25519 AA== fixture'
+    if ($fail -or $result -ne 'AAH+/w') { throw 'Unexpected SSH fingerprint result' }
+  } catch { if (-not $fail -or $_.Exception.Message -notmatch 'hash failure') { throw } }
+  if (-not $script:legacyHash.Cleared) { throw 'Fingerprint hash was not released' }
+}
+`);
+  const result = spawnSync(pwsh, ["-NoProfile", "-File", scriptPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test("SSH setup file hashing and host fingerprint match OpenSSH SHA256", { skip: !pwsh }, () => {
+  const local = temp();
+  const fixture = join(local, "fixture");
+  writeFileSync(fixture, "installer hash fixture");
+  const keyPath = join(local, "key");
+  assert.equal(spawnSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", keyPath]).status, 0);
+  const expected = spawnSync("ssh-keygen", ["-lf", `${keyPath}.pub`, "-E", "sha256"], { encoding: "utf8" }).stdout.split(/\s+/)[1];
+  const command = `$t=$null;$e=$null;$ast=[System.Management.Automation.Language.Parser]::ParseFile(${psQuote(resolve("scripts/windows/setup-ssh.ps1"))},[ref]$t,[ref]$e);$ast.FindAll({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst]},$true) | ForEach-Object {Invoke-Expression $_.Extent.Text}; Get-Sha256 ${psQuote(fixture)}; 'SHA256:' + (Get-SshFingerprint (Get-Content ${psQuote(`${keyPath}.pub`)}))`;
+  const result = spawnSync(pwsh, ["-NoProfile", "-Command", command], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.trim().split(/\r?\n/), [hashFile(fixture), expected]);
+});
+
 test("PowerShell deployment files parse and avoid cmdlets unavailable in PowerShell 2", { skip: !pwsh }, () => {
   const result = spawnSync(pwsh, ["-NoProfile", "-Command", "$failed=$false; Get-ChildItem scripts/windows/*.ps1 | ForEach-Object { $t=$null;$e=$null;[void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$t,[ref]$e);if($e.Count){$e;$failed=$true} }; if($failed){exit 1}"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stdout + result.stderr);

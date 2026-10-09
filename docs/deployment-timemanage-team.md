@@ -244,7 +244,11 @@ npm run server:ssh:prepare -- --host <服务器公网IP>
 
 命令自动生成独立部署密钥、下载并校验 Bitvise 安装程序，在 Mac 桌面生成 `TimeManage-SSH-Setup.zip` 和 `publish-timemanage.command`。后者双击即可检查 SSH 连接、构建临时统一版本包并发布，首次 SSH 连接时核对主机密钥即可。私钥保留在 Mac 的 `~/.ssh/timemanage_deploy`；ZIP 内只有公钥和安装配置。连接配置保存在 `~/.config/timemanage-deploy/config.json`，不写入仓库。
 
+只准备 SSH 安装和连接检查时，加上 `--ssh-only`；此时生成 `check-timemanage-ssh.command`，双击只检查 SSH，不构建或发布应用。
+
 将 ZIP 拷到服务器并全部解压，双击 `enable-ssh.cmd`，允许 UAC 提权。首次安装需输入一次 `YES` 接受 Bitvise Standard 的 30 天评估许可；组织长期使用需要商业许可。脚本自动安装、配置公钥登录、启用开机启动、生成 SSH 主机密钥，并把 SSH 来源限制为准备安装包时检测到的 Mac 公网 IPv4。
+
+安装脚本使用旧版 .NET 的 `HashAlgorithm.Clear()` 和 `Stream.Close()` 释放资源，同时适用于安装程序校验与主机指纹计算。失败时显示执行阶段、源代码位置，完整记录保存在解压目录的 `ssh-setup.log`。更新安装脚本后可覆盖原文件并重新运行入口，保留原来的 `setup-config.ps1` 和 `deploy-key.pub`。
 
 如果云安全组尚未放行，添加脚本显示的 TCP 端口和来源 IP `/32` 规则。Windows 脚本只能配置本机防火墙，无法访问未配置凭据的云安全组。网络出口变化时，使用 `--client-ip <新的公网IPv4>` 重新准备安装包，并重跑服务器安装入口；已有部署私钥不会被覆盖。
 
@@ -264,7 +268,7 @@ npm run server:deploy -- --package deploy/timemanageTeam-v<版本>-<时间戳>
 
 默认上传根目录和正式目录沿用本文的 Administrator Desktop 约定；可在准备阶段使用 `--remote-root`、`--user`、`--port`、`--key` 指定实际配置。SFTP 上传根目录和连接配置须保持一致。Nginx 的 alias 和反向代理路径沿用现有配置，无需为每次替换静态资源重载。
 
-脚本校验：`npm run verify:server-automation`。设置 `TM_PWSH` 为可运行的 PowerShell 7 路径时，额外执行语法检查及正常发布、上传损坏、备份失败、迁移失败和健康失败的本地流程测试。测试替换 Windows 服务与 COM 操作，不连接生产服务器；Windows Server 2008 R2 的实际安装和连接仍需在目标机器首次运行验证。
+脚本校验：`npm run verify:server-automation`。设置 `TM_PWSH` 为可运行的 PowerShell 7 路径时，额外执行语法检查、旧 .NET 无公开 `Dispose()` 的哈希接口回归、OpenSSH 指纹对照，以及正常发布、上传损坏、备份失败、迁移失败和健康失败的本地流程测试。测试替换 Windows 服务与 COM 操作，不连接生产服务器；Windows Server 2008 R2 的实际安装和连接仍需在目标机器首次运行验证。
 
 参考：[Bitvise 静默安装](https://bitvise.com/ssh-server-guide-installing)、[脚本配置](https://bitvise.com/ssh-server-guide-scriptable)、[安装包版本与校验](https://github.com/microsoft/winget-pkgs/blob/master/manifests/b/Bitvise/SSH/Server/9.66/Bitvise.SSH.Server.installer.yaml)。
 

@@ -2,15 +2,27 @@
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
+$phase = "preflight"
+$transcriptStarted = $false
+$logPath = Join-Path $scriptDir "ssh-setup.log"
 
 function Get-Sha256([string]$Path) {
   $stream = [IO.File]::OpenRead($Path)
   $hash = [Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($hash.ComputeHash($stream))).Replace("-", "").ToLowerInvariant() }
-  finally { $stream.Dispose(); $hash.Dispose() }
+  finally { $stream.Close(); $hash.Clear() }
+}
+
+function Get-SshFingerprint([string]$PublicKey) {
+  $digest = [Security.Cryptography.SHA256]::Create()
+  try { return [Convert]::ToBase64String($digest.ComputeHash([Convert]::FromBase64String(($PublicKey -split '\s+')[1]))).TrimEnd('=') }
+  finally { $digest.Clear() }
 }
 
 try {
+  Start-Transcript -Path $logPath -Append | Out-Null
+  $transcriptStarted = $true
+  Write-Host ("PowerShell " + $PSVersionTable.PSVersion + "; CLR " + [Environment]::Version)
   $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
   if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw "Run this script as administrator." }
   $options = & (Join-Path $scriptDir "setup-config.ps1")
@@ -29,15 +41,21 @@ try {
   if (-not $service) {
     if ([Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | Where-Object { $_.Port -eq $options.Port }) { throw "SSH port is already in use." }
     $installer = Join-Path $scriptDir "Bitvise-SSH-Server.exe"
+    $phase = "installer checksum"
+    Write-Host "Checking installer checksum..."
     if ((Get-Sha256 $installer) -ne $options.InstallerSha256) { throw "Installer checksum mismatch." }
     Write-Host "Bitvise Standard Edition: 30-day evaluation, then a commercial license is required."
     Write-Host "License: https://bitvise.com/winsshd-license"
     if ((Read-Host "Read and accept the license, then type YES to install") -cne "YES") { throw "Installation cancelled." }
     New-Item -ItemType Directory -Force -Path $stateDir | Out-Null
     Set-Content -Path $marker -Value "Created by TimeManage SSH setup"
+    $phase = "Bitvise installation"
+    Write-Host "Installing Bitvise SSH Server..."
     $result = Start-Process $installer -ArgumentList "-defaultInstance -acceptEULA" -Wait -PassThru
     if ($result.ExitCode -ne 0 -and $result.ExitCode -ne 16) { throw "Bitvise installation failed: $($result.ExitCode)" }
   }
+  $phase = "SSH account and access rules"
+  Write-Host "Configuring SSH account and access rules..."
   $cfg = New-Object -ComObject "Bitvise.BssCfg"
   $cfg.SetInstance("")
   $cfg.settings.Lock()
@@ -86,9 +104,11 @@ try {
     $rules.NewCommit()
     $cfg.settings.Save()
   } finally { $cfg.settings.Unlock() }
+  $phase = "Windows firewall"
   $null = & netsh.exe advfirewall firewall delete rule "name=TimeManage SSH"
   $null = & netsh.exe advfirewall firewall add rule "name=TimeManage SSH" dir=in action=allow protocol=TCP "localport=$($options.Port)" "remoteip=$($options.ClientIp)" profile=any
   if ($LASTEXITCODE -ne 0) { throw "Windows firewall configuration failed." }
+  $phase = "SSH host keys"
   $cfg.keypairs.Lock()
   try {
     $cfg.keypairs.Load()
@@ -97,6 +117,8 @@ try {
       $cfg.keypairs.Save($true)
     }
   } finally { $cfg.keypairs.Unlock() }
+  $phase = "SSH service startup"
+  Write-Host "Starting SSH service and checking its port..."
   Set-Service BvSshServer -StartupType Automatic
   if ((Get-Service BvSshServer).Status -eq "Running") { Restart-Service BvSshServer }
   else { Start-Service BvSshServer }
@@ -109,15 +131,14 @@ try {
     finally { $client.Close() }
   }
   if (-not $listening) { throw "SSH service started but its port is not listening." }
+  $phase = "host key fingerprint export"
   $cfg.keypairs.Load()
   $hostLines = @()
   foreach ($key in $cfg.keypairs.entries) {
     if ($key.employed) {
       $publicKey = $key.ExportPublicKeyToBase64String($cfg.enums.PublicKeyFormat.openSsh)
       $hostLines += "$($options.HostName) " + $publicKey
-      $digest = [Security.Cryptography.SHA256]::Create()
-      try { $fingerprint = [Convert]::ToBase64String($digest.ComputeHash([Convert]::FromBase64String(($publicKey -split '\s+')[1]))).TrimEnd('=') }
-      finally { $digest.Dispose() }
+      $fingerprint = Get-SshFingerprint $publicKey
       Write-Host "Host key: $($key.alg) SHA256:$fingerprint"
     }
   }
@@ -126,8 +147,12 @@ try {
   Write-Host "SSH READY. Allow TCP $($options.Port) from $($options.ClientIp)/32 in the cloud security group."
   Write-Host "On the Mac, run: npm run server:ssh:check"
 } catch {
-  Write-Host ("FAILED: " + $_.Exception.Message) -ForegroundColor Red
+  Write-Host ("FAILED [" + $phase + "]: " + $_.Exception.Message) -ForegroundColor Red
+  Write-Host $_.InvocationInfo.PositionMessage
+  Write-Host ("Setup log: " + $logPath)
+  if ($transcriptStarted) { Stop-Transcript | Out-Null; $transcriptStarted = $false }
   Read-Host "Press Enter to close"
   exit 1
 }
+if ($transcriptStarted) { Stop-Transcript | Out-Null }
 Read-Host "Press Enter to close"
