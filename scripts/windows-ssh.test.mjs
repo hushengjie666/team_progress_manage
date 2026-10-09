@@ -67,6 +67,79 @@ test("dry-run validates the payload without calling SSH or changing the server",
 });
 
 const pwsh = process.env.TM_PWSH;
+test("SSH installer preserves native error output and rejects authentication-package failure", { skip: !pwsh }, () => {
+  const local = temp();
+  const scriptPath = join(local, "installer-output.ps1");
+  writeFileSync(scriptPath, `
+$ErrorActionPreference='Stop'
+$t=$null; $e=$null
+$ast=[System.Management.Automation.Language.Parser]::ParseFile(${psQuote(resolve("scripts/windows/setup-ssh.ps1"))},[ref]$t,[ref]$e)
+$function=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-BitviseInstall'},$true)
+Invoke-Expression $function.Extent.Text
+function Start-Process {
+  param($FilePath,$ArgumentList,[switch]$Wait,[switch]$PassThru,$RedirectStandardOutput,$RedirectStandardError)
+  if ($ArgumentList -ne '-defaultInstance -acceptEULA' -or -not $Wait -or -not $PassThru) { throw 'Unexpected installer arguments' }
+  Set-Content $RedirectStandardOutput 'Registering authentication package failed: fixture Windows error'
+  Set-Content $RedirectStandardError 'fixture stderr'
+  return New-Object PSObject -Property @{ExitCode=$script:code}
+}
+foreach ($script:code in @(0,16,115,106)) {
+  $failed=$false
+  try { Invoke-BitviseInstall 'installer with spaces.exe' ${psQuote(local)} }
+  catch {
+    $failed=$true
+    if ($script:code -eq 115 -and $_.Exception.Message -notmatch 'authentication package setup failed') { throw }
+    if ($script:code -eq 106 -and $_.Exception.Message -notmatch '106') { throw }
+  }
+  if ($failed -ne ($script:code -ne 0 -and $script:code -ne 16)) { throw 'Wrong installer success classification' }
+}
+`);
+  const result = spawnSync(pwsh, ["-NoProfile", "-File", scriptPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /Registering authentication package failed: fixture Windows error/);
+  assert.match(result.stdout, /fixture stderr/);
+});
+
+test("single-file SSH diagnosis only invokes installer help and collects a report", { skip: !pwsh }, () => {
+  const local = temp();
+  const repair = join(local, "diagnostic folder");
+  mkdirSync(repair);
+  const installer = join(local, "Bitvise-SSH-Server.exe");
+  writeFileSync(installer, "installer fixture");
+  const source = readFileSync("scripts/windows/diagnose-ssh.cmd", "utf8");
+  const body = source.split("\n# POWERSHELL START\n")[1];
+  assert.ok(body, "Hybrid command must contain its PowerShell body");
+  const scriptPath = join(local, "diagnosis-test.ps1");
+  const mocked = body.replace("[Security.Principal.WindowsIdentity]::GetCurrent()", "$script:identity")
+    .replace("New-Object Security.Principal.WindowsPrincipal($identity)", "$script:principal")
+    .replace("d1407f989d18f4505bf623eb1c33a68cd5c79a483214ebc1ff86bee9821293a6", hashFile(installer));
+  writeFileSync(scriptPath, `
+$env:TM_SSH_DIAG_SCRIPT=${psQuote(join(repair, "diagnose-ssh.cmd"))}
+$env:windir=${psQuote(local)}
+$script:identity=New-Object PSObject -Property @{Name='fixture account'}
+$script:principal=New-Object PSObject
+$script:principal | Add-Member ScriptMethod IsInRole {return $true}
+function whoami.exe {param($arg) if ($arg -ne '/priv') {throw 'Unexpected identity query'}; 'fixture privileges'}
+function Get-ItemProperty {param($Path) if ($Path -ne 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Lsa') {throw 'Unexpected registry query'}; New-Object PSObject -Property @{'Authentication Packages'=@('msv1_0');RunAsPPL=$null}}
+function Get-Acl {param($Path) New-Object PSObject -Property @{Sddl='fixture ACL'}}
+function Get-Service {param($Name,$ErrorAction) if ($Name -ne 'BvSshServer') {throw 'Unexpected service query'}}
+function Get-EventLog {param($LogName,$After,$EntryType,$Newest,$ErrorAction) New-Object PSObject -Property @{Message='Bitvise fixture event';TimeGenerated='fixture time';Source='Bitvise fixture';EventID=1}}
+function Start-Process {
+  param($FilePath,$ArgumentList,[switch]$Wait,[switch]$PassThru,$RedirectStandardOutput,$RedirectStandardError)
+  if ($ArgumentList -ne '-help-codes') {throw 'Diagnosis attempted to install or modify system state'}
+  Set-Content $RedirectStandardOutput '115: Authentication package could not be set up'
+  Set-Content $RedirectStandardError ''
+  New-Object PSObject -Property @{ExitCode=12}
+}
+${mocked}
+`);
+  const result = spawnSync(pwsh, ["-NoProfile", "-File", scriptPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.doesNotMatch(result.stdout, /DIAGNOSIS FAILED/);
+  assert.match(result.stdout, /DIAGNOSIS COMPLETE/);
+  assert.match(readFileSync(join(repair, "ssh-diagnostics.log"), "utf8"), /115: Authentication package/);
+});
+
 test("SSH setup resolves a nested repair folder and prefers its own configuration", { skip: !pwsh }, () => {
   const local = temp();
   const bundle = join(local, "TimeManage-SSH-Setup");

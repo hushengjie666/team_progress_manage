@@ -29,6 +29,21 @@ function Get-SshFingerprint([string]$PublicKey) {
   finally { $digest.Clear() }
 }
 
+function Invoke-BitviseInstall([string]$Installer, [string]$LogDir) {
+  $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+  $stdout = Join-Path $LogDir ("bitvise-install-" + $stamp + "-stdout.log")
+  $stderr = Join-Path $LogDir ("bitvise-install-" + $stamp + "-stderr.log")
+  $result = Start-Process $Installer -ArgumentList "-defaultInstance -acceptEULA" -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+  foreach ($log in @($stdout, $stderr)) {
+    Write-Host ("Installer output: " + $log)
+    if (Test-Path $log) { Get-Content $log | ForEach-Object { Write-Host $_ } }
+  }
+  if ($result.ExitCode -eq 115) {
+    throw "Bitvise exit 115: Windows authentication package setup failed. The original installer error is in the output above and the installer logs. Public-key login has not been verified."
+  }
+  if ($result.ExitCode -ne 0 -and $result.ExitCode -ne 16) { throw "Bitvise installation failed: $($result.ExitCode). See installer logs above." }
+}
+
 try {
   Start-Transcript -Path $logPath -Append | Out-Null
   $transcriptStarted = $true
@@ -63,8 +78,7 @@ try {
     Set-Content -Path $marker -Value "Created by TimeManage SSH setup"
     $phase = "Bitvise installation"
     Write-Host "Installing Bitvise SSH Server..."
-    $result = Start-Process $installer -ArgumentList "-defaultInstance -acceptEULA" -Wait -PassThru
-    if ($result.ExitCode -ne 0 -and $result.ExitCode -ne 16) { throw "Bitvise installation failed: $($result.ExitCode)" }
+    Invoke-BitviseInstall $installer $scriptDir
   }
   $phase = "SSH account and access rules"
   Write-Host "Configuring SSH account and access rules..."
