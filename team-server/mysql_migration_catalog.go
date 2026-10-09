@@ -33,7 +33,8 @@ var migrationCatalog = []migrationDefinition{
 	{SchemaVersion: 10, ReleaseVersion: "v0.2.7", FileName: "00010_v0_2_7_noop.sql"},
 	{SchemaVersion: 11, ReleaseVersion: "v0.2.8", FileName: "00011_v0_2_8_noop.sql"},
 	{SchemaVersion: 12, ReleaseVersion: "v0.2.9", FileName: "00012_v0_2_9_noop.sql"},
-	{SchemaVersion: 13, ReleaseVersion: serverReleaseVersion, FileName: "00013_v0_2_10_noop.sql"},
+	{SchemaVersion: 13, ReleaseVersion: "v0.2.10", FileName: "00013_v0_2_10_noop.sql"},
+	{SchemaVersion: 14, ReleaseVersion: serverReleaseVersion, FileName: "00014_v0_2_11_relational_business.sql", RequiresBackup: true},
 }
 
 func migrationForRelease(release string) (migrationDefinition, error) {

@@ -76,7 +76,7 @@ func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, t
 
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("project_member", "")+`
 		 FROM business_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ? AND status = 'active'`,
 		task.WorkspaceID,
@@ -87,7 +87,7 @@ func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, t
 		return "", false, false, err
 	}
 	defer rows.Close()
-	members, err := scanBusinessRows(rows)
+	members, err := scanBusinessRows(ctx, q, rows)
 	if err != nil {
 		return "", false, false, err
 	}
@@ -117,7 +117,7 @@ func endTaskWorkSessionsForReview(ctx context.Context, tx *sql.Tx, task business
 func endTaskWorkSessionsInTx(ctx context.Context, tx *sql.Tx, task businessRow, now string, outcome string) error {
 	rows, err := tx.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'work_session' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'work_session' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("work_session", "")+`
 		 FROM business_work_sessions
 		 WHERE workspace_id = ? AND task_id = ? AND status IN ('active', 'paused')
 		 FOR UPDATE`,
@@ -127,7 +127,7 @@ func endTaskWorkSessionsInTx(ctx context.Context, tx *sql.Tx, task businessRow, 
 	if err != nil {
 		return err
 	}
-	sessions, err := scanBusinessRows(rows)
+	sessions, err := scanBusinessRows(ctx, tx, rows)
 	_ = rows.Close()
 	if err != nil {
 		return err

@@ -89,24 +89,19 @@ func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth a
 		writeError(w, http.StatusInternalServerError, "move project plans failed")
 		return
 	}
-	if _, err := tx.ExecContext(r.Context(), `UPDATE business_projects SET workspace_id = ?, payload = ?, updated_at = ? WHERE workspace_id = ? AND id = ?`, targetWorkspaceID, raw, now, sourceWorkspaceID, projectID); err != nil {
-		writeError(w, http.StatusConflict, "project move conflicts with target workspace")
-		return
-	}
-	for _, table := range []string{"business_focus_sessions", "business_work_sessions", "business_execution_signals", "business_interruptions"} {
-		query := `UPDATE ` + table + ` SET workspace_id = ?, payload = JSON_SET(payload, '$.workspaceId', ?), updated_at = ? WHERE workspace_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.taskId')) IN (SELECT id FROM business_tasks WHERE workspace_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.projectId')) = ?)`
-		if _, err := tx.ExecContext(r.Context(), query, targetWorkspaceID, targetWorkspaceID, now, sourceWorkspaceID, sourceWorkspaceID, projectID); err != nil {
-			writeError(w, http.StatusInternalServerError, "move project history failed")
-			return
+	for _, row := range sourceRows {
+		if row.Entity == "daily_plan" || row.Entity == "reward_state" {
+			continue
 		}
-	}
-	for _, table := range []string{"business_project_members", "business_tasks"} {
-		query := `UPDATE ` + table + ` SET workspace_id = ?, payload = JSON_SET(payload, '$.workspaceId', ?), updated_at = ? WHERE workspace_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(payload, '$.projectId')) = ?`
-		if _, err := tx.ExecContext(r.Context(), query, targetWorkspaceID, targetWorkspaceID, now, sourceWorkspaceID, projectID); err != nil {
+		if row.Entity == "project" {
+			row.Payload = raw
+		}
+		if err := moveBusinessCoreRow(r.Context(), tx, row, targetWorkspaceID, now); err != nil {
 			writeError(w, http.StatusConflict, "project move conflicts with target workspace")
 			return
 		}
 	}
+
 	targetRows, err := businessLoadRowsForProjects(r.Context(), tx, targetWorkspaceID, []string{projectID}, auth.AccountID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "load moved project rows failed")

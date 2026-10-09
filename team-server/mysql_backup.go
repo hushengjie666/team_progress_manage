@@ -67,7 +67,7 @@ func createMySQLBackup(ctx context.Context, db *sql.DB, cfg config, outputPath s
 	args := []string{
 		"--defaults-extra-file=" + clientFile,
 		"--single-transaction", "--routines", "--triggers", "--events", "--hex-blob",
-		"--set-gtid-purged=OFF",
+		"--set-gtid-purged=OFF", "--complete-insert", "--skip-extended-insert",
 	}
 	if commandSupportsOption(ctx, cfg.mysqldumpPath, "column-statistics") {
 		args = append(args, "--column-statistics=0")
@@ -83,6 +83,10 @@ func createMySQLBackup(ctx context.Context, db *sql.DB, cfg config, outputPath s
 	if runErr != nil || closeErr != nil || fileErr != nil {
 		_ = os.Remove(absPath)
 		return databaseBackupManifest{}, commandFailure("mysqldump", runErr, closeErr, fileErr, stderr.String())
+	}
+	if err := verifyMySQLBackupDump(ctx, db, absPath); err != nil {
+		_ = os.Remove(absPath)
+		return databaseBackupManifest{}, fmt.Errorf("backup column verification: %w", err)
 	}
 	stat, err := os.Stat(absPath)
 	if err != nil {

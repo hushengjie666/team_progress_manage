@@ -33,6 +33,9 @@ func newMigrationProvider(db *sql.DB) (*goose.Provider, error) {
 
 func migrateMySQLUp(ctx context.Context, db *sql.DB, cfg config) error {
 	return withMigrationLock(ctx, db, func() error {
+		if err := requireRelationalMySQL(ctx, db); err != nil {
+			return err
+		}
 		provider, err := newMigrationProvider(db)
 		if err != nil {
 			return err
@@ -59,7 +62,11 @@ func migrateMySQLUp(ctx context.Context, db *sql.DB, cfg config) error {
 				latestSchemaVersion,
 			)
 		}
-		if pendingMigrationNeedsBackup(currentVersion, latestSchemaVersion) {
+		skipBackup, err := emptyRelationalMigration(ctx, db, pendingMigrations)
+		if err != nil {
+			return err
+		}
+		if pendingMigrationNeedsBackup(currentVersion, latestSchemaVersion) && !skipBackup {
 			if err := requireRecentMigrationBackup(cfg, currentVersion); err != nil {
 				return err
 			}

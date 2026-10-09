@@ -172,7 +172,35 @@ func TestMySQLBackupArtifactAndRestoreValidation(t *testing.T) {
 	dir := t.TempDir()
 	dumpPath := filepath.Join(dir, "mysqldump")
 	mysqlPath := filepath.Join(dir, "mysql")
-	if err := os.WriteFile(dumpPath, []byte("#!/bin/sh\nprintf '%s\\n' 'CREATE TABLE backup_probe (id INT);'\n"), 0o700); err != nil {
+	dumpSource := filepath.Join(dir, "source.sql")
+	cursor, err := db.QueryContext(ctx, "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE' ORDER BY TABLE_NAME")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tables := []string{}
+	for cursor.Next() {
+		var name string
+		if err := cursor.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		tables = append(tables, name)
+	}
+	if err := cursor.Err(); err != nil {
+		t.Fatal(err)
+	}
+	cursor.Close()
+	var dump strings.Builder
+	for _, name := range tables {
+		var table, ddl string
+		if err := db.QueryRowContext(ctx, "SHOW CREATE TABLE `"+name+"`").Scan(&table, &ddl); err != nil {
+			t.Fatal(err)
+		}
+		dump.WriteString(ddl + ";\n")
+	}
+	if err := os.WriteFile(dumpSource, []byte(dump.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(dumpPath, []byte("#!/bin/sh\ncat '"+dumpSource+"'\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(mysqlPath, []byte("#!/bin/sh\ncat >/dev/null\n"), 0o700); err != nil {
@@ -196,6 +224,11 @@ func TestMySQLBackupArtifactAndRestoreValidation(t *testing.T) {
 	}
 	if err := requireRecentMigrationBackup(cfg, latestSchemaVersion); err != nil {
 		t.Fatalf("custom backup did not satisfy receipt gate: %v", err)
+	}
+	other := cfg
+	other.mysqlDSN = strings.Replace(cfg.mysqlDSN, "/tm_test_", "/another_tm_test_", 1)
+	if err := requireRecentMigrationBackup(other, latestSchemaVersion); err == nil {
+		t.Fatal("backup gate accepted another database's backup")
 	}
 	if err := verifyRestoredDatabase(ctx, cfg, manifest); err != nil {
 		t.Fatal(err)

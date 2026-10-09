@@ -1,0 +1,306 @@
+{
+  "project": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "name": "text",
+      "description": "text",
+      "taskStageMode": "text",
+      "createdAt": "text",
+      "updatedAt": "text",
+      "archivedAt": "text",
+      "defaultExpectedStartHours": "number",
+      "sortOrder": "number"
+    },
+    "objects": [],
+    "relations": []
+  },
+  "project_member": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "projectId": "text",
+      "accountId": "text",
+      "name": "text",
+      "email": "text",
+      "status": "text",
+      "createdAt": "text",
+      "updatedAt": "text"
+    },
+    "objects": [],
+    "relations": [
+      {
+        "field": "roles",
+        "table": "project_member_roles",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      }
+    ]
+  },
+  "task": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "title": "text",
+      "notes": "text",
+      "projectId": "text",
+      "project": "text",
+      "creatorMemberId": "text",
+      "primaryExecutorMemberId": "text",
+      "expectedStartAt": "text",
+      "expectedFinishAt": "text",
+      "progressNote": "text",
+      "priority": "text",
+      "severity": "text",
+      "stage": "text",
+      "status": "text",
+      "dueAt": "text",
+      "reminderAt": "text",
+      "repeatRule": "text",
+      "recurrenceParentId": "text",
+      "nextRepeatAt": "text",
+      "lastReminderSentAt": "text",
+      "createdAt": "text",
+      "updatedAt": "text",
+      "reviewSubmittedAt": "text",
+      "reviewSubmittedByMemberId": "text",
+      "reviewAcceptedAt": "text",
+      "reviewAcceptedByMemberId": "text",
+      "reviewReturnedAt": "text",
+      "reviewReturnedByMemberId": "text",
+      "reviewReturnReason": "text",
+      "completedAt": "text",
+      "progressPercent": "number",
+      "estimatePomodoros": "number",
+      "repeatIntervalDays": "number",
+      "repeatDayOfMonth": "number",
+      "sortOrder": "number",
+      "actualPomodoros": "number"
+    },
+    "objects": [],
+    "relations": [
+      {
+        "field": "tags",
+        "table": "task_tags",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      },
+      {
+        "field": "collaboratorMemberIds",
+        "table": "task_collaborators",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      },
+      {
+        "field": "repeatWeekdays",
+        "table": "task_repeat_weekdays",
+        "fields": {
+          "value": "number"
+        },
+        "object": false
+      },
+      {
+        "field": "subtasks",
+        "table": "task_subtasks",
+        "fields": {
+          "id": "text",
+          "title": "text",
+          "completed": "boolean",
+          "createdAt": "text",
+          "completedAt": "text"
+        },
+        "object": true
+      },
+      {
+        "field": "estimateHistory",
+        "table": "task_estimate_history",
+        "fields": {
+          "id": "text",
+          "estimatedPomodoros": "number",
+          "actualPomodoros": "number",
+          "recordedAt": "text",
+          "source": "text"
+        },
+        "object": true
+      }
+    ]
+  },
+  "daily_plan": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "ownerAccountId": "text",
+      "date": "text",
+      "reflection": "text",
+      "reviewedAt": "text",
+      "createdAt": "text",
+      "updatedAt": "text",
+      "review.mood": "text",
+      "review.wins": "text",
+      "review.blockers": "text",
+      "review.interruptionPattern": "text",
+      "review.tomorrowFocus": "text",
+      "capacityPomodoros": "number",
+      "completedPomodoros": "number",
+      "recommendedCapacityPomodoros": "number",
+      "suggestedCapacityPomodoros": "number",
+      "overloadAcknowledged": "boolean"
+    },
+    "objects": [
+      "review"
+    ],
+    "relations": [
+      {
+        "field": "committedTaskIds",
+        "table": "daily_plan_committed_tasks",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      },
+      {
+        "field": "suggestedTaskIds",
+        "table": "daily_plan_suggested_tasks",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      }
+    ]
+  },
+  "focus_session": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "taskId": "text",
+      "mode": "text",
+      "startedAt": "text",
+      "endedAt": "text",
+      "outcome": "text",
+      "duration": "number",
+      "interruptionCounts.internal": "number",
+      "interruptionCounts.external": "number"
+    },
+    "objects": [
+      "interruptionCounts"
+    ],
+    "relations": []
+  },
+  "work_session": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "ownerAccountId": "text",
+      "taskId": "text",
+      "executorMemberId": "text",
+      "focusSessionId": "text",
+      "status": "text",
+      "startedAt": "text",
+      "pausedAt": "text",
+      "endedAt": "text",
+      "createdAt": "text",
+      "updatedAt": "text",
+      "outcome": "text",
+      "totalPausedSeconds": "number",
+      "resumedAt": "text"
+    },
+    "objects": [],
+    "relations": []
+  },
+  "execution_signal": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "workSessionId": "text",
+      "taskId": "text",
+      "executorMemberId": "text",
+      "type": "text",
+      "createdAt": "text"
+    },
+    "objects": [],
+    "relations": []
+  },
+  "interruption": {
+    "fields": {
+      "id": "text",
+      "workspaceId": "text",
+      "sessionId": "text",
+      "taskId": "text",
+      "type": "text",
+      "note": "text",
+      "action": "text",
+      "createdAt": "text",
+      "resolvedAt": "text",
+      "convertedTaskId": "text"
+    },
+    "objects": [],
+    "relations": []
+  },
+  "reward_state": {
+    "fields": {
+      "lastRewardedAt": "text",
+      "streak": "number",
+      "dailyGoal": "number",
+      "focusGarden": "number",
+      "visualProgress": "number"
+    },
+    "objects": [],
+    "relations": [
+      {
+        "field": "badges",
+        "table": "reward_badges",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      }
+    ]
+  },
+  "task_template": {
+    "fields": {
+      "id": "text",
+      "name": "text",
+      "description": "text",
+      "project": "text",
+      "priority": "text",
+      "severity": "text",
+      "stage": "text",
+      "repeatRule": "text",
+      "estimatePomodoros": "number"
+    },
+    "objects": [],
+    "relations": [
+      {
+        "field": "tags",
+        "table": "task_template_tags",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      },
+      {
+        "field": "subtasks",
+        "table": "task_template_subtasks",
+        "fields": {
+          "value": "text"
+        },
+        "object": false
+      }
+    ]
+  },
+  "template_instance": {
+    "fields": {
+      "templateId": "text",
+      "taskId": "text",
+      "createdAt": "text"
+    },
+    "objects": [],
+    "relations": []
+  }
+}

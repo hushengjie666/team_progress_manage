@@ -11,7 +11,7 @@ func cleanupTaskReferencesForDelete(ctx context.Context, tx *sql.Tx, task busine
 	}
 	rows, err := tx.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'daily_plan' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'daily_plan' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("daily_plan", "")+`
 		 FROM business_daily_plans
 		 WHERE workspace_id = ?
 		 FOR UPDATE`,
@@ -20,7 +20,7 @@ func cleanupTaskReferencesForDelete(ctx context.Context, tx *sql.Tx, task busine
 	if err != nil {
 		return err
 	}
-	plans, err := scanBusinessRows(rows)
+	plans, err := scanBusinessRows(ctx, tx, rows)
 	_ = rows.Close()
 	if err != nil {
 		return err

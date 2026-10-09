@@ -4448,10 +4448,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.10",
+  releaseVersion: "0.2.11",
   apiProtocolVersion: 2,
-  databaseSchemaVersion: 13,
-  minimumClientRelease: "0.2.10"
+  databaseSchemaVersion: 14,
+  minimumClientRelease: "0.2.11"
 };
 
 // src/teamBackendHttp.ts
@@ -4466,6 +4466,12 @@ var authHeaders = (token) => ({
   ...token ? { Authorization: `Bearer ${token}` } : {}
 });
 var REQUEST_TIMEOUT_MS = 8e3;
+var TeamRequestError = class extends Error {
+  constructor(kind) {
+    super(kind === "timeout" ? "\u56E2\u961F\u540E\u53F0\u54CD\u5E94\u8D85\u65F6\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u6216\u5237\u65B0\u6570\u636E\u786E\u8BA4\u64CD\u4F5C\u7ED3\u679C" : "\u4E0E\u56E2\u961F\u540E\u53F0\u7684\u8FDE\u63A5\u6682\u65F6\u4E2D\u65AD\uFF0C\u8BF7\u68C0\u67E5\u7F51\u7EDC\u540E\u91CD\u8BD5\u6216\u5237\u65B0\u6570\u636E\u786E\u8BA4\u64CD\u4F5C\u7ED3\u679C");
+    this.kind = kind;
+  }
+};
 var TeamHttpError = class extends Error {
   constructor(status, message, code, details) {
     super(message);
@@ -4491,7 +4497,7 @@ var readResponse = async (response) => {
   }
   throw new TeamHttpError(response.status, message, typeof details?.code === "string" ? details.code : void 0, details);
 };
-var requestJson = async (input, init) => {
+var requestJsonOnce = async (input, init) => {
   const timeoutController = init?.signal ? void 0 : new AbortController();
   let timeoutId;
   try {
@@ -4499,14 +4505,28 @@ var requestJson = async (input, init) => {
       timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
     }
     const response = await fetch(input, timeoutController ? { ...init, signal: timeoutController.signal } : init);
-    return readResponse(response);
+    return await readResponse(response);
   } catch (error) {
+    if (timeoutController?.signal.aborted) throw new TeamRequestError("timeout");
     if (error instanceof TypeError || error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("\u65E0\u6CD5\u8FDE\u63A5\u56E2\u961F\u540E\u53F0\uFF0C\u8BF7\u68C0\u67E5\u670D\u52A1\u5730\u5740\u662F\u5426\u6B63\u786E\uFF0C\u5E76\u786E\u8BA4\u540E\u53F0\u670D\u52A1\u5DF2\u542F\u52A8");
+      if (init?.signal?.aborted) throw error;
+      throw new TeamRequestError("network");
     }
     throw error;
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+var requestJson = async (input, init, options = {}) => {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const safeToRetry = method === "GET" || method === "HEAD" || Boolean(new Headers(init?.headers).get("Idempotency-Key"));
+  try {
+    return await requestJsonOnce(input, init);
+  } catch (error) {
+    const transient = error instanceof TeamRequestError || error instanceof TeamHttpError && [502, 503, 504].includes(error.status);
+    if (!options.retry || !safeToRetry || !transient || init?.signal?.aborted) throw error;
+    await new Promise((resolve2) => setTimeout(resolve2, 400));
+    return requestJsonOnce(input, init);
   }
 };
 
@@ -4919,7 +4939,7 @@ var reconcileTeamActiveTimerAfterDelta = (local, merged, changedWorkSessionIds, 
     return timerFromWorkSession(merged, merged.settings, session, local, serverTime, now3);
   }
   if (changedWorkSessionIds.size === 0) return active;
-  return recoverReplacement();
+  return recoverReplacement() ?? active;
 };
 
 // src/teamBusinessRows.ts
@@ -5078,7 +5098,7 @@ async function loadTeamData(local) {
   try {
     payload = await requestJson(apiUrl(local.backend.serverUrl, "/app/bootstrap"), {
       headers: authHeaders(token)
-    });
+    }, { retry: true });
   } catch (error) {
     if (error instanceof TeamHttpError && error.status === 404) {
       throw new TeamBackendCompatibilityError(compatibilityStateForHttpError(error));
@@ -5164,15 +5184,16 @@ async function submitTeamDomainCommand(backend, token, command) {
     "Idempotency-Key": mutationKey,
     "X-TimeManage-Mutation-ID": mutationKey
   };
+  const requestCommand = (url2, init) => requestJson(url2, init, { retry: true });
   if (command.kind === "settings") {
-    return requireDeltaResponse(await requestJson(apiUrl(backend.serverUrl, "/settings"), {
+    return requireDeltaResponse(await requestCommand(apiUrl(backend.serverUrl, "/settings"), {
       method: "PATCH",
       headers: mutationHeaders,
       body: JSON.stringify(command.patch)
     }));
   }
   if (command.kind === "action") {
-    return requireDeltaResponse(await requestJson(
+    return requireDeltaResponse(await requestCommand(
       apiUrl(backend.serverUrl, withWorkspace(`/${command.resource}/${encodeURIComponent(command.id)}/${command.action}`, command.workspaceId)),
       {
         method: "POST",
@@ -5183,7 +5204,7 @@ async function submitTeamDomainCommand(backend, token, command) {
   }
   const resource = resourcePathByEntity[command.entity];
   if (command.kind === "create") {
-    return requireDeltaResponse(await requestJson(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
+    return requireDeltaResponse(await requestCommand(apiUrl(backend.serverUrl, withWorkspace(`/${resource}`, command.workspaceId)), {
       method: "POST",
       headers: mutationHeaders,
       body: JSON.stringify(command.payload)
@@ -5191,13 +5212,13 @@ async function submitTeamDomainCommand(backend, token, command) {
   }
   const url = apiUrl(backend.serverUrl, withWorkspace(`/${resource}/${encodeURIComponent(command.id)}`, command.workspaceId));
   if (command.kind === "patch") {
-    return requireDeltaResponse(await requestJson(url, {
+    return requireDeltaResponse(await requestCommand(url, {
       method: "PATCH",
       headers: mutationHeaders,
       body: JSON.stringify(command.patch)
     }));
   }
-  return requireDeltaResponse(await requestJson(url, {
+  return requireDeltaResponse(await requestCommand(url, {
     method: "DELETE",
     headers: mutationHeaders
   }));
@@ -6677,7 +6698,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.10").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.11").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {

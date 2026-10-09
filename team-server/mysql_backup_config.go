@@ -72,6 +72,10 @@ func mysqlPort(address string) string {
 }
 
 func requireRecentMigrationBackup(cfg config, schemaVersion int64) error {
+	dsn, err := mysql.ParseDSN(cfg.mysqlDSN)
+	if err != nil {
+		return err
+	}
 	paths, err := filepath.Glob(filepath.Join(cfg.backupDir, "*.json"))
 	if err != nil {
 		return err
@@ -81,7 +85,7 @@ func requireRecentMigrationBackup(cfg config, schemaVersion int64) error {
 	now := time.Now()
 	for _, path := range paths {
 		manifest, err := readBackupManifest(path)
-		if err != nil || manifest.SchemaVersion != schemaVersion || manifest.CreatedAt.IsZero() ||
+		if err != nil || manifest.DatabaseName != dsn.DBName || manifest.SchemaVersion != schemaVersion || manifest.CreatedAt.IsZero() ||
 			manifest.CreatedAt.After(now.Add(5*time.Minute)) || now.Sub(manifest.CreatedAt) > maxAge {
 			continue
 		}

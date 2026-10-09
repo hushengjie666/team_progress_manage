@@ -65,7 +65,7 @@ func teamAccountCanManageWorkspace(ctx context.Context, q sqlRunner, auth authCo
 func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, workspaceID string, accountID string, projectID string) (bool, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'project_member' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("project_member", "")+`
 		 FROM business_project_members
 		 WHERE workspace_id = ? AND project_id = ? AND account_ref = ?
 			   AND status = 'active'`,
@@ -77,7 +77,7 @@ func teamAccountCanManageProjectMembers(ctx context.Context, q sqlRunner, worksp
 		return false, err
 	}
 	defer rows.Close()
-	items, err := scanBusinessRows(rows)
+	items, err := scanBusinessRows(ctx, q, rows)
 	if err != nil {
 		return false, err
 	}

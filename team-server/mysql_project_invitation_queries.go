@@ -9,7 +9,7 @@ import (
 func mysqlProjectInvitationSummariesForAccount(ctx context.Context, q sqlRunner, accountID string) ([]projectInvitationSummary, error) {
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
+		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(`+businessCorePayloadSQL("project", "p.")+` AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
 		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i
@@ -38,7 +38,7 @@ func mysqlProjectInvitationSummariesForAccount(ctx context.Context, q sqlRunner,
 func mysqlProjectInvitationSummaryByID(ctx context.Context, q sqlRunner, invitationID string) (projectInvitationSummary, bool, error) {
 	invitation, err := scanProjectInvitationSummary(q.QueryRowContext(
 		ctx,
-		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
+		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(`+businessCorePayloadSQL("project", "p.")+` AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
 		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i
@@ -57,7 +57,7 @@ func mysqlProjectInvitationSummaryByID(ctx context.Context, q sqlRunner, invitat
 func mysqlPendingProjectInvitation(ctx context.Context, q sqlRunner, workspaceID string, projectID string, inviteeAccountID string) (projectInvitationSummary, bool, error) {
 	invitation, err := scanProjectInvitationSummary(q.QueryRowContext(
 		ctx,
-		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(p.payload AS CHAR), ''),
+		`SELECT i.id, i.workspace_id, w.name, i.project_id, COALESCE(CAST(`+businessCorePayloadSQL("project", "p.")+` AS CHAR), ''),
 		        i.inviter_account_id, inviter.name, inviter.email, i.invitee_account_id, i.invitee_email,
 		        i.roles_json, i.status, i.created_at, i.updated_at, i.accepted_at
 		 FROM project_invitations i

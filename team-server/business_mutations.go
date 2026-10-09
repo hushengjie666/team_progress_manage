@@ -147,7 +147,7 @@ func businessExistingRowForUpdate(ctx context.Context, tx *sql.Tx, workspaceID s
 	}
 	var row businessRow
 	var accountID sql.NullString
-	err := tx.QueryRowContext(ctx, `SELECT workspace_id, id, account_id, updated_at, payload FROM `+spec.table+` WHERE workspace_id = ? AND id = ? FOR UPDATE`, workspaceID, id).
+	err := tx.QueryRowContext(ctx, `SELECT workspace_id, id, account_id, updated_at, `+businessCorePayloadSQL(entity, "")+` FROM `+spec.table+` WHERE workspace_id = ? AND id = ? FOR UPDATE`, workspaceID, id).
 		Scan(&row.WorkspaceID, &row.ID, &accountID, &row.UpdatedAt, &row.Payload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return businessRow{}, false, nil
@@ -159,7 +159,11 @@ func businessExistingRowForUpdate(ctx context.Context, tx *sql.Tx, workspaceID s
 	if accountID.Valid {
 		row.AccountID = accountID.String
 	}
-	return row, true, nil
+	items := []businessRow{row}
+	if err := loadBusinessRelations(ctx, tx, items, true); err != nil {
+		return businessRow{}, false, err
+	}
+	return items[0], true, nil
 }
 
 func applyBusinessMergePatch(document json.RawMessage, patch json.RawMessage) (json.RawMessage, error) {

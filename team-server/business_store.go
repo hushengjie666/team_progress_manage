@@ -6,7 +6,8 @@ import (
 	"fmt"
 )
 
-func scanBusinessRows(rows *sql.Rows) ([]businessRow, error) {
+func scanBusinessRows(ctx context.Context, q sqlRunner, rows *sql.Rows) ([]businessRow, error) {
+	defer rows.Close()
 	result := []businessRow{}
 	for rows.Next() {
 		var row businessRow
@@ -19,23 +20,30 @@ func scanBusinessRows(rows *sql.Rows) ([]businessRow, error) {
 		}
 		result = append(result, row)
 	}
-	return result, rows.Err()
+	if err := rows.Err(); err != nil {
+		return result, err
+	}
+	if err := rows.Close(); err != nil {
+		return result, err
+	}
+	return result, loadBusinessRelations(ctx, q, result, false)
 }
 
 func businessLoadRows(ctx context.Context, q sqlRunner, workspaceID string) ([]businessRow, error) {
 	result := []businessRow{}
 	for _, spec := range businessEntityTables {
 		query := fmt.Sprintf(
-			`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
+			`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, %s
 			 FROM %s WHERE workspace_id = ? ORDER BY updated_at ASC`,
 			spec.entity,
+			businessCorePayloadSQL(spec.entity, ""),
 			spec.table,
 		)
 		rows, err := q.QueryContext(ctx, query, workspaceID)
 		if err != nil {
 			return result, err
 		}
-		items, scanErr := scanBusinessRows(rows)
+		items, scanErr := scanBusinessRows(ctx, q, rows)
 		closeErr := rows.Close()
 		if scanErr != nil {
 			return result, scanErr
@@ -59,9 +67,10 @@ func businessLoadRowsByColumn(ctx context.Context, q sqlRunner, spec businessEnt
 		args = append(args, value)
 	}
 	query := fmt.Sprintf(
-		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, %s
 		 FROM %s WHERE workspace_id = ? AND %s IN (%s) ORDER BY updated_at ASC`,
 		spec.entity,
+		businessCorePayloadSQL(spec.entity, ""),
 		spec.table,
 		column,
 		teamPlaceholders(len(values)),
@@ -71,7 +80,7 @@ func businessLoadRowsByColumn(ctx context.Context, q sqlRunner, spec businessEnt
 		return nil, err
 	}
 	defer rows.Close()
-	return scanBusinessRows(rows)
+	return scanBusinessRows(ctx, q, rows)
 }
 
 func businessLoadDailyPlanRowsForProjects(ctx context.Context, q sqlRunner, workspaceID string, taskIDs []string, accountID string) ([]businessRow, error) {
@@ -82,9 +91,10 @@ func businessLoadDailyPlanRowsForProjects(ctx context.Context, q sqlRunner, work
 	}
 	dailyPlanSpec, _ := businessTableForEntity("daily_plan")
 	query := fmt.Sprintf(
-		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, '%s' AS entity, id, account_id, updated_at, %s
 		 FROM %s WHERE workspace_id = ? ORDER BY updated_at ASC`,
 		dailyPlanSpec.entity,
+		businessCorePayloadSQL(dailyPlanSpec.entity, ""),
 		dailyPlanSpec.table,
 	)
 	rows, err := q.QueryContext(ctx, query, workspaceID)
@@ -92,7 +102,7 @@ func businessLoadDailyPlanRowsForProjects(ctx context.Context, q sqlRunner, work
 		return nil, err
 	}
 	defer rows.Close()
-	items, err := scanBusinessRows(rows)
+	items, err := scanBusinessRows(ctx, q, rows)
 	if err != nil {
 		return nil, err
 	}
@@ -183,6 +193,7 @@ func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 	payload := row.Payload
 	if len(payload) == 0 {
 		payload = []byte(`{}`)
+		row.Payload = payload
 	}
 	_, err := tx.ExecContext(
 		ctx,
@@ -211,7 +222,7 @@ func businessUpsertRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 		payload,
 	)
 	if err == nil {
-		mutationRecorderFromContext(ctx).recordRow(row)
+		err = recordBusinessCoreWrite(ctx, tx, row)
 	}
 	return err
 }
@@ -239,7 +250,7 @@ func businessCreateRow(ctx context.Context, tx *sql.Tx, row businessRow) error {
 		row.Payload,
 	)
 	if err == nil {
-		mutationRecorderFromContext(ctx).recordRow(row)
+		err = recordBusinessCoreWrite(ctx, tx, row)
 	}
 	return err
 }
@@ -271,13 +282,13 @@ func businessUpdateRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, 
 	count, err := result.RowsAffected()
 	if err != nil || count == 1 {
 		if err == nil && count == 1 {
-			mutationRecorderFromContext(ctx).recordRow(row)
+			err = recordBusinessCoreWrite(ctx, tx, row)
 		}
 		return count == 1, err
 	}
 	_, found, lookupErr := businessExistingRow(ctx, tx, row.WorkspaceID, row.Entity, row.ID)
 	if lookupErr == nil && found {
-		mutationRecorderFromContext(ctx).recordRow(row)
+		lookupErr = recordBusinessCoreWrite(ctx, tx, row)
 	}
 	return found, lookupErr
 }
@@ -296,4 +307,12 @@ func businessDeleteRow(ctx context.Context, tx *sql.Tx, row businessRow) (bool, 
 		mutationRecorderFromContext(ctx).recordDeleted(row)
 	}
 	return count == 1, err
+}
+
+func recordBusinessCoreWrite(ctx context.Context, tx *sql.Tx, row businessRow) error {
+	if err := writeBusinessCore(ctx, tx, row); err != nil {
+		return err
+	}
+	mutationRecorderFromContext(ctx).recordRow(row)
+	return nil
 }

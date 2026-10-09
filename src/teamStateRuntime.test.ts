@@ -68,7 +68,7 @@ describe("team state runtime", () => {
       ...before,
       projects: before.projects.map((project) => ({ ...project, name: "服务端确认名称" })),
     };
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn<typeof fetch>(async (_input: RequestInfo | URL, init?: RequestInit) => {
       return new Response(JSON.stringify({
         mutation_id: "mutation_project",
         delta: true,
@@ -124,7 +124,7 @@ describe("team state runtime", () => {
     const confirmedTask = { ...before.tasks[0], status: "committed" as const, updatedAt: "2026-08-19T03:00:00.000Z" };
     const row = businessRowsFromState({ ...before, tasks: [confirmedTask, ...before.tasks.slice(1)] })
       .find((item) => item.entity === "task" && item.id === confirmedTask.id)!;
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+    const fetchMock = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({
       mutation_id: "mutation_daily_plan",
       delta: true,
       rows: [row],

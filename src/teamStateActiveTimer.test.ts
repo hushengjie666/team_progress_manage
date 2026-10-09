@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AppState } from "./types";
 import { loadTeamData } from "./teamApi";
 import { businessRowsFromState } from "./teamBusinessRows";
 import { createTestState, teamBootstrapPayload, withWorkSession } from "./test/fixtures";
@@ -237,7 +238,7 @@ describe("team backend active timer state loading", () => {
         interruptionCounts: { internal: 0, external: 0 },
       },
     ];
-    let remote = { ...base, updatedAt: "2026-08-25T08:10:00.000Z", focusSessions, workSessions: [] };
+    let remote: AppState = { ...base, updatedAt: "2026-08-25T08:10:00.000Z", focusSessions, workSessions: [] };
     remote = withWorkSession(remote, {
       id: "work_current_older",
       ownerAccountId: "account_owner",

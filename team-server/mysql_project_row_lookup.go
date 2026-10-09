@@ -13,7 +13,7 @@ func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, p
 	}
 	rows, err := q.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'project' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'project' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("project", "")+`
 		 FROM business_projects
 		 WHERE id = ? AND (? = '' OR workspace_id = ?)
 		 ORDER BY updated_at DESC
@@ -26,7 +26,7 @@ func mysqlProjectRowByID(ctx context.Context, q sqlRunner, workspaceID string, p
 		return businessRow{}, false, err
 	}
 	defer rows.Close()
-	items, err := scanBusinessRows(rows)
+	items, err := scanBusinessRows(ctx, q, rows)
 	if err != nil {
 		return businessRow{}, false, err
 	}

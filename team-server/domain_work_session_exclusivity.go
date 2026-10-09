@@ -24,7 +24,7 @@ func lockWorkSessionTask(ctx context.Context, tx *sql.Tx, auth authContext, work
 func endOtherAccountActiveWorkSessions(ctx context.Context, tx *sql.Tx, auth authContext, keepSessionID string, now string) error {
 	rows, err := tx.QueryContext(
 		ctx,
-		`SELECT workspace_id, 'work_session' AS entity, id, account_id, updated_at, payload
+		`SELECT workspace_id, 'work_session' AS entity, id, account_id, updated_at, `+businessCorePayloadSQL("work_session", "")+`
 		 FROM business_work_sessions
 		 WHERE account_id = ? AND status IN ('active', 'paused')
 		 FOR UPDATE`,
@@ -33,7 +33,7 @@ func endOtherAccountActiveWorkSessions(ctx context.Context, tx *sql.Tx, auth aut
 	if err != nil {
 		return err
 	}
-	sessions, err := scanBusinessRows(rows)
+	sessions, err := scanBusinessRows(ctx, tx, rows)
 	_ = rows.Close()
 	if err != nil {
 		return err
