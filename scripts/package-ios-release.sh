@@ -85,7 +85,7 @@ IPA: TimeManage.ipa
 Human gates: privacy policy, review account/contact, legal declarations, real-device acceptance
 EOF
 
-find "${OUTPUT}" -type f -exec shasum -a 256 {} \; > "${OUTPUT}/SHA256SUMS.txt"
+(cd "${OUTPUT}" && find . -type f ! -name SHA256SUMS.txt -exec shasum -a 256 {} \;) > "${OUTPUT}/SHA256SUMS.txt"
 cat >> "${PACKAGE_DIR}/RELEASE.txt" <<EOF
 
 iOS:
