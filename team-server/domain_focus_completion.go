@@ -20,7 +20,9 @@ func completeFocusedTaskInTx(ctx context.Context, tx *sql.Tx, auth authContext, 
 	if err != nil {
 		return err
 	}
-	taskPayload["status"] = "in_progress"
+	if status, _ := taskPayload["status"].(string); status == "pool" || status == "committed" {
+		taskPayload["status"] = "in_progress"
+	}
 	taskPayload["actualPomodoros"] = numericInt(taskPayload["actualPomodoros"]) + 1
 	if err := savePayloadObject(ctx, tx, task, taskPayload, now); err != nil {
 		return err

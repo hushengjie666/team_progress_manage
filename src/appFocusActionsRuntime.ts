@@ -51,6 +51,10 @@ export function createAppFocusActionsRuntime({
       const source = getState();
       const task = source.tasks.find((item) => item.id === taskId);
       if (!task) return;
+      if (task.status !== "pool" && task.status !== "committed" && task.status !== "in_progress") {
+        setToast("当前任务状态不能开始执行");
+        return;
+      }
       const taskWorkspaceId = workspaceIdForTask(source, task);
       const workSessionId = uid("work_session");
       const previousTask = task;
@@ -72,7 +76,7 @@ export function createAppFocusActionsRuntime({
         },
         idempotencyKey: `start:${taskId}:${sessionId}`,
       }, {
-        resourceKey: `tasks:${taskId}:timer`,
+        resourceKey: `task:${taskId}`,
         pendingMode: "background",
         optimistic: (state) => {
           const projected = startTimerInState(state, mode, taskId, timestamp, sessionId, { workSessionId });

@@ -55,6 +55,8 @@ test("edits task detail and persists progress fields", async ({ page }) => {
   await dialog.getByLabel("进展说明").fill("E2E 进度已持久化。");
   const requestBody = (await progressRequest).postDataJSON();
   expect(requestBody).toEqual(expect.objectContaining({ progressNote: "E2E 进度已持久化。" }));
+  expect(requestBody).not.toHaveProperty("status");
+  expect(requestBody).not.toHaveProperty("reviewSubmittedAt");
 
   await expect(dialog.getByRole("spinbutton", { name: "进度百分比" })).toHaveValue("45");
   await expect(dialog.getByLabel("进展说明")).toHaveValue("E2E 进度已持久化。");

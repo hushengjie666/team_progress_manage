@@ -15,7 +15,14 @@ export function createAppTaskUpdateRuntime({ getState, runTeamCommand }: AppTask
     const current = source.tasks.find((item) => item.id === taskId);
     if (!current) return;
     const next = { ...(typeof updater === "function" ? updater(current) : { ...current, ...updater }), updatedAt: nowIso() };
-    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch: next as unknown as Record<string, unknown> }, {
+    const patch: Record<string, unknown> = {};
+    for (const key of Object.keys(next) as Array<keyof Task>) {
+      if (key !== "updatedAt" && JSON.stringify(next[key]) !== JSON.stringify(current[key])) {
+        patch[key] = next[key] ?? null;
+      }
+    }
+    if (Object.keys(patch).length === 0) return;
+    void runTeamCommand({ kind: "patch", entity: "task", id: taskId, workspaceId: current.workspaceId, patch }, {
       resourceKey: `task:${taskId}`,
       pendingMode: "background",
       optimistic: (state) => ({

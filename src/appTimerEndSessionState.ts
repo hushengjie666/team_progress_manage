@@ -47,7 +47,7 @@ export const endSessionInState = (state: AppState, outcome: SessionOutcome, time
         task.id === active.taskId
           ? {
               ...task,
-              status: "in_progress" as const,
+              status: task.status === "pool" || task.status === "committed" ? "in_progress" as const : task.status,
               actualPomodoros: (task.actualPomodoros ?? 0) + 1,
               updatedAt: endedAt,
             }

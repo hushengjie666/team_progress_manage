@@ -29,6 +29,28 @@ const signedInState = () => {
 };
 
 describe("team state runtime", () => {
+  it("serializes task actions with edits to the same task", async () => {
+    const before = signedInState();
+    const resolvers: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn((_input: RequestInfo | URL) => new Promise<Response>((resolve) => resolvers.push(resolve)));
+    vi.stubGlobal("fetch", fetchMock);
+    const { runtime } = createHarness(before);
+    const taskId = before.tasks[0].id;
+    const response = () => new Response(JSON.stringify({ delta: true, rows: [], deleted: [], settings: {} }), { status: 200 });
+
+    const edit = runtime.runTeamCommand({ kind: "patch", entity: "task", id: taskId, patch: { notes: "编辑中" } });
+    const submit = runtime.runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review" });
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const countBeforeEditSaved = fetchMock.mock.calls.length;
+    resolvers[0](response());
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    resolvers[1](response());
+    await Promise.all([edit, submit]);
+
+    expect(countBeforeEditSaved).toBe(1);
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("submit-review");
+  });
+
   it("rejects business commands when no backend session exists", async () => {
     const state = createTestState();
     const { runtime, getCurrent, getToast } = createHarness(state);

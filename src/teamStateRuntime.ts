@@ -20,7 +20,7 @@ export type TeamDataRuntime = {
 
 const defaultResourceKey = (command: TeamDomainCommand) => {
   if (command.kind === "settings") return "settings:account";
-  if (command.kind === "action") return `${command.resource}:${command.id}`;
+  if (command.kind === "action") return `${command.resource === "tasks" ? "task" : command.resource}:${command.id}`;
   if (command.kind === "create") {
     const id = typeof command.payload.id === "string" ? command.payload.id : "new";
     return `${command.entity}:${id}`;

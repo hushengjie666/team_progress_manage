@@ -23,7 +23,7 @@ export const finishWorkSessionInState = (
       task.id === session.taskId
         ? {
             ...task,
-            status: task.status === "pending_review" ? task.status : ("in_progress" as const),
+            status: task.status === "pool" || task.status === "committed" ? "in_progress" as const : task.status,
             actualPomodoros: outcome === "completed" ? (task.actualPomodoros ?? 0) + 1 : task.actualPomodoros,
             updatedAt: timestamp,
           }

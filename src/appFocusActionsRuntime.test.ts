@@ -4,6 +4,29 @@ import { createTestState } from "./test/fixtures";
 import type { AppState } from "./types";
 
 describe("app focus actions runtime", () => {
+  it.each(["pending_review", "completed", "split", "archived"] as const)("does not send a start command for %s tasks", async (status) => {
+    const state = createTestState();
+    state.tasks[0] = { ...state.tasks[0], status };
+    const runTeamCommand = vi.fn();
+    const setToast = vi.fn();
+    const runtime = createAppFocusActionsRuntime({
+      getState: () => state,
+      getQuickNote: () => "",
+      updateState: vi.fn(),
+      runTeamCommand,
+      setQuickNote: vi.fn(),
+      setToast,
+      setPreferredFocusTaskId: vi.fn(),
+      setPendingReset: vi.fn(),
+    });
+
+    await runtime.beginTimer("focus", state.tasks[0].id);
+
+    expect(runTeamCommand).not.toHaveBeenCalled();
+    expect(state.tasks[0].status).toBe(status);
+    expect(setToast).toHaveBeenCalledWith("当前任务状态不能开始执行");
+  });
+
   it("projects a newly started timer before the server responds", async () => {
     const initial = createTestState();
     const task = { ...initial.tasks[0], status: "pool" as const };
@@ -30,6 +53,7 @@ describe("app focus actions runtime", () => {
     expect(state.dailyPlans[0].committedTaskIds).toContain(task.id);
     expect(state.activeTimer?.taskId).toBe(task.id);
     expect(state.activeTimer?.workSessionId).toBeTruthy();
+    expect(runTeamCommand.mock.calls[0]?.[1]).toMatchObject({ resourceKey: `task:${task.id}` });
     expect(runTeamCommand.mock.calls[0]?.[0]).toEqual(expect.objectContaining({
       payload: expect.objectContaining({
         focus_session_id: state.activeTimer?.sessionId,

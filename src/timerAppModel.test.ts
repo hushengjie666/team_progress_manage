@@ -10,6 +10,17 @@ import { todayKey } from "./seed";
 import { createInitialState } from "./test/fixtures";
 
 describe("timer app model", () => {
+  it.each(["pending_review", "completed", "split", "archived"] as const)("does not downgrade %s when a focus completion arrives late", (status) => {
+    const state = createInitialState();
+    const started = startTimerInState(state, "focus", state.tasks[0].id, `${todayKey()}T08:00:00.000Z`);
+    const changed = { ...started, tasks: started.tasks.map((task, index) => index === 0 ? { ...task, status } : task) };
+
+    const ended = endSessionInState(changed, "completed", `${todayKey()}T08:25:00.000Z`);
+
+    expect(ended.tasks[0].status).toBe(status);
+    expect(ended.tasks[0].actualPomodoros).toBe(1);
+  });
+
   it("finishes an expired active timer through the app model", () => {
     const state = createInitialState();
     const taskId = state.tasks[0].id;

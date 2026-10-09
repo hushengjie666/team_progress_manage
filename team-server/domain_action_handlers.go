@@ -134,6 +134,10 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 			}
 		}
 	case "start":
+		if status := stringField(task.Payload, "status"); status != "pool" && status != "committed" && status != "in_progress" {
+			writeError(w, http.StatusConflict, "task cannot be started in its current status")
+			return
+		}
 		payload["status"] = "in_progress"
 		if err := a.startTaskInTx(r.Context(), tx, auth, task, payload, req, now); err != nil {
 			writeError(w, http.StatusInternalServerError, "start task failed")
