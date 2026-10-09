@@ -170,3 +170,5 @@ python3 scripts/test_recover_navicat_sql.py
 此次验证包含 SQL 修复和补全的 17 项单元测试、真实 MySQL 备份恢复、62 条 JSON 逐条比较、最后一条记录模拟并发编辑时的整批回滚及数据库关联审计。本机客户端通过“管理中心 → 团队后台 → 刷新在线数据”读取更新；SQL 维护不会主动发送实时变更事件，其他已打开的客户端也应执行刷新。
 
 更新前备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-172809-000.sql.gz`，SHA-256 为 `d09676e6b9731a3de9d55a1bb209694c055da0c36c26e84137ec96c55dfe9646`，同名清单已核对。原计划、最终计划、执行 SQL 和日志保存在 `/var/backups/timemanage-team/enrichment-20261009-172808/`。本次为业务数据整理，未修改 schema、迁移文件或客户端二进制。
+
+用户随后要求停止继续恢复，并移除恢复提示。客户端已取消全局历史数据横幅；12 个项目和 50 条任务中自动生成的恢复说明已清空。此操作仅清理显示文案，保留已经补回的名称、项目和任务记录及后台恢复元数据。清理前备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-174018-000.sql.gz`，SHA-256 为 `697847ac9e80872bdc5fc16361d96b9b826883e47dfcfa636b65e34ffa3c2632`；清理使用前像校验和整批事务保护，材料保存在 `/var/backups/timemanage-team/hide-copy-20261009-1740/`。不再向日常页面添加恢复提示或自动生成的恢复说明。
