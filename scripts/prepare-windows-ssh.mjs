@@ -39,13 +39,15 @@ try {
   copyFileSync(join(root, "scripts", "windows", "setup-ssh.ps1"), join(bundle, "setup-ssh.ps1"));
   copyFileSync(join(root, "scripts", "windows", "enable-ssh.cmd"), join(bundle, "enable-ssh.cmd"));
   writeFileSync(join(bundle, "setup-config.ps1"), `@{\r\nHostName=${psQuote(config.host)}\r\nAccountName=${psQuote(config.user)}\r\nPort=${config.port}\r\nClientIp=${psQuote(clientIp)}\r\nRemoteRoot=${psQuote(config.remoteRoot)}\r\nInstallerSha256=${psQuote(bitviseInstaller.sha256)}\r\n}\r\n`);
-  writeFileSync(join(bundle, "README.txt"), "\ufeffTimeManage SSH 一次性安装包\r\n\r\n将整个 ZIP 拷到 Windows 服务器，全部解压后双击 enable-ssh.cmd，允许管理员提权。\r\n首次安装只需输入一次 YES，接受 Bitvise Standard 30 天试用许可；组织长期使用需购买许可。\r\n脚本会完成安装、导入公钥、限制来源 IP、设置服务开机启动和 Windows 防火墙，并显示主机密钥。\r\n\r\n云安全组如未放行：TCP " + config.port + "，来源 " + clientIp + "/32。Windows 脚本不具备云账号权限。\r\n\r\n回到 Mac，在 TimeManage 项目中执行：npm run server:ssh:check\r\n首次连接核对服务器显示的主机密钥。也可把服务器生成的 server-host-keys.txt 拷回 Mac，用 --host-keys 指定。\r\n私钥保留在 Mac，安装包内只有公钥，没有服务器密码。\r\n");
+  writeFileSync(join(bundle, "README.txt"), "\ufeffTimeManage SSH 完整安装包\r\n\r\n将整个 ZIP 拷到 Windows 服务器，全部解压后双击 enable-ssh.cmd，允许管理员提权。\r\n以下六个文件应在同一个文件夹：\r\nBitvise-SSH-Server.exe、deploy-key.pub、setup-config.ps1、setup-ssh.ps1、enable-ssh.cmd、README.txt。\r\n安装所需文件全部包含在此 ZIP 中，不依赖旧安装目录。\r\n首次安装只需输入一次 YES，接受 Bitvise Standard 30 天试用许可；组织长期使用需购买许可。\r\n脚本会完成安装、导入公钥、限制来源 IP、设置服务开机启动和 Windows 防火墙，并显示主机密钥。\r\n\r\n云安全组如未放行：TCP " + config.port + "，来源 " + clientIp + "/32。Windows 脚本不具备云账号权限。\r\n\r\n回到 Mac，在 TimeManage 项目中执行：npm run server:ssh:check\r\n首次连接核对服务器显示的主机密钥。也可把服务器生成的 server-host-keys.txt 拷回 Mac，用 --host-keys 指定。\r\n私钥保留在 Mac，安装包内只有公钥，没有服务器密码。\r\n");
   mkdirSync(configDir, { recursive: true, mode: 0o700 });
   writeFileSync(join(configDir, "config.json"), JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   chmodSync(join(configDir, "config.json"), 0o600);
   const zip = `${bundle}.zip`;
   const temporaryZip = `${bundle}-${Date.now()}.zip`;
-  execFileSync("zip", ["-q", "-r", temporaryZip, "."], { cwd: bundle });
+  const bundleFiles = ["Bitvise-SSH-Server.exe", "deploy-key.pub", "setup-config.ps1", "setup-ssh.ps1", "enable-ssh.cmd", "README.txt"];
+  execFileSync("zip", ["-q", temporaryZip, ...bundleFiles], { cwd: bundle });
+  execFileSync("unzip", ["-tq", temporaryZip]);
   renameSync(temporaryZip, zip);
   const sshOnly = args.includes("--ssh-only");
   const launcher = join(homedir(), "Desktop", sshOnly ? "check-timemanage-ssh.command" : "publish-timemanage.command");
