@@ -36,7 +36,7 @@ Ubuntu 24.04 amd64 服务器沿用已有 Nginx HTTPS 网站和证书。TimeManag
 
 | 用途 | 路径 |
 | --- | --- |
-| 应用版本目录 | `/opt/timemanage-team/releases/timemanageTeam-v0.2.10-20261009-165630/` |
+| 应用版本目录 | `/opt/timemanage-team/releases/timemanageTeam-v0.2.10-20261009-174158/` |
 | 当前版本链接 | `/opt/timemanage-team/current` |
 | Linux 后端 | `/opt/timemanage-team/current/server/timemanage-team-linux-amd64` |
 | 前端静态文件 | `/opt/timemanage-team/current/web/` |
@@ -172,3 +172,5 @@ python3 scripts/test_recover_navicat_sql.py
 更新前备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-172809-000.sql.gz`，SHA-256 为 `d09676e6b9731a3de9d55a1bb209694c055da0c36c26e84137ec96c55dfe9646`，同名清单已核对。原计划、最终计划、执行 SQL 和日志保存在 `/var/backups/timemanage-team/enrichment-20261009-172808/`。本次为业务数据整理，未修改 schema、迁移文件或客户端二进制。
 
 用户随后要求停止继续恢复，并移除恢复提示。客户端已取消全局历史数据横幅；12 个项目和 50 条任务中自动生成的恢复说明已清空。此操作仅清理显示文案，保留已经补回的名称、项目和任务记录及后台恢复元数据。清理前备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.10-20261009-174018-000.sql.gz`，SHA-256 为 `697847ac9e80872bdc5fc16361d96b9b826883e47dfcfa636b65e34ffa3c2632`；清理使用前像校验和整批事务保护，材料保存在 `/var/backups/timemanage-team/hide-copy-20261009-1740/`。不再向日常页面添加恢复提示或自动生成的恢复说明。
+
+移除提示的界面构建来自提交 `0e60a661375d`，统一版本目录为 `timemanageTeam-v0.2.10-20261009-174158`。该目录的 `web/` 和 `server/` 已发布到 Ubuntu 并切换 `current`，后端和 Nginx 状态检查通过；本机 macOS 客户端已替换为同包应用并重新打开。验证包括 308 项单元测试、38 项浏览器测试（6 项跳过）、Go 后端测试及无用代码检查；macOS 应用采用本地 ad-hoc 签名，完整签名校验通过，DMG、ZIP、iOS Archive/IPA 的完整性和签名检查通过。本次仍是同版本临时构建，未创建发布 tag。
