@@ -234,6 +234,42 @@ location ^~ /timemanage-team/ {
 
 ## 服务器操作顺序
 
+### SSH 一次性安装与脚本发布
+
+Windows Server 2008 R2 使用 Bitvise SSH Server。Mac 端运行一次：
+
+```sh
+npm run server:ssh:prepare -- --host <服务器公网IP>
+```
+
+命令自动生成独立部署密钥、下载并校验 Bitvise 安装程序，在 Mac 桌面生成 `TimeManage-SSH-Setup.zip` 和 `publish-timemanage.command`。后者双击即可检查 SSH 连接、构建临时统一版本包并发布，首次 SSH 连接时核对主机密钥即可。私钥保留在 Mac 的 `~/.ssh/timemanage_deploy`；ZIP 内只有公钥和安装配置。连接配置保存在 `~/.config/timemanage-deploy/config.json`，不写入仓库。
+
+将 ZIP 拷到服务器并全部解压，双击 `enable-ssh.cmd`，允许 UAC 提权。首次安装需输入一次 `YES` 接受 Bitvise Standard 的 30 天评估许可；组织长期使用需要商业许可。脚本自动安装、配置公钥登录、启用开机启动、生成 SSH 主机密钥，并把 SSH 来源限制为准备安装包时检测到的 Mac 公网 IPv4。
+
+如果云安全组尚未放行，添加脚本显示的 TCP 端口和来源 IP `/32` 规则。Windows 脚本只能配置本机防火墙，无法访问未配置凭据的云安全组。网络出口变化时，使用 `--client-ip <新的公网IPv4>` 重新准备安装包，并重跑服务器安装入口；已有部署私钥不会被覆盖。
+
+在 Mac 上运行 `npm run server:ssh:check`，核对服务器脚本显示的主机密钥指纹后完成首次连接。也可以把服务器生成的 `server-host-keys.txt` 拷回 Mac，通过 `--host-keys <文件路径>` 导入已核对的主机密钥。自动发布要求主机密钥已受信任，不跳过主机身份校验。
+
+后续在项目目录中执行一条命令，发布指定的统一版本目录：
+
+```sh
+npm run server:deploy -- --package deploy/timemanageTeam-v<版本>-<时间戳>
+```
+
+省略 `--package` 时选择 `deploy/` 中最新时间戳的版本目录，并显示所选版本。`--dry-run` 只校验和展示计划，不连接服务器。临时测试可以使用 `npm run server:deploy -- --build`，它先调用唯一临时打包入口 `npm run deploy:team`；正式发布仍须先按 tag 流程生成统一版本包，再指定版本目录发布，不自动创建或移动 tag。
+
+发布脚本只上传统一版本包的 `web/`、`server/`、`RELEASE.txt` 和 `release-contract.json`。拒绝含生产 `backend.json`、符号链接或缺少迁移 SQL 的包。服务器校验 ZIP 和每个文件的 SHA-256，准备下一版本目录后停止后台，备份数据库并检查备份清单，然后使用新后台执行升级、状态检查和完整性审计，切换运行目录、启动 Windows Service，并验证本机 `/health` 的版本、API、数据库 schema 和就绪状态。
+
+现有 `server/backend.json` 及服务器目录内的其他运行文件会保留。恢复文件存放在正式目录同级的 `timemanage-recovery-<时间戳>/`，包含数据库备份及原运行目录。备份失败时恢复原后台运行；一旦尝试数据库迁移，后续失败会停止服务并报告恢复目录，避免未经确认的数据库恢复或程序降级。旧版控制台后台会按完整可执行文件路径识别并停止，成功发布后转为开机启动的 Windows Service。若已有同名服务指向其他安装目录，脚本停止并提示，不修改其他安装。
+
+默认上传根目录和正式目录沿用本文的 Administrator Desktop 约定；可在准备阶段使用 `--remote-root`、`--user`、`--port`、`--key` 指定实际配置。SFTP 上传根目录和连接配置须保持一致。Nginx 的 alias 和反向代理路径沿用现有配置，无需为每次替换静态资源重载。
+
+脚本校验：`npm run verify:server-automation`。设置 `TM_PWSH` 为可运行的 PowerShell 7 路径时，额外执行语法检查及正常发布、上传损坏、备份失败、迁移失败和健康失败的本地流程测试。测试替换 Windows 服务与 COM 操作，不连接生产服务器；Windows Server 2008 R2 的实际安装和连接仍需在目标机器首次运行验证。
+
+参考：[Bitvise 静默安装](https://bitvise.com/ssh-server-guide-installing)、[脚本配置](https://bitvise.com/ssh-server-guide-scriptable)、[安装包版本与校验](https://github.com/microsoft/winget-pkgs/blob/master/manifests/b/Bitvise/SSH/Server/9.66/Bitvise.SSH.Server.installer.yaml)。
+
+### 手动发布
+
 1. 本地运行 `npm run deploy:team`。
 2. 上传 `deploy/timemanageTeam-v<version>-<yyyyMMdd-HHmmss>.zip` 到服务器的 `C:/Users/Administrator/Desktop/`。
 3. 在 Desktop 下解压，确认出现同名版本目录，例如 `timemanageTeam-v0.2.9-20260819-153000/`。
