@@ -6,6 +6,16 @@ $phase = "preflight"
 $transcriptStarted = $false
 $logPath = Join-Path $scriptDir "ssh-setup.log"
 
+function Get-SetupDirectory([string]$EntryDir) {
+  $parentDir = Split-Path -Parent $EntryDir
+  foreach ($candidate in @($EntryDir, $parentDir)) {
+    if ($candidate -and (Test-Path (Join-Path $candidate "setup-config.ps1") -PathType Leaf)) {
+      return $candidate
+    }
+  }
+  throw "setup-config.ps1 is missing from the script directory and its parent. Extract the complete TimeManage-SSH-Setup.zip, then run enable-ssh.cmd."
+}
+
 function Get-Sha256([string]$Path) {
   $stream = [IO.File]::OpenRead($Path)
   $hash = [Security.Cryptography.SHA256]::Create()
@@ -25,14 +35,16 @@ try {
   Write-Host ("PowerShell " + $PSVersionTable.PSVersion + "; CLR " + [Environment]::Version)
   $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
   if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { throw "Run this script as administrator." }
-  $options = & (Join-Path $scriptDir "setup-config.ps1")
+  $setupDir = Get-SetupDirectory $scriptDir
+  Write-Host ("Setup files: " + $setupDir)
+  $options = & (Join-Path $setupDir "setup-config.ps1")
   $ip = [Net.IPAddress]::Parse($options.ClientIp)
   if ($ip.AddressFamily -ne [Net.Sockets.AddressFamily]::InterNetwork -or $options.ClientIp -eq "0.0.0.0") { throw "A single client IPv4 address is required." }
   if ($options.Port -lt 1 -or $options.Port -gt 65535) { throw "Invalid SSH port." }
   if (-not (Test-Path $options.RemoteRoot -PathType Container)) { throw "Remote upload directory does not exist: $($options.RemoteRoot)" }
   $account = New-Object Security.Principal.NTAccount($env:COMPUTERNAME, $options.AccountName)
   $null = $account.Translate([Security.Principal.SecurityIdentifier])
-  $keyFile = Join-Path $scriptDir "deploy-key.pub"
+  $keyFile = Join-Path $setupDir "deploy-key.pub"
   if (-not (Test-Path $keyFile)) { throw "deploy-key.pub is missing." }
   $stateDir = Join-Path $env:ProgramData "TimeManage-SSH"
   $marker = Join-Path $stateDir "setup-owned.txt"
@@ -40,7 +52,7 @@ try {
   if ($service -and -not (Test-Path $marker)) { throw "An existing Bitvise installation was found. It has not been changed; import the key into that installation instead." }
   if (-not $service) {
     if ([Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | Where-Object { $_.Port -eq $options.Port }) { throw "SSH port is already in use." }
-    $installer = Join-Path $scriptDir "Bitvise-SSH-Server.exe"
+    $installer = Join-Path $setupDir "Bitvise-SSH-Server.exe"
     $phase = "installer checksum"
     Write-Host "Checking installer checksum..."
     if ((Get-Sha256 $installer) -ne $options.InstallerSha256) { throw "Installer checksum mismatch." }

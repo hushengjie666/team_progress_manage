@@ -67,6 +67,45 @@ test("dry-run validates the payload without calling SSH or changing the server",
 });
 
 const pwsh = process.env.TM_PWSH;
+test("SSH setup resolves a nested repair folder and prefers its own configuration", { skip: !pwsh }, () => {
+  const local = temp();
+  const bundle = join(local, "TimeManage-SSH-Setup");
+  const repair = join(bundle, "TimeManage-SSH-Fix");
+  mkdirSync(repair, { recursive: true });
+  writeFileSync(join(bundle, "setup-config.ps1"), "@{ClientIp='203.0.113.8'}");
+  writeFileSync(join(bundle, "deploy-key.pub"), "public key fixture");
+  writeFileSync(join(bundle, "Bitvise-SSH-Server.exe"), "installer fixture");
+  const scriptPath = join(local, "directories.ps1");
+  writeFileSync(scriptPath, `
+$ErrorActionPreference='Stop'
+$t=$null; $e=$null
+$ast=[System.Management.Automation.Language.Parser]::ParseFile(${psQuote(resolve("scripts/windows/setup-ssh.ps1"))},[ref]$t,[ref]$e)
+$function=$ast.Find({param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-SetupDirectory'},$true)
+Invoke-Expression $function.Extent.Text
+$bundle=${psQuote(bundle)}; $repair=${psQuote(repair)}
+if ((Get-SetupDirectory $bundle) -ne $bundle) { throw 'Complete bundle did not resolve' }
+$setupDir=Get-SetupDirectory $repair
+if ($setupDir -ne $bundle) { throw 'Nested repair did not resolve its parent' }
+$options=& (Join-Path $setupDir 'setup-config.ps1')
+if ($options.ClientIp -ne '203.0.113.8') { throw 'Parent configuration was not loaded' }
+foreach ($name in @('deploy-key.pub','Bitvise-SSH-Server.exe')) {
+  if (-not (Test-Path (Join-Path $setupDir $name))) { throw "Missing setup asset: $name" }
+}
+Set-Content (Join-Path $repair 'setup-config.ps1') "@{ClientIp='203.0.113.9'}"
+if ((Get-SetupDirectory $repair) -ne $repair) { throw 'Local configuration must take precedence' }
+Remove-Item (Join-Path $repair 'setup-config.ps1')
+Remove-Item (Join-Path $bundle 'setup-config.ps1')
+try { $null=Get-SetupDirectory $repair; throw 'Missing configuration was accepted' }
+catch { if ($_.Exception.Message -notmatch 'setup-config.ps1 is missing') { throw } }
+`);
+  const result = spawnSync(pwsh, ["-NoProfile", "-File", scriptPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  const source = readFileSync("scripts/windows/setup-ssh.ps1", "utf8");
+  for (const file of ["setup-config.ps1", "deploy-key.pub", "Bitvise-SSH-Server.exe"]) {
+    assert.ok(source.includes(`Join-Path $setupDir "${file}"`), `${file} must use the resolved setup directory`);
+  }
+});
+
 test("SSH hash helpers work with legacy .NET objects without public Dispose", { skip: !pwsh }, () => {
   const scriptPath = join(temp(), "legacy-hash.ps1");
   writeFileSync(scriptPath, `
