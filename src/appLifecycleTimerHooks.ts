@@ -43,6 +43,8 @@ export function useRunningTimerInterval({
       if (!shouldFinishExpiredTimerInState(current, timestamp)) return false;
       const title = `${modeLabel[current.activeTimer.mode]}已结束`;
       const next = finishExpiredTimerInState(current, timestamp);
+      stateRef.current = next;
+      setState(next);
       const nextMode = next.activeTimer?.mode;
       setToast(nextMode ? `${title}，${modeLabel[nextMode]}已准备` : title);
       announceTimerEndForRuntime(current.settings, current.activeTimer, title);
@@ -51,7 +53,6 @@ export function useRunningTimerInterval({
         const session = current.workSessions.find((item) => item.id === active.workSessionId);
         void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
       }
-      setState(next);
       return true;
     };
     if (state.activeTimer.pendingSettlement === "pending") {
@@ -99,6 +100,8 @@ export function useTimerRestoreListeners({
       const timestamp = nowIso();
       const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
       const next = restoreTimerInState(current, timestamp);
+      stateRef.current = next;
+      setState(next);
       if (shouldFinish) {
         const title = `${modeLabel[current.activeTimer.mode]}已结束`;
         announceTimerEndForRuntime(current.settings, current.activeTimer, title);
@@ -108,10 +111,8 @@ export function useTimerRestoreListeners({
           const session = current.workSessions.find((item) => item.id === current.activeTimer?.workSessionId);
           void runTeamCommand({ kind: "action", resource: "work-sessions", id: current.activeTimer.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
         }
-        setState(next);
         return;
       }
-      setState(next);
     };
     document.addEventListener("visibilitychange", handle);
     window.addEventListener("focus", handle);

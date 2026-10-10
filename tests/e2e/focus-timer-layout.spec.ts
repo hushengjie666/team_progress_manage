@@ -2,8 +2,38 @@ import { expect, test } from "@playwright/test";
 import { authenticatedState } from "./support/authenticatedState";
 import { openApp } from "./support/openApp";
 import { startTimerInState } from "../../src/appModel";
+import type { Task } from "../../src/types";
+import { mockTeamBackend } from "./support/mockTeamBackend";
 
 test.use({ viewport: { width: 1280, height: 820 } });
+
+test("shows a recoverable page error instead of an empty window", async ({ page }) => {
+  const state = authenticatedState();
+  state.projects[0].name = { invalid: true } as unknown as string;
+  await openApp(page, state);
+  await expect(page.getByRole("heading", { name: "页面暂时无法显示" })).toBeVisible();
+  await mockTeamBackend(page, authenticatedState());
+  await page.getByRole("button", { name: "重新加载", exact: true }).click();
+  await expect(page.getByRole("navigation", { name: "页面导航", exact: true })).toBeVisible();
+});
+
+test("settles an expired focus timer without blanking the app when a task has no estimate history", async ({ page }) => {
+  const initial = authenticatedState();
+  initial.settings.notificationsEnabled = false;
+  const state = startTimerInState(initial, "focus", initial.tasks[0].id,
+    new Date(Date.now() - 26 * 60_000).toISOString(), "focus_missing_history",
+    { workSessionId: "work_missing_history" });
+  state.tasks[0] = { ...state.tasks[0], estimateHistory: null } as unknown as Task;
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  await openApp(page, state);
+  await expect(page.getByRole("navigation", { name: "页面导航", exact: true })).toBeVisible();
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  await expect(page.locator(".timer-face")).toContainText("短休息");
+  await expect(page.locator(".timer-countdown")).toHaveText("05:00");
+  expect(errors).toEqual([]);
+});
 
 test("keeps the focus timer geometry stable while the countdown changes", async ({ page }, testInfo) => {
   const state = authenticatedState();
@@ -127,6 +157,40 @@ test("prepares the next stage at full duration and waits for the user to start",
     "session_natural_finish",
     { workSessionId: "work_natural_finish" },
   );
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    const observed = { contexts: 0, oscillators: 0, peak: 0 };
+    Object.assign(window, { timerAudioObserved: observed });
+    const NativeAudioContext = window.AudioContext;
+    window.AudioContext = class extends NativeAudioContext {
+      constructor() {
+        super();
+        observed.contexts += 1;
+      }
+      createOscillator() {
+        observed.oscillators += 1;
+        return super.createOscillator();
+      }
+      createGain() {
+        const gain = super.createGain();
+        const connect = gain.connect.bind(gain);
+        gain.connect = ((destination: AudioNode) => {
+          if (destination !== this.destination) return connect(destination);
+          const analyser = this.createAnalyser();
+          analyser.connect(destination);
+          const samples = new Float32Array(analyser.fftSize);
+          const handle = setInterval(() => {
+            analyser.getFloatTimeDomainData(samples);
+            observed.peak = Math.max(observed.peak, ...samples.map(Math.abs));
+          }, 25);
+          setTimeout(() => clearInterval(handle), 5000);
+          return connect(analyser);
+        }) as typeof gain.connect;
+        return gain;
+      }
+    };
+  });
   await openApp(page, state);
   await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
 
@@ -136,6 +200,11 @@ test("prepares the next stage at full duration and waits for the user to start",
   await expect(timerFace).toContainText("短休息", { timeout: 5_000 });
   await expect(countdown).toHaveText("05:00");
   await expect(startButton).toBeVisible();
+  const audioResult = () => page.evaluate(() =>
+    (window as unknown as { timerAudioObserved: { contexts: number; oscillators: number; peak: number } }).timerAudioObserved);
+  await expect.poll(async () => (await audioResult()).peak).toBeGreaterThan(0.001);
+  expect(await audioResult()).toMatchObject({ contexts: 1, oscillators: state.settings.timerEndSoundRepeats });
+  expect(errors).toEqual([]);
 
   await page.waitForTimeout(1_200);
   await expect(countdown).toHaveText("05:00");

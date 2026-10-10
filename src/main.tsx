@@ -2,6 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { App } from "./App";
 import { scheduleTauriLaunchFocus } from "./tauriLaunchFocus";
+import { installTimerSoundUnlock } from "./notifications";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import "./styles.css";
 
 const prepareTauriSmokeRuntime = async () => {
@@ -12,10 +14,13 @@ const prepareTauriSmokeRuntime = async () => {
 
 void prepareTauriSmokeRuntime().then(() => {
   scheduleTauriLaunchFocus();
+  installTimerSoundUnlock();
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <App />
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
     </React.StrictMode>,
   );
 });

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { businessRowsFromState, mergeBusinessRowChangesIntoState } from "./teamBusinessRows";
+import { businessRowsFromState, mergeBusinessRowChangesIntoState, mergeBusinessRowsIntoState } from "./teamBusinessRows";
+import { finishExpiredTimerInState, startTimerInState } from "./appModel";
 import { createTestState, withWorkSession } from "./test/fixtures";
 
 afterEach(() => {
@@ -7,6 +8,20 @@ afterEach(() => {
 });
 
 describe("business delta merge", () => {
+  it.each([null, undefined])("normalizes absent task lists in bootstrap and deltas (%s)", (empty) => {
+    const source = createTestState();
+    const row = businessRowsFromState(source).find((item) => item.entity === "task")!;
+    const incoming = { ...row, payload: { ...row.payload, tags: empty, subtasks: empty, estimateHistory: empty } } as unknown as typeof row;
+    for (const merge of [mergeBusinessRowsIntoState, mergeBusinessRowChangesIntoState]) {
+      const merged = merge(source, [incoming]);
+      expect(merged.tasks[0]).toMatchObject({ tags: [], subtasks: [], estimateHistory: [] });
+      const started = startTimerInState(merged, "focus", row.id, "2026-10-10T00:00:00.000Z");
+      const finished = finishExpiredTimerInState(started, "2026-10-10T01:00:00.000Z");
+      expect(finished.activeTimer).toMatchObject({ mode: "short_break", prepared: true });
+      expect(finished.tasks[0].actualPomodoros).toBe(merged.tasks[0].actualPomodoros + 1);
+    }
+  });
+
   it("is idempotent for repeated rows and deletion markers", () => {
     const source = createTestState();
     const task = source.tasks[0];

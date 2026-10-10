@@ -113,4 +113,65 @@ describe("TimeManage Tauri desktop smoke", () => {
     await waitForText("项目总览", "Authenticated state was not restored after reload");
     await waitForText("退出登录");
   });
+
+  it("plays the automatic timer reminder through the desktop WebView audio output", async () => {
+    await browser.execute((key) => {
+      const stored = JSON.parse(localStorage.getItem(key));
+      stored.settings = {
+        ...stored.settings, shortBreakMinutes: 0.05, soundEnabled: true,
+        timerEndSoundVolume: 100, timerEndSoundRepeats: 3, notificationsEnabled: false,
+      };
+      localStorage.setItem(key, JSON.stringify(stored));
+    }, storageKey);
+    await browser.refresh();
+    await waitForText("项目总览");
+    await waitForText("开始工作");
+    await browser.execute(() => {
+      window.timerAudioObserved = { contexts: 0, oscillators: 0, peak: 0, errors: [] };
+      const observed = window.timerAudioObserved;
+      window.addEventListener("error", (event) => observed.errors.push(event.message));
+      const NativeAudioContext = window.AudioContext;
+      window.AudioContext = class extends NativeAudioContext {
+        constructor() {
+          super();
+          observed.contexts += 1;
+        }
+        createOscillator() {
+          observed.oscillators += 1;
+          return super.createOscillator();
+        }
+        createGain() {
+          const gain = super.createGain();
+          const connect = gain.connect.bind(gain);
+          gain.connect = (destination) => {
+            if (destination !== this.destination) return connect(destination);
+            const analyser = this.createAnalyser();
+            analyser.connect(destination);
+            const samples = new Float32Array(analyser.fftSize);
+            const handle = setInterval(() => {
+              analyser.getFloatTimeDomainData(samples);
+              observed.peak = Math.max(observed.peak, ...samples.map(Math.abs));
+            }, 25);
+            setTimeout(() => clearInterval(handle), 5000);
+            return connect(analyser);
+          };
+          return gain;
+        }
+      };
+    });
+    await browser.execute(() => document.dispatchEvent(new Event("pointerdown", { bubbles: true })));
+    await clickButton("开始工作");
+    await waitForText("短休息");
+    await clickButton("短休息");
+    await browser.waitUntil(async () => {
+      return (await browser.execute(() => window.timerAudioObserved.peak)) > 0.001;
+    }, { timeout: 10000, timeoutMsg: "The desktop timer produced no audio signal" });
+    const observed = await browser.execute(() => window.timerAudioObserved);
+    assert.equal(observed.contexts, 1);
+    assert.equal(observed.oscillators, 3);
+    assert.deepEqual(observed.errors, []);
+    await browser.waitUntil(async () => {
+      return browser.execute(() => document.querySelector(".timer-countdown")?.textContent === "25:00");
+    }, { timeout: 10000, timeoutMsg: "The desktop timer did not prepare the next stage" });
+  });
 });

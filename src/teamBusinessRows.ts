@@ -197,7 +197,7 @@ export function mergeBusinessRowsIntoState(local: AppState, rows: BusinessRow[])
   for (const row of rows) {
     if (row.entity === "project") next.projects.push(row.payload as Project);
     if (row.entity === "project_member") next.projectMembers.push(row.payload as ProjectMember);
-    if (row.entity === "task") next.tasks.push(row.payload as Task);
+    if (row.entity === "task") next.tasks.push(taskFromRow(row));
     if (row.entity === "daily_plan") next.dailyPlans.push(row.payload as DailyPlan);
     if (row.entity === "focus_session") next.focusSessions.push(row.payload as FocusSession);
     if (row.entity === "work_session") next.workSessions.push(workSessionFromRow(row));
@@ -227,6 +227,16 @@ const workSessionFromRow = (row: BusinessRow): WorkSession => ({
   ...(row.payload as WorkSession),
   ownerAccountId: row.account_id ?? (row.payload as WorkSession).ownerAccountId,
 });
+
+const taskFromRow = (row: BusinessRow): Task => {
+  const task = row.payload as Task;
+  return {
+    ...task,
+    tags: Array.isArray(task.tags) ? task.tags : [],
+    subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
+    estimateHistory: Array.isArray(task.estimateHistory) ? task.estimateHistory : [],
+  };
+};
 
 const replaceTemplateInstance = (items: TemplateInstance[], row: BusinessRow) => {
   const payload = row.payload as TemplateInstance;
@@ -262,7 +272,7 @@ export function mergeBusinessRowChangesIntoState(
 	for (const row of rows) {
     if (row.entity === "project") next = { ...next, projects: replacePayloadById(next.projects, row) };
     if (row.entity === "project_member") next = { ...next, projectMembers: replacePayloadById(next.projectMembers, row) };
-    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
+    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, { ...row, payload: taskFromRow(row) }) };
     if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
     if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
     if (row.entity === "work_session") {

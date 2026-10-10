@@ -76,19 +76,55 @@ const audioContext = () => {
 };
 
 const resumeAudioContext = (context: AudioContext) => {
-  if (context.state === "suspended") {
+  if (context.state !== "running" && context.state !== "closed") {
     void context.resume().catch(() => undefined);
   }
 };
 
-export function playTimerSound(settings: TimerSoundSettings): void {
+let timerSoundContext: AudioContext | null = null;
+
+const getTimerSoundContext = () => {
+  if (!timerSoundContext || timerSoundContext.state === "closed") {
+    timerSoundContext = audioContext();
+  }
+  return timerSoundContext;
+};
+
+export async function prepareTimerSound(): Promise<void> {
+  try {
+    const context = getTimerSoundContext();
+    if (context && context.state !== "running") await context.resume();
+  } catch (error) {
+    console.error("Failed to prepare timer sound", error);
+  }
+}
+
+// Unlock the retained context inside a user gesture, before a timer or server request completes.
+export function installTimerSoundUnlock(): () => void {
+  const unlock = () => { void prepareTimerSound(); };
+  document.addEventListener("pointerdown", unlock, true);
+  document.addEventListener("keydown", unlock, true);
+  return () => {
+    document.removeEventListener("pointerdown", unlock, true);
+    document.removeEventListener("keydown", unlock, true);
+  };
+}
+
+export async function playTimerSound(settings: TimerSoundSettings): Promise<void> {
   if (!settings.soundEnabled) return;
   const volume = normalizeTimerSoundVolume(settings.timerEndSoundVolume);
   if (volume <= 0) return;
-  const context = audioContext();
-  if (!context) return;
-  resumeAudioContext(context);
+  try {
+    const context = getTimerSoundContext();
+    if (!context) return;
+    if (context.state !== "running") await context.resume();
+    scheduleTimerSound(context, settings, volume);
+  } catch (error) {
+    console.error("Failed to play timer sound", error);
+  }
+}
 
+const scheduleTimerSound = (context: AudioContext, settings: TimerSoundSettings, volume: number) => {
   const profile = settings.timerEndSound;
   const repeats = normalizeTimerSoundRepeats(settings.timerEndSoundRepeats);
   const peakGain = 0.18 * (volume / 100);
@@ -106,12 +142,14 @@ export function playTimerSound(settings: TimerSoundSettings): void {
     gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.75);
     oscillator.connect(gain);
     gain.connect(context.destination);
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    };
     oscillator.start(startAt);
     oscillator.stop(startAt + duration);
   }
-
-  window.setTimeout(() => void context.close(), (duration + gap) * repeats * 1000 + 200);
-}
+};
 
 export function startWhiteNoise(kind: WhiteNoise, volume: number): () => void {
   if (kind === "off") return () => undefined;
