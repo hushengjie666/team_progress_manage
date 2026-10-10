@@ -51,7 +51,7 @@ export function createAppTaskDeletionRuntime({
         setDeletedTaskSnapshot(snapshot);
         if (undoTimerRef.current) window.clearTimeout(undoTimerRef.current);
         undoTimerRef.current = window.setTimeout(() => setDeletedTaskSnapshot(null), 8_000);
-        setToast("任务已删除，可在 8 秒内撤销");
+        setToast("");
       });
   };
 

@@ -42,7 +42,6 @@ export function AppAuthenticatedShellDialogs({
     setQuickProjectWarning,
     pendingDeleteTask,
     setPendingDeleteTask,
-    deletedTaskSnapshot,
     pendingReset,
     setPendingReset,
     pendingSplit,
@@ -77,14 +76,6 @@ export function AppAuthenticatedShellDialogs({
           toggleTimer={focusActions.toggleTimer}
           finishTimer={focusActions.finishTimer}
         />
-      )}
-      {deletedTaskSnapshot && (
-        <div className="undo-banner" role="status">
-          <span>已删除「{deletedTaskSnapshot.task.title}」</span>
-          <button className="small-button" onClick={taskActions.undoDeleteTask}>
-            撤销
-          </button>
-        </div>
       )}
       <ConfirmDialog
         open={Boolean(pendingDeleteTask)}

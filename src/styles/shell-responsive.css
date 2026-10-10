@@ -55,11 +55,11 @@
     flex: 1 0 auto;
   }
 
-  .global-toast {
+  .notification-stack {
     top: 72px;
     right: 16px;
     bottom: auto;
     left: auto;
-    max-width: min(520px, 100%);
+    width: min(520px, calc(100vw - 32px));
   }
 }

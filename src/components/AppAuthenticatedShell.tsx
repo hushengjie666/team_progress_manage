@@ -68,12 +68,6 @@ export function AppAuthenticatedShell({
             <button className="secondary-button" onClick={() => void backendActions.handleBackendRefresh()}>刷新数据</button>
           </div>
         )}
-        {chrome.toast && chrome.toastVisible && !(view.state.backend.status === "error" && chrome.toast === view.state.backend.message) && (
-          <div className="global-toast" role="status" aria-live="polite">
-            {chrome.toast}
-          </div>
-        )}
-
         <AppAuthenticatedShellRoutes
           view={view}
           shellState={shellState}
@@ -92,6 +86,22 @@ export function AppAuthenticatedShell({
           loadDemoData={loadDemoData}
         />
       </section>
+      <div className="notification-stack">
+        {chrome.toast && chrome.toastVisible && !(view.state.backend.status === "error" && chrome.toast === view.state.backend.message) && (
+          <div className="global-toast" role="status" aria-live="polite">
+            {chrome.toast}
+          </div>
+        )}
+        {shellState.deletedTaskSnapshot && (
+          <div className="global-toast undo-banner" role="status" aria-live="polite">
+            <div>
+              <span>已删除「{shellState.deletedTaskSnapshot.task.title}」</span>
+              <small>8 秒内可撤销</small>
+            </div>
+            <button className="small-button" onClick={taskActions.undoDeleteTask}>撤销</button>
+          </div>
+        )}
+      </div>
       <AppAuthenticatedShellDialogs
         view={view}
         shellState={shellState}

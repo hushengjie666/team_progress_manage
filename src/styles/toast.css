@@ -1,12 +1,21 @@
-.global-toast {
+.notification-stack {
   position: fixed;
   top: 84px;
-  right: 84px;
+  right: 24px;
   bottom: auto;
   left: auto;
   z-index: 90;
+  width: min(520px, calc(100vw - 48px));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.global-toast {
   width: max-content;
-  max-width: min(520px, calc(100vw - 48px));
+  max-width: 100%;
   min-height: 42px;
   display: flex;
   align-items: center;
@@ -23,6 +32,23 @@
   text-align: left;
   overflow-wrap: anywhere;
   animation: toast-enter 160ms ease-out;
+  pointer-events: auto;
+}
+
+.undo-banner {
+  gap: 12px;
+}
+
+.undo-banner small {
+  display: block;
+  margin-top: 3px;
+  color: #667074;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.undo-banner button {
+  flex-shrink: 0;
 }
 
 @keyframes toast-enter {

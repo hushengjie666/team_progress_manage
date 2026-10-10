@@ -488,11 +488,11 @@
     justify-content: flex-end;
   }
 
-  .global-toast {
+  .notification-stack {
     right: 12px;
     bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 12px);
     left: 12px;
-    max-width: none;
+    width: auto;
   }
 
   .mobile-sort-action {
