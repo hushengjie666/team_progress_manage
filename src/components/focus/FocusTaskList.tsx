@@ -1,4 +1,4 @@
-import { CheckCircle2, ListChecks, Play } from "lucide-react";
+import { CheckCircle2, Play, Plus } from "lucide-react";
 import { projectToneClassName } from "../../projectVisuals";
 import type { SessionMode } from "../../types";
 import type { FocusTaskGroup } from "./focusModel";
@@ -8,6 +8,8 @@ export function FocusTaskList(props: {
   taskCount: number;
   activeTaskId?: string;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
+  openCreateTask: () => void;
+  canCreateTask: boolean;
 }) {
   return (
     <section className="band focus-todo-panel">
@@ -16,10 +18,12 @@ export function FocusTaskList(props: {
           <p className="eyebrow">今日工作</p>
           <h2>今日任务</h2>
         </div>
-        <ListChecks size={20} />
+        <button className="icon-button small" title={props.canCreateTask ? "快捷新增今日任务" : "暂无可用项目，请先创建项目"} aria-label="快捷新增今日任务" disabled={!props.canCreateTask} onClick={props.openCreateTask}>
+          <Plus size={20} />
+        </button>
       </div>
       <div className="focus-todo-list">
-        {props.taskCount === 0 && <p className="empty">今日任务为空，先去我的任务选择要推进的任务。</p>}
+        {props.taskCount === 0 && <p className="empty">今日任务为空，可点击右上角新增任务，或去我的任务选择要推进的任务。</p>}
         {props.groups.map((group) => (
           <section className={`focus-project-group ${projectToneClassName(group.projectId)}`} key={group.projectId}>
             <div className="focus-project-heading">

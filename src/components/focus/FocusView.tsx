@@ -15,6 +15,8 @@ export function FocusView(props: {
   finishTimer: (outcome: SessionOutcome) => Promise<void>;
   addInterruption: (type: InterruptionType, action?: InterruptionAction) => void;
   completeTask: (taskId: string) => void;
+  openCreateTask: () => void;
+  canCreateTask: boolean;
 }) {
   const { state, currentTask, committedTasks } = props;
   const active = props.activeTimer;
@@ -52,6 +54,8 @@ export function FocusView(props: {
           taskCount={todayWorkTasks.length}
           activeTaskId={activeTaskId}
           beginTimer={props.beginTimer}
+          openCreateTask={props.openCreateTask}
+          canCreateTask={props.canCreateTask}
         />
       </aside>
     </div>

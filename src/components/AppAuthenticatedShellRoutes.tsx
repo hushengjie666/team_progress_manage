@@ -105,6 +105,7 @@ export function AppAuthenticatedShellRoutes({
     return (
       <AppFocusRoute
         view={view}
+        shellState={shellState}
         taskActions={taskActions}
         focusActions={focusActions}
       />

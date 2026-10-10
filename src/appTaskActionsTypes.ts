@@ -28,8 +28,8 @@ export type AppTaskActionsRuntimeOptions = {
 
 export type AppTaskActionsRuntime = {
   addTask: (projectId?: string) => void;
-  createProjectTask: (projectId: string, input: ProjectTaskInput) => void;
-  commitTask: (taskId: string) => void;
+  createProjectTask: (projectId: string, input: ProjectTaskInput) => Promise<Task | undefined>;
+  commitTask: (taskId: string) => Promise<boolean>;
   removeCommittedTask: (taskId: string) => void;
   completeTask: (taskId: string) => void;
   acceptTask: (taskId: string) => void;

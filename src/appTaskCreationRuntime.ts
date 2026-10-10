@@ -68,12 +68,12 @@ export function createAppTaskCreationRuntime({
       });
   };
 
-  const createProjectTask = (projectId: string, input: ProjectTaskInput) => {
+  const createProjectTask = async (projectId: string, input: ProjectTaskInput) => {
     const source = getState();
     const next = createProjectTaskInState(source, projectId, input, nowIso());
     const task = next.tasks.find((item) => !source.tasks.some((current) => current.id === item.id));
     if (!task) return;
-    void runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> }, {
+    const saved = await runTeamCommand({ kind: "create", entity: "task", workspaceId: task.workspaceId, payload: task as unknown as Record<string, unknown> }, {
       resourceKey: `task:${task.id}`,
       pendingMode: "background",
       optimistic: (state) => ({
@@ -83,22 +83,24 @@ export function createAppTaskCreationRuntime({
           tasks: current.tasks.filter((item) => item.id !== task.id || item.updatedAt !== task.updatedAt),
         }),
       }),
-    })
-      .then((saved) => saved && setToast("项目任务已创建"));
+    });
+    if (!saved) return undefined;
+    setToast("项目任务已创建");
+    return saved.tasks.find((item) => item.id === task.id) ?? task;
   };
 
-  const commitTask = (taskId: string) => {
+  const commitTask = async (taskId: string) => {
     const source = getState();
     const task = source.tasks.find((item) => item.id === taskId);
-    if (!task) return;
+    if (!task) return false;
     const workspaceId = workspaceIdForTask(source, task);
     const date = today();
     const timestamp = nowIso();
     const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, date)
       ?? createDailyPlanForDate(source, date, timestamp, workspaceId);
     const snapshot = taskQueueCommitSnapshot(source, taskId, workspaceId, date);
-    if (!snapshot) return;
-    void runTeamCommand({
+    if (!snapshot) return false;
+    const saved = await runTeamCommand({
       kind: "action",
       resource: "daily-plans",
       id: plan.id,
@@ -112,11 +114,9 @@ export function createAppTaskCreationRuntime({
         next: addTaskToDailyPlanInState(current, taskId, workspaceId, date, timestamp),
         rollback: (latest) => rollbackTaskQueueCommitInState(latest, taskId, workspaceId, date, snapshot),
       }),
-    }).then((saved) => {
-      if (saved) {
-        setToast("已加入工作队列");
-      }
     });
+    if (saved) setToast("已加入工作队列");
+    return Boolean(saved);
   };
 
   const removeCommittedTask = (taskId: string) => {
