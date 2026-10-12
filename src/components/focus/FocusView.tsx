@@ -56,6 +56,7 @@ export function FocusView(props: {
           beginTimer={props.beginTimer}
           openCreateTask={props.openCreateTask}
           canCreateTask={props.canCreateTask}
+          saving={state.backend.pendingResourceKeys?.some((key) => key.startsWith("daily-plan:")) ?? false}
         />
       </aside>
     </div>

@@ -68,7 +68,7 @@ export function createAppTaskCreationRuntime({
       });
   };
 
-  const createProjectTask = async (projectId: string, input: ProjectTaskInput) => {
+  const createProjectTask = async (projectId: string, input: ProjectTaskInput, options: { notify?: boolean } = {}) => {
     const source = getState();
     const next = createProjectTaskInState(source, projectId, input, nowIso());
     const task = next.tasks.find((item) => !source.tasks.some((current) => current.id === item.id));
@@ -85,7 +85,7 @@ export function createAppTaskCreationRuntime({
       }),
     });
     if (!saved) return undefined;
-    setToast("项目任务已创建");
+    if (options.notify !== false) setToast("项目任务已创建");
     return saved.tasks.find((item) => item.id === task.id) ?? task;
   };
 

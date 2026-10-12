@@ -10,12 +10,13 @@ export function FocusTaskList(props: {
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
   openCreateTask: () => void;
   canCreateTask: boolean;
+  saving: boolean;
 }) {
   return (
     <section className="band focus-todo-panel">
       <div className="section-title">
         <div>
-          <p className="eyebrow">今日工作</p>
+          <p className="eyebrow" aria-live="polite">{props.saving ? "今日工作 · 保存中…" : "今日工作"}</p>
           <h2>今日任务</h2>
         </div>
         <button className="icon-button small" title={props.canCreateTask ? "快捷新增今日任务" : "暂无可用项目，请先创建项目"} aria-label="快捷新增今日任务" disabled={!props.canCreateTask} onClick={props.openCreateTask}>

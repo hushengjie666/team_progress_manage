@@ -41,6 +41,7 @@ test("creates a configured task in another project and joins today without chang
   await expect(page.locator(".timer-face")).toContainText(initial.tasks[0].title);
   expect(creates).toHaveLength(1);
   expect(creates[0]).toMatchObject({ projectId: project.id, primaryExecutorMemberId: "member_quick_owner", stage: "planning", priority: "high", tags: ["临时", "今日"], estimatePomodoros: 2 });
+  await expect(page.getByText("已加入工作队列", { exact: true })).toBeVisible();
   await page.reload();
   await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
   await expect(group).toContainText("快速记录一个今日任务");
@@ -83,4 +84,66 @@ test("retries a failed queue addition without creating the task twice", async ({
   await expect(dialog).toHaveCount(0);
   await expect(page.locator(".focus-todo-item").filter({ hasText: "只创建一次的今日任务" })).toHaveCount(1);
   expect(creates).toBe(1);
+});
+
+test("closes the dialog and keeps the task usable while queue confirmation is delayed", async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  let releaseWrite = () => undefined;
+  let markWriteStarted = () => undefined;
+  const writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+  const writeStarted = new Promise<void>((resolve) => { markWriteStarted = resolve; });
+  await page.route(`${MOCK_SERVER}/daily-plans/**`, async (route) => {
+    markWriteStarted();
+    await writeGate;
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "快捷新增今日任务" }).click();
+  const dialog = page.getByRole("dialog", { name: "新增今日任务" });
+  await dialog.getByLabel("标题", { exact: true }).fill("后台确认中的新任务");
+  await dialog.getByRole("button", { name: "创建并加入今日" }).click();
+  await writeStarted;
+  try {
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator(".focus-todo-item").filter({ hasText: "后台确认中的新任务" })).toBeVisible();
+    await expect(page.getByText("今日工作 · 保存中…", { exact: true })).toBeVisible();
+    await expect(page.getByText("项目任务已创建", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("已加入工作队列", { exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "快捷新增今日任务" }).click();
+    await expect(dialog.getByLabel("标题", { exact: true })).toHaveValue("");
+    await dialog.getByRole("button", { name: "取消", exact: true }).click();
+  } finally {
+    releaseWrite();
+  }
+  await expect(page.getByText("已加入工作队列", { exact: true })).toBeVisible();
+  await expect(page.getByText("今日工作 · 保存中…", { exact: true })).toHaveCount(0);
+});
+
+test("does not replace a new draft when an earlier background queue save fails", async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  let releaseWrite = () => undefined;
+  let markWriteStarted = () => undefined;
+  const writeGate = new Promise<void>((resolve) => { releaseWrite = resolve; });
+  const writeStarted = new Promise<void>((resolve) => { markWriteStarted = resolve; });
+  await page.route(`${MOCK_SERVER}/daily-plans/**`, async (route) => {
+    markWriteStarted();
+    await writeGate;
+    await route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: "上一个任务队列保存失败" }) });
+  });
+  await page.getByRole("button", { name: "快捷新增今日任务" }).click();
+  const dialog = page.getByRole("dialog", { name: "新增今日任务" });
+  await dialog.getByLabel("标题", { exact: true }).fill("上一个后台保存的任务");
+  await dialog.getByRole("button", { name: "创建并加入今日" }).click();
+  await writeStarted;
+  try {
+    await expect(dialog).toHaveCount(0);
+    await page.getByRole("button", { name: "快捷新增今日任务" }).click();
+    await dialog.getByLabel("标题", { exact: true }).fill("正在填写的新草稿");
+  } finally {
+    releaseWrite();
+  }
+  await expect(page.locator(".backend-error-banner")).toContainText("上一个任务队列保存失败");
+  await expect(dialog.getByLabel("标题", { exact: true })).toHaveValue("正在填写的新草稿");
+  await expect(dialog.getByLabel("标题", { exact: true })).toBeEnabled();
 });

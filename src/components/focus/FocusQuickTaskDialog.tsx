@@ -7,22 +7,30 @@ import type { ProjectTaskInput } from "../../projectDetail";
 import { ProjectTaskCreateDialog } from "../projectDetail/ProjectTaskCreateDialog";
 import { createEmptyProjectTaskDraft } from "../projectDetail/projectDetailControllerModel";
 
-export function FocusQuickTaskDialog({ state, projects, defaultProjectId, taskActions, onClose }: {
+export type FocusQuickTaskRecovery = {
+  taskId: string;
+  projectId: string;
+  draft: ProjectTaskInput;
+};
+
+export function FocusQuickTaskDialog({ state, projects, defaultProjectId, taskActions, recovery, onClose, onQueueFailure }: {
   state: AppState;
   projects: Project[];
   defaultProjectId?: string;
   taskActions: Pick<AppTaskActionsRuntime, "createProjectTask" | "commitTask">;
+  recovery?: FocusQuickTaskRecovery;
   onClose: () => void;
+  onQueueFailure: (recovery: FocusQuickTaskRecovery) => void;
 }) {
-  const initialProject = projects.find((project) => project.id === defaultProjectId) ?? projects[0];
+  const initialProject = projects.find((project) => project.id === (recovery?.projectId ?? defaultProjectId)) ?? projects[0];
   const [projectId, setProjectId] = useState(initialProject?.id ?? "");
-  const [draft, setDraft] = useState<ProjectTaskInput>(() => ({
+  const [draft, setDraft] = useState<ProjectTaskInput>(() => recovery?.draft ?? ({
     ...createEmptyProjectTaskDraft(initialProject?.taskStageMode),
     primaryExecutorMemberId: initialProject ? resolveMemberIdForProject(state, initialProject.id) : undefined,
   }));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [createdTaskId, setCreatedTaskId] = useState<string>();
+  const [error, setError] = useState(recovery ? "任务已创建，但未加入今日队列。点击重试即可继续，不会重复创建任务。" : "");
+  const [createdTaskId, setCreatedTaskId] = useState<string | undefined>(recovery?.taskId);
   const submittingRef = useRef(false);
   const selectedProject = projects.find((project) => project.id === projectId);
   const members = state.projectMembers.filter((member) => member.projectId === projectId && member.status !== "disabled");
@@ -48,7 +56,7 @@ export function FocusQuickTaskDialog({ state, projects, defaultProjectId, taskAc
     let taskId = createdTaskId;
     try {
       if (!taskId) {
-        const task = await taskActions.createProjectTask(projectId, draft);
+        const task = await taskActions.createProjectTask(projectId, draft, { notify: false });
         if (!task) {
           setError("任务保存失败，请重试。已填写的内容已保留。");
           return;
@@ -56,14 +64,16 @@ export function FocusQuickTaskDialog({ state, projects, defaultProjectId, taskAc
         taskId = task.id;
         setCreatedTaskId(taskId);
       }
-      const queued = await taskActions.commitTask(taskId);
+      const savingQueue = taskActions.commitTask(taskId);
+      onClose();
+      const queued = await savingQueue;
       if (!queued) {
-        setError("任务已创建，但未加入今日队列。点击重试即可继续，不会重复创建任务。");
+        onQueueFailure({ taskId, projectId, draft });
         return;
       }
-      onClose();
     } catch {
-      setError(taskId ? "任务已创建，但未加入今日队列，请重试。" : "任务保存失败，请重试。已填写的内容已保留。");
+      if (taskId) onQueueFailure({ taskId, projectId, draft });
+      else setError("任务保存失败，请重试。已填写的内容已保留。");
     } finally {
       submittingRef.current = false;
       setBusy(false);
