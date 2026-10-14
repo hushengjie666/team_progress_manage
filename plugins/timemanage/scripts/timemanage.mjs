@@ -4448,10 +4448,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.11",
+  releaseVersion: "0.2.12",
   apiProtocolVersion: 2,
-  databaseSchemaVersion: 14,
-  minimumClientRelease: "0.2.11"
+  databaseSchemaVersion: 15,
+  minimumClientRelease: "0.2.12"
 };
 
 // src/teamBackendHttp.ts
@@ -4978,7 +4978,7 @@ function mergeBusinessRowsIntoState(local, rows) {
   for (const row of rows) {
     if (row.entity === "project") next.projects.push(row.payload);
     if (row.entity === "project_member") next.projectMembers.push(row.payload);
-    if (row.entity === "task") next.tasks.push(row.payload);
+    if (row.entity === "task") next.tasks.push(taskFromRow(row));
     if (row.entity === "daily_plan") next.dailyPlans.push(row.payload);
     if (row.entity === "focus_session") next.focusSessions.push(row.payload);
     if (row.entity === "work_session") next.workSessions.push(workSessionFromRow(row));
@@ -5005,6 +5005,15 @@ var workSessionFromRow = (row) => ({
   ...row.payload,
   ownerAccountId: row.account_id ?? row.payload.ownerAccountId
 });
+var taskFromRow = (row) => {
+  const task = row.payload;
+  return {
+    ...task,
+    tags: Array.isArray(task.tags) ? task.tags : [],
+    subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
+    estimateHistory: Array.isArray(task.estimateHistory) ? task.estimateHistory : []
+  };
+};
 var replaceTemplateInstance = (items, row) => {
   const payload = row.payload;
   const index = items.findIndex((item) => templateInstanceId(item) === row.id);
@@ -5030,7 +5039,7 @@ function mergeBusinessRowChangesIntoState(local, rows, deleted = [], serverTime)
   for (const row of rows) {
     if (row.entity === "project") next = { ...next, projects: replacePayloadById(next.projects, row) };
     if (row.entity === "project_member") next = { ...next, projectMembers: replacePayloadById(next.projectMembers, row) };
-    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, row) };
+    if (row.entity === "task") next = { ...next, tasks: replacePayloadById(next.tasks, { ...row, payload: taskFromRow(row) }) };
     if (row.entity === "daily_plan") next = { ...next, dailyPlans: replacePayloadById(next.dailyPlans, row) };
     if (row.entity === "focus_session") next = { ...next, focusSessions: replacePayloadById(next.focusSessions, row) };
     if (row.entity === "work_session") {
@@ -6698,7 +6707,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.11").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.12").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {

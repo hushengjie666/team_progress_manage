@@ -1,5 +1,14 @@
 # TimeManage Team Release History
 
+## v0.2.12
+
+- Adds quick task creation from the focus page, including workspace and project selection, draft preservation, and retrying a failed queue addition without creating duplicate tasks.
+- Improves task notifications and project headings, updates the application icon, and fixes timer completion reminders and desktop error recovery.
+- Includes the relational business storage introduced in the 0.2.11 temporary builds and the fixes for project creation and settings confirmation races.
+- Release contract: release `0.2.12`, API protocol `2`, schema `15`, minimum client `0.2.12`.
+- Migration `00015_v0_2_12_noop.sql` is reversible and does not modify business data. Existing schema 14 SQL remains unchanged.
+- Build the unified desktop, iOS, Web, and server package from the immutable annotated `v0.2.12` tag with `npm run release:team:tag -- v0.2.12`.
+
 ## Legacy deployed package: 2026-07-01 01:58
 
 This is the package currently reported as deployed on the Windows server:
