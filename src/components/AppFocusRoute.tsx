@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { accessibleProjectIdsForCurrentUser, workspaceIdForProject } from "../accessControl";
+import { accessibleProjectIdsForCurrentUser } from "../accessControl";
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { FocusView } from "./focus/FocusView";
 import { FocusQuickTaskDialog, type FocusQuickTaskRecovery } from "./focus/FocusQuickTaskDialog";
@@ -14,8 +14,7 @@ export function AppFocusRoute({ view, shellState, taskActions, focusActions }: A
   const dialogSession = dialogSessionRef.current;
   const accessibleProjectIds = accessibleProjectIdsForCurrentUser(state);
   const projects = state.projects.filter((project) =>
-    accessibleProjectIds.has(project.id) && !project.archivedAt &&
-    (!shellState.selectedWorkspaceId || workspaceIdForProject(state, project) === shellState.selectedWorkspaceId));
+    accessibleProjectIds.has(project.id) && !project.archivedAt);
 
   return (
     <>
@@ -42,6 +41,7 @@ export function AppFocusRoute({ view, shellState, taskActions, focusActions }: A
           key={dialogSession}
           state={state}
           projects={projects}
+          defaultWorkspaceId={shellState.selectedWorkspaceId ?? undefined}
           defaultProjectId={currentTask?.projectId ?? view.activeProjectId}
           taskActions={taskActions}
           recovery={recovery}

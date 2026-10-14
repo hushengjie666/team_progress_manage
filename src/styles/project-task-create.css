@@ -36,6 +36,22 @@
   background: #fffdfa;
 }
 
+.focus-quick-task-location {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 12px;
+}
+
+.focus-quick-task-location select {
+  width: 100%;
+  min-height: 36px;
+}
+
+.focus-quick-task-location .empty {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .project-task-create-primary .task-create-title-field {
   grid-column: 1 / -1;
 }
