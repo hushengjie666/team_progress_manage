@@ -1,5 +1,21 @@
 # TimeManage Team Ubuntu 部署记录
 
+## 2026-10-14 正式发布 v0.2.12
+
+正式标签为 `v0.2.12`，源码提交 `afb6f35e61dfcddd1a1c596bff484fd8d7c6bc26`。统一目录及同名 ZIP 为 `deploy/timemanageTeam-v0.2.12-20261014-115352`，由干净标签通过 `npm run release:team:tag -- v0.2.12` 构建。版本合同为 release `0.2.12`、API `2`、schema `15`、最低客户端 `0.2.12`。新增迁移 `00015_v0_2_12_noop.sql` 仅执行可逆的空操作。
+
+服务器 `current` 已切换到该版本，Linux 后端、Web 和本机 macOS 客户端使用同一标签来源。公网健康检查为 ready；首页和主 JavaScript 与统一包字节一致。systemd 服务 active、开机启动 enabled，Nginx 配置检查通过。本机客户端签名、版本和二进制摘要与发布包匹配，原登录保留，界面显示版本匹配；实际验证新增今日任务弹窗中切换工作区会联动更新所属项目，随后取消草稿，没有创建生产测试任务。
+
+数据库备份先在隔离 MySQL 8.0 中恢复，并完成 schema `14 → 15 → 14 → 15` 验证。正式切换前停止服务，再制作并验证最终备份。升级前后 22 张业务和明细表的稳定排序数据指纹相同：`fbc373e88801fdc93f5f7ee3a5e43fa5cf5d408c93da682a8dfdbe8ae56b56ca`；项目 16 个、任务 101 个、业务记录 824 条。
+
+上线前已有 26 条 ended 工作会话和 60 条执行信号引用了不存在的任务，合计 86 个审计问题。此次只记录、比较并保留这些历史记录；升级前后审计结果完全一致，未执行历史数据清理。最终备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.11-20261014-120101-000.sql.gz`，SHA-256 为 `0204f5c4d53243d0981c5fdf6d6869e73750e2b3488b3c70d7e681df7b2a727a`；同名清单、迁移日志、前后审计、业务指纹及旧版本链接保留于服务器受保护的 `/var/backups/timemanage-team/release-v0.2.12-20261014-115352/`。
+
+发布验证通过：329 个前端测试、带真实 MySQL 的完整 Go 测试、2 个 Rust 测试、50 个浏览器用例（6 个按配置跳过）、17 个 CLI 测试、类型检查、质量检查和桌面/iOS 发布配置检查。签名 iOS Archive、IPA、截图及校验清单完整；macOS 应用使用有效的 ad-hoc 资源签名，DMG 已重新生成并通过 `hdiutil verify`。此次未提交 App Store 或执行 Apple 公证。
+
+- 统一 ZIP SHA-256：`99e1384b0fd56317a1e337841bc55aad2c1697ec33ccd0d5cfad01c8b8c218f8`，`unzip -t` 通过。
+- macOS DMG SHA-256：`5ee5eebad58b859d1f0eef7e258c8c8c452a6c882f3c19ee3d9126f38a262644`。
+- 统一目录中的 `SHA256SUMS.txt` 覆盖全部 91 个交付文件，iOS 另保留独立的校验清单。
+
 ## 2026-10-09 部署状态
 
 Ubuntu 24.04 amd64 服务器沿用已有 Nginx HTTPS 网站和证书。TimeManage 使用旧站约定的 `/timemanage-team/` 前端和 `/timemanage-team/api/` API 路径，后端仅监听 `127.0.0.1:8787`。其他应用不在此次部署范围内。
