@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	releaseVersion              = "0.2.15"
+	releaseVersion              = "0.2.16"
 	serverReleaseVersion        = "v" + releaseVersion
 	apiProtocolVersion    int64 = 2
-	databaseSchemaVersion int64 = 18
-	minimumClientRelease        = "0.2.15"
+	databaseSchemaVersion int64 = 19
+	minimumClientRelease        = "0.2.16"
 )
 
 func parseReleaseVersion(value string) ([3]int, bool) {
