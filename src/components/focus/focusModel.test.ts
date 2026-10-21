@@ -50,6 +50,36 @@ describe("focus task ordering", () => {
     expect(tasks.map((item) => item.id)).toEqual([committedLater.id, reviewLater.id, completedEarly.id]);
   });
 
+  it("keeps project positions when starting, switching, and completing tasks changes their status", () => {
+    const tasks = [
+      task("task_a1", "project_a", "项目 A", 10),
+      task("task_b1", "project_b", "项目 B", 20),
+      task("task_a2", "project_a", "项目 A", 30),
+    ];
+    for (const statuses of [
+      ["committed", "committed", "committed"],
+      ["committed", "in_progress", "committed"],
+      ["committed", "in_progress", "in_progress"],
+      ["completed", "pending_review", "completed"],
+    ] as Task["status"][][]) {
+      const updated = tasks.map((item, index) => ({ ...item, status: statuses[index] }));
+      const groups = groupFocusTasksByProject(buildFocusTaskList(undefined, updated));
+      expect(groups.map((group) => group.projectId)).toEqual(["project_a", "project_b"]);
+      expect(groups[0].tasks.map((item) => item.id)).toEqual(statuses[2] === "in_progress"
+        ? ["task_a2", "task_a1"] : ["task_a1", "task_a2"]);
+    }
+  });
+
+  it("uses project identity to keep equal-order groups stable regardless of status sorting", () => {
+    const first = task("task_a", "project_a", "项目 A", 10);
+    const second = task("task_b", "project_b", "项目 B", 10);
+    const active = { ...second, status: "in_progress" as const };
+    expect(groupFocusTasksByProject(buildFocusTaskList(undefined, [second, first])).map((group) => group.projectId))
+      .toEqual(["project_a", "project_b"]);
+    expect(groupFocusTasksByProject(buildFocusTaskList(active, [first, active])).map((group) => group.projectId))
+      .toEqual(["project_a", "project_b"]);
+  });
+
   it("keeps tasks that are already waiting for review visible", () => {
     const committed = task("task_committed", "project_a", "项目 A", 10);
     const pendingReview = { ...task("task_review", "project_a", "项目 A", 20), status: "pending_review" as const };

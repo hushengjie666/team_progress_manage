@@ -4,8 +4,58 @@ import { openApp } from "./support/openApp";
 import { startTimerInState } from "../../src/appModel";
 import type { Task } from "../../src/types";
 import { mockTeamBackend } from "./support/mockTeamBackend";
+import { MOCK_SERVER } from "./support/constants";
+import { rowsFromState } from "./support/mockTeamBackendState";
 
 test.use({ viewport: { width: 1280, height: 820 } });
+
+test("keeps today project cards in place when starting and switching tasks", async ({ page }, testInfo) => {
+  const state = authenticatedState();
+  const firstProject = state.projects[0];
+  const secondProject = { ...firstProject, id: "project_focus_second", name: "第二个项目" };
+  state.projects.push(secondProject);
+  const member = { ...state.projectMembers[0], id: "member_focus_second", projectId: secondProject.id };
+  state.projectMembers.push(member);
+  state.tasks[0].project = firstProject.name;
+  const secondTask = {
+    ...state.tasks[0], id: "task_focus_second", title: "第二个项目的任务",
+    projectId: secondProject.id, project: secondProject.name, sortOrder: 20,
+    primaryExecutorMemberId: member.id, creatorMemberId: member.id,
+  };
+  state.tasks.push(secondTask);
+  state.dailyPlans[0].committedTaskIds.push(secondTask.id);
+  await openApp(page, state);
+  await page.route(`${MOCK_SERVER}/tasks/*/start*`, async (route) => {
+    const id = new URL(route.request().url()).pathname.split("/")[2];
+    const task = state.tasks.find((item) => item.id === id)!;
+    task.status = "in_progress";
+    task.updatedAt = new Date().toISOString();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        delta: true, mutation_id: route.request().headers()["x-timemanage-mutation-id"],
+        rows: rowsFromState(state).filter((row) => row.entity === "task" && row.id === id),
+        deleted: [], settings: {}, server_time: task.updatedAt,
+      }),
+    });
+  });
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  const headings = page.locator(".focus-project-heading strong");
+  const expectedOrder = [firstProject.name, secondProject.name];
+  await expect(headings).toHaveText(expectedOrder);
+  const first = page.locator(".focus-todo-item").filter({ hasText: state.tasks[0].title });
+  const second = page.locator(".focus-todo-item").filter({ hasText: secondTask.title });
+  await second.getByRole("button", { name: "开始", exact: true }).click();
+  await expect(second).toContainText("执行中");
+  await expect(headings).toHaveText(expectedOrder);
+  await first.getByRole("button", { name: "开始", exact: true }).click();
+  await expect(first).toContainText("执行中");
+  await expect(headings).toHaveText(expectedOrder);
+  await page.screenshot({ path: testInfo.outputPath("focus-stable-project-order.png") });
+  await page.reload();
+  await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  await expect(headings).toHaveText(expectedOrder);
+});
 
 test("shows a recoverable page error instead of an empty window", async ({ page }) => {
   const state = authenticatedState();

@@ -37,6 +37,7 @@ export const buildFocusTaskList = (currentTask: Task | undefined, committedTasks
     .filter(isVisibleFocusTask)
     .sort((left, right) => focusTaskStatusRank(left) - focusTaskStatusRank(right) || left.sortOrder - right.sortOrder);
 
+// Status changes can reorder tasks; project positions follow their earliest queue order.
 export const groupFocusTasksByProject = (tasks: Task[]) =>
   tasks.reduce<FocusTaskGroup[]>((groups, task) => {
     const projectId = task.projectId || task.project || "unassigned_project";
@@ -48,4 +49,6 @@ export const groupFocusTasksByProject = (tasks: Task[]) =>
       groups.push({ projectId, project, tasks: [task] });
     }
     return groups;
-  }, []);
+  }, []).sort((left, right) =>
+    Math.min(...left.tasks.map((task) => task.sortOrder)) - Math.min(...right.tasks.map((task) => task.sortOrder)) ||
+    left.projectId.localeCompare(right.projectId));
