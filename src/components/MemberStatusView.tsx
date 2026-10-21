@@ -1,6 +1,5 @@
 import {
-  buildMemberStatusColumns,
-  countMemberStatusTodayTasks,
+  buildMemberStatusModel,
 } from "../memberStatusColumns";
 import type { AppState } from "../types";
 import { MemberStatusColumnView } from "./memberStatus/MemberStatusColumnView";
@@ -24,8 +23,7 @@ export function MemberStatusView({
   workspaceId?: string;
   selectTask: (taskId: string | null) => void;
 }) {
-  const columns = buildMemberStatusColumns(state, projectId, undefined, workspaceId);
-  const todayTaskCount = countMemberStatusTodayTasks(state, projectId, undefined, workspaceId);
+  const { columns, taskCount } = buildMemberStatusModel(state, projectId, undefined, workspaceId);
 
   return (
     <section className="band member-status-panel">
@@ -34,7 +32,7 @@ export function MemberStatusView({
           <p className="eyebrow">成员状况</p>
           <h2>今日任务总览</h2>
         </div>
-        <span className="count-pill">{todayTaskCount}</span>
+        <span className="count-pill" title="按任务去重统计；协作任务可能同时出现在多名成员列中" aria-label={`今日任务共 ${taskCount} 项（去重）`}>{taskCount} 项任务</span>
       </div>
       <div className="member-status-board" aria-label="成员今日任务列">
         {columns.map((member) => (

@@ -5553,7 +5553,8 @@ var stageTaskSortRank = (status, isActive, isTodayTask) => {
 var memberProjectRoleLabel = (members, projectId) => {
   const projectMember = members.find((member) => member.projectId === projectId);
   if (!projectMember) return "\u6210\u5458";
-  return projectMember.roles.includes("project_owner") ? "\u9879\u76EE\u8D1F\u8D23\u4EBA" : "\u6267\u884C\u8005";
+  if (projectMember.roles.includes("project_owner")) return "\u9879\u76EE\u8D1F\u8D23\u4EBA";
+  return projectMember.roles.includes("executor") ? "\u6267\u884C\u8005" : "\u6210\u5458";
 };
 var groupMemberTasksByProject = (member, tasks, projectNameById, workspaceNameByProjectId) => {
   const groups = /* @__PURE__ */ new Map();
@@ -5578,12 +5579,8 @@ var groupMemberTasksByProject = (member, tasks, projectNameById, workspaceNameBy
   return Array.from(groups.values());
 };
 var taskBelongsToMemberStatusPerson = (task, member, memberIds) => {
-  const collaboratorMemberIds = task.collaboratorMemberIds ?? [];
-  const isExplicitlyAssigned = Boolean(
-    task.primaryExecutorMemberId && memberIds.has(task.primaryExecutorMemberId) || collaboratorMemberIds.some((memberId) => memberIds.has(memberId))
-  );
-  const isUnassigned = !task.primaryExecutorMemberId && collaboratorMemberIds.length === 0;
-  return isExplicitlyAssigned || isUnassigned && member.roles.includes("project_owner") && member.projectIds.includes(task.projectId);
+  const assignedIds = [task.primaryExecutorMemberId, ...task.collaboratorMemberIds ?? []];
+  return member.members.some((binding) => binding.projectId === task.projectId && memberIds.has(binding.id) && assignedIds.includes(binding.id));
 };
 var sortMemberStatusTasks = (tasks, runningTask) => [...tasks].sort((left, right) => {
   if (left.id === runningTask?.id) return -1;
@@ -5605,51 +5602,115 @@ var sourceProjectIdsForMemberStatus = (state, projectId, workspaceId) => {
 var sourceTasksForMemberStatus = (state, sourceProjectIds) => state.tasks.filter(
   (task) => task.status !== "split" && task.status !== "archived" && sourceProjectIds.has(task.projectId)
 );
-var todayTaskIdsForMemberStatus = (state, sourceTaskIds, date) => new Set(
-  state.dailyPlans.filter((plan) => plan.date === date).flatMap((plan) => plan.committedTaskIds).filter((taskId) => sourceTaskIds.has(taskId))
-);
-var buildMemberStatusColumns = (state, projectId, date = today(), workspaceId) => {
+var localDateForTimestamp = (timestamp) => {
+  if (!timestamp) return void 0;
+  const value = new Date(timestamp);
+  return Number.isFinite(value.getTime()) ? todayKey(value) : void 0;
+};
+var sessionTouchesDate = (session, date, currentDate) => {
+  const start = localDateForTimestamp(session.startedAt);
+  const end = localDateForTimestamp(session.endedAt ?? (session.status === "paused" ? session.pausedAt : void 0)) ?? (session.status === "active" ? currentDate : start);
+  return Boolean(start && end && start <= date && date <= end);
+};
+var buildMemberStatusModel = (state, projectId, date = today(), workspaceId) => {
   const sourceProjectIds = sourceProjectIdsForMemberStatus(state, projectId, workspaceId);
   const accessibleWorkspaceIds = activeWorkspaceIdsForCurrentAccount(state);
   const sourceWorkspaceIds = new Set(
-    state.projects.filter((project) => sourceProjectIds.has(project.id)).map((project) => workspaceIdForProject(state, project)).filter((workspaceId2) => typeof workspaceId2 === "string" && accessibleWorkspaceIds.has(workspaceId2))
+    state.projects.filter((project) => sourceProjectIds.has(project.id)).map((project) => workspaceIdForProject(state, project)).filter((id) => typeof id === "string" && accessibleWorkspaceIds.has(id))
   );
   const sourceProjectMembers = state.projectMembers.filter((member) => sourceProjectIds.has(member.projectId) && member.status !== "disabled");
   const sourceWorkspaceMemberships = workspaceMembershipsForState(state).filter(
     (membership) => sourceWorkspaceIds.has(membership.workspaceId) && membership.status === "active"
   );
-  const members = buildMemberStatusPeople(sourceProjectMembers, sourceWorkspaceMemberships);
-  const sourceTasks = sourceTasksForMemberStatus(state, sourceProjectIds);
-  const sourceTaskIds = new Set(sourceTasks.map((task) => task.id));
-  const todayTaskIdSet = todayTaskIdsForMemberStatus(state, sourceTaskIds, date);
-  const activeSessions = state.workSessions.filter((session) => session.status === "active" && sourceTasks.some((task) => task.id === session.taskId)).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+  const people = buildMemberStatusPeople(sourceProjectMembers, sourceWorkspaceMemberships);
+  const tasksById = new Map(sourceTasksForMemberStatus(state, sourceProjectIds).map((task) => [task.id, task]));
+  const planOwnersByTaskId = /* @__PURE__ */ new Map();
+  for (const plan of state.dailyPlans) {
+    if (plan.date !== date) continue;
+    for (const taskId of plan.committedTaskIds) {
+      const task = tasksById.get(taskId);
+      if (!task) continue;
+      const owners = planOwnersByTaskId.get(taskId) ?? /* @__PURE__ */ new Set();
+      if (plan.ownerAccountId) owners.add(plan.ownerAccountId);
+      planOwnersByTaskId.set(taskId, owners);
+    }
+  }
+  const currentDate = today();
+  const sessionsByTaskId = /* @__PURE__ */ new Map();
+  for (const session of state.workSessions) {
+    if (!tasksById.has(session.taskId) || !sessionTouchesDate(session, date, currentDate)) continue;
+    const sessions = sessionsByTaskId.get(session.taskId) ?? [];
+    sessions.push(session);
+    sessionsByTaskId.set(session.taskId, sessions);
+  }
+  const todayTasks = [...tasksById.values()].filter(
+    (task) => planOwnersByTaskId.has(task.id) || sessionsByTaskId.has(task.id) || task.status === "completed" && localDateForTimestamp(task.completedAt) === date || task.status === "pending_review" && localDateForTimestamp(task.reviewSubmittedAt) === date
+  );
+  const personByAccountId = new Map(people.filter((person) => person.accountId).map((person) => [person.accountId, person]));
+  const personForMemberId = (memberId, taskProjectId) => memberId ? people.find((person) => person.members.some((member) => member.id === memberId && member.projectId === taskProjectId)) : void 0;
+  const personForSession = (session, taskProjectId) => personForMemberId(session.executorMemberId, taskProjectId) ?? (session.ownerAccountId ? personByAccountId.get(session.ownerAccountId) : void 0);
+  const tasksByPersonId = new Map(people.map((person) => [person.id, []]));
+  const unresolvedTasks = [];
+  for (const task of todayTasks) {
+    const recipients = new Set(people.filter(
+      (person) => taskBelongsToMemberStatusPerson(task, person, new Set(person.memberIds))
+    ).map((person) => person.id));
+    for (const session of sessionsByTaskId.get(task.id) ?? []) {
+      const person = personForSession(session, task.projectId);
+      if (person) recipients.add(person.id);
+    }
+    const unassigned = !task.primaryExecutorMemberId && !task.collaboratorMemberIds?.length;
+    if (unassigned) {
+      for (const ownerId of planOwnersByTaskId.get(task.id) ?? []) {
+        const person = personByAccountId.get(ownerId);
+        if (person) recipients.add(person.id);
+      }
+      const submitter = personForMemberId(task.reviewSubmittedByMemberId, task.projectId);
+      if (submitter && (localDateForTimestamp(task.reviewSubmittedAt) === date || localDateForTimestamp(task.completedAt) === date)) {
+        recipients.add(submitter.id);
+      }
+    }
+    if (!recipients.size) unresolvedTasks.push(task);
+    for (const id of recipients) tasksByPersonId.get(id).push(task);
+  }
   const projectNameById = new Map(state.projects.map((project) => [project.id, project.name]));
   const workspaceNameByProjectId = new Map(
     state.projects.flatMap((project) => {
-      const workspaceName2 = workspaceForProject(state, project)?.name;
-      return workspaceName2 ? [[project.id, workspaceName2]] : [];
+      const name = workspaceForProject(state, project)?.name;
+      return name ? [[project.id, name]] : [];
     })
   );
-  return members.map((member) => {
-    const memberIdSet = new Set(member.memberIds);
-    const runningSession = activeSessions.find((session) => session.executorMemberId && memberIdSet.has(session.executorMemberId));
-    const runningTask = runningSession ? sourceTasks.find((task) => task.id === runningSession.taskId) : void 0;
-    const memberTodayTasks = sortMemberStatusTasks(
-      sourceTasks.filter(
-        (task) => (todayTaskIdSet.has(task.id) || task.id === runningTask?.id) && taskBelongsToMemberStatusPerson(task, member, memberIdSet)
-      ),
-      runningTask
-    );
-    const displayedTasks = runningTask && !memberTodayTasks.some((task) => task.id === runningTask.id) ? [runningTask, ...memberTodayTasks] : memberTodayTasks;
-    const projectTaskGroups = groupMemberTasksByProject(member, displayedTasks, projectNameById, workspaceNameByProjectId).filter((group) => group.tasks.length > 0);
+  const runningSessions = date === currentDate ? [...sessionsByTaskId.values()].flat().filter((session) => session.status === "active" && !session.endedAt && ["committed", "in_progress"].includes(tasksById.get(session.taskId).status)).sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()) : [];
+  const columns = people.map((person) => {
+    const runningSession = runningSessions.find((session) => personForSession(session, tasksById.get(session.taskId).projectId)?.id === person.id);
+    const runningTask = runningSession ? tasksById.get(runningSession.taskId) : void 0;
+    const displayedTasks = sortMemberStatusTasks(tasksByPersonId.get(person.id), runningTask);
     return {
-      ...member,
+      ...person,
       displayedTasks,
-      projectTaskGroups,
-      runningTask
+      runningTask,
+      projectTaskGroups: groupMemberTasksByProject(person, displayedTasks, projectNameById, workspaceNameByProjectId).filter((group) => group.tasks.length > 0)
     };
   });
+  if (unresolvedTasks.length) {
+    const unresolved = {
+      id: "member_status_unresolved",
+      name: "\u5F52\u5C5E\u5F85\u786E\u8BA4",
+      roles: [],
+      memberIds: [],
+      projectIds: [],
+      workspaceIds: [],
+      members: [],
+      workspaceMemberships: [],
+      displayedTasks: sortMemberStatusTasks(unresolvedTasks),
+      projectTaskGroups: []
+    };
+    unresolved.projectTaskGroups = groupMemberTasksByProject(unresolved, unresolved.displayedTasks, projectNameById, workspaceNameByProjectId).map((group) => ({ ...group, roleLabel: "\u672A\u786E\u8BA4\u5F52\u5C5E" }));
+    columns.push(unresolved);
+  }
+  return { columns, taskCount: todayTasks.length };
 };
+var buildMemberStatusColumns = (state, projectId, date = today(), workspaceId) => buildMemberStatusModel(state, projectId, date, workspaceId).columns;
 
 // cli/src/views.ts
 var workspaceName = (state, workspaceId) => workspaceId ? state.auth.workspaces?.find((workspace) => workspace.id === workspaceId)?.name ?? state.auth.workspace?.name : void 0;

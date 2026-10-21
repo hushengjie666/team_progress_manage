@@ -5,7 +5,8 @@ import type { ProjectMember, Task } from "./types";
 const memberProjectRoleLabel = (members: ProjectMember[], projectId: string) => {
   const projectMember = members.find((member) => member.projectId === projectId);
   if (!projectMember) return "成员";
-  return projectMember.roles.includes("project_owner") ? "项目负责人" : "执行者";
+  if (projectMember.roles.includes("project_owner")) return "项目负责人";
+  return projectMember.roles.includes("executor") ? "执行者" : "成员";
 };
 
 export const groupMemberTasksByProject = (
@@ -38,13 +39,9 @@ export const groupMemberTasksByProject = (
 };
 
 export const taskBelongsToMemberStatusPerson = (task: Task, member: MemberStatusPerson, memberIds: Set<string>) => {
-  const collaboratorMemberIds = task.collaboratorMemberIds ?? [];
-  const isExplicitlyAssigned = Boolean(
-    (task.primaryExecutorMemberId && memberIds.has(task.primaryExecutorMemberId)) ||
-    collaboratorMemberIds.some((memberId) => memberIds.has(memberId)),
-  );
-  const isUnassigned = !task.primaryExecutorMemberId && collaboratorMemberIds.length === 0;
-  return isExplicitlyAssigned || (isUnassigned && member.roles.includes("project_owner") && member.projectIds.includes(task.projectId));
+  const assignedIds = [task.primaryExecutorMemberId, ...(task.collaboratorMemberIds ?? [])];
+  return member.members.some((binding) => binding.projectId === task.projectId &&
+    memberIds.has(binding.id) && assignedIds.includes(binding.id));
 };
 
 export const sortMemberStatusTasks = (tasks: Task[], runningTask?: Task) =>

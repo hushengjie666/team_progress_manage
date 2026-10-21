@@ -82,6 +82,7 @@ export function AppAuthenticatedShellRoutes({
       <AppMemberStatusRoute
         view={view}
         shellState={shellState}
+        taskActions={taskActions}
       />
     );
   }
