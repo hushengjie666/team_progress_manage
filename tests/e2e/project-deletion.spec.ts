@@ -6,7 +6,7 @@ import { workspaceMemberState } from "./support/scenarioStates";
 
 test.beforeEach(async ({ page }) => { await clearStoredApp(page); });
 
-test("confirms project deletion from the card without opening the project and persists cleanup", async ({ page }, testInfo) => {
+test("confirms project deletion from settings and persists cleanup", async ({ page }, testInfo) => {
   const state = authenticatedState();
   const project = state.projects[0];
   state.projects.push({ ...project, id: "project_keep", name: "保留项目" });
@@ -14,18 +14,20 @@ test("confirms project deletion from the card without opening the project and pe
   const card = page.locator(`[data-project-card-id="${project.id}"]`);
   let deletes = 0;
   page.on("request", (request) => { if (request.method() === "DELETE") deletes += 1; });
-  await card.screenshot({ path: testInfo.outputPath("project-delete-card.png") });
-  await card.getByRole("button", { name: "删除项目", exact: true }).focus();
+  await expect(card.getByRole("button", { name: "删除项目", exact: true })).toHaveCount(0);
+  await card.screenshot({ path: testInfo.outputPath("project-card-without-delete.png") });
+  await card.getByRole("button", { name: "进入项目", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "删除项目", exact: true }).focus();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "删除项目", exact: true });
   await expect(dialog).toContainText(project.name);
   await expect(dialog).toContainText("1 个任务");
   await page.screenshot({ path: testInfo.outputPath("project-delete-confirmation.png") });
-  await expect(page.getByRole("heading", { name: "任务阶段总览" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
-  await expect(card).toBeVisible();
+  await expect(page.getByRole("button", { name: "删除项目", exact: true })).toBeVisible();
   expect(deletes).toBe(0);
-  await card.getByRole("button", { name: "删除项目", exact: true }).click();
+  await page.getByRole("button", { name: "删除项目", exact: true }).click();
   await dialog.getByRole("button", { name: "删除项目及任务" }).click();
   await expect(card).toHaveCount(0);
   await expect(page.getByText("项目及关联任务已删除", { exact: true })).toBeVisible();
@@ -40,17 +42,19 @@ test("keeps the project and confirmation open after a failed delete and supports
   const state = authenticatedState();
   await openApp(page, state);
   const card = page.locator(`[data-project-card-id="${state.projects[0].id}"]`);
+  await card.getByRole("button", { name: "进入项目", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   const endpoint = `${MOCK_SERVER}/projects/${state.projects[0].id}*`;
   await page.route(endpoint, async (route) => {
     if (route.request().method() === "DELETE") {
       await route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "delete denied" }) });
     } else await route.fallback();
   });
-  await card.getByRole("button", { name: "删除项目", exact: true }).click();
+  await page.getByRole("button", { name: "删除项目", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "删除项目", exact: true });
   await dialog.getByRole("button", { name: "删除项目及任务" }).click();
   await expect(dialog.getByRole("alert")).toContainText("删除失败");
-  await expect(card).toBeVisible();
+  await expect(page.getByRole("button", { name: "删除项目", exact: true })).toBeVisible();
   await page.unroute(endpoint);
   await dialog.getByRole("button", { name: "删除项目及任务" }).click();
   await expect(card).toHaveCount(0);
@@ -72,14 +76,16 @@ test("blocks repeated confirmation while project deletion is being saved", async
     await route.fallback();
   });
   const card = page.locator(`[data-project-card-id="${state.projects[0].id}"]`);
-  await card.getByRole("button", { name: "删除项目", exact: true }).click();
+  await card.getByRole("button", { name: "进入项目", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await page.getByRole("button", { name: "删除项目", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "删除项目", exact: true });
   await dialog.getByRole("button", { name: "删除项目及任务" }).click();
   await writeStarted;
   try {
     await expect(dialog.getByRole("button", { name: "正在删除…", exact: true })).toBeDisabled();
     await expect(dialog.getByRole("button", { name: "取消", exact: true })).toBeDisabled();
-    await expect(card).toBeVisible();
+    await expect(page.getByRole("button", { name: "删除项目", exact: true })).toBeVisible();
     expect(requests).toBe(1);
   } finally {
     release();

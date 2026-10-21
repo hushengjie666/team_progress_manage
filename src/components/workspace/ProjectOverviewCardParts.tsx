@@ -1,5 +1,4 @@
 import { ChevronRight } from "lucide-react";
-import type { ReactNode } from "react";
 import type { ProjectOverviewCard } from "../../projectOverview";
 import type { TaskStatus } from "../../types";
 
@@ -99,10 +98,9 @@ export function ProjectOverviewCardSignals({ card }: { card: ProjectOverviewCard
   );
 }
 
-export function ProjectOverviewCardActions({ openProject, children }: { openProject: () => void; children?: ReactNode }) {
+export function ProjectOverviewCardActions({ openProject }: { openProject: () => void }) {
   return (
     <div className="project-overview-actions">
-      {children}
       <button
         className="primary-button"
         onClick={(event) => {
