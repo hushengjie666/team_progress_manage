@@ -1,4 +1,4 @@
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Trash2 } from "lucide-react";
 import { labelPriority, labelTaskStage } from "../../appModel";
 import { projectTaskStatusColumns } from "../../projectTaskDisplay";
 import type { ProjectMember, Task, TaskStatus } from "../../types";
@@ -8,6 +8,7 @@ export function ProjectTaskRow(props: {
   members: ProjectMember[];
   canEdit: boolean;
   canReview: boolean;
+  deleteTask: (taskId: string) => void;
   selectTask: (taskId: string) => void;
   beginFocus: (taskId: string) => void;
   updateStatus: (taskId: string, status: TaskStatus) => void;
@@ -51,6 +52,7 @@ export function ProjectTaskRow(props: {
       <span className={`priority priority-${props.task.priority}`}>{labelPriority[props.task.priority]}</span>
       <span>{props.task.progressPercent ?? 0}%</span>
       <div className="button-row">
+        {props.canEdit && <button className="icon-button small danger" title="删除任务" type="button" onClick={() => props.deleteTask(props.task.id)}><Trash2 size={16} /></button>}
         <button className="small-button" onClick={() => props.selectTask(props.task.id)}>详情</button>
         {props.task.status !== "completed" && props.task.status !== "split" && props.task.status !== "archived" && (
           <button className="small-button" onClick={() => props.beginFocus(props.task.id)}>

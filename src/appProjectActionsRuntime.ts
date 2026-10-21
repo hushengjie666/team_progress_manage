@@ -33,6 +33,7 @@ export type AppProjectActionsRuntimeOptions = {
 export type AppProjectActionsRuntime = {
   createProject: (name: string, description: string, workspaceId?: string, taskStageMode?: TaskStageMode) => void;
   updateProject: (project: Project) => void;
+  deleteProject: (projectId: string) => Promise<boolean>;
   reorderProjects: (projectIds: string[]) => void;
   canManageProjectMembersForProject: (source: AppState, projectId: string) => boolean;
   bindAccessibleMemberToProject: (projectId: string, input: AccessibleMemberInput) => void;
@@ -118,6 +119,20 @@ export function createAppProjectActionsRuntime({
         }),
       }),
     });
+  };
+
+  const deleteProject = async (projectId: string) => {
+    const source = getState();
+    const project = source.projects.find((item) => item.id === projectId);
+    if (!project) return false;
+    if (!canManageProjectMembers(source, projectId)) {
+      setToast("只有项目负责人或工作区管理员可以删除项目");
+      return false;
+    }
+    const saved = await runTeamCommand({ kind: "delete", entity: "project", id: projectId, workspaceId: project.workspaceId });
+    if (!saved) return false;
+    setToast("项目及关联任务已删除");
+    return true;
   };
 
   const reorderProjects = (projectIds: string[]) => {
@@ -206,6 +221,7 @@ export function createAppProjectActionsRuntime({
   return {
     createProject,
     updateProject,
+    deleteProject,
     reorderProjects,
     canManageProjectMembersForProject,
     bindAccessibleMemberToProject,

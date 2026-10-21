@@ -1,5 +1,6 @@
 import type React from "react";
 import type { ProjectOverviewCard } from "../../projectOverview";
+import { ProjectDeleteButton } from "../ProjectDeleteButton";
 import {
   ProjectOverviewCardActions,
   ProjectOverviewCardHeader,
@@ -19,6 +20,7 @@ export function ProjectOverviewCardItem(props: {
   onPointerUp: (event: React.PointerEvent<HTMLElement>) => void;
   openProjectDetail: (projectId: string) => void;
   shouldSuppressClick: () => boolean;
+  deleteProject?: (projectId: string) => Promise<boolean>;
 }) {
   const { card } = props;
   const hasRisk = card.riskCount > 0;
@@ -46,6 +48,7 @@ export function ProjectOverviewCardItem(props: {
         openProject();
       }}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           openProject();
@@ -62,7 +65,11 @@ export function ProjectOverviewCardItem(props: {
       <ProjectOverviewCardMetrics card={card} />
       <ProjectOverviewCardStatusStrip card={card} />
       <ProjectOverviewCardSignals card={card} />
-      <ProjectOverviewCardActions openProject={openProject} />
+      <ProjectOverviewCardActions openProject={openProject}>
+        {props.deleteProject && (
+          <ProjectDeleteButton projectId={card.projectId} projectName={card.name} taskCount={card.taskCount} deleteProject={props.deleteProject} />
+        )}
+      </ProjectOverviewCardActions>
     </article>
   );
 }

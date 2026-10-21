@@ -22,6 +22,7 @@ type ProjectDetailTasksTabProps = {
     assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] },
   ) => void;
   openCreateTaskDialog: () => void;
+  deleteTask: (taskId: string) => void;
 };
 
 export function ProjectDetailTasksTab({
@@ -39,6 +40,7 @@ export function ProjectDetailTasksTab({
   updateStatus,
   updateTaskAssignment,
   openCreateTaskDialog,
+  deleteTask,
 }: ProjectDetailTasksTabProps) {
   return (
     <section className="band project-task-workspace">
@@ -81,6 +83,7 @@ export function ProjectDetailTasksTab({
             beginFocus={beginFocus}
             updateStatus={updateStatus}
             updateTaskAssignment={updateTaskAssignment}
+            deleteTask={deleteTask}
           />
         ))}
         {filteredTasks.length === 0 && <p className="empty">当前筛选下没有任务。</p>}

@@ -106,6 +106,7 @@ export function WorkspaceWorkbenchColumns({
         actionIcon={<Play size={15} />}
         onAction={beginFocus}
         onRemove={removeCommittedTask}
+        onDelete={deleteTask}
         onComplete={completeTask}
         onAccept={acceptTask}
         canReviewTask={canReviewTask}

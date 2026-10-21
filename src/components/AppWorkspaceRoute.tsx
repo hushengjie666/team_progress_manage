@@ -68,6 +68,8 @@ export function AppWorkspaceRoute({
       updateTaskProgress={taskActions.updateTaskProgress}
       acceptTask={taskActions.acceptTask}
       canReviewTask={(task) => canReviewProjectTasks(state, task.projectId)}
+      deleteProject={projectActions.deleteProject}
+      canDeleteProject={(projectId) => canReviewProjectTasks(state, projectId)}
       returnTaskForReview={taskActions.returnTaskForReview}
       moveCommittedTask={taskActions.moveCommittedTask}
       splitTask={taskActions.splitTask}

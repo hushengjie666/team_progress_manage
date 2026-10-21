@@ -55,6 +55,11 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 				return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
 			}
 		}
+		if current.Entity == "project" {
+			if err := cleanupProjectReferencesForDelete(ctx, tx, current, time.Now().UTC().Format(time.RFC3339Nano)); err != nil {
+				return businessMutationFailure{status: http.StatusInternalServerError, message: "delete project references failed"}
+			}
+		}
 		deleted, err := businessDeleteRow(ctx, tx, current)
 		if err != nil {
 			return businessMutationFailure{status: http.StatusInternalServerError, message: "save failed"}
@@ -83,6 +88,11 @@ func applyBusinessOperation(ctx context.Context, tx *sql.Tx, auth authContext, o
 	}
 	if !allowed {
 		return businessMutationFailure{status: http.StatusForbidden, message: "business row write denied"}
+	}
+	if entity == "task" && businessProjectID(current) != businessProjectID(next) {
+		if failure := lockBusinessParentsForCreate(ctx, tx, next); failure.status != 0 {
+			return failure
+		}
 	}
 	updated, err := businessUpdateRow(ctx, tx, next)
 	if err != nil {
@@ -125,6 +135,9 @@ func applyBusinessCreate(ctx context.Context, tx *sql.Tx, auth authContext, oper
 	}
 	if !allowed {
 		return businessMutationFailure{status: http.StatusForbidden, message: "business row write denied"}
+	}
+	if failure := lockBusinessParentsForCreate(ctx, tx, row); failure.status != 0 {
+		return failure
 	}
 	if err := businessCreateRow(ctx, tx, row); err != nil {
 		return businessCreateFailure(err)

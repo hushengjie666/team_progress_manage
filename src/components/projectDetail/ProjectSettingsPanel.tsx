@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { taskStageModeOptions } from "../../appModel";
 import type { TaskStageMode, Workspace } from "../../types";
 import type { ProjectSettingsDraft } from "./projectDetailControllerModel";
+import { ProjectDeleteButton } from "../ProjectDeleteButton";
 
 export function ProjectSettingsPanel({
   settings,
@@ -9,12 +10,20 @@ export function ProjectSettingsPanel({
   canEdit,
   updateSettings,
   saveSettings,
+  projectName,
+  taskCount,
+  deleteProject,
+  onDeleted,
 }: {
   settings: ProjectSettingsDraft;
   workspaceOptions: Workspace[];
   canEdit: boolean;
   updateSettings: (patch: Partial<Omit<ProjectSettingsDraft, "projectId">>) => void;
   saveSettings: () => void;
+  projectName: string;
+  taskCount: number;
+  deleteProject: (projectId: string) => Promise<boolean>;
+  onDeleted: () => void;
 }) {
   return (
     <section className="band project-settings-panel">
@@ -65,6 +74,7 @@ export function ProjectSettingsPanel({
           <Save size={16} />
           保存项目资料
         </button>
+        {canEdit && <ProjectDeleteButton projectId={settings.projectId} projectName={projectName} taskCount={taskCount} deleteProject={deleteProject} onDeleted={onDeleted} />}
       </div>
     </section>
   );

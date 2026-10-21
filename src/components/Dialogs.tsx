@@ -7,28 +7,31 @@ export function ConfirmDialog(props: {
   body: string;
   confirmLabel: string;
   danger?: boolean;
+  busy?: boolean;
+  error?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   if (!props.open) return null;
   return (
     <div className="modal-backdrop" role="presentation">
-      <section className="modal-panel" role="dialog" aria-modal="true" aria-label={props.title}>
+      <section className="modal-panel" role="dialog" aria-modal="true" aria-label={props.title} aria-busy={props.busy}>
         <div className="section-title">
           <div>
             <p className="eyebrow">Confirm</p>
             <h2>{props.title}</h2>
           </div>
-          <button className="icon-button small" onClick={props.onCancel} title="关闭">
+          <button className="icon-button small" disabled={props.busy} onClick={props.onCancel} title="关闭">
             <X size={16} />
           </button>
         </div>
         <p className="muted">{props.body}</p>
+        {props.error && <p className="warning-line" role="alert">{props.error}</p>}
         <div className="button-row modal-actions">
-          <button className="secondary-button" onClick={props.onCancel}>
+          <button className="secondary-button" disabled={props.busy} onClick={props.onCancel}>
             取消
           </button>
-          <button className={props.danger ? "primary-button danger-button" : "primary-button"} onClick={props.onConfirm}>
+          <button className={props.danger ? "primary-button danger-button" : "primary-button"} disabled={props.busy} onClick={props.onConfirm}>
             {props.confirmLabel}
           </button>
         </div>

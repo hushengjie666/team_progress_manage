@@ -8,6 +8,8 @@ export function ProjectOverviewCardsPanel(props: {
   openProjectDetail: (projectId: string) => void;
   openProjectCreate: () => void;
   reorderProjects: (projectIds: string[]) => void;
+  deleteProject: (projectId: string) => Promise<boolean>;
+  canDeleteProject: (projectId: string) => boolean;
 }) {
   const cardReorder = useProjectOverviewCardReorder(props.cards, props.reorderProjects);
 
@@ -28,6 +30,7 @@ export function ProjectOverviewCardsPanel(props: {
           onPointerMove={cardReorder.movePressedProject}
           onPointerUp={cardReorder.finishProjectPress}
           openProjectDetail={props.openProjectDetail}
+          deleteProject={props.canDeleteProject(card.projectId) ? props.deleteProject : undefined}
           shouldSuppressClick={cardReorder.shouldSuppressProjectClick}
         />
       ))}

@@ -69,6 +69,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
           beginFocus={props.beginFocus}
           updateStatus={detail.updateStatus}
           updateTaskAssignment={props.updateTaskAssignment}
+          deleteTask={props.deleteTask}
           openCreateTaskDialog={detail.openCreateTaskDialog}
         />
       )}
@@ -108,6 +109,10 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
           canEdit={detail.access.canReviewTasks}
           updateSettings={detail.updateSettingsDraft}
           saveSettings={detail.saveProjectSettings}
+          projectName={detail.project.name}
+          taskCount={detail.allProjectTasks.length}
+          deleteProject={props.deleteProject}
+          onDeleted={props.backToBoard}
         />
       )}
 
@@ -122,6 +127,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
         returnTaskForReview={props.returnTaskForReview}
         close={() => props.selectTask(null)}
         splitTask={props.splitTask}
+        deleteTask={props.deleteTask}
         canEdit={detail.access.canEditTasks}
         canReview={detail.access.canReviewTasks}
         lockProject

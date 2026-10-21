@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PanelRight, X } from "lucide-react";
+import { PanelRight, Trash2, X } from "lucide-react";
 import { TaskDetailBasicInfoSection } from "./taskDetail/TaskDetailBasicInfoSection";
 import { TaskDetailCollaboratorsSection } from "./taskDetail/TaskDetailCollaboratorsSection";
 import type { TaskDetailPanelProps } from "./taskDetail/taskDetailPanelTypes";
@@ -88,6 +88,9 @@ export function TaskDetailPanel(props: TaskDetailPanelProps) {
 
       <TaskDetailSubtasksSection task={task} canEdit={canEdit} updateTask={updateTask} />
       <TaskDetailSplitAction task={task} canEdit={canEdit} splitTask={props.splitTask} />
+      {canEdit && props.deleteTask && (
+        <button className="secondary-button danger-button" type="button" onClick={() => props.deleteTask?.(task.id)}><Trash2 size={16} />删除任务</button>
+      )}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { businessRowKey } from "../../../src/teamBusinessRows";
 import { applyBusinessRow, rowsForRuntimeStates, rowsFromState } from "./mockTeamBackendState";
 import { fulfillJson } from "./mockTeamBackendResponses";
 import type { MockTeamBackendRuntime } from "./mockTeamBackendRuntime";
+import { deleteMockBusinessRows } from "./mockTeamBackendDeletion";
 
 const entityByResource: Record<string, BusinessEntity> = {
   projects: "project",
@@ -248,14 +249,9 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     return true;
   }
   if (request.method() === "DELETE") {
-    rowsByKey.delete(currentKey);
+    const { changed, deleted } = deleteMockBusinessRows(rowsByKey, currentKey);
     rebuildStates(runtime, [...rowsByKey.values()]);
-    await fulfillJson(route, mutationDelta(request, [], [{
-      workspace_id: current.workspace_id,
-      account_id: current.account_id,
-      entity: current.entity,
-      id: current.id,
-    }]));
+    await fulfillJson(route, mutationDelta(request, changed, deleted));
     return true;
   }
   if (request.method() === "PATCH") {

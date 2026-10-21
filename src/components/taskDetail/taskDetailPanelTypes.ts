@@ -18,4 +18,5 @@ export type TaskDetailPanelProps = {
   canEdit?: boolean;
   canReview?: boolean;
   lockProject?: boolean;
+  deleteTask?: (taskId: string) => void;
 };

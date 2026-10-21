@@ -59,6 +59,8 @@ export function AppProjectDetailRoute({
       selectTask={setSelectedTaskId}
       createProjectTask={taskActions.createProjectTask}
       updateProject={projectActions.updateProject}
+      deleteProject={projectActions.deleteProject}
+      deleteTask={taskActions.deleteTask}
       updateTask={taskActions.updateTask}
       updateTaskAssignment={taskActions.updateTaskAssignment}
       updateTaskProgress={taskActions.updateTaskProgress}

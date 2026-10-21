@@ -47,8 +47,9 @@ func TestBusinessPatchUsesCurrentRowWithoutClientRevision(t *testing.T) {
 
 func TestBusinessPatchDoesNotOverwriteUnrelatedFields(t *testing.T) {
 	api := mysqlSeededApp(t)
+	project := businessRow{WorkspaceID: "workspace_test", Entity: "project", ID: "project_test", UpdatedAt: "2026-07-17T01:00:00Z", Payload: json.RawMessage(`{"id":"project_test","workspaceId":"workspace_test","name":"Field merge project"}`)}
 	row := businessRow{WorkspaceID: "workspace_test", Entity: "task", ID: "task_field_merge", UpdatedAt: "2026-07-17T01:00:00Z", Payload: json.RawMessage(`{"id":"task_field_merge","workspaceId":"workspace_test","projectId":"project_test","title":"before","priority":"high","createdAt":"2026-07-17T01:00:00Z","updatedAt":"2026-07-17T01:00:00Z"}`)}
-	saveRows(t, api, ownerAuth(), "", []businessRow{row})
+	saveRows(t, api, ownerAuth(), "", []businessRow{project, row})
 	tx, err := api.db.BeginTx(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)

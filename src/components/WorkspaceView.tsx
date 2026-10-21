@@ -34,6 +34,8 @@ export function WorkspaceView(props: {
   reorderProjects: (projectIds: string[]) => void;
   openProjectCreate: () => void;
   openProjectDetail: (projectId: string) => void;
+  deleteProject: (projectId: string) => Promise<boolean>;
+  canDeleteProject: (projectId: string) => boolean;
 }) {
   const {
     model,
@@ -73,6 +75,8 @@ export function WorkspaceView(props: {
           openProjectDetail={props.openProjectDetail}
           openProjectCreate={props.openProjectCreate}
           reorderProjects={props.reorderProjects}
+          deleteProject={props.deleteProject}
+          canDeleteProject={props.canDeleteProject}
         />
       </div>
     );
@@ -110,6 +114,7 @@ export function WorkspaceView(props: {
         returnTaskForReview={returnTaskForReview}
         close={() => selectTask(null)}
         splitTask={splitTask}
+        deleteTask={deleteTask}
       />
 
     </div>

@@ -20,6 +20,8 @@ export type ProjectDetailViewProps = {
   selectTask: (taskId: string | null) => void;
   createProjectTask: (projectId: string, input: ProjectTaskInput) => void;
   updateProject: (project: Project) => void;
+  deleteProject: (projectId: string) => Promise<boolean>;
+  deleteTask: (taskId: string) => void;
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
   updateTaskAssignment: (taskId: string, assignment: {
     projectId?: string;
