@@ -1,5 +1,22 @@
 # TimeManage Team Ubuntu 部署记录
 
+## 2026-10-21 正式发布 v0.2.13
+
+正式标签为 `v0.2.13`，源码提交 `439c1203fdc55ab06045ac1642c06f090aec5cfd`。统一目录及同名 ZIP 为 `deploy/timemanageTeam-v0.2.13-20261021-095016`，由干净标签通过 `npm run release:team:tag -- v0.2.13` 构建。版本合同为 release `0.2.13`、API `2`、schema `16`、最低客户端 `0.2.13`。新增迁移 `00016_v0_2_13_noop.sql` 为可逆空操作，已发布 SQL 保持不变。
+
+本次增加待验收任务卡片上的“快速验收通过”按钮，位于任务详情按钮左侧，按现有验收权限显示；保存失败时保留待验收状态。服务器 `current` 已切换到新版本，公网健康状态 ready，首页和主 JavaScript 与统一包字节一致。systemd 服务 active、开机启动 enabled，Nginx 配置检查通过。本机 macOS 客户端已从同包更新到 `0.2.13`，原登录及运行中的计时状态保留；实际界面显示版本匹配，并确认待验收卡片出现快速验收按钮，未通过验收生产任务来测试。
+
+线上备份先恢复到隔离 MySQL，完成 schema `15 → 16 → 15 → 16` 验证，业务数据指纹一致。正式切换前停止服务、生成并验证最终备份，迁移前后 22 张业务及明细表的稳定排序数据指纹均为 `7c82afaab98f0e3f261f9630c72787c0f5e6234b908ac74859216d967271df93`。项目 16 个、任务 101 个、业务记录 852 条，迁移前后保持一致。
+
+上线前已有 28 条工作会话和 63 条执行信号引用不存在的任务，合计 91 个审计问题；迁移前后审计结果完全一致，未清理这些历史记录。最终备份为 `/var/lib/timemanage-team/backups/timemanage-db-0.2.12-20261021-095434-000.sql.gz`，SHA-256 为 `a7481bf2413f3f2e9ee02cd842fd12ee1fd7d1fdde2b068a5e3239a1d47039b0`；备份清单、迁移日志、前后审计、业务指纹和旧版本链接记录保存在服务器受保护的 `/var/backups/timemanage-team/release-v0.2.13/`。
+
+发布验证包括 329 个前端测试、真实 MySQL 后端完整测试、2 个 Rust 测试、53 个浏览器用例（另 6 个按配置跳过）、17 个 CLI 测试，以及应用和测试类型、质量、桌面/iOS 发布配置检查。浏览器按项目分组运行完成；额外复核组因原测试服务退出产生连接拒绝，独立重跑 13 项全部通过。签名 iOS Archive、IPA、5 张 App Store 截图及校验清单完整，截图生成用例通过。macOS 应用采用有效 ad-hoc 资源签名，DMG 已从校验后的应用重新生成并通过 `hdiutil verify`；此次未提交 App Store 或执行 Apple 公证。
+
+- 统一 ZIP SHA-256：`32e9e6c59321197bcddc0b21567ec245f0b6f495726ae4ee67184d2b29c7d096`，`unzip -t` 通过。
+- macOS DMG SHA-256：`8600cf84ccd4ca0a3763886564a70c867675753281d7f7a6a3824abeab7c1456`。
+- iOS IPA SHA-256：`0ca13d44a9fc81c7867b95ed009f8da56246fdf740eafa0fe6f85d68c1b7159f`。
+- 统一目录的 `SHA256SUMS.txt` 覆盖全部 94 个交付文件，另有服务器文件清单及 iOS 独立校验清单。
+
 ## 2026-10-14 正式发布 v0.2.12
 
 正式标签为 `v0.2.12`，源码提交 `afb6f35e61dfcddd1a1c596bff484fd8d7c6bc26`。统一目录及同名 ZIP 为 `deploy/timemanageTeam-v0.2.12-20261014-115352`，由干净标签通过 `npm run release:team:tag -- v0.2.12` 构建。版本合同为 release `0.2.12`、API `2`、schema `15`、最低客户端 `0.2.12`。新增迁移 `00015_v0_2_12_noop.sql` 仅执行可逆的空操作。
