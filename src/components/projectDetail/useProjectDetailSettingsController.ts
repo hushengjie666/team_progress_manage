@@ -77,6 +77,7 @@ export function useProjectDetailSettingsController({
       name: nextName,
       description: editableProjectSettings.description,
       taskStageMode: editableProjectSettings.taskStageMode,
+      autoAcceptCompletedTasks: editableProjectSettings.autoAcceptCompletedTasks,
       workspaceId: nextWorkspaceId,
     });
   };

@@ -69,6 +69,14 @@ export function ProjectSettingsPanel({
           <textarea value={settings.description} disabled={!canEdit} onChange={(event) => updateSettings({ description: event.target.value })} />
         </label>
       </div>
+      <label className="project-settings-auto-accept">
+        <input type="checkbox" checked={settings.autoAcceptCompletedTasks} disabled={!canEdit}
+          onChange={(event) => updateSettings({ autoAcceptCompletedTasks: event.target.checked })} />
+        <span>
+          <strong>完成任务后自动验收</strong>
+          <small>开启后，完成任务即验收通过；关闭后需由项目负责人手动验收。</small>
+        </span>
+      </label>
       <div className="project-settings-actions">
         <button className="primary-button" disabled={!canEdit || !settings.name.trim()} onClick={saveSettings}>
           <Save size={16} />

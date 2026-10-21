@@ -10,7 +10,8 @@
       "updatedAt": "text",
       "archivedAt": "text",
       "defaultExpectedStartHours": "number",
-      "sortOrder": "number"
+      "sortOrder": "number",
+      "autoAcceptCompletedTasks": "boolean"
     },
     "objects": [],
     "relations": []

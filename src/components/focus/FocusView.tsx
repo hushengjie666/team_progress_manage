@@ -30,6 +30,7 @@ export function FocusView(props: {
         <div className="focus-stage-inner">
           <FocusCurrentTaskPanel
             currentTask={currentTask}
+            autoAcceptCompletedTasks={state.projects.find((project) => project.id === currentTask?.projectId)?.autoAcceptCompletedTasks !== false}
             completeTask={props.completeTask}
           />
           <FocusTimerPanel

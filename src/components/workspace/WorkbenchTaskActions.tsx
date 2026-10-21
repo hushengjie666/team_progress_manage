@@ -72,7 +72,7 @@ export function WorkbenchTaskActions({
           </button>
         )}
         {onComplete && canSubmitReview && (
-          <button className="icon-button small" title="提交验收" onClick={() => onComplete(task.id)}>
+          <button className="icon-button small" title="完成任务" onClick={() => onComplete(task.id)}>
             <Check size={16} />
           </button>
         )}

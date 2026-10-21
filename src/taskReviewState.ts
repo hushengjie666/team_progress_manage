@@ -38,12 +38,17 @@ export function submitTaskForReviewInState(
     updatedAt: timestamp,
   };
   if (!shouldEndActiveWork) return submitted;
-  return endActiveWorkSessionsForTaskInState(submitted, taskId, timestamp, {
+  const ended = endActiveWorkSessionsForTaskInState(submitted, taskId, timestamp, {
     reason: "submitted_for_review",
     activeTimerWorkSessionId: state.activeTimer?.workSessionId,
     activeTimerTotalPausedSeconds: state.activeTimer?.totalPausedSeconds,
     clearActiveTimer: true,
   });
+  const task = state.tasks.find((item) => item.id === taskId)!;
+  const project = state.projects.find((item) => item.id === task.projectId);
+  return project && project.autoAcceptCompletedTasks !== false
+    ? acceptTaskInState(ended, taskId, submitterMemberId, timestamp)
+    : ended;
 }
 
 export function acceptTaskInState(

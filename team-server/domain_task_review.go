@@ -32,6 +32,22 @@ func applyTaskReviewActionInTx(ctx context.Context, tx *sql.Tx, task businessRow
 		if err := endTaskWorkSessionsForReview(ctx, tx, task, now); err != nil {
 			return &taskReviewFailure{status: http.StatusInternalServerError, message: "end task sessions failed"}
 		}
+		project, found, err := businessExistingRow(ctx, tx, task.WorkspaceID, "project", businessProjectID(task))
+		if err != nil || !found {
+			return &taskReviewFailure{status: http.StatusInternalServerError, message: "load project review setting failed"}
+		}
+		projectPayload, err := rowPayloadObject(project)
+		if err != nil {
+			return &taskReviewFailure{status: http.StatusInternalServerError, message: "invalid project review setting"}
+		}
+		if projectPayload["autoAcceptCompletedTasks"] != false {
+			raw, err := json.Marshal(payload)
+			if err != nil {
+				return &taskReviewFailure{status: http.StatusInternalServerError, message: "invalid task payload"}
+			}
+			task.Payload = raw
+			return applyTaskReviewActionInTx(ctx, tx, task, payload, "accept-review", "", memberID, now)
+		}
 	case "accept-review":
 		if stringField(task.Payload, "status") != "pending_review" {
 			return &taskReviewFailure{status: http.StatusConflict, message: "task is not pending review"}

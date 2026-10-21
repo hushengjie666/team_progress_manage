@@ -68,12 +68,14 @@ describe("project detail controller model", () => {
       projectId: "project_a",
       name: "项目 A",
       workspaceId: "workspace_a",
+      autoAcceptCompletedTasks: true,
     });
     expect(editableProjectSettingsFor(sourceProject, sourceWorkspace, {
       projectId: "project_a",
       name: "草稿名",
       description: "草稿说明",
       taskStageMode: "regular",
+      autoAcceptCompletedTasks: false,
       workspaceId: "workspace_b",
     })).toMatchObject({ name: "草稿名", workspaceId: "workspace_b" });
   });

@@ -4,6 +4,7 @@ import { PomodoroProgress } from "./PomodoroProgress";
 
 export function FocusCurrentTaskPanel(props: {
   currentTask?: Task;
+  autoAcceptCompletedTasks: boolean;
   completeTask: (taskId: string) => void;
 }) {
   const { currentTask } = props;
@@ -36,7 +37,7 @@ export function FocusCurrentTaskPanel(props: {
           ) : (
             <button className="small-button" onClick={() => props.completeTask(currentTask.id)}>
               <Check size={15} />
-              提交验收
+              {props.autoAcceptCompletedTasks ? "完成任务" : "提交验收"}
             </button>
           )}
         </div>

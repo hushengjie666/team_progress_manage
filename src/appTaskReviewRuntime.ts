@@ -18,7 +18,8 @@ export function createAppTaskReviewRuntime({
   setPreferredFocusTaskId,
 }: AppTaskReviewRuntimeOptions): AppTaskReviewRuntime {
   const completeTask = (taskId: string) => {
-    const task = getState().tasks.find((item) => item.id === taskId);
+    const state = getState();
+    const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
     if (task.status === "pending_review") {
       setToast("该任务已提交验收，等待项目负责人确认");
@@ -36,9 +37,12 @@ export function createAppTaskReviewRuntime({
       setToast("当前状态不能提交验收");
       return;
     }
-    void runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: task.workspaceId });
-    setPreferredFocusTaskId(taskId);
-    setToast("已提交验收，等待项目负责人确认");
+    void runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: task.workspaceId }).then((saved) => {
+      if (!saved) return;
+      const completed = getState().tasks.find((item) => item.id === taskId)?.status === "completed";
+      setPreferredFocusTaskId(completed ? null : taskId);
+      setToast(completed ? "任务已完成并自动验收通过" : "已提交验收，等待项目负责人确认");
+    });
   };
 
   const acceptTask = async (taskId: string) => {

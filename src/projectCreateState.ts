@@ -30,6 +30,7 @@ export function createProjectInState(
         name: name.trim() || "新项目",
         description: description.trim(),
         defaultExpectedStartHours: 24,
+        autoAcceptCompletedTasks: true,
         taskStageMode: owner?.taskStageMode ?? "regular",
         sortOrder: nextProjectSortOrder(state.projects),
         createdAt: timestamp,

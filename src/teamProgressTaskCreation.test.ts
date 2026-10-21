@@ -12,6 +12,7 @@ import type { AppState, ProjectMember } from "./types";
 describe("team progress task creation", () => {
   it("creates and reviews tasks with the authenticated project member when currentMemberId is stale", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const owner = state.projectMembers[0];
     const teammate: ProjectMember = {
       ...owner,

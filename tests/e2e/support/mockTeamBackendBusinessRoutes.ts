@@ -5,6 +5,8 @@ import { applyBusinessRow, rowsForRuntimeStates, rowsFromState } from "./mockTea
 import { fulfillJson } from "./mockTeamBackendResponses";
 import type { MockTeamBackendRuntime } from "./mockTeamBackendRuntime";
 import { deleteMockBusinessRows } from "./mockTeamBackendDeletion";
+import { submitTaskForReviewInState } from "../../../src/taskReviewState";
+import { resolveMemberIdForProject } from "../../../src/memberIdentity";
 
 const entityByResource: Record<string, BusinessEntity> = {
   projects: "project",
@@ -204,6 +206,14 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     return true;
   }
   const [currentKey, current] = currentEntry;
+  if (request.method() === "POST" && entity === "task" && parts[2] === "submit-review") {
+    const state = runtime.workspaceStates[workspaceId];
+    const next = submitTaskForReviewInState(state, id,
+      resolveMemberIdForProject(state, String((current.payload as Record<string, unknown>).projectId)));
+    runtime.workspaceStates[workspaceId] = next;
+    await fulfillJson(route, mutationDelta(request, rowsFromState(next)));
+    return true;
+  }
   if (request.method() === "POST" && entity === "task" && parts[2] === "accept-review") {
     const payload = current.payload as Record<string, unknown>;
     if (payload.status !== "pending_review") {

@@ -11,107 +11,167 @@ import (
 )
 
 func TestTaskReviewAllowsExecutorSubmissionAndRequiresReviewerForDecision(t *testing.T) {
-	api := mysqlSeededApp(t)
-	now := "2026-07-17T08:00:00Z"
-	executorAccount := accountRecord{
-		ID: "account_executor", WorkspaceID: "workspace_test", Name: "Executor", Email: "executor@example.test",
-		PasswordHash: "hash", CreatedAt: now, UpdatedAt: now,
-	}
-	tx, err := api.db.BeginTx(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := mysqlUpsertAccount(context.Background(), tx, executorAccount); err != nil {
-		_ = tx.Rollback()
-		t.Fatal(err)
-	}
-	if err := mysqlEnsureWorkspaceMembership(context.Background(), tx, "workspace_test", executorAccount.ID, "member", "active", now); err != nil {
-		_ = tx.Rollback()
-		t.Fatal(err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatal(err)
-	}
+	for _, mode := range []string{"manual", "default", "enabled"} {
+		t.Run(mode, func(t *testing.T) {
+			api := mysqlSeededApp(t)
+			now := "2026-07-17T08:00:00Z"
+			executorAccount := accountRecord{
+				ID: "account_executor", WorkspaceID: "workspace_test", Name: "Executor", Email: "executor@example.test",
+				PasswordHash: "hash", CreatedAt: now, UpdatedAt: now,
+			}
+			tx, err := api.db.BeginTx(context.Background(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := mysqlUpsertAccount(context.Background(), tx, executorAccount); err != nil {
+				_ = tx.Rollback()
+				t.Fatal(err)
+			}
+			if err := mysqlEnsureWorkspaceMembership(context.Background(), tx, "workspace_test", executorAccount.ID, "member", "active", now); err != nil {
+				_ = tx.Rollback()
+				t.Fatal(err)
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
 
-	project := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project", ID: "project_review_test", UpdatedAt: now, Payload: json.RawMessage(`{"id":"project_review_test","workspaceId":"workspace_test","name":"Review test","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
-	ownerMember := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project_member", ID: "member_review_owner", UpdatedAt: now, Payload: json.RawMessage(`{"id":"member_review_owner","workspaceId":"workspace_test","projectId":"project_review_test","accountId":"account_owner","name":"Owner","roles":["project_owner"],"status":"active","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
-	executorMember := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project_member", ID: "member_review_executor", UpdatedAt: now, Payload: json.RawMessage(`{"id":"member_review_executor","workspaceId":"workspace_test","projectId":"project_review_test","accountId":"account_executor","name":"Executor","roles":["executor"],"status":"active","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
-	task := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "task", ID: "task_review_test", UpdatedAt: now, Payload: json.RawMessage(`{"id":"task_review_test","workspaceId":"workspace_test","projectId":"project_review_test","title":"Submit me","status":"in_progress","progressPercent":40,"primaryExecutorMemberId":"member_review_executor","repeatRule":"after_completion","repeatIntervalDays":2,"dueAt":"2026-07-17T09:00:00Z","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
-	saveRows(t, api, ownerAuth(), "", []businessRow{project, ownerMember, executorMember, task})
+			project := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project", ID: "project_review_test", UpdatedAt: now, Payload: json.RawMessage(`{"id":"project_review_test","workspaceId":"workspace_test","name":"Review test","autoAcceptCompletedTasks":true,"createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
+			if mode != "manual" {
+				payload, _ := rowPayloadObject(project)
+				delete(payload, "autoAcceptCompletedTasks")
+				if mode == "enabled" {
+					payload["autoAcceptCompletedTasks"] = false
+				}
+				project.Payload, _ = json.Marshal(payload)
+			}
+			ownerMember := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project_member", ID: "member_review_owner", UpdatedAt: now, Payload: json.RawMessage(`{"id":"member_review_owner","workspaceId":"workspace_test","projectId":"project_review_test","accountId":"account_owner","name":"Owner","roles":["project_owner"],"status":"active","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
+			executorMember := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "project_member", ID: "member_review_executor", UpdatedAt: now, Payload: json.RawMessage(`{"id":"member_review_executor","workspaceId":"workspace_test","projectId":"project_review_test","accountId":"account_executor","name":"Executor","roles":["executor"],"status":"active","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
+			task := businessRow{WorkspaceID: "workspace_test", AccountID: "account_owner", Entity: "task", ID: "task_review_test", UpdatedAt: now, Payload: json.RawMessage(`{"id":"task_review_test","workspaceId":"workspace_test","projectId":"project_review_test","title":"Submit me","status":"in_progress","progressPercent":40,"primaryExecutorMemberId":"member_review_executor","repeatRule":"after_completion","repeatIntervalDays":2,"dueAt":"2026-07-17T09:00:00Z","createdAt":"2026-07-17T08:00:00Z","updatedAt":"2026-07-17T08:00:00Z"}`)}
+			saveRows(t, api, ownerAuth(), "", []businessRow{project, ownerMember, executorMember, task})
 
-	executorAuth := authContext{AccountID: executorAccount.ID, WorkspaceID: "workspace_test"}
-	submitRecorder := httptest.NewRecorder()
-	api.handleTaskAction(submitRecorder, httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/submit-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`)), executorAuth, task.ID, "submit-review")
-	if submitRecorder.Code != http.StatusOK {
-		t.Fatalf("executor submit status = %d, body = %s", submitRecorder.Code, submitRecorder.Body.String())
-	}
-	submitted, found, err := businessExistingRow(context.Background(), api.db, "workspace_test", "task", task.ID)
-	if err != nil || !found {
-		t.Fatalf("load submitted task: found=%v err=%v", found, err)
-	}
-	submittedPayload, _ := rowPayloadObject(submitted)
-	if status := stringField(submitted.Payload, "status"); status != "pending_review" {
-		t.Fatalf("submitted status = %q", status)
-	}
-	if submittedPayload["reviewSubmittedByMemberId"] != executorMember.ID || numericInt(submittedPayload["progressPercent"]) != 100 {
-		t.Fatalf("submitted payload = %#v", submittedPayload)
-	}
+			executorAuth := authContext{AccountID: executorAccount.ID, WorkspaceID: "workspace_test"}
+			settingBody := `{"autoAcceptCompletedTasks":false}`
+			if mode == "enabled" {
+				settingBody = `{"autoAcceptCompletedTasks":true}`
+			}
+			deniedSetting := httptest.NewRecorder()
+			api.handleBusinessResource(deniedSetting, httptest.NewRequest(http.MethodPatch, "/projects/"+project.ID+"?workspace_id=workspace_test", strings.NewReader(settingBody)), executorAuth, domainResourceSpecs[0])
+			if deniedSetting.Code != http.StatusForbidden {
+				t.Fatalf("executor changed project setting: %d %s", deniedSetting.Code, deniedSetting.Body.String())
+			}
+			if mode != "default" {
+				savedSetting := httptest.NewRecorder()
+				api.handleBusinessResource(savedSetting, httptest.NewRequest(http.MethodPatch, "/projects/"+project.ID+"?workspace_id=workspace_test", strings.NewReader(settingBody)), ownerAuth(), domainResourceSpecs[0])
+				if savedSetting.Code != http.StatusOK {
+					t.Fatalf("save project setting: %d %s", savedSetting.Code, savedSetting.Body.String())
+				}
+			}
+			startRecorder := httptest.NewRecorder()
+			api.handleTaskAction(startRecorder, httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/start", strings.NewReader(`{"workspace_id":"workspace_test","focus_session_id":"focus_review","work_session_id":"work_review","duration":1500}`)), executorAuth, task.ID, "start")
+			if startRecorder.Code != http.StatusOK {
+				t.Fatalf("start = %d: %s", startRecorder.Code, startRecorder.Body.String())
+			}
+			submitRecorder := httptest.NewRecorder()
+			submitRequest := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/submit-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`))
+			submitRequest.Header.Set("Idempotency-Key", "submit-review:test")
+			api.handleTaskAction(submitRecorder, submitRequest, executorAuth, task.ID, "submit-review")
+			if submitRecorder.Code != http.StatusOK {
+				t.Fatalf("executor submit status = %d, body = %s", submitRecorder.Code, submitRecorder.Body.String())
+			}
+			submitted, found, err := businessExistingRow(context.Background(), api.db, "workspace_test", "task", task.ID)
+			if err != nil || !found {
+				t.Fatalf("load submitted task: found=%v err=%v", found, err)
+			}
+			submittedPayload, _ := rowPayloadObject(submitted)
+			expectedStatus := "pending_review"
+			if mode != "manual" {
+				expectedStatus = "completed"
+			}
+			if status := stringField(submitted.Payload, "status"); status != expectedStatus {
+				t.Fatalf("submitted status = %q", status)
+			}
+			if submittedPayload["reviewSubmittedByMemberId"] != executorMember.ID || numericInt(submittedPayload["progressPercent"]) != 100 {
+				t.Fatalf("submitted payload = %#v", submittedPayload)
+			}
 
-	deniedRecorder := httptest.NewRecorder()
-	api.handleTaskAction(deniedRecorder, httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`)), executorAuth, task.ID, "accept-review")
-	if deniedRecorder.Code != http.StatusForbidden {
-		t.Fatalf("executor accept status = %d, want %d", deniedRecorder.Code, http.StatusForbidden)
-	}
+			work, _, _ := businessExistingRow(context.Background(), api.db, "workspace_test", "work_session", "work_review")
+			if stringField(work.Payload, "status") != "ended" {
+				t.Fatalf("work session was not ended: %s", work.Payload)
+			}
+			if mode != "manual" {
+				if submittedPayload["completedAt"] == nil || submittedPayload["reviewAcceptedAt"] != submittedPayload["completedAt"] || submittedPayload["reviewAcceptedByMemberId"] != executorMember.ID {
+					t.Fatalf("auto accepted payload = %#v", submittedPayload)
+				}
+				retry := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/submit-review", strings.NewReader(`{"workspace_id":"workspace_test"}`))
+				retry.Header.Set("Idempotency-Key", "submit-review:test")
+				recorder := httptest.NewRecorder()
+				api.handleTaskAction(recorder, retry, executorAuth, task.ID, "submit-review")
+				if recorder.Code != http.StatusOK {
+					t.Fatalf("repeat auto completion = %d: %s", recorder.Code, recorder.Body.String())
+				}
+				var count int
+				if err := api.db.QueryRow(`SELECT COUNT(*) FROM business_tasks WHERE workspace_id = ? AND project_id = ?`, "workspace_test", project.ID).Scan(&count); err != nil || count != 2 {
+					t.Fatalf("auto recurring task count=%d err=%v", count, err)
+				}
+				return
+			}
+			deniedRecorder := httptest.NewRecorder()
+			api.handleTaskAction(deniedRecorder, httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`)), executorAuth, task.ID, "accept-review")
+			if deniedRecorder.Code != http.StatusForbidden {
+				t.Fatalf("executor accept status = %d, want %d", deniedRecorder.Code, http.StatusForbidden)
+			}
 
-	acceptRecorder := httptest.NewRecorder()
-	acceptRequest := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`))
-	acceptRequest.Header.Set("Idempotency-Key", "accept-review:task_review_test")
-	api.handleTaskAction(acceptRecorder, acceptRequest, ownerAuth(), task.ID, "accept-review")
-	if acceptRecorder.Code != http.StatusOK {
-		t.Fatalf("owner accept status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
-	}
-	accepted, _, _ := businessExistingRow(context.Background(), api.db, "workspace_test", "task", task.ID)
-	acceptedPayload, _ := rowPayloadObject(accepted)
-	if stringField(accepted.Payload, "status") != "completed" || acceptedPayload["reviewAcceptedByMemberId"] != ownerMember.ID || acceptedPayload["completedAt"] == nil {
-		t.Fatalf("accepted payload = %#v", acceptedPayload)
-	}
-	var taskCount int
-	if err := api.db.QueryRow(`SELECT COUNT(*) FROM business_tasks WHERE workspace_id = ? AND project_id = ?`, "workspace_test", project.ID).Scan(&taskCount); err != nil {
-		t.Fatal(err)
-	}
-	if taskCount != 2 {
-		t.Fatalf("task count after recurring acceptance = %d, want 2", taskCount)
-	}
-	retryRecorder := httptest.NewRecorder()
-	retryRequest := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`))
-	retryRequest.Header.Set("Idempotency-Key", "accept-review:task_review_test")
-	api.handleTaskAction(retryRecorder, retryRequest, ownerAuth(), task.ID, "accept-review")
-	if retryRecorder.Code != http.StatusOK {
-		t.Fatalf("idempotent accept retry status = %d, body = %s", retryRecorder.Code, retryRecorder.Body.String())
-	}
-	if err := api.db.QueryRow(`SELECT COUNT(*) FROM business_tasks WHERE workspace_id = ? AND project_id = ?`, "workspace_test", project.ID).Scan(&taskCount); err != nil {
-		t.Fatal(err)
-	}
-	if taskCount != 2 {
-		t.Fatalf("task count after idempotent retry = %d, want 2", taskCount)
-	}
-	var nextPayloadRaw []byte
-	if err := api.db.QueryRow(`SELECT payload FROM business_tasks WHERE workspace_id = ? AND project_id = ? AND id <> ?`, "workspace_test", project.ID, task.ID).Scan(&nextPayloadRaw); err != nil {
-		t.Fatal(err)
-	}
-	var nextPayload map[string]any
-	if err := json.Unmarshal(nextPayloadRaw, &nextPayload); err != nil {
-		t.Fatal(err)
-	}
-	completedAt, err := time.Parse(time.RFC3339Nano, acceptedPayload["completedAt"].(string))
-	if err != nil {
-		t.Fatal(err)
-	}
-	nextDueAt, err := time.Parse(time.RFC3339Nano, stringField(json.RawMessage(nextPayloadRaw), "dueAt"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if nextPayload["status"] != "pool" || nextPayload["recurrenceParentId"] != task.ID || !nextDueAt.Equal(completedAt.AddDate(0, 0, 2)) {
-		t.Fatalf("next recurring payload = %#v", nextPayload)
+			acceptRecorder := httptest.NewRecorder()
+			acceptRequest := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`))
+			acceptRequest.Header.Set("Idempotency-Key", "accept-review:task_review_test")
+			api.handleTaskAction(acceptRecorder, acceptRequest, ownerAuth(), task.ID, "accept-review")
+			if acceptRecorder.Code != http.StatusOK {
+				t.Fatalf("owner accept status = %d, body = %s", acceptRecorder.Code, acceptRecorder.Body.String())
+			}
+			accepted, _, _ := businessExistingRow(context.Background(), api.db, "workspace_test", "task", task.ID)
+			acceptedPayload, _ := rowPayloadObject(accepted)
+			if stringField(accepted.Payload, "status") != "completed" || acceptedPayload["reviewAcceptedByMemberId"] != ownerMember.ID || acceptedPayload["completedAt"] == nil {
+				t.Fatalf("accepted payload = %#v", acceptedPayload)
+			}
+			var taskCount int
+			if err := api.db.QueryRow(`SELECT COUNT(*) FROM business_tasks WHERE workspace_id = ? AND project_id = ?`, "workspace_test", project.ID).Scan(&taskCount); err != nil {
+				t.Fatal(err)
+			}
+			if taskCount != 2 {
+				t.Fatalf("task count after recurring acceptance = %d, want 2", taskCount)
+			}
+			retryRecorder := httptest.NewRecorder()
+			retryRequest := httptest.NewRequest(http.MethodPost, "/tasks/task_review_test/accept-review?workspace_id=workspace_test", strings.NewReader(`{"workspace_id":"workspace_test"}`))
+			retryRequest.Header.Set("Idempotency-Key", "accept-review:task_review_test")
+			api.handleTaskAction(retryRecorder, retryRequest, ownerAuth(), task.ID, "accept-review")
+			if retryRecorder.Code != http.StatusOK {
+				t.Fatalf("idempotent accept retry status = %d, body = %s", retryRecorder.Code, retryRecorder.Body.String())
+			}
+			if err := api.db.QueryRow(`SELECT COUNT(*) FROM business_tasks WHERE workspace_id = ? AND project_id = ?`, "workspace_test", project.ID).Scan(&taskCount); err != nil {
+				t.Fatal(err)
+			}
+			if taskCount != 2 {
+				t.Fatalf("task count after idempotent retry = %d, want 2", taskCount)
+			}
+			var nextPayloadRaw []byte
+			if err := api.db.QueryRow(`SELECT payload FROM business_tasks WHERE workspace_id = ? AND project_id = ? AND id <> ?`, "workspace_test", project.ID, task.ID).Scan(&nextPayloadRaw); err != nil {
+				t.Fatal(err)
+			}
+			var nextPayload map[string]any
+			if err := json.Unmarshal(nextPayloadRaw, &nextPayload); err != nil {
+				t.Fatal(err)
+			}
+			completedAt, err := time.Parse(time.RFC3339Nano, acceptedPayload["completedAt"].(string))
+			if err != nil {
+				t.Fatal(err)
+			}
+			nextDueAt, err := time.Parse(time.RFC3339Nano, stringField(json.RawMessage(nextPayloadRaw), "dueAt"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if nextPayload["status"] != "pool" || nextPayload["recurrenceParentId"] != task.ID || !nextDueAt.Equal(completedAt.AddDate(0, 0, 2)) {
+				t.Fatalf("next recurring payload = %#v", nextPayload)
+			}
+		})
 	}
 }

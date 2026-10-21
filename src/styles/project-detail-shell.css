@@ -184,3 +184,25 @@
   margin: 0;
   font-size: 18px;
 }
+
+.project-settings-auto-accept {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-settings-auto-accept input {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.project-settings-auto-accept span {
+  display: grid;
+  gap: 4px;
+}
+
+.project-settings-auto-accept small {
+  color: var(--muted);
+  font-weight: 400;
+}

@@ -9,6 +9,33 @@ import {
 } from "./teamProgress";
 
 describe("team progress review transitions", () => {
+  it.each([undefined, true])("automatically accepts completed work when the project setting is %s", (setting) => {
+    const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = setting;
+    const taskId = state.tasks[0].id;
+    const started = startTimerInState(state, "focus", taskId, "2026-05-10T10:00:00.000Z", "auto_session");
+    const timestamp = "2026-05-10T10:05:00.000Z";
+    const completed = submitTaskForReviewInState(started, taskId, "member_executor", timestamp);
+    expect(completed.tasks.find((task) => task.id === taskId)).toMatchObject({
+      status: "completed", progressPercent: 100, completedAt: timestamp,
+      reviewSubmittedAt: timestamp, reviewSubmittedByMemberId: "member_executor",
+      reviewAcceptedAt: timestamp, reviewAcceptedByMemberId: "member_executor",
+    });
+    expect(completed.activeTimer).toBeUndefined();
+    expect(completed.workSessions.find((session) => session.id === started.activeTimer?.workSessionId)?.status).toBe("ended");
+    const repeated = submitTaskForReviewInState(completed, taskId, "member_other", "2026-05-10T11:00:00.000Z");
+    expect(repeated.tasks.find((task) => task.id === taskId)).toEqual(completed.tasks.find((task) => task.id === taskId));
+    expect(repeated.tasks.find((task) => task.id === taskId)?.estimateHistory).toHaveLength(1);
+  });
+
+  it("does not automatically accept tasks that were already waiting for review", () => {
+    const state = createInitialState();
+    state.tasks[0].status = "pending_review";
+    const result = submitTaskForReviewInState(state, state.tasks[0].id, "member_executor");
+    expect(result.tasks[0].status).toBe("pending_review");
+    expect(result.tasks[0].completedAt).toBeUndefined();
+  });
+
   it("updates task progress with bounded percent and a manual progress note", () => {
     const state = createInitialState();
     const updated = updateTaskProgressInState(
@@ -30,6 +57,7 @@ describe("team progress review transitions", () => {
 
   it("submits a task for review before it can be accepted as completed", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
     const submitted = submitTaskForReviewInState(
       inProgressState,
@@ -62,6 +90,7 @@ describe("team progress review transitions", () => {
 
   it("does not resubmit tasks already waiting for review", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
     const submitted = submitTaskForReviewInState(
       inProgressState,
@@ -106,6 +135,7 @@ describe("team progress review transitions", () => {
 
   it("ends active work when submitting an in-progress task for review", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const taskId = state.tasks[0].id;
     const started = startTimerInState(
       state,
@@ -141,6 +171,7 @@ describe("team progress review transitions", () => {
 
   it("only submits committed or in-progress tasks for review", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const poolState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "pool" as const } : task) };
     const poolAttempt = submitTaskForReviewInState(poolState, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
     const committedState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "committed" as const } : task) };
@@ -152,6 +183,7 @@ describe("team progress review transitions", () => {
 
   it("returns a pending review task with a reason", () => {
     const state = createInitialState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const inProgressState = { ...state, tasks: state.tasks.map((task, index) => index === 0 ? { ...task, status: "in_progress" as const } : task) };
     const submitted = submitTaskForReviewInState(inProgressState, state.tasks[0].id, "member_owner", "2026-05-10T10:00:00.000Z");
     const returned = returnTaskForReviewInState(

@@ -4185,6 +4185,7 @@ function createProjectInState(state, name, description, timestamp = (/* @__PURE_
         name: name.trim() || "\u65B0\u9879\u76EE",
         description: description.trim(),
         defaultExpectedStartHours: 24,
+        autoAcceptCompletedTasks: true,
         taskStageMode: owner?.taskStageMode ?? "regular",
         sortOrder: nextProjectSortOrder(state.projects),
         createdAt: timestamp,
@@ -4448,10 +4449,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.14",
+  releaseVersion: "0.2.15",
   apiProtocolVersion: 2,
-  databaseSchemaVersion: 17,
-  minimumClientRelease: "0.2.14"
+  databaseSchemaVersion: 18,
+  minimumClientRelease: "0.2.15"
 };
 
 // src/teamBackendHttp.ts
@@ -6707,7 +6708,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.14").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.15").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {

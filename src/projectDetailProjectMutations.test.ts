@@ -17,6 +17,7 @@ describe("project detail project mutations", () => {
       id: "project_test",
       name: "客户交付项目",
       defaultExpectedStartHours: 24,
+      autoAcceptCompletedTasks: true,
     });
     expect(next.projectMembers[0]).toMatchObject({
       id: "member_test",

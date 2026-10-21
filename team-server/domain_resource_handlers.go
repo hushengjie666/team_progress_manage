@@ -15,7 +15,7 @@ type domainResourceSpec struct {
 }
 
 var domainResourceSpecs = []domainResourceSpec{
-	{path: "projects", entity: "project", patchFields: fields("name", "description", "taskStageMode", "defaultExpectedStartHours", "archivedAt", "sortOrder")},
+	{path: "projects", entity: "project", patchFields: fields("name", "description", "taskStageMode", "autoAcceptCompletedTasks", "defaultExpectedStartHours", "archivedAt", "sortOrder")},
 	{path: "project-members", entity: "project_member", patchFields: fields("name", "email", "roles", "status", "accountId")},
 	{path: "tasks", entity: "task", patchFields: fields("title", "notes", "tags", "projectId", "project", "priority", "severity", "stage", "estimateHours", "estimatePomodoros", "expectedStartAt", "expectedFinishAt", "dueAt", "reminderAt", "lastReminderSentAt", "repeatRule", "repeatIntervalDays", "primaryExecutorMemberId", "collaboratorMemberIds", "status", "progressPercent", "progressNote", "subtasks", "sortOrder", "reviewSubmittedAt", "reviewSubmittedByMemberId", "reviewAcceptedAt", "reviewAcceptedByMemberId", "reviewReturnedAt", "reviewReturnedByMemberId", "reviewReturnReason")},
 	{path: "daily-plans", entity: "daily_plan", patchFields: fields("capacityPomodoros", "recommendedCapacityPomodoros", "suggestedCapacityPomodoros", "overloadAcknowledged", "committedTaskIds", "suggestedTaskIds", "completedPomodoros", "reflection", "review")},

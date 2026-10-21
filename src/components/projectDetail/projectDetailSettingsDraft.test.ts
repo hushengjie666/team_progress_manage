@@ -6,15 +6,16 @@ const original: ProjectSettingsDraft = {
   name: "Original",
   description: "Original description",
   taskStageMode: "software",
+  autoAcceptCompletedTasks: true,
   workspaceId: "workspace_test",
 };
 
 describe("project settings draft reconciliation", () => {
   it("keeps unsaved edits when the server acknowledges project creation", () => {
-    const edited = { ...original, name: "User edit", taskStageMode: "regular" as const };
+    const edited = { ...original, name: "User edit", taskStageMode: "regular" as const, autoAcceptCompletedTasks: false };
     const incoming = { ...original, description: "Server description" };
     expect(reconcileProjectSettingsDraft(edited, original, incoming)).toEqual({
-      ...incoming, name: "User edit", taskStageMode: "regular",
+      ...incoming, name: "User edit", taskStageMode: "regular", autoAcceptCompletedTasks: false,
     });
   });
 

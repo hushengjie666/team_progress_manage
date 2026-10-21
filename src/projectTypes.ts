@@ -9,6 +9,7 @@ export interface Project {
   description: string;
   defaultExpectedStartHours: number;
   taskStageMode?: TaskStageMode;
+  autoAcceptCompletedTasks?: boolean;
   sortOrder?: number;
   createdAt: string;
   updatedAt: string;

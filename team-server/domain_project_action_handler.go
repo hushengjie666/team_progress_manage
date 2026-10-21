@@ -77,7 +77,7 @@ func (a *app) handleProjectAction(w http.ResponseWriter, r *http.Request, auth a
 		return
 	}
 	for key, value := range req.Patch {
-		if fields("name", "description", "taskStageMode", "defaultExpectedStartHours", "archivedAt", "sortOrder")[key] {
+		if fields("name", "description", "taskStageMode", "autoAcceptCompletedTasks", "defaultExpectedStartHours", "archivedAt", "sortOrder")[key] {
 			payload[key] = value
 		}
 	}

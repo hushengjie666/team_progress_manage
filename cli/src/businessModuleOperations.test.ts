@@ -251,6 +251,7 @@ describe("CLI task, today plan, and work-session business operations", () => {
 describe("CLI review, interruption, settings, and template business operations", () => {
   it("covers review flow, interruptions, daily review, settings, and templates", () => {
     let state = makeState();
+    state.projects[0].autoAcceptCompletedTasks = false;
     const created = createTask(state, "验收任务");
     state = addTaskToTodayInTeamState(created.state, created.task.id, timestamp);
 

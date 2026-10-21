@@ -10,6 +10,7 @@ export type ProjectSettingsDraft = {
   name: string;
   description: string;
   taskStageMode: TaskStageMode;
+  autoAcceptCompletedTasks: boolean;
   workspaceId: string;
 };
 
@@ -42,6 +43,7 @@ export const projectSettingsDraftForModel = (model: ProjectDetailModel): Project
   name: model.project.name,
   description: model.project.description,
   taskStageMode: model.project.taskStageMode ?? "software",
+  autoAcceptCompletedTasks: model.project.autoAcceptCompletedTasks !== false,
   workspaceId: model.project.workspaceId ?? model.workspace?.id ?? "",
 });
 
@@ -53,7 +55,7 @@ export const reconcileProjectSettingsDraft = (
   if (!current || current.projectId !== incoming.projectId) return incoming;
   if (!previous || previous.projectId !== incoming.projectId) return current;
   let result = incoming;
-  for (const field of ["name", "description", "taskStageMode", "workspaceId"] as const) {
+  for (const field of ["name", "description", "taskStageMode", "autoAcceptCompletedTasks", "workspaceId"] as const) {
     if (current[field] !== previous[field]) result = { ...result, [field]: current[field] };
   }
   return result;
@@ -72,6 +74,7 @@ export const editableProjectSettingsFor = (
     name: project.name,
     description: project.description,
     taskStageMode: projectStageMode,
+    autoAcceptCompletedTasks: project.autoAcceptCompletedTasks !== false,
     workspaceId: currentProjectWorkspaceId ?? "",
   };
 };
