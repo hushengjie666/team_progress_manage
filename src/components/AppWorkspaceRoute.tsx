@@ -1,6 +1,7 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { mergeScopedProjectOrder } from "../workspaceScope";
 import { WorkspaceView } from "./WorkspaceView";
+import { canReviewProjectTasks } from "../accessControl";
 
 type AppWorkspaceRouteProps = Pick<
   AppAuthenticatedShellProps,
@@ -66,6 +67,7 @@ export function AppWorkspaceRoute({
       updateTaskAssignment={taskActions.updateTaskAssignment}
       updateTaskProgress={taskActions.updateTaskProgress}
       acceptTask={taskActions.acceptTask}
+      canReviewTask={(task) => canReviewProjectTasks(state, task.projectId)}
       returnTaskForReview={taskActions.returnTaskForReview}
       moveCommittedTask={taskActions.moveCommittedTask}
       splitTask={taskActions.splitTask}

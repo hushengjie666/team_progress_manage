@@ -15,6 +15,8 @@ export function TaskColumn(props: {
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
+  onAccept?: (taskId: string) => void;
+  canReviewTask?: (task: Task) => boolean;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
   onMove?: (taskId: string, direction: -1 | 1) => void;
@@ -68,6 +70,7 @@ export function TaskColumn(props: {
             onDelete={props.onDelete}
             onRemove={props.onRemove}
             onComplete={props.onComplete}
+            onAccept={props.canReviewTask?.(task) ? props.onAccept : undefined}
             onSelect={props.onSelect}
             onSplit={props.onSplit}
             onMove={props.onMove}

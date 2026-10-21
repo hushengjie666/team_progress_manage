@@ -26,6 +26,7 @@ export function WorkspaceView(props: {
   updateTaskAssignment: (taskId: string, assignment: { projectId?: string; primaryExecutorMemberId?: string; collaboratorMemberIds?: string[] }) => void;
   updateTaskProgress: (taskId: string, progressPercent: number, progressNote: string) => void;
   acceptTask: (taskId: string) => void;
+  canReviewTask: (task: Task) => boolean;
   returnTaskForReview: (taskId: string, reason: string) => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
   splitTask: (taskId: string) => void;
@@ -89,6 +90,8 @@ export function WorkspaceView(props: {
         commitTask={commitTask}
         removeCommittedTask={removeCommittedTask}
         completeTask={completeTask}
+        acceptTask={acceptTask}
+        canReviewTask={props.canReviewTask}
         deleteTask={deleteTask}
         selectTask={selectTask}
         moveCommittedTask={moveCommittedTask}

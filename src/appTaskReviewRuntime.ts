@@ -41,10 +41,11 @@ export function createAppTaskReviewRuntime({
     setToast("已提交验收，等待项目负责人确认");
   };
 
-  const acceptTask = (taskId: string) => {
+  const acceptTask = async (taskId: string) => {
     const task = getState().tasks.find((item) => item.id === taskId);
     if (!task) return;
-    void runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "accept-review", workspaceId: task.workspaceId, idempotencyKey: `accept-review:${taskId}` });
+    const saved = await runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "accept-review", workspaceId: task.workspaceId, idempotencyKey: `accept-review:${taskId}` });
+    if (!saved) return;
     setSelectedTaskId((current) => (current === taskId ? null : current));
     setToast("验收通过，任务已完成");
   };

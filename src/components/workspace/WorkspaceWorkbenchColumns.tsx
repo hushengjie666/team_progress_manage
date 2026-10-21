@@ -15,6 +15,8 @@ type WorkspaceWorkbenchColumnsProps = {
   commitTask: (taskId: string) => void;
   removeCommittedTask: (taskId: string) => void;
   completeTask: (taskId: string) => void;
+  acceptTask: (taskId: string) => void;
+  canReviewTask: (task: Task) => boolean;
   deleteTask: (taskId: string) => void;
   selectTask: (taskId: string | null) => void;
   moveCommittedTask: (taskId: string, direction: -1 | 1) => void;
@@ -35,6 +37,8 @@ export function WorkspaceWorkbenchColumns({
   commitTask,
   removeCommittedTask,
   completeTask,
+  acceptTask,
+  canReviewTask,
   deleteTask,
   selectTask,
   moveCommittedTask,
@@ -85,6 +89,8 @@ export function WorkspaceWorkbenchColumns({
         actionLabel="加入队列"
         actionIcon={<ChevronRight size={15} />}
         onAction={commitTask}
+        onAccept={acceptTask}
+        canReviewTask={canReviewTask}
         onDelete={deleteTask}
         onSelect={selectTask}
         onSplit={splitTask}
@@ -101,6 +107,8 @@ export function WorkspaceWorkbenchColumns({
         onAction={beginFocus}
         onRemove={removeCommittedTask}
         onComplete={completeTask}
+        onAccept={acceptTask}
+        canReviewTask={canReviewTask}
         onSelect={selectTask}
         onSplit={splitTask}
         onMove={moveCommittedTask}

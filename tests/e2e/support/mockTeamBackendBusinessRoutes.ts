@@ -203,6 +203,24 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     return true;
   }
   const [currentKey, current] = currentEntry;
+  if (request.method() === "POST" && entity === "task" && parts[2] === "accept-review") {
+    const payload = current.payload as Record<string, unknown>;
+    if (payload.status !== "pending_review") {
+      await fulfillJson(route, { error: "task is not pending review" }, 409);
+      return true;
+    }
+    const timestamp = new Date().toISOString();
+    const row: BusinessRow = {
+      ...current,
+      updated_at: timestamp,
+      payload: { ...payload, status: "completed", progressPercent: 100,
+        reviewAcceptedAt: timestamp, completedAt: timestamp, updatedAt: timestamp } as never,
+    };
+    rowsByKey.set(currentKey, row);
+    rebuildStates(runtime, [...rowsByKey.values()]);
+    await fulfillJson(route, mutationDelta(request, [row]));
+    return true;
+  }
   if (request.method() === "POST" && entity === "project" && parts[2] === "move") {
     const targetWorkspace = String(body.target_workspace_id ?? "");
     const projectPatch = isObject(body.patch) ? body.patch : {};

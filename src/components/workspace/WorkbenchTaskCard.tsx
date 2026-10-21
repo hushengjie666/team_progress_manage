@@ -16,6 +16,7 @@ export function WorkbenchTaskCard({
   onDelete,
   onRemove,
   onComplete,
+  onAccept,
   onSelect,
   onSplit,
   onMove,
@@ -38,6 +39,7 @@ export function WorkbenchTaskCard({
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
+  onAccept?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
   onMove?: (taskId: string, direction: -1 | 1) => void;
@@ -89,6 +91,7 @@ export function WorkbenchTaskCard({
           onDelete={onDelete}
           onRemove={onRemove}
           onComplete={onComplete}
+          onAccept={onAccept}
           onSelect={onSelect}
           onSplit={onSplit}
           onMove={onMove}

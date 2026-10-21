@@ -1,5 +1,5 @@
 import type React from "react";
-import { Activity, ArrowDown, ArrowUp, Check, PanelRight, Split, Trash2, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowUp, Check, CircleCheck, PanelRight, Split, Trash2, X } from "lucide-react";
 import type { Task } from "../../types";
 
 type WorkbenchTaskActionsProps = {
@@ -14,6 +14,7 @@ type WorkbenchTaskActionsProps = {
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
+  onAccept?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
   onMove?: (taskId: string, direction: -1 | 1) => void;
@@ -33,6 +34,7 @@ export function WorkbenchTaskActions({
   onDelete,
   onRemove,
   onComplete,
+  onAccept,
   onSelect,
   onSplit,
   onMove,
@@ -53,6 +55,11 @@ export function WorkbenchTaskActions({
               <ArrowDown size={16} />
             </button>
           </>
+        )}
+        {onAccept && task.status === "pending_review" && (
+          <button className="icon-button small" type="button" title="快速验收通过" aria-label="快速验收通过" onClick={() => onAccept(task.id)}>
+            <CircleCheck size={16} />
+          </button>
         )}
         {onSelect && (
           <button className="icon-button small" title="任务详情" onClick={() => onSelect(task.id)}>
