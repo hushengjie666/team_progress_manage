@@ -34,8 +34,28 @@ export const teamRealtimeReconnectDelay = (failureCount: number) =>
 
 export const teamBusinessRefreshDelay = teamRealtimeReconnectDelay;
 
-export const mergeTeamBusinessRefreshState = (remote: AppState, current: AppState, now = new Date()) =>
-  preserveLocalUnpersistedTimer(remote, current, now);
+const refreshSnapshotKeys = [
+  "projects", "projectMembers", "tasks", "dailyPlans", "focusSessions", "workSessions",
+  "executionSignals", "interruptions", "rewardState", "taskTemplates", "templateInstances", "settings",
+] as const;
+
+export const canApplyTeamBusinessRefresh = (source: AppState, current: AppState) =>
+  source.auth.token === current.auth.token &&
+  source.backend.token === current.backend.token &&
+  source.backend.serverUrl === current.backend.serverUrl &&
+  source.auth.account?.id === current.auth.account?.id &&
+  !source.backend.pendingResourceKeys?.length &&
+  !current.backend.pendingResourceKeys?.length &&
+  refreshSnapshotKeys.every((key) => source[key] === current[key]);
+
+export const mergeTeamBusinessRefreshState = (
+  remote: AppState,
+  current: AppState,
+  now = new Date(),
+  source?: AppState,
+) => source && !canApplyTeamBusinessRefresh(source, current)
+  ? current
+  : preserveLocalUnpersistedTimer(remote, current, now);
 
 const realtimeSocketUrl = (serverUrl: string, ticket: string) => {
   const url = new URL(apiUrl(serverUrl, "/app/events"));
@@ -63,6 +83,8 @@ export function useTeamBusinessRefresh({
     let hasConnected = false;
     let forceResync = false;
     let refreshing = false;
+    let refreshRequested = false;
+    let refreshRetryTimer: number | undefined;
     const appliedMutationIds = new Set<string>();
 
     const setRealtimeStatus = (realtimeStatus: "connected" | "reconnecting" | "degraded") => {
@@ -70,18 +92,47 @@ export function useTeamBusinessRefresh({
       setState((value) => value ? { ...value, backend: { ...value.backend, realtimeStatus } } : value);
     };
 
+    const retryRefresh = () => {
+      if (cancelled || refreshRetryTimer !== undefined) return;
+      refreshRetryTimer = window.setTimeout(() => {
+        refreshRetryTimer = undefined;
+        void fullRefresh();
+      }, 1_000);
+    };
+
     const fullRefresh = async () => {
-      if (cancelled || refreshing) return;
+      if (cancelled) return;
+      if (refreshing) {
+        refreshRequested = true;
+        return;
+      }
       const current = stateRef.current;
       if (!current) return;
       refreshing = true;
       try {
         const remote = await loadTeamData(current);
-        if (!cancelled) setState((value) => value ? mergeTeamBusinessRefreshState(remote, value) : remote);
+        if (!cancelled) {
+          // A bootstrap is a replacement snapshot. Never let an in-flight snapshot
+          // erase a command or realtime delta received after the request started.
+          if (!stateRef.current || !canApplyTeamBusinessRefresh(current, stateRef.current)) {
+            refreshRequested = true;
+          } else {
+            setState((value) => {
+              if (!value) return value;
+              const merged = mergeTeamBusinessRefreshState(remote, value, new Date(), current);
+              if (merged === value) retryRefresh();
+              return merged;
+            });
+          }
+        }
       } catch {
         if (!cancelled) setRealtimeStatus("degraded");
       } finally {
         refreshing = false;
+        if (refreshRequested) {
+          refreshRequested = false;
+          retryRefresh();
+        }
       }
     };
 
@@ -183,6 +234,7 @@ export function useTeamBusinessRefresh({
     return () => {
       cancelled = true;
       if (reconnectTimer !== undefined) window.clearTimeout(reconnectTimer);
+      if (refreshRetryTimer !== undefined) window.clearTimeout(refreshRetryTimer);
       stopDegradedMode();
       if (socket) {
         socket.onclose = null;
