@@ -39,6 +39,17 @@ afterEach(() => {
 });
 
 describe("timer sound playback", () => {
+  it.each([
+    ["soft", "triangle", 0.18], ["bell", "sine", 0.15], ["digital", "square", 0.06],
+  ] as const)("balances %s playback while retaining the selected volume", async (profile, waveform, gain) => {
+    const { context, oscillators } = audioMock();
+    const { playTimerSound } = await import("./notifications");
+    await playTimerSound({ ...soundSettings, timerEndSound: profile, timerEndSoundRepeats: 1 });
+    expect(oscillators[0].type).toBe(waveform);
+    expect(context.createGain.mock.results[0].value.gain.exponentialRampToValueAtTime)
+      .toHaveBeenCalledWith(gain, 10.02);
+  });
+
   it("uses native Mac playback for previews and automatic completion alerts", async () => {
     const { ctor } = audioMock();
     Object.assign(window, { __TAURI_INTERNALS__: {} });

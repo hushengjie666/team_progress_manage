@@ -27,6 +27,13 @@ fn timer_sound_wav(profile: &str, repeats: u8) -> Vec<u8> {
         "digital" => 520.0,
         _ => 660.0,
     };
+    // Match the Web Audio levels in notifications.ts: lift the quieter tones
+    // and reduce the square wave's more prominent harmonics.
+    let peak_gain = match profile {
+        "digital" => 0.12_f64,
+        "bell" => 0.30_f64,
+        _ => 0.36_f64,
+    };
     for index in 0..sample_count {
         let offset = index % (tone_samples + gap_samples);
         let time = offset as f64 / SAMPLE_RATE as f64;
@@ -43,9 +50,9 @@ fn timer_sound_wav(profile: &str, repeats: u8) -> Vec<u8> {
             _ => 1.0 - 4.0 * (phase - 0.5).abs(),
         };
         let gain = if time < 0.02 {
-            0.0001_f64 * (0.18_f64 / 0.0001).powf(time / 0.02)
+            0.0001_f64 * (peak_gain / 0.0001).powf(time / 0.02)
         } else if time < 0.75 {
-            0.18_f64 * (0.0001_f64 / 0.18).powf((time - 0.02) / 0.73)
+            peak_gain * (0.0001_f64 / peak_gain).powf((time - 0.02) / 0.73)
         } else {
             0.0
         };
@@ -79,6 +86,35 @@ pub(crate) fn play(profile: &str, volume: u8, repeats: u8) -> Result<(), String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quieter_tones_are_audible_and_electronic_tone_is_restrained() {
+        let mut rms = Vec::new();
+        for profile in ["soft", "bell", "digital"] {
+            let wav = timer_sound_wav(profile, 1);
+            let samples: Vec<f64> = wav[44..]
+                .chunks_exact(2)
+                .map(|bytes| i16::from_le_bytes([bytes[0], bytes[1]]) as f64 / i16::MAX as f64)
+                .collect();
+            assert!(samples.iter().all(|sample| sample.abs() < 0.37));
+            rms.push(
+                (samples.iter().map(|sample| sample * sample).sum::<f64>() / samples.len() as f64)
+                    .sqrt(),
+            );
+        }
+        assert!(
+            rms[0] > 0.045 && rms[1] > 0.045,
+            "Soft and bell tones must remain audible: {rms:?}"
+        );
+        assert!(
+            (0.9..1.1).contains(&(rms[0] / rms[1])),
+            "Soft and bell energy should be close: {rms:?}"
+        );
+        assert!(
+            (0.4..0.75).contains(&(rms[2] / rms[0])),
+            "Restrain the electronic tone's stronger harmonics: {rms:?}"
+        );
+    }
 
     #[test]
     fn wav_is_decodable_and_preserves_repeat_duration() {

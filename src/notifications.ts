@@ -141,7 +141,10 @@ export async function playTimerSound(settings: TimerSoundSettings): Promise<void
 const scheduleTimerSound = (context: AudioContext, settings: TimerSoundSettings, volume: number) => {
   const profile = settings.timerEndSound;
   const repeats = normalizeTimerSoundRepeats(settings.timerEndSoundRepeats);
-  const peakGain = 0.18 * (volume / 100);
+  // Compensate for the quieter triangle/sine tones and the square wave's
+  // stronger harmonics. Keep these levels aligned with timer_sound.rs.
+  const profileGain = profile === "digital" ? 0.12 : profile === "bell" ? 0.30 : 0.36;
+  const peakGain = profileGain * (volume / 100);
   const duration = 0.8;
   const gap = 0.25;
 
