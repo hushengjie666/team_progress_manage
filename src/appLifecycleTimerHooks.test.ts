@@ -13,10 +13,14 @@ afterEach(() => {
 });
 
 describe("timer expiration lifecycle", () => {
-  it.each(["interval", "restore"] as const)("settles once when %s callbacks arrive before React renders", (surface) => {
-    const state = startTimerInState(createInitialState(), "focus", undefined,
+  it.each([
+    ["interval", "focus"], ["restore", "focus"],
+    ["interval", "short_break"], ["restore", "short_break"],
+    ["interval", "long_break"], ["restore", "long_break"],
+  ] as const)("settles and announces once when %s callbacks expire %s before React renders", (surface, mode) => {
+    const state = startTimerInState(createInitialState(), mode, undefined,
       new Date(Date.now() - 26 * 60_000).toISOString());
-    state.activeTimer!.workSessionId = "work_expired";
+    if (mode === "focus") state.activeTimer!.workSessionId = "work_expired";
     const stateRef = { current: state };
     const callbacks: Array<() => void> = [];
     vi.stubGlobal("window", {
@@ -35,10 +39,14 @@ describe("timer expiration lifecycle", () => {
     callbacks[0]();
     callbacks[0]();
 
-    expect(stateRef.current.activeTimer).toMatchObject({ mode: "short_break", prepared: true });
+    expect(stateRef.current.activeTimer).toMatchObject({ mode: mode === "focus" ? "short_break" : "focus", prepared: true });
     expect(mocks.announceTimerEnd).toHaveBeenCalledOnce();
-    expect(runTeamCommand).toHaveBeenCalledOnce();
-    expect(runTeamCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "work_expired", action: "finish" }));
+    if (mode === "focus") {
+      expect(runTeamCommand).toHaveBeenCalledOnce();
+      expect(runTeamCommand).toHaveBeenCalledWith(expect.objectContaining({ id: "work_expired", action: "finish" }));
+    } else {
+      expect(runTeamCommand).not.toHaveBeenCalled();
+    }
     expect(setState.mock.calls[0][0].activeTimer?.sessionId).toBe(stateRef.current.activeTimer?.sessionId);
   });
 });

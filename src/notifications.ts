@@ -115,6 +115,20 @@ export async function playTimerSound(settings: TimerSoundSettings): Promise<void
   const volume = normalizeTimerSoundVolume(settings.timerEndSoundVolume);
   if (volume <= 0) return;
   try {
+    const platform = platformCapabilities();
+    if (platform.isTauri && !platform.isIOS && /Mac/i.test(navigator.platform)) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("play_timer_sound_command", {
+          profile: settings.timerEndSound,
+          volume,
+          repeats: normalizeTimerSoundRepeats(settings.timerEndSoundRepeats),
+        });
+        return;
+      } catch (error) {
+        console.error("Failed to play native timer sound; trying Web Audio", error);
+      }
+    }
     const context = getTimerSoundContext();
     if (!context) return;
     if (context.state !== "running") await context.resume();

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const native = vi.hoisted(() => ({ invoke: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: native.invoke }));
+
 const soundSettings = { soundEnabled: true, timerEndSound: "bell" as const, timerEndSoundVolume: 50, timerEndSoundRepeats: 3 };
 
 const audioMock = (state = "running") => {
@@ -26,13 +29,42 @@ const audioMock = (state = "running") => {
   return { context, ctor, oscillators };
 };
 
-beforeEach(() => vi.resetModules());
+beforeEach(() => {
+  vi.resetModules();
+  native.invoke.mockReset().mockResolvedValue(undefined);
+});
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("timer sound playback", () => {
+  it("uses native Mac playback for previews and automatic completion alerts", async () => {
+    const { ctor } = audioMock();
+    Object.assign(window, { __TAURI_INTERNALS__: {} });
+    vi.stubGlobal("navigator", { platform: "MacIntel", userAgent: "Macintosh", maxTouchPoints: 0 });
+    const { playTimerSound } = await import("./notifications");
+    await playTimerSound(soundSettings);
+    expect(native.invoke).toHaveBeenCalledWith("play_timer_sound_command", {
+      profile: "bell", volume: 50, repeats: 3,
+    });
+    expect(ctor).not.toHaveBeenCalled();
+    await playTimerSound({ ...soundSettings, soundEnabled: false });
+    await playTimerSound({ ...soundSettings, timerEndSoundVolume: 0 });
+    expect(native.invoke).toHaveBeenCalledOnce();
+  });
+
+  it("falls back to Web Audio if native Mac playback fails", async () => {
+    const { oscillators } = audioMock();
+    Object.assign(window, { __TAURI_INTERNALS__: {} });
+    vi.stubGlobal("navigator", { platform: "MacIntel", userAgent: "Macintosh", maxTouchPoints: 0 });
+    native.invoke.mockRejectedValue(new Error("native playback unavailable"));
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { playTimerSound } = await import("./notifications");
+    await expect(playTimerSound(soundSettings)).resolves.toBeUndefined();
+    expect(oscillators).toHaveLength(3);
+  });
+
   it("reuses the context unlocked by a gesture for later automatic reminders", async () => {
     const { context, ctor, oscillators } = audioMock("suspended");
     const { prepareTimerSound, playTimerSound } = await import("./notifications");

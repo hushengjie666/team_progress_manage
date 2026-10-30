@@ -2,6 +2,23 @@ use tauri::Manager;
 
 #[cfg(desktop)]
 mod desktop_timer_tray;
+#[cfg(target_os = "macos")]
+mod timer_sound;
+
+#[tauri::command]
+async fn play_timer_sound_command(profile: String, volume: u8, repeats: u8) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        return tauri::async_runtime::spawn_blocking(move || timer_sound::play(&profile, volume, repeats))
+            .await
+            .map_err(|error| error.to_string())?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (profile, volume, repeats);
+        Err("Native timer sound is only available on macOS".into())
+    }
+}
 
 fn restore_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
@@ -145,6 +162,7 @@ pub fn run() {
     let app = builder
         .invoke_handler(tauri::generate_handler![
             restore_main_window_command,
+            play_timer_sound_command,
             sync_desktop_timer_status_command
         ])
         .setup(|app| {

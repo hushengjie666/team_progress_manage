@@ -114,7 +114,7 @@ describe("TimeManage Tauri desktop smoke", () => {
     await waitForText("退出登录");
   });
 
-  it("plays the automatic timer reminder through the desktop WebView audio output", async () => {
+  it("plays the automatic timer reminder through the desktop audio output", async () => {
     await browser.execute((key) => {
       const stored = JSON.parse(localStorage.getItem(key));
       stored.settings = {
@@ -126,9 +126,20 @@ describe("TimeManage Tauri desktop smoke", () => {
     await browser.refresh();
     await waitForText("项目总览");
     await waitForText("开始工作");
+    if (process.platform === "darwin") {
+      await browser.executeAsync((done) => {
+        window.__TAURI_INTERNALS__.invoke("play_timer_sound_command", { profile: "bell", volume: 50, repeats: 1 })
+          .then(() => done({ ok: true }), (error) => done({ error: String(error) }));
+      }).then((result) => assert.deepEqual(result, { ok: true }));
+    }
     await browser.execute(() => {
       window.timerAudioObserved = { contexts: 0, oscillators: 0, peak: 0, errors: [] };
       const observed = window.timerAudioObserved;
+      const logError = console.error.bind(console);
+      console.error = (...args) => {
+        if (String(args[0]).includes("timer sound")) observed.errors.push(args.map(String).join(" "));
+        logError(...args);
+      };
       window.addEventListener("error", (event) => observed.errors.push(event.message));
       const NativeAudioContext = window.AudioContext;
       window.AudioContext = class extends NativeAudioContext {
@@ -164,11 +175,27 @@ describe("TimeManage Tauri desktop smoke", () => {
     await waitForText("短休息");
     await clickButton("短休息");
     await browser.waitUntil(async () => {
-      return (await browser.execute(() => window.timerAudioObserved.peak)) > 0.001;
-    }, { timeout: 10000, timeoutMsg: "The desktop timer produced no audio signal" });
+      return browser.execute(() => /Mac/i.test(navigator.platform)
+        ? JSON.parse(localStorage.getItem("timemanage.ios.activeTimer.v1"))?.timer?.mode === "focus" &&
+          document.querySelector(".timer-countdown")?.textContent === "25:00"
+        : window.timerAudioObserved.peak > 0.001);
+    }, { timeout: 10000, timeoutMsg: "The desktop timer produced no audio signal" }).catch(async (error) => {
+      const diagnostic = await browser.execute(() => ({
+        observed: window.timerAudioObserved,
+        countdown: document.querySelector(".timer-countdown")?.textContent,
+        timer: JSON.parse(localStorage.getItem("timemanage.app_state.v4"))?.activeTimer,
+        settings: JSON.parse(localStorage.getItem("timemanage.app_state.v4"))?.settings,
+        snapshot: localStorage.getItem("timemanage.ios.activeTimer.v1"),
+      }));
+      throw new Error(`${error.message}: ${JSON.stringify(diagnostic)}`);
+    });
     const observed = await browser.execute(() => window.timerAudioObserved);
     assert.equal(observed.contexts, 1);
-    assert.equal(observed.oscillators, 3);
+    if (process.platform === "darwin") {
+      assert.equal(observed.oscillators, 0);
+    } else {
+      assert.equal(observed.oscillators, 3);
+    }
     assert.deepEqual(observed.errors, []);
     await browser.waitUntil(async () => {
       return browser.execute(() => document.querySelector(".timer-countdown")?.textContent === "25:00");
