@@ -27,11 +27,11 @@ for (const mode of ["regular", "software"] as TaskStageMode[]) {
     await openApp(page, state);
     await page.getByRole("button", { name: "进入项目" }).first().click();
     const overview = page.locator(".project-stage-overview");
-    await expect(overview.getByRole("button")).toHaveCount(state.tasks.length);
+    await expect(overview.locator(".project-stage-task-open")).toHaveCount(state.tasks.length);
     for (const { label } of taskStageOptions) {
       const row = overview.locator(".project-stage-row").filter({ has: page.locator(".project-stage-label strong", { hasText: label }) });
       await expect(row.locator(".project-stage-label span")).toHaveText("1");
-      await expect(row.getByRole("button", { name: `E2E ${label}阶段任务` })).toBeVisible();
+      await expect(row.locator(".project-stage-task-open")).toContainText(`E2E ${label}阶段任务`);
     }
     await page.getByRole("button", { name: "任务", exact: true }).click();
     await expect(page.locator(".project-task-row")).toHaveCount(state.tasks.length);

@@ -14,6 +14,7 @@ export type ProjectDetailViewProps = {
   allProjectMembers: ProjectMember[];
   availableWorkspaces: Workspace[];
   currentProjectMemberId?: string;
+  currentAccountId?: string;
   activeTab: ProjectDetailTab;
   setActiveTab: (tab: ProjectDetailTab) => void;
   selectedTask?: Task;

@@ -1,4 +1,4 @@
-import { Eye, UserRoundPen } from "lucide-react";
+import { Bot, Eye, UserRoundPen } from "lucide-react";
 import { labelPriority, taskStageOptionsForTasks } from "../../appModel";
 import {
   stageTaskCardClassName,
@@ -15,6 +15,7 @@ export function ProjectOverviewTaskBoard(props: {
   selectTask: (taskId: string) => void;
   activeTaskIds: string[];
   taskStageMode: TaskStageMode;
+  analyzeTask?: (taskId: string) => void;
 }) {
   const activeTaskIdSet = new Set(props.activeTaskIds);
   const todayTaskIdSet = new Set(props.todayTaskIds);
@@ -45,30 +46,37 @@ export function ProjectOverviewTaskBoard(props: {
     const statePills = stageTaskStatePills(task.status, showsActiveState);
     const executorName = task.primaryExecutorMemberId ? membersById.get(task.primaryExecutorMemberId)?.name ?? "已分配" : undefined;
     return (
-      <button
+      <div
         className={stageTaskCardClassName(task.status, showsActiveState, isTodayTask)}
         key={task.id}
-        onClick={() => props.selectTask(task.id)}
-        type="button"
       >
-        <div className="project-stage-task-main">
-          <strong>{task.title}</strong>
-          <span>{statusLabel} · {labelPriority[task.priority]} · {task.progressPercent ?? 0}% · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
-        </div>
-        {showsActiveState && (
-          <span className="working-indicator" aria-label="当前任务执行中">
-            <UserRoundPen size={32} />
-          </span>
-        )}
-        <div className="project-stage-task-tags">
-          {executorName ? <span className="task-info-pill assignee">{executorName}</span> : <span className="task-info-pill muted">未分配</span>}
-          {isTodayTask && <span className="task-info-pill today">今日</span>}
-          {statePills.map((pill) => (
-            <span className={`task-info-pill ${pill.className}`} key={pill.className}>{pill.label}</span>
-          ))}
-          <Eye size={14} />
-        </div>
-      </button>
+        <button className="project-stage-task-open" onClick={() => props.selectTask(task.id)} type="button">
+          <div className="project-stage-task-main">
+            <strong>{task.title}</strong>
+            <span>{statusLabel} · {labelPriority[task.priority]} · {task.progressPercent ?? 0}% · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
+          </div>
+          {showsActiveState && (
+            <span className="working-indicator" aria-label="当前任务执行中">
+              <UserRoundPen size={32} />
+            </span>
+          )}
+          <div className="project-stage-task-tags">
+            {executorName ? <span className="task-info-pill assignee">{executorName}</span> : <span className="task-info-pill muted">未分配</span>}
+            {isTodayTask && <span className="task-info-pill today">今日</span>}
+            {statePills.map((pill) => (
+              <span className={`task-info-pill ${pill.className}`} key={pill.className}>{pill.label}</span>
+            ))}
+            <Eye size={14} />
+          </div>
+        </button>
+        {props.analyzeTask && <button
+          className="project-stage-task-ai"
+          type="button"
+          aria-label={`AI 需求分析：${task.title}`}
+          title="AI 需求分析"
+          onClick={() => props.analyzeTask?.(task.id)}
+        ><Bot size={17} /><span>AI</span></button>}
+      </div>
     );
   };
 

@@ -7,6 +7,7 @@ sync-server/config.local.json
 .codegraph
 .DS_Store
 *.log
+.env.local
 test-results
 playwright-report
 deploy/

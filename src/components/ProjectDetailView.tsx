@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { TaskDetailModal } from "./taskDetail/TaskDetailModal";
+import { TaskAiDialog } from "./projectDetail/TaskAiDialog";
 import { ProjectDetailHero } from "./projectDetail/ProjectDetailHero";
 import { ProjectDetailMembersTab } from "./projectDetail/ProjectDetailMembersTab";
 import { ProjectDetailOverviewTab } from "./projectDetail/ProjectDetailOverviewTab";
@@ -13,6 +15,8 @@ export type { ProjectDetailTab, ProjectDetailViewProps } from "./projectDetail/p
 
 export function ProjectDetailView(props: ProjectDetailViewProps) {
   const detail = useProjectDetailController(props);
+  const [aiTaskId, setAiTaskId] = useState<string>();
+  useEffect(() => setAiTaskId(undefined), [props.model?.project.id, props.currentAccountId]);
 
   if (!detail.hasModel) {
     return (
@@ -22,6 +26,8 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
       </section>
     );
   }
+
+  const aiTask = detail.allProjectTasks.find((task) => task.id === aiTaskId);
 
   return (
     <div className="project-detail-layout">
@@ -51,6 +57,7 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
           riskTaskCount={detail.riskTaskCount}
           selectTask={props.selectTask}
           openCreateTaskDialog={detail.openCreateTaskDialog}
+          analyzeTask={import.meta.env.DEV && detail.access.canEditTasks ? setAiTaskId : undefined}
         />
       )}
 
@@ -116,6 +123,14 @@ export function ProjectDetailView(props: ProjectDetailViewProps) {
         />
       )}
 
+      {aiTask && <TaskAiDialog
+        key={`${props.currentAccountId}:${aiTask.id}`}
+        task={{ ...aiTask, workspaceId: aiTask.workspaceId ?? detail.project.workspaceId ?? detail.model.workspace?.id }}
+        ownerId={props.currentAccountId ?? props.currentProjectMemberId ?? "local"}
+        canEdit={detail.access.canEditTasks}
+        close={() => setAiTaskId(undefined)}
+        updateTask={props.updateTask}
+      />}
       <TaskDetailModal
         task={props.selectedTask?.projectId === detail.project.id ? props.selectedTask : undefined}
         projects={props.allProjects}
