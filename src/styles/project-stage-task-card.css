@@ -161,59 +161,6 @@
   gap: 5px;
 }
 
-.project-stage-task-open {
-  min-width: 0;
-  display: grid;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-}
-
-.project-stage-task-card:has(.project-stage-task-ai) .project-stage-task-main {
-  padding-right: 49px;
-}
-
-.project-stage-task-open::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.project-stage-task-ai {
-  z-index: 1;
-  position: absolute;
-  top: 7px;
-  right: 7px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 28px;
-  padding: 0 5px;
-  border: 1px solid #d5e5e1;
-  border-radius: 6px;
-  color: #246c60;
-  background: #eff7f4;
-  font-size: 10px;
-  font-weight: 800;
-}
-
-.project-stage-task-ai:hover {
-  border-color: #76aa9e;
-  background: #dfeee9;
-}
-
-.project-stage-task-ai:focus-visible,
-.project-stage-task-open:focus-visible {
-  outline: 2px solid #246c60;
-  outline-offset: 3px;
-}
-
 .task-info-pill {
   min-height: 22px;
   display: inline-flex;

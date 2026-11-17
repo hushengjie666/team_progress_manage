@@ -18,7 +18,6 @@ type ProjectDetailOverviewTabProps = {
   riskTaskCount: number;
   selectTask: (taskId: string | null) => void;
   openCreateTaskDialog: () => void;
-  analyzeTask?: (taskId: string) => void;
 };
 
 export function ProjectDetailOverviewTab({
@@ -34,7 +33,6 @@ export function ProjectDetailOverviewTab({
   riskTaskCount,
   selectTask,
   openCreateTaskDialog,
-  analyzeTask,
 }: ProjectDetailOverviewTabProps) {
   return (
     <>
@@ -56,7 +54,6 @@ export function ProjectDetailOverviewTab({
           selectTask={selectTask}
           activeTaskIds={activeProjectTaskIds}
           taskStageMode={taskStageMode}
-          analyzeTask={analyzeTask}
         />
       </section>
       <ProjectRiskSignalPanel

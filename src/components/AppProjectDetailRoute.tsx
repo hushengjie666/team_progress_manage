@@ -53,7 +53,6 @@ export function AppProjectDetailRoute({
       allProjectMembers={state.projectMembers}
       availableWorkspaces={visibleWorkspaces}
       currentProjectMemberId={currentProjectMemberId}
-      currentAccountId={state.auth.account?.id}
       activeTab={projectDetailTab}
       setActiveTab={setProjectDetailTab}
       selectedTask={selectedTask}
