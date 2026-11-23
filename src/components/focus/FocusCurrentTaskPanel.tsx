@@ -4,6 +4,7 @@ import { PomodoroProgress } from "./PomodoroProgress";
 
 export function FocusCurrentTaskPanel(props: {
   currentTask?: Task;
+  outsideTodayList: boolean;
   autoAcceptCompletedTasks: boolean;
   completeTask: (taskId: string) => void;
 }) {
@@ -28,6 +29,7 @@ export function FocusCurrentTaskPanel(props: {
           <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} />
           <div className="task-meta">
             <span>{currentTask.project}</span>
+            {props.outsideTodayList && <span className="task-state-chip">未列入今日任务</span>}
           </div>
           {isPendingReview ? (
             <button className="small-button" disabled>

@@ -29,11 +29,8 @@ const focusTaskStatusRank = (task: Task) => {
   return 3;
 };
 
-export const buildFocusTaskList = (currentTask: Task | undefined, committedTasks: Task[], _activeTaskId?: string) =>
-  [
-    ...(currentTask && !committedTasks.some((task) => task.id === currentTask.id) ? [currentTask] : []),
-    ...committedTasks,
-  ]
+export const buildFocusTaskList = (committedTasks: Task[]) =>
+  committedTasks
     .filter(isVisibleFocusTask)
     .sort((left, right) => focusTaskStatusRank(left) - focusTaskStatusRank(right) || left.sortOrder - right.sortOrder);
 

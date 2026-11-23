@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createAppFocusActionsRuntime } from "./appFocusActionsRuntime";
+import { getTodayPlan } from "./appTodayPlan";
 import { createTestState } from "./test/fixtures";
 import type { AppState } from "./types";
 
@@ -60,6 +61,36 @@ describe("app focus actions runtime", () => {
         work_session_id: state.activeTimer?.workSessionId,
       }),
     }));
+  });
+
+  it("restores today's existing plan when starting an unplanned task fails", async () => {
+    const initial = createTestState();
+    const task = initial.tasks[2];
+    const todayPlan = getTodayPlan(initial);
+    const olderPlan = { ...todayPlan, id: "plan_older", date: "2026-01-01", committedTaskIds: [task.id] };
+    let state: AppState = { ...initial, dailyPlans: [olderPlan, todayPlan] };
+    const runTeamCommand = vi.fn(async (_command, behavior) => {
+      const optimistic = behavior.optimistic(state);
+      expect(getTodayPlan(optimistic.next).committedTaskIds).toContain(task.id);
+      state = optimistic.rollback(optimistic.next);
+      return undefined;
+    });
+    const runtime = createAppFocusActionsRuntime({
+      getState: () => state,
+      getQuickNote: () => "",
+      updateState: vi.fn(),
+      runTeamCommand,
+      setQuickNote: vi.fn(),
+      setToast: vi.fn(),
+      setPreferredFocusTaskId: vi.fn(),
+      setPendingReset: vi.fn(),
+    });
+
+    await runtime.beginTimer("focus", task.id);
+
+    expect(state.dailyPlans).toEqual([olderPlan, todayPlan]);
+    expect(state.tasks[2]).toEqual(task);
+    expect(state.activeTimer).toBeUndefined();
   });
 
   it("pauses a newly started server session before the work-session list catches up", async () => {

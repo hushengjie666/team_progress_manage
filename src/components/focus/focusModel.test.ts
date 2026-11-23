@@ -25,19 +25,17 @@ const task = (id: string, projectId: string, project: string, sortOrder: number)
 });
 
 describe("focus task ordering", () => {
-  it("keeps task and project group order stable when the active task changes", () => {
+  it("sorts tasks within their status and keeps project groups in queue order", () => {
     const tasks = [
       task("task_a1", "project_a", "项目 A", 10),
       task("task_b1", "project_b", "项目 B", 20),
       task("task_a2", "project_a", "项目 A", 30),
     ];
 
-    const idle = buildFocusTaskList(undefined, tasks);
-    const activeSecondProject = buildFocusTaskList(tasks[1], tasks, "task_b1");
+    const ordered = buildFocusTaskList([tasks[2], tasks[0], tasks[1]]);
 
-    expect(idle.map((item) => item.id)).toEqual(["task_a1", "task_b1", "task_a2"]);
-    expect(activeSecondProject.map((item) => item.id)).toEqual(["task_a1", "task_b1", "task_a2"]);
-    expect(groupFocusTasksByProject(activeSecondProject).map((group) => group.projectId)).toEqual(["project_a", "project_b"]);
+    expect(ordered.map((item) => item.id)).toEqual(["task_a1", "task_b1", "task_a2"]);
+    expect(groupFocusTasksByProject(ordered).map((group) => group.projectId)).toEqual(["project_a", "project_b"]);
   });
 
   it("puts unfinished tasks before completed tasks", () => {
@@ -45,7 +43,7 @@ describe("focus task ordering", () => {
     const committedLater = task("task_committed", "project_a", "项目 A", 20);
     const reviewLater = { ...task("task_review", "project_a", "项目 A", 30), status: "pending_review" as const };
 
-    const tasks = buildFocusTaskList(undefined, [completedEarly, committedLater, reviewLater]);
+    const tasks = buildFocusTaskList([completedEarly, committedLater, reviewLater]);
 
     expect(tasks.map((item) => item.id)).toEqual([committedLater.id, reviewLater.id, completedEarly.id]);
   });
@@ -63,7 +61,7 @@ describe("focus task ordering", () => {
       ["completed", "pending_review", "completed"],
     ] as Task["status"][][]) {
       const updated = tasks.map((item, index) => ({ ...item, status: statuses[index] }));
-      const groups = groupFocusTasksByProject(buildFocusTaskList(undefined, updated));
+      const groups = groupFocusTasksByProject(buildFocusTaskList(updated));
       expect(groups.map((group) => group.projectId)).toEqual(["project_a", "project_b"]);
       expect(groups[0].tasks.map((item) => item.id)).toEqual(statuses[2] === "in_progress"
         ? ["task_a2", "task_a1"] : ["task_a1", "task_a2"]);
@@ -74,9 +72,9 @@ describe("focus task ordering", () => {
     const first = task("task_a", "project_a", "项目 A", 10);
     const second = task("task_b", "project_b", "项目 B", 10);
     const active = { ...second, status: "in_progress" as const };
-    expect(groupFocusTasksByProject(buildFocusTaskList(undefined, [second, first])).map((group) => group.projectId))
+    expect(groupFocusTasksByProject(buildFocusTaskList([second, first])).map((group) => group.projectId))
       .toEqual(["project_a", "project_b"]);
-    expect(groupFocusTasksByProject(buildFocusTaskList(active, [first, active])).map((group) => group.projectId))
+    expect(groupFocusTasksByProject(buildFocusTaskList([first, active])).map((group) => group.projectId))
       .toEqual(["project_a", "project_b"]);
   });
 
@@ -84,7 +82,7 @@ describe("focus task ordering", () => {
     const committed = task("task_committed", "project_a", "项目 A", 10);
     const pendingReview = { ...task("task_review", "project_a", "项目 A", 20), status: "pending_review" as const };
 
-    const tasks = buildFocusTaskList(pendingReview, [committed, pendingReview], pendingReview.id);
+    const tasks = buildFocusTaskList([committed, pendingReview]);
 
     expect(tasks.map((item) => item.id)).toEqual([committed.id, pendingReview.id]);
   });
@@ -93,19 +91,9 @@ describe("focus task ordering", () => {
     const committed = task("task_committed", "project_a", "项目 A", 10);
     const completed = { ...task("task_completed", "project_a", "项目 A", 20), status: "completed" as const };
 
-    const tasks = buildFocusTaskList(undefined, [committed, completed]);
+    const tasks = buildFocusTaskList([committed, completed]);
 
     expect(tasks.map((item) => item.id)).toEqual([committed.id, completed.id]);
-  });
-
-  it("keeps a same-scope timed task visible outside the daily queue", () => {
-    const current = task("task_current", "project_scoped", "当前工作区", 10);
-    const scoped = task("task_scoped", "project_scoped", "当前工作区", 20);
-
-    expect(buildFocusTaskList(current, [scoped]).map((item) => item.id)).toEqual([
-      current.id,
-      scoped.id,
-    ]);
   });
 
   it("keeps the full minute visible briefly, then moves on the next second", () => {

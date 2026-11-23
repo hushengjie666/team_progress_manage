@@ -54,8 +54,8 @@ export function ProjectTaskRow(props: {
       <div className="button-row">
         {props.canEdit && <button className="icon-button small danger" title="删除任务" type="button" onClick={() => props.deleteTask(props.task.id)}><Trash2 size={16} /></button>}
         <button className="small-button" onClick={() => props.selectTask(props.task.id)}>详情</button>
-        {props.task.status !== "completed" && props.task.status !== "split" && props.task.status !== "archived" && (
-          <button className="small-button" onClick={() => props.beginFocus(props.task.id)}>
+        {(props.task.status === "pool" || props.task.status === "committed" || props.task.status === "in_progress") && (
+          <button className="small-button" title="开始番茄并加入今日计划" onClick={() => props.beginFocus(props.task.id)}>
             <ChevronRight size={14} />
             开始
           </button>

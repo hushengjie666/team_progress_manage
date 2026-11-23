@@ -21,8 +21,9 @@ export function FocusView(props: {
   const { state, currentTask, committedTasks } = props;
   const active = props.activeTimer;
   const activeTaskId = active?.taskId;
-  const todayWorkTasks = buildFocusTaskList(currentTask, committedTasks, activeTaskId);
+  const todayWorkTasks = buildFocusTaskList(committedTasks);
   const groupedWorkTasks = groupFocusTasksByProject(todayWorkTasks);
+  const currentTaskOutsideTodayList = Boolean(currentTask && !todayWorkTasks.some((task) => task.id === currentTask.id));
 
   return (
     <div className="focus-layout">
@@ -30,6 +31,7 @@ export function FocusView(props: {
         <div className="focus-stage-inner">
           <FocusCurrentTaskPanel
             currentTask={currentTask}
+            outsideTodayList={currentTaskOutsideTodayList}
             autoAcceptCompletedTasks={state.projects.find((project) => project.id === currentTask?.projectId)?.autoAcceptCompletedTasks !== false}
             completeTask={props.completeTask}
           />

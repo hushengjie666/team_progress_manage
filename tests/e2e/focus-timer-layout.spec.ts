@@ -9,6 +9,64 @@ import { rowsFromState } from "./support/mockTeamBackendState";
 
 test.use({ viewport: { width: 1280, height: 820 } });
 
+test("removes a running task from today's list while keeping its timer available", async ({ page }) => {
+  const initial = authenticatedState();
+  const task = initial.tasks[0];
+  const state = startTimerInState(initial, "focus", task.id, new Date().toISOString(), "focus_outside_today",
+    { workSessionId: "work_outside_today" });
+  const showFocus = () => page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
+  const todayList = page.locator(".focus-todo-list");
+  const currentTask = page.locator(".focus-current-panel");
+  const pause = page.locator(".focus-timer-panel").getByRole("button", { name: "暂停", exact: true });
+
+  await openApp(page, state);
+  await showFocus();
+  await expect(todayList).toContainText(task.title);
+  await expect(pause).toBeVisible();
+
+  await page.getByLabel("页面导航").getByRole("button", { name: "我的任务" }).click();
+  const saved = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/remove-task"));
+  await page.locator(".task-item").filter({ hasText: task.title }).getByRole("button", { name: "移回活动清单" }).click();
+  expect((await saved).ok()).toBe(true);
+
+  await showFocus();
+  await expect(todayList).not.toContainText(task.title);
+  await expect(currentTask).toContainText(task.title);
+  await expect(currentTask).toContainText("未列入今日任务");
+  await expect(pause).toBeVisible();
+
+  await page.reload();
+  await showFocus();
+  await expect(todayList).not.toContainText(task.title);
+  await expect(currentTask).toContainText("未列入今日任务");
+  await expect(pause).toBeVisible();
+});
+
+test("keeps today's plan intact when starting an unplanned task from a project fails", async ({ page }) => {
+  const state = authenticatedState();
+  const planned = state.tasks[0];
+  const unplanned = { ...planned, id: "task_unplanned_start", title: "未安排的项目任务", status: "pool" as const };
+  state.tasks.push(unplanned);
+  await openApp(page, state);
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST") writes.push(new URL(request.url()).pathname);
+  });
+  await page.route(`${MOCK_SERVER}/tasks/${unplanned.id}/start*`, (route) => route.fulfill({
+    status: 403, contentType: "application/json", body: JSON.stringify({ error: "start denied" }),
+  }));
+
+  await page.getByRole("button", { name: "进入项目", exact: true }).first().click();
+  await page.getByRole("button", { name: "任务", exact: true }).click();
+  const row = page.locator(".project-task-row").filter({ hasText: unplanned.title });
+  await row.getByTitle("开始番茄并加入今日计划").click();
+
+  await expect(page.getByRole("alert")).toContainText("start denied");
+  await expect(page.locator(".focus-todo-list")).toContainText(planned.title);
+  await expect(page.locator(".focus-todo-list")).not.toContainText(unplanned.title);
+  expect(writes.filter((path) => path.endsWith("/add-task"))).toEqual([]);
+});
+
 test("keeps today project cards in place when starting and switching tasks", async ({ page }, testInfo) => {
   const state = authenticatedState();
   const firstProject = state.projects[0];

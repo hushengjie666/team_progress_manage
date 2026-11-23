@@ -9,7 +9,7 @@ import { createAppFocusInterruptionRuntime } from "./appFocusInterruptionRuntime
 import { uid } from "./seed";
 import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome } from "./types";
 import type { RunTeamDomainCommand } from "./teamDomainCommands";
-import { workspaceIdForTask } from "./dailyPlanScope";
+import { currentAccountDailyPlanForWorkspaceDate, workspaceIdForTask } from "./dailyPlanScope";
 
 type UpdateState = (updater: (value: AppState) => AppState) => void;
 type Setter<T> = (value: T | ((current: T) => T)) => void;
@@ -56,10 +56,11 @@ export function createAppFocusActionsRuntime({
         return;
       }
       const taskWorkspaceId = workspaceIdForTask(source, task);
+      const date = today();
       const workSessionId = uid("work_session");
       const previousTask = task;
       const previousTimer = source.activeTimer;
-      const previousPlan = source.dailyPlans.find((plan) => plan.workspaceId === taskWorkspaceId && plan.committedTaskIds.includes(taskId));
+      const previousPlan = currentAccountDailyPlanForWorkspaceDate(source, taskWorkspaceId, date);
       setPreferredFocusTaskId(taskId);
       setToast(`${modeLabel[mode]}已开始`);
       await runTeamCommand({
@@ -67,12 +68,12 @@ export function createAppFocusActionsRuntime({
         resource: "tasks",
         id: taskId,
         action: "start",
-        workspaceId: task.workspaceId,
+        workspaceId: taskWorkspaceId,
         payload: {
           focus_session_id: sessionId,
           work_session_id: workSessionId,
           duration: source.settings.focusMinutes * 60,
-          date: today(),
+          date,
         },
         idempotencyKey: `start:${taskId}:${sessionId}`,
       }, {
@@ -80,6 +81,7 @@ export function createAppFocusActionsRuntime({
         pendingMode: "background",
         optimistic: (state) => {
           const projected = startTimerInState(state, mode, taskId, timestamp, sessionId, { workSessionId });
+          const projectedPlan = currentAccountDailyPlanForWorkspaceDate(projected, taskWorkspaceId, date);
           return {
             next: { ...projected, executionSignals: state.executionSignals },
             rollback: (current) => ({
@@ -92,7 +94,7 @@ export function createAppFocusActionsRuntime({
                 currentTask.id === taskId && currentTask.updatedAt === timestamp ? previousTask : currentTask,
               ),
               dailyPlans: current.dailyPlans.flatMap((plan) => {
-                if (plan.updatedAt !== timestamp || !plan.committedTaskIds.includes(taskId)) return [plan];
+                if (plan.id !== projectedPlan?.id || plan.updatedAt !== timestamp || projectedPlan === previousPlan) return [plan];
                 return previousPlan ? [previousPlan] : [];
               }),
             }),
