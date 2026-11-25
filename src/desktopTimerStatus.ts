@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef } from "react";
+import type { AppFocusActionsRuntime } from "./appFocusActionsRuntime";
+import { shouldFinishExpiredTimerInState } from "./appTimerExpirationState";
 import { platformCapabilities } from "./platformCapabilities";
 import type { AppState, Task } from "./types";
 
 export const DESKTOP_TIMER_TOGGLE_EVENT = "desktop-timer:toggle";
 export const DESKTOP_TIMER_ABORT_EVENT = "desktop-timer:abort";
+export const DESKTOP_TIMER_SHORT_BREAK_EVENT = "desktop-timer:short-break";
 
 export type DesktopTimerStatusPayload = {
+  sessionId: string;
   mode: "focus" | "short_break" | "long_break";
   duration: number;
   remaining: number;
@@ -24,6 +28,7 @@ export const buildDesktopTimerStatusPayload = (
   if (!active) return null;
 
   return {
+    sessionId: active.sessionId,
     mode: active.mode,
     duration: active.duration,
     remaining: active.remaining,
@@ -35,11 +40,30 @@ export const buildDesktopTimerStatusPayload = (
   };
 };
 
-type DesktopTimerStatusOptions = {
-  state: AppState | null;
-  currentTask?: Task;
+export const startDesktopShortBreak = async (
+  state: AppState | null,
+  sessionId: string,
+  beginTimer: AppFocusActionsRuntime["beginTimer"] | undefined,
+) => {
+  const active = state?.activeTimer;
+  if (
+    !beginTimer || !state || state.auth.status !== "authenticated" || !state.auth.token ||
+    state.backend.status === "incompatible" || !active || active.sessionId !== sessionId ||
+    active.mode === "short_break" || shouldFinishExpiredTimerInState(state)
+  ) return;
+
+  await beginTimer("short_break");
+};
+
+type DesktopTimerActions = {
   toggleTimer: () => void;
   abortTimer: () => void;
+  startShortBreak: (sessionId: string) => Promise<void>;
+};
+
+type DesktopTimerStatusOptions = DesktopTimerActions & {
+  state: AppState | null;
+  currentTask?: Task;
 };
 
 const supportsDesktopTimerStatus = () => {
@@ -47,7 +71,41 @@ const supportsDesktopTimerStatus = () => {
   return platform.isTauri && !platform.isMobile;
 };
 
-export function useDesktopTimerStatus({ state, currentTask, toggleTimer, abortTimer }: DesktopTimerStatusOptions) {
+export function attachDesktopTimerListeners({ toggleTimer, abortTimer, startShortBreak }: DesktopTimerActions) {
+  let disposed = false;
+  const unlisteners: Array<() => void> = [];
+
+  const attach = async () => {
+    const { listen } = await import("@tauri-apps/api/event");
+    if (disposed) return;
+
+    const attachListener = async <T,>(event: string, handle: (payload: T) => void) => {
+      const unlisten = await listen<T>(event, ({ payload }) => {
+        if (!disposed) handle(payload);
+      }, { target: { kind: "WebviewWindow", label: "main" } });
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    };
+
+    await Promise.all([
+      attachListener(DESKTOP_TIMER_TOGGLE_EVENT, toggleTimer),
+      attachListener(DESKTOP_TIMER_ABORT_EVENT, abortTimer),
+      attachListener<string>(DESKTOP_TIMER_SHORT_BREAK_EVENT, (sessionId) => {
+        void startShortBreak(sessionId).catch((error) => console.error("Failed to start desktop short break", error));
+      }),
+    ]);
+  };
+
+  void attach().catch((error) => {
+    if (!disposed) console.error("Failed to attach desktop timer status listeners", error);
+  });
+  return () => {
+    disposed = true;
+    unlisteners.forEach((unlisten) => unlisten());
+  };
+}
+
+export function useDesktopTimerStatus({ state, currentTask, toggleTimer, abortTimer, startShortBreak }: DesktopTimerStatusOptions) {
   const payloadRef = useRef<DesktopTimerStatusPayload | null>(null);
   const payload = useMemo(
     () => buildDesktopTimerStatusPayload(
@@ -73,31 +131,6 @@ export function useDesktopTimerStatus({ state, currentTask, toggleTimer, abortTi
 
   useEffect(() => {
     if (!supportsDesktopTimerStatus()) return undefined;
-    let disposed = false;
-    const unlisteners: Array<() => void> = [];
-
-    const attach = async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      const removeToggle = await listen(DESKTOP_TIMER_TOGGLE_EVENT, toggleTimer, {
-        target: { kind: "WebviewWindow", label: "main" },
-      });
-      const removeAbort = await listen(DESKTOP_TIMER_ABORT_EVENT, abortTimer, {
-        target: { kind: "WebviewWindow", label: "main" },
-      });
-      if (disposed) {
-        removeToggle();
-        removeAbort();
-        return;
-      }
-      unlisteners.push(removeToggle, removeAbort);
-    };
-
-    void attach().catch((error) => {
-      if (!disposed) console.error("Failed to attach desktop timer status listeners", error);
-    });
-    return () => {
-      disposed = true;
-      unlisteners.forEach((unlisten) => unlisten());
-    };
-  }, [abortTimer, toggleTimer]);
+    return attachDesktopTimerListeners({ toggleTimer, abortTimer, startShortBreak });
+  }, [abortTimer, startShortBreak, toggleTimer]);
 }

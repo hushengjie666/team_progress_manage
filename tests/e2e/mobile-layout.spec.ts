@@ -102,6 +102,24 @@ test("keeps the app usable in iPhone landscape", async ({ page }, testInfo) => {
   await expectNoPageOverflow(page);
 });
 
+test("can start, pause, and resume the existing mobile short break", async ({ page }, testInfo) => {
+  await openApp(page);
+  await page.getByRole("navigation", { name: "手机页面导航" }).getByRole("button", { name: "专注" }).click();
+  await page.locator(".mode-switcher").getByRole("button", { name: "短休息", exact: true }).click();
+  const timerFace = page.locator(".timer-face");
+  const controls = page.locator(".timer-controls");
+  const pause = controls.getByRole("button", { name: "暂停", exact: true });
+  const resume = controls.getByRole("button", { name: "继续", exact: true });
+
+  await expect(timerFace).toContainText("短休息");
+  await expect(timerFace.locator(".timer-countdown")).toHaveText(/04:5\d|05:00/);
+  await pause.click();
+  await expect(resume).toBeVisible();
+  await resume.click();
+  await expect(pause).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("short-break-mobile.png") });
+});
+
 test("keeps mobile sheets and form controls reachable", async ({ page }) => {
   await openApp(page);
   await page.getByRole("button", { name: /新增项目/ }).click();

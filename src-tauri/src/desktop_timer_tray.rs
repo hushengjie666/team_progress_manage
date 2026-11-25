@@ -1,4 +1,6 @@
 use serde::Deserialize;
+#[cfg(target_os = "macos")]
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, MenuItemBuilder, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder},
@@ -7,14 +9,20 @@ use tauri::{
 
 const TIMER_TRAY_ID: &str = "timer-status";
 const TIMER_TOGGLE_MENU_ID: &str = "timer-status-toggle";
+#[cfg(target_os = "macos")]
+const TIMER_SHORT_BREAK_MENU_ID: &str = "timer-status-short-break";
 const TIMER_ABORT_MENU_ID: &str = "timer-status-abort";
 const TIMER_OPEN_MENU_ID: &str = "timer-status-open";
 const TIMER_TOGGLE_EVENT: &str = "desktop-timer:toggle";
+#[cfg(target_os = "macos")]
+const TIMER_SHORT_BREAK_EVENT: &str = "desktop-timer:short-break";
 const TIMER_ABORT_EVENT: &str = "desktop-timer:abort";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DesktopTimerStatusPayload {
+    #[cfg(target_os = "macos")]
+    session_id: String,
     mode: String,
     duration: u64,
     remaining: u64,
@@ -32,6 +40,10 @@ struct DesktopTimerTray<R: Runtime> {
     pomodoro_item: MenuItem<R>,
     progress_item: MenuItem<R>,
     toggle_item: MenuItem<R>,
+    #[cfg(target_os = "macos")]
+    short_break_item: MenuItem<R>,
+    #[cfg(target_os = "macos")]
+    short_break_session_id: Mutex<Option<String>>,
     abort_item: MenuItem<R>,
 }
 
@@ -113,6 +125,13 @@ fn toggle_text(payload: &DesktopTimerStatusPayload) -> &'static str {
     }
 }
 
+#[cfg(target_os = "macos")]
+fn short_break_session_id(payload: Option<&DesktopTimerStatusPayload>) -> Option<&str> {
+    payload
+        .filter(|timer| timer.mode != "short_break")
+        .map(|timer| timer.session_id.as_str())
+}
+
 pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
     let header_item = MenuItemBuilder::new("TimeManage 计时器")
         .enabled(false)
@@ -123,6 +142,10 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
         .enabled(false)
         .build(app)?;
     let toggle_item = MenuItemBuilder::with_id(TIMER_TOGGLE_MENU_ID, "暂停").build(app)?;
+    #[cfg(target_os = "macos")]
+    let short_break_item = MenuItemBuilder::with_id(TIMER_SHORT_BREAK_MENU_ID, "短休息")
+        .enabled(false)
+        .build(app)?;
     let abort_item = MenuItemBuilder::with_id(TIMER_ABORT_MENU_ID, "作废番茄").build(app)?;
     let open_item = MenuItemBuilder::with_id(TIMER_OPEN_MENU_ID, "打开 TimeManage").build(app)?;
     let first_separator = PredefinedMenuItem::separator(app)?;
@@ -136,6 +159,8 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
             &progress_item,
             &first_separator,
             &toggle_item,
+            #[cfg(target_os = "macos")]
+            &short_break_item,
             &abort_item,
             &second_separator,
             &open_item,
@@ -149,6 +174,15 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             TIMER_TOGGLE_MENU_ID => {
                 let _ = app.emit_to("main", TIMER_TOGGLE_EVENT, ());
+            }
+            #[cfg(target_os = "macos")]
+            TIMER_SHORT_BREAK_MENU_ID => {
+                let source = app
+                    .try_state::<DesktopTimerTray<R>>()
+                    .and_then(|tray| tray.short_break_session_id.lock().ok()?.clone());
+                if let Some(session_id) = source {
+                    let _ = app.emit_to("main", TIMER_SHORT_BREAK_EVENT, session_id);
+                }
             }
             TIMER_ABORT_MENU_ID => {
                 let _ = app.emit_to("main", TIMER_ABORT_EVENT, ());
@@ -169,6 +203,10 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
         pomodoro_item,
         progress_item,
         toggle_item,
+        #[cfg(target_os = "macos")]
+        short_break_item,
+        #[cfg(target_os = "macos")]
+        short_break_session_id: Mutex::new(None),
         abort_item,
     });
     Ok(())
@@ -179,6 +217,18 @@ pub(crate) fn sync<R: Runtime>(
     payload: Option<DesktopTimerStatusPayload>,
 ) -> Result<(), String> {
     let tray = app.state::<DesktopTimerTray<R>>();
+    #[cfg(target_os = "macos")]
+    {
+        let session_id = short_break_session_id(payload.as_ref());
+        *tray
+            .short_break_session_id
+            .lock()
+            .map_err(|error| error.to_string())? = session_id.map(str::to_owned);
+        tray.short_break_item
+            .set_enabled(session_id.is_some())
+            .map_err(|error| error.to_string())?;
+    }
+
     let Some(payload) = payload else {
         tray.tray
             .set_title::<&str>(None)
@@ -230,6 +280,8 @@ mod tests {
 
     fn payload() -> DesktopTimerStatusPayload {
         DesktopTimerStatusPayload {
+            #[cfg(target_os = "macos")]
+            session_id: "focus_status".to_string(),
             mode: "focus".to_string(),
             duration: 100,
             remaining: 79,
@@ -261,5 +313,31 @@ mod tests {
         assert_eq!(toggle_text(&payload), "继续");
         payload.prepared = Some(true);
         assert_eq!(toggle_text(&payload), "开始");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn enables_short_break_for_eligible_sessions_only() {
+        let mut payload = payload();
+        assert_eq!(short_break_session_id(None), None);
+        for (is_running, prepared, toggle) in [
+            (true, false, "暂停"),
+            (false, false, "继续"),
+            (false, true, "开始"),
+        ] {
+            payload.is_running = is_running;
+            payload.prepared = Some(prepared);
+            for mode in ["focus", "long_break"] {
+                payload.mode = mode.to_string();
+                assert_eq!(short_break_session_id(Some(&payload)), Some("focus_status"));
+            }
+            payload.mode = "short_break".to_string();
+            assert_eq!(short_break_session_id(Some(&payload)), None);
+            assert_eq!(toggle_text(&payload), toggle);
+        }
+        payload.is_running = true;
+        assert_eq!(status_title(&payload), "☕ 01:19");
+        assert_eq!(header_text(&payload), "短休息 · 01:19");
+        assert_eq!(progress_text(&payload), "计时进度：━━──────── 21%");
     }
 }
