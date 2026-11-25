@@ -1,0 +1,57 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "在运行预览的 Mac 打开工作区 .cache/gh14-native/TimeManage GH-14.app，用样例账号登录。关闭主窗口，在系统菜单栏选「短休息」，核对顺序、咖啡图标、约 7 分钟倒计时及窗口仍隐藏。",
+      "再次打开系统菜单，核对「短休息」置灰；通过菜单暂停再打开 TimeManage，核对主窗口与菜单的剩余时间一致，且都显示「继续」。"
+    ],
+    "kind": "preview"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/result.json",
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "command": "PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/desktop.png",
+      ".cache/browser-artifacts/mobile.png",
+      ".cache/browser-artifacts/business-report.json"
+    ],
+    "command": "PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --retry-after-fix '为项目两级 npm 脚本分别保留参数分隔符；--list 已确认加载隔离配置和 83 个测试' --run /bin/sh -c 'exec npm run verify:e2e -- -- --config .cache/gh14-playwright.config.ts'",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "native_tests": {
+    "artifacts": [
+      ".cache/gh14-native/native-menu.log",
+      ".cache/gh14-native/restored-main-window.png"
+    ],
+    "command": "node .cache/gh14-native/run.mjs",
+    "native_screenshot": "unavailable: CGPreflightScreenCaptureAccess() returned false",
+    "scope": "macos_native_menu",
+    "status": "passed",
+    "summary": "系统辅助功能点击真实菜单。窗口隐藏后从专注切到 07:00 短休息且保持隐藏；菜单显示咖啡图标、进度及禁用项。原生暂停、继续与打开 TimeManage 生效，恢复的窗口显示相同的短休息模式、剩余时间和控制状态；清除后菜单栏计时器隐藏。"
+  },
+  "review_sample": {
+    "login_email": "owner@example.com",
+    "macos_app": ".cache/gh14-native/TimeManage GH-14.app",
+    "preview_command": "python3 .agent-run/review_preview.py start --route / --port 31915 -- /opt/homebrew/bin/node .cache/gh14-native/fixture.mjs '{bind}' '{port}' .cache/gh14-native/web",
+    "preview_state": ".agent-run/review-previews/7164414290-47623a2427e2/state.json",
+    "sample_password": "gh14-demo",
+    "url": "http://127.0.0.1:31915/"
+  },
+  "risks": "原生 Accessibility 权限可用，屏幕录制权限未授权。提供系统辅助功能取得的真实菜单结构与点击操作记录、恢复后的应用窗口截图。其余模式、重复和过期事件详见前端及 Rust 测试。远端 CI 等待宿主发布草稿 PR。无其他已知实现风险。",
+  "status": "ready_for_review",
+  "summary": "GH-14 在 macOS 系统菜单栏的计时控制区增加「短休息」，位于开始／暂停／继续与作废番茄之间。点击由 Tauri 向主窗口计时桥接发送活动会话 ID，并调用现有 focusActions.beginTimer(\"short_break\")。沿用配置时长、倒计时、休息图标、进度和暂停/继续状态。当前短休息、过期、退出登录、无活动计时器和旧会话事件受到守卫，重复事件不会重置，监听随生命周期清理。",
+  "tests": "编码前 .cache/autodev-python/bin/python .agent-run/browser_probe.py --check-only 退出 2，返回 native_browser_approval_required；原生 Auto-review 运行隔离 smoke 退出 0，桌面/手机 localhost 点击和截图均通过。\nnpm test -- --run desktopTimerStatus.test.ts appFocusActionsRuntime.test.ts timerDomain.test.ts 退出 0，25 项通过。首次退出 1 因无 jsdom，测试已改用项目现有 Node 环境。\ncargo test --locked --manifest-path src-tauri/Cargo.toml --lib desktop_timer_tray 退出 0，3 项通过。cargo check --locked --manifest-path src-tauri/Cargo.toml 退出 0。\nnpm run typecheck、npm run typecheck:test、rustfmt --edition 2021 --check src-tauri/src/desktop_timer_tray.rs、git diff --check 均退出 0。npm run verify:fast 退出 0，368 项通过并完成前端构建。\n业务 Playwright 由原生 Auto-review 批准，经 browser_probe.py 启动 npm run verify:e2e -- -- --config .cache/gh14-playwright.config.ts，探针和项目命令均退出 0，77 项通过、6 项按设备条件跳过。两次准备命令分别因探针参数解析退出 2 和 npm 参数转发错误（项目命令退出 1，探针退出 2），业务用例当时未执行，修正后的 --list 退出 0 并确认 83 项。\n独立样例 Tauri debug Bundle 构建退出 0。首次临时配置构建退出 1，Tauri 宏将可选 dataStoreIdentifier 生成为 Vec<u8>；移除该临时配置键后重建，保留独立 Bundle ID。node .cache/gh14-native/run.mjs 在原生执行上下文退出 0，真实 macOS 菜单 1 项通过。\nreview_preview.py start 退出 0。预览路由、健康检查与样例登录均为 HTTP 200，核对专用样例工作区。"
+}
