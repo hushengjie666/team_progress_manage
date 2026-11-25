@@ -1,3 +1,4 @@
+import { withoutDailyQuoteSettings } from "./dailyQuotes/accountSettingKey";
 import { applyTeamStateSaveFailure } from "./appBoot";
 import { mergeBusinessRowChangesIntoState } from "./teamBusinessRows";
 import {
@@ -111,8 +112,9 @@ export const createTeamDataRuntime = ({ getState, setState, setToast }: TeamData
         const confirmedSource = getState();
         if (!confirmedSource) return undefined;
         const merged = mergeBusinessRowChangesIntoState(confirmedSource, result.rows, result.deleted, result.server_time);
-        const withSettings = Object.keys(result.settings).length > 0
-          ? { ...merged, settings: { ...merged.settings, ...result.settings } as Settings }
+        const settings = withoutDailyQuoteSettings(result.settings);
+        const withSettings = Object.keys(settings).length > 0
+          ? { ...merged, settings: { ...merged.settings, ...settings } as Settings }
           : merged;
         const saved = withPendingResource(withSettings, behavior.resourceKey, false);
         setState(saved);

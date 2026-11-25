@@ -3,6 +3,7 @@ import type { SettingsSection } from "./settingsTypes";
 const settingsSections: { key: SettingsSection; label: string }[] = [
   { key: "members", label: "成员管理" },
   { key: "timer", label: "计时偏好" },
+  { key: "quotes", label: "名言警句" },
   { key: "backend", label: "团队后台" },
   { key: "demo", label: "演示数据" },
 ];

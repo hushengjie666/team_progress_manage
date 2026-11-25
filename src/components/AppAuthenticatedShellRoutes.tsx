@@ -1,4 +1,5 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
+import { DailyQuotesProvider } from "../dailyQuotes/DailyQuotesProvider";
 import { AppFocusRoute } from "./AppFocusRoute";
 import { AppMemberStatusRoute } from "./AppMemberStatusRoute";
 import { AppProjectDetailRoute } from "./AppProjectDetailRoute";
@@ -25,7 +26,21 @@ type AppAuthenticatedShellRoutesProps = Pick<
   | "loadDemoData"
 >;
 
-export function AppAuthenticatedShellRoutes({
+export function AppAuthenticatedShellRoutes(props: AppAuthenticatedShellRoutesProps) {
+  const { auth, backend } = props.view.state;
+  return (
+    <DailyQuotesProvider
+      key={JSON.stringify([backend.serverUrl, auth.account?.id])}
+      accountId={auth.account?.id ?? ""}
+      token={auth.token}
+      backend={backend}
+    >
+      <AppRoutes {...props} />
+    </DailyQuotesProvider>
+  );
+}
+
+function AppRoutes({
   view,
   shellState,
   chrome,
@@ -108,6 +123,7 @@ export function AppAuthenticatedShellRoutes({
         shellState={shellState}
         taskActions={taskActions}
         focusActions={focusActions}
+        openQuoteSettings={() => openAdmin("quotes")}
       />
     );
   }

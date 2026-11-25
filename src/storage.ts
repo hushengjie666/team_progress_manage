@@ -1,3 +1,4 @@
+import { withoutDailyQuoteSettings } from "./dailyQuotes/accountSettingKey";
 import { createInitialState } from "./seed";
 import type {
   AppState,
@@ -43,7 +44,7 @@ export const parseCurrentAppStatePayload = (payload: unknown): AppState => {
     ...initial,
     settings: {
       ...initial.settings,
-      ...payload.settings,
+      ...withoutDailyQuoteSettings(payload.settings),
     },
     auth: {
       ...initial.auth,
@@ -78,7 +79,7 @@ export async function loadState(): Promise<AppState> {
 export async function saveState(state: AppState): Promise<void> {
   const payload: StoredAppRuntime = {
     version: 5,
-    settings: state.settings,
+    settings: withoutDailyQuoteSettings(state.settings),
     auth: {
       status: state.auth.status,
       token: state.auth.token,

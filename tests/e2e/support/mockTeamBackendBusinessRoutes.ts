@@ -101,6 +101,10 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
     await fulfillJson(route, bootstrapPayload(runtime));
     return true;
   }
+  if (url.pathname === "/settings" && request.method() === "GET") {
+    await fulfillJson(route, { settings: runtime.initialState.settings });
+    return true;
+  }
   if (url.pathname === "/settings" && request.method() === "PATCH") {
     runtime.initialState = { ...runtime.initialState, settings: { ...runtime.initialState.settings, ...request.postDataJSON() } };
     await fulfillJson(route, mutationDelta(request, [], [], runtime.initialState.settings));
