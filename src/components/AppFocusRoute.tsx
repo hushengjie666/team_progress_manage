@@ -7,7 +7,7 @@ import { FocusQuickTaskDialog, type FocusQuickTaskRecovery } from "./focus/Focus
 type AppFocusRouteProps = Pick<AppAuthenticatedShellProps, "view" | "shellState" | "taskActions" | "focusActions">;
 
 export function AppFocusRoute({ view, shellState, taskActions, focusActions }: AppFocusRouteProps) {
-  const { state, currentTask, focusCommittedTasks, focusActiveTimer } = view;
+  const { state, currentTask, focusCommittedTasks } = view;
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [recovery, setRecovery] = useState<FocusQuickTaskRecovery>();
   const dialogSessionRef = useRef(0);
@@ -20,7 +20,6 @@ export function AppFocusRoute({ view, shellState, taskActions, focusActions }: A
     <>
       <FocusView
         state={state}
-        activeTimer={focusActiveTimer}
         currentTask={currentTask}
         committedTasks={focusCommittedTasks}
         beginTimer={focusActions.beginTimer}

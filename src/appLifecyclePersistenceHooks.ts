@@ -70,8 +70,10 @@ export function useInitialAppLoad({
   | "setProjectInvitations"
 >) {
   useEffect(() => {
+    let disposed = false;
     loadInitialAppState()
       .then((result) => {
+        if (disposed) return;
         setPlatformAccounts(result.platformAccounts);
         setWorkspaceInvitations(result.workspaceInvitations);
         setProjectInvitations(result.projectInvitations);
@@ -80,8 +82,10 @@ export function useInitialAppLoad({
         setLoaded(true);
       })
       .catch(() => {
+        if (disposed) return;
         setToast("读取应用缓存失败，已加载默认数据");
       });
+    return () => { disposed = true; };
   }, []);
 }
 

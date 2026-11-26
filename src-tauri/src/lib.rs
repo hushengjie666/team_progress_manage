@@ -159,6 +159,17 @@ pub fn run() {
             .plugin(tauri_plugin_wdio_webdriver::init());
     }
 
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "macos")]
+    let context = {
+        let mut context = context;
+        // Keep menu actions and deadline notifications deliverable after closing the window.
+        if let Some(main) = context.config_mut().app.windows.iter_mut().find(|window| window.label == "main") {
+            main.background_throttling = Some(tauri::utils::config::BackgroundThrottlingPolicy::Throttle);
+        }
+        context
+    };
+
     let app = builder
         .invoke_handler(tauri::generate_handler![
             restore_main_window_command,
@@ -183,7 +194,7 @@ pub fn run() {
             desktop_timer_tray::setup(app)?;
             Ok(())
         })
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("error while running tauri application");
 
     app.run(|app, event| {

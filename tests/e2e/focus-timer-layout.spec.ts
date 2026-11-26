@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { authenticatedState } from "./support/authenticatedState";
 import { openApp } from "./support/openApp";
-import { startTimerInState } from "../../src/appModel";
+import { endSessionInState, startTimerInState } from "../../src/appModel";
 import type { Task } from "../../src/types";
 import { mockTeamBackend } from "./support/mockTeamBackend";
 import { MOCK_SERVER } from "./support/constants";
@@ -301,7 +301,34 @@ test("prepares the next stage at full duration and waits for the user to start",
       }
     };
   });
-  await openApp(page, state);
+  let finishes = 0;
+  await page.addInitScript(() => {
+    const fetch = window.fetch.bind(window);
+    let firstBoot = true;
+    window.fetch = async (...args) => {
+      const input = args[0];
+      const url = new URL(input instanceof Request ? input.url : input, location.href);
+      const delay = firstBoot && url.pathname === "/app/bootstrap";
+      if (delay) firstBoot = false;
+      const response = await fetch(...args);
+      if (delay) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+      return response;
+    };
+  });
+  const bootRequest = page.waitForRequest((request) => new URL(request.url()).pathname === "/app/bootstrap");
+  const opening = openApp(page, state);
+  await bootRequest;
+  await page.route(`${MOCK_SERVER}/work-sessions/work_natural_finish/finish*`, async (route) => {
+    finishes += 1;
+    const ended = endSessionInState(state, "completed");
+    await route.fulfill({ json: {
+      mutation_id: route.request().headers()["x-timemanage-mutation-id"], delta: true,
+      rows: rowsFromState(ended), deleted: [], settings: {}, server_time: ended.updatedAt,
+    } });
+  });
+  await opening;
   await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
 
   const timerFace = page.locator(".timer-face");
@@ -319,6 +346,7 @@ test("prepares the next stage at full duration and waits for the user to start",
   await page.waitForTimeout(1_200);
   await expect(countdown).toHaveText("05:00");
 
+  expect(finishes).toBe(1);
   await startButton.click();
   await expect(page.locator(".timer-controls").getByRole("button", { name: "暂停" })).toBeVisible();
   await expect(countdown).not.toHaveText("05:00", { timeout: 2_500 });

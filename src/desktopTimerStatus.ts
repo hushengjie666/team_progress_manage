@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import type { AppFocusActionsRuntime } from "./appFocusActionsRuntime";
 import { shouldFinishExpiredTimerInState } from "./appTimerExpirationState";
+import { normalizeTimerSpeedMultiplier } from "./timerSpeed";
 import { platformCapabilities } from "./platformCapabilities";
 import type { AppState, Task } from "./types";
 
@@ -13,6 +14,8 @@ export type DesktopTimerStatusPayload = {
   mode: "focus" | "short_break" | "long_break";
   duration: number;
   remaining: number;
+  deadlineMs?: number;
+  speedMultiplier: number;
   isRunning: boolean;
   prepared?: boolean;
   taskTitle?: string;
@@ -27,12 +30,15 @@ export const buildDesktopTimerStatusPayload = (
   const active = state?.activeTimer;
   if (!active) return null;
 
+  const isRunning = active.isRunning && active.pendingSettlement !== "pending";
   return {
     sessionId: active.sessionId,
     mode: active.mode,
     duration: active.duration,
     remaining: active.remaining,
-    isRunning: active.isRunning,
+    deadlineMs: isRunning ? Date.parse(active.plannedEndAt) : undefined,
+    speedMultiplier: normalizeTimerSpeedMultiplier(active.speedMultiplier),
+    isRunning,
     prepared: active.prepared,
     taskTitle: task?.title,
     actualPomodoros: task?.actualPomodoros,
@@ -55,9 +61,17 @@ export const startDesktopShortBreak = async (
   await beginTimer("short_break");
 };
 
+export type DesktopTimerActionSource = Pick<DesktopTimerStatusPayload, "sessionId" | "isRunning" | "deadlineMs">;
+
+export function matchesDesktopTimerAction(state: AppState | null, source: DesktopTimerActionSource) {
+  const active = state?.activeTimer;
+  return Boolean(state && active && active.sessionId === source.sessionId && active.isRunning === source.isRunning &&
+    (!active.isRunning || Date.parse(active.plannedEndAt) === source.deadlineMs) && !shouldFinishExpiredTimerInState(state));
+}
+
 type DesktopTimerActions = {
-  toggleTimer: () => void;
-  abortTimer: () => void;
+  toggleTimer: (source: DesktopTimerActionSource) => void;
+  abortTimer: (source: DesktopTimerActionSource) => void;
   startShortBreak: (sessionId: string) => Promise<void>;
 };
 
@@ -106,27 +120,32 @@ export function attachDesktopTimerListeners({ toggleTimer, abortTimer, startShor
 }
 
 export function useDesktopTimerStatus({ state, currentTask, toggleTimer, abortTimer, startShortBreak }: DesktopTimerStatusOptions) {
-  const payloadRef = useRef<DesktopTimerStatusPayload | null>(null);
+  const active = state?.activeTimer;
   const payload = useMemo(
     () => buildDesktopTimerStatusPayload(
       state?.auth.status === "authenticated" ? state : null,
       currentTask,
     ),
     [
-      state,
+      state?.auth.status,
+      active?.sessionId, active?.mode, active?.duration, active?.prepared,
+      active?.isRunning, active?.plannedEndAt, active?.speedMultiplier, active?.pendingSettlement,
+      active?.isRunning ? undefined : active?.remaining,
       currentTask?.id,
       currentTask?.title,
       currentTask?.actualPomodoros,
       currentTask?.estimatePomodoros,
     ],
   );
-  payloadRef.current = payload;
+
 
   useEffect(() => {
     if (!supportsDesktopTimerStatus()) return;
+    let current = true;
     void import("@tauri-apps/api/core")
-      .then(({ invoke }) => invoke("sync_desktop_timer_status_command", { payload: payloadRef.current }))
+      .then(({ invoke }) => current ? invoke("sync_desktop_timer_status_command", { payload }) : undefined)
       .catch((error) => console.error("Failed to sync desktop timer status", error));
+    return () => { current = false; };
   }, [payload]);
 
   useEffect(() => {

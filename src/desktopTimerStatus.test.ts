@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppFocusActionsRuntime } from "./appFocusActionsRuntime";
 import { prepareTimerStageInState, startTimerInState } from "./appTimerStartSessionState";
 import {
+  matchesDesktopTimerAction,
   attachDesktopTimerListeners,
   buildDesktopTimerStatusPayload,
   DESKTOP_TIMER_ABORT_EVENT,
@@ -25,6 +26,17 @@ const signedInState = (): AppState => {
 };
 
 describe("desktop timer status", () => {
+  it("rejects clicks from a replaced session or a previous running interval", () => {
+    const state = startTimerInState(signedInState(), "focus", undefined, new Date().toISOString());
+    const source = buildDesktopTimerStatusPayload(state, undefined)!;
+    expect(matchesDesktopTimerAction(state, source)).toBe(true);
+    expect(matchesDesktopTimerAction(state, { ...source, sessionId: "previous" })).toBe(false);
+    expect(matchesDesktopTimerAction(state, { ...source, deadlineMs: source.deadlineMs! - 1000 })).toBe(false);
+    expect(matchesDesktopTimerAction(state, { ...source, isRunning: false })).toBe(false);
+    const paused = { ...state, activeTimer: { ...state.activeTimer!, isRunning: false, remaining: 72 } };
+    expect(buildDesktopTimerStatusPayload(paused, undefined)).toMatchObject({ remaining: 72, deadlineMs: undefined });
+  });
+
   it("hides the status component without an active timer", () => {
     expect(buildDesktopTimerStatusPayload(createInitialState(), undefined)).toBeNull();
   });
@@ -60,6 +72,8 @@ describe("desktop timer status", () => {
       mode: "focus",
       duration: 1500,
       remaining: 19,
+      deadlineMs: Date.parse(state.activeTimer.plannedEndAt),
+      speedMultiplier: 1,
       isRunning: true,
       prepared: false,
       taskTitle: "梳理现有出口细分方案",

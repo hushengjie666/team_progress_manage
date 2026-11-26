@@ -3,10 +3,10 @@ import {
   modeLabel,
   nowIso,
   finishExpiredTimerInState,
-  restoreTimerInState,
   shouldFinishExpiredTimerInState,
 } from "./appModel";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
+import { platformCapabilities } from "./platformCapabilities";
 import { calculateRemaining } from "./domain";
 import {
   announceTimerEnd,
@@ -35,48 +35,68 @@ export function useRunningTimerInterval({
   runTeamCommand,
 }: Pick<AppLifecycleHooksOptions, "state" | "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
   useEffect(() => {
-    if (!state?.activeTimer || state.backend.status === "incompatible") return;
-    const settleExpiredTimer = () => {
+    const active = state?.activeTimer;
+    if (!active || (!active.isRunning && active.pendingSettlement !== "pending")) return;
+    const refresh = () => {
       const current = stateRef.current;
-      if (!current?.activeTimer || current.backend.status === "saving" || current.backend.status === "incompatible") return false;
+      const timer = current?.activeTimer;
+      if (!current || !timer || timer.sessionId !== active.sessionId || current.backend.status === "saving" ||
+        current.backend.status === "incompatible") return;
       const timestamp = nowIso();
-      if (!shouldFinishExpiredTimerInState(current, timestamp)) return false;
-      const title = `${modeLabel[current.activeTimer.mode]}已结束`;
+      if (!shouldFinishExpiredTimerInState(current, timestamp)) {
+        const remaining = calculateRemaining(timer, new Date(timestamp));
+        if (remaining !== timer.remaining) {
+          const next = { ...current, activeTimer: { ...timer, remaining }, updatedAt: timestamp };
+          stateRef.current = next;
+          setState(next);
+        }
+        return;
+      }
       const next = finishExpiredTimerInState(current, timestamp);
       stateRef.current = next;
       setState(next);
+      const title = `${modeLabel[timer.mode]}已结束`;
       const nextMode = next.activeTimer?.mode;
       setToast(nextMode ? `${title}，${modeLabel[nextMode]}已准备` : title);
-      announceTimerEndForRuntime(current.settings, current.activeTimer, title);
-      const active = current.activeTimer;
-      if (active.workSessionId) {
-        const session = current.workSessions.find((item) => item.id === active.workSessionId);
-        void runTeamCommand({ kind: "action", resource: "work-sessions", id: active.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
-      }
-      return true;
-    };
-    if (state.activeTimer.pendingSettlement === "pending") {
-      settleExpiredTimer();
-      return;
-    }
-    if (!state.activeTimer.isRunning) return;
-    const intervalDelay = normalizeTimerSpeedMultiplier(state.activeTimer.speedMultiplier) > 1 ? 250 : 1000;
-    const handle = window.setInterval(() => {
-      const current = stateRef.current;
-      if (!current?.activeTimer?.isRunning) return;
-      if (current.backend.status === "saving" || current.backend.status === "incompatible") return;
-      const nextRemaining = calculateRemaining(current.activeTimer);
-      if (nextRemaining > 0) {
-        setState({
-          ...current,
-          activeTimer: { ...current.activeTimer, remaining: nextRemaining },
-          updatedAt: nowIso(),
+      announceTimerEndForRuntime(current.settings, timer, title);
+      if (timer.workSessionId) {
+        const session = current.workSessions.find((item) => item.id === timer.workSessionId);
+        void runTeamCommand({
+          kind: "action", resource: "work-sessions", id: timer.workSessionId, action: "finish",
+          idempotencyKey: `finish:${timer.workSessionId}:completed`,
+          workspaceId: current.tasks.find((item) => item.id === session?.taskId)?.workspaceId,
+          payload: { outcome: "completed" },
         });
-        return;
       }
-      settleExpiredTimer();
-    }, intervalDelay);
-    return () => window.clearInterval(handle);
+    };
+
+    refresh();
+    const intervalDelay = normalizeTimerSpeedMultiplier(active.speedMultiplier) > 1 ? 250 : 1000;
+    const handle = window.setInterval(refresh, intervalDelay);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    const platform = platformCapabilities();
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    if (platform.isTauri && !platform.isMobile) {
+      void import("@tauri-apps/api/event").then(({ listen }) =>
+        listen<string>("desktop-timer:expired", ({ payload }) => {
+          if (!disposed && payload === active.sessionId) refresh();
+        }, { target: { kind: "WebviewWindow", label: "main" } }),
+      ).then((remove) => {
+        if (disposed) remove();
+        else unlisten = remove;
+      }).catch((error) => console.error("Failed to attach desktop timer expiration listener", error));
+    }
+    return () => {
+      disposed = true;
+      unlisten?.();
+      window.clearInterval(handle);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+    };
   }, [
     state?.activeTimer?.sessionId,
     state?.activeTimer?.isRunning,
@@ -84,43 +104,6 @@ export function useRunningTimerInterval({
     state?.activeTimer?.speedMultiplier,
     state?.backend.status,
   ]);
-}
-
-export function useTimerRestoreListeners({
-  stateRef,
-  setState,
-  setToast,
-  runTeamCommand,
-}: Pick<AppLifecycleHooksOptions, "stateRef" | "setState" | "setToast" | "runTeamCommand">) {
-  useEffect(() => {
-    const handle = () => {
-      const current = stateRef.current;
-      if (!current?.activeTimer) return;
-      if (current.backend.status === "saving" || current.backend.status === "incompatible") return;
-      const timestamp = nowIso();
-      const shouldFinish = shouldFinishExpiredTimerInState(current, timestamp);
-      const next = restoreTimerInState(current, timestamp);
-      stateRef.current = next;
-      setState(next);
-      if (shouldFinish) {
-        const title = `${modeLabel[current.activeTimer.mode]}已结束`;
-        announceTimerEndForRuntime(current.settings, current.activeTimer, title);
-        const nextMode = next.activeTimer?.mode;
-        setToast(nextMode ? `${title}，${modeLabel[nextMode]}已准备` : `${title}，已自动记录`);
-        if (current.activeTimer.workSessionId) {
-          const session = current.workSessions.find((item) => item.id === current.activeTimer?.workSessionId);
-          void runTeamCommand({ kind: "action", resource: "work-sessions", id: current.activeTimer.workSessionId, action: "finish", workspaceId: session ? current.tasks.find((item) => item.id === session.taskId)?.workspaceId : undefined, payload: { outcome: "completed" } });
-        }
-        return;
-      }
-    };
-    document.addEventListener("visibilitychange", handle);
-    window.addEventListener("focus", handle);
-    return () => {
-      document.removeEventListener("visibilitychange", handle);
-      window.removeEventListener("focus", handle);
-    };
-  }, []);
 }
 
 export function useTimerRuntimeEffects({

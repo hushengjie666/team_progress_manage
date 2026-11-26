@@ -3,7 +3,6 @@ import { getTodayPlan, type TaskFilters } from "./appModel";
 import type { AppState } from "./types";
 import { workspacesForState } from "./accessControl";
 import {
-  activeTimerForFocus,
   committedTasksForPlan,
   currentMemberForState,
   currentTaskForFocus,
@@ -148,11 +147,6 @@ export function useAppWorkspaceViewModelHooks({
     return currentTaskForFocus(state, focusCommittedTasks, preferredFocusTaskId, selectedWorkspaceProjectIds);
   }, [state, focusCommittedTasks, preferredFocusTaskId, selectedWorkspaceProjectIds]);
 
-  const focusActiveTimer = useMemo(() => {
-    if (!state) return undefined;
-    return activeTimerForFocus(state, selectedWorkspaceProjectIds);
-  }, [state, selectedWorkspaceProjectIds]);
-
   return {
     todayPlan,
     committedTasks,
@@ -162,6 +156,5 @@ export function useAppWorkspaceViewModelHooks({
     workspaceModel,
     toggleWorkbenchProject,
     currentTask,
-    focusActiveTimer,
   };
 }

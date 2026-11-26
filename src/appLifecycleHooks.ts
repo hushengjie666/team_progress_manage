@@ -10,7 +10,6 @@ import {
 import {
   useRunningTimerInterval,
   useTaskReminderInterval,
-  useTimerRestoreListeners,
   useTimerRuntimeEffects,
 } from "./appLifecycleTimerHooks";
 import { useTeamBusinessRefresh } from "./appLifecycleTeamHooks";
@@ -55,7 +54,6 @@ export function useAppLifecycleHooks({
   useTeamBusinessRefresh({ state, loaded, stateRef, setState });
   usePageLifecycleStateFlush({ stateRef });
   useRunningTimerInterval({ state, stateRef, setState, setToast, runTeamCommand });
-  useTimerRestoreListeners({ stateRef, setState, setToast, runTeamCommand });
   useTimerRuntimeEffects({ state, stopNoiseRef });
   useTaskReminderInterval({ state, stateRef, reminderSentRef, runTeamCommand });
 }

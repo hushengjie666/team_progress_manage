@@ -1,6 +1,7 @@
-use serde::Deserialize;
-#[cfg(target_os = "macos")]
-use std::sync::Mutex;
+mod clock;
+
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 use tauri::{
     menu::{Menu, MenuItem, MenuItemBuilder, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder},
@@ -21,11 +22,12 @@ const TIMER_ABORT_EVENT: &str = "desktop-timer:abort";
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DesktopTimerStatusPayload {
-    #[cfg(target_os = "macos")]
     session_id: String,
     mode: String,
     duration: u64,
     remaining: u64,
+    deadline_ms: Option<u64>,
+    speed_multiplier: f64,
     is_running: bool,
     prepared: Option<bool>,
     task_title: Option<String>,
@@ -42,9 +44,25 @@ struct DesktopTimerTray<R: Runtime> {
     toggle_item: MenuItem<R>,
     #[cfg(target_os = "macos")]
     short_break_item: MenuItem<R>,
-    #[cfg(target_os = "macos")]
-    short_break_session_id: Mutex<Option<String>>,
+    current: Mutex<Option<Arc<DesktopTimerStatusPayload>>>,
     abort_item: MenuItem<R>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ActionSource<'a> {
+    session_id: &'a str,
+    is_running: bool,
+    deadline_ms: Option<u64>,
+}
+
+impl<R: Runtime> DesktopTimerTray<R> {
+    fn is_current(&self, timer: &Arc<DesktopTimerStatusPayload>) -> bool {
+        self.current.lock().is_ok_and(|slot| {
+            slot.as_ref()
+                .is_some_and(|current| Arc::ptr_eq(current, timer))
+        })
+    }
 }
 
 fn format_time(remaining: u64) -> String {
@@ -59,7 +77,7 @@ fn mode_label(mode: &str) -> &'static str {
     }
 }
 
-fn status_title(payload: &DesktopTimerStatusPayload) -> String {
+fn status_title(payload: &DesktopTimerStatusPayload, remaining: u64) -> String {
     let marker = if payload.is_running {
         match payload.mode.as_str() {
             "focus" => "🍅",
@@ -68,15 +86,11 @@ fn status_title(payload: &DesktopTimerStatusPayload) -> String {
     } else {
         "⏸"
     };
-    format!("{marker} {}", format_time(payload.remaining))
+    format!("{marker} {}", format_time(remaining))
 }
 
-fn header_text(payload: &DesktopTimerStatusPayload) -> String {
-    format!(
-        "{} · {}",
-        mode_label(&payload.mode),
-        format_time(payload.remaining)
-    )
+fn header_text(payload: &DesktopTimerStatusPayload, remaining: u64) -> String {
+    format!("{} · {}", mode_label(&payload.mode), format_time(remaining))
 }
 
 fn task_text(payload: &DesktopTimerStatusPayload) -> String {
@@ -96,13 +110,13 @@ fn pomodoro_text(payload: &DesktopTimerStatusPayload) -> String {
     }
 }
 
-fn progress_text(payload: &DesktopTimerStatusPayload) -> String {
+fn progress_text(payload: &DesktopTimerStatusPayload, remaining: u64) -> String {
     let percent = if payload.duration == 0 {
         0
     } else {
         payload
             .duration
-            .saturating_sub(payload.remaining)
+            .saturating_sub(remaining)
             .saturating_mul(100)
             / payload.duration
     }
@@ -171,24 +185,34 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
         .menu(&menu)
         .tooltip("TimeManage 计时器")
         .show_menu_on_left_click(true)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            TIMER_TOGGLE_MENU_ID => {
-                let _ = app.emit_to("main", TIMER_TOGGLE_EVENT, ());
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            if id == TIMER_OPEN_MENU_ID {
+                super::restore_main_window_on_main_thread(app);
+                return;
             }
-            #[cfg(target_os = "macos")]
-            TIMER_SHORT_BREAK_MENU_ID => {
-                let source = app
-                    .try_state::<DesktopTimerTray<R>>()
-                    .and_then(|tray| tray.short_break_session_id.lock().ok()?.clone());
-                if let Some(session_id) = source {
-                    let _ = app.emit_to("main", TIMER_SHORT_BREAK_EVENT, session_id);
+            let timer = app
+                .try_state::<DesktopTimerTray<R>>()
+                .and_then(|tray| tray.current.lock().ok()?.clone());
+            let Some(timer) = timer else { return };
+            let source = ActionSource {
+                session_id: &timer.session_id,
+                is_running: timer.is_running,
+                deadline_ms: timer.deadline_ms,
+            };
+            match id {
+                TIMER_TOGGLE_MENU_ID => {
+                    let _ = app.emit_to("main", TIMER_TOGGLE_EVENT, source);
                 }
+                TIMER_ABORT_MENU_ID => {
+                    let _ = app.emit_to("main", TIMER_ABORT_EVENT, source);
+                }
+                #[cfg(target_os = "macos")]
+                TIMER_SHORT_BREAK_MENU_ID if timer.mode != "short_break" => {
+                    let _ = app.emit_to("main", TIMER_SHORT_BREAK_EVENT, &timer.session_id);
+                }
+                _ => {}
             }
-            TIMER_ABORT_MENU_ID => {
-                let _ = app.emit_to("main", TIMER_ABORT_EVENT, ());
-            }
-            TIMER_OPEN_MENU_ID => super::restore_main_window_on_main_thread(app),
-            _ => {}
         });
     if let Some(icon) = app.default_window_icon().cloned() {
         builder = builder.icon(icon);
@@ -205,8 +229,7 @@ pub(crate) fn setup<R: Runtime>(app: &mut App<R>) -> tauri::Result<()> {
         toggle_item,
         #[cfg(target_os = "macos")]
         short_break_item,
-        #[cfg(target_os = "macos")]
-        short_break_session_id: Mutex::new(None),
+        current: Mutex::new(None),
         abort_item,
     });
     Ok(())
@@ -217,17 +240,12 @@ pub(crate) fn sync<R: Runtime>(
     payload: Option<DesktopTimerStatusPayload>,
 ) -> Result<(), String> {
     let tray = app.state::<DesktopTimerTray<R>>();
+    let payload = payload.map(Arc::new);
+    *tray.current.lock().map_err(|error| error.to_string())? = payload.clone();
     #[cfg(target_os = "macos")]
-    {
-        let session_id = short_break_session_id(payload.as_ref());
-        *tray
-            .short_break_session_id
-            .lock()
-            .map_err(|error| error.to_string())? = session_id.map(str::to_owned);
-        tray.short_break_item
-            .set_enabled(session_id.is_some())
-            .map_err(|error| error.to_string())?;
-    }
+    tray.short_break_item
+        .set_enabled(short_break_session_id(payload.as_deref()).is_some())
+        .map_err(|error| error.to_string())?;
 
     let Some(payload) = payload else {
         tray.tray
@@ -239,18 +257,11 @@ pub(crate) fn sync<R: Runtime>(
         return Ok(());
     };
 
-    let title = status_title(&payload);
-    tray.header_item
-        .set_text(header_text(&payload))
-        .map_err(|error| error.to_string())?;
     tray.task_item
         .set_text(task_text(&payload))
         .map_err(|error| error.to_string())?;
     tray.pomodoro_item
         .set_text(pomodoro_text(&payload))
-        .map_err(|error| error.to_string())?;
-    tray.progress_item
-        .set_text(progress_text(&payload))
         .map_err(|error| error.to_string())?;
     tray.toggle_item
         .set_text(toggle_text(&payload))
@@ -258,18 +269,34 @@ pub(crate) fn sync<R: Runtime>(
     tray.abort_item
         .set_enabled(true)
         .map_err(|error| error.to_string())?;
-    tray.tray
-        .set_title(Some(&title))
-        .map_err(|error| error.to_string())?;
-    tray.tray
-        .set_tooltip(Some(format!(
-            "{} · {}",
-            header_text(&payload),
-            task_text(&payload)
-        )))
-        .map_err(|error| error.to_string())?;
+    let remaining = payload.remaining_now();
+    render_time(&tray, &payload, remaining)?;
     tray.tray
         .set_visible(true)
+        .map_err(|error| error.to_string())?;
+    if payload.is_running && payload.deadline_ms.is_some() {
+        clock::start_ticks(app.clone(), payload, remaining);
+    }
+    Ok(())
+}
+
+fn render_time<R: Runtime>(
+    tray: &DesktopTimerTray<R>,
+    timer: &DesktopTimerStatusPayload,
+    remaining: u64,
+) -> Result<(), String> {
+    let header = header_text(timer, remaining);
+    tray.header_item
+        .set_text(&header)
+        .map_err(|error| error.to_string())?;
+    tray.progress_item
+        .set_text(progress_text(timer, remaining))
+        .map_err(|error| error.to_string())?;
+    tray.tray
+        .set_title(Some(status_title(timer, remaining)))
+        .map_err(|error| error.to_string())?;
+    tray.tray
+        .set_tooltip(Some(format!("{} · {}", header, task_text(timer))))
         .map_err(|error| error.to_string())?;
     Ok(())
 }
@@ -280,11 +307,12 @@ mod tests {
 
     fn payload() -> DesktopTimerStatusPayload {
         DesktopTimerStatusPayload {
-            #[cfg(target_os = "macos")]
             session_id: "focus_status".to_string(),
             mode: "focus".to_string(),
             duration: 100,
             remaining: 79,
+            deadline_ms: Some(100_000),
+            speed_multiplier: 1.0,
             is_running: true,
             prepared: Some(false),
             task_title: Some("梳理现有出口细分方案".to_string()),
@@ -294,14 +322,28 @@ mod tests {
     }
 
     #[test]
+    fn projects_the_deadline_after_sleep_and_freezes_on_pause() {
+        let mut timer = payload();
+        assert_eq!(timer.remaining_at(21_001), 79);
+        assert_eq!(timer.remaining_at(900_000), 0);
+        timer.speed_multiplier = 100.0;
+        assert_eq!(timer.remaining_at(99_699), 31);
+        timer.is_running = false;
+        assert_eq!(timer.remaining_at(900_000), 79);
+    }
+
+    #[test]
     fn formats_status_bar_timer_information() {
         let payload = payload();
         assert_eq!(format_time(payload.remaining), "01:19");
-        assert_eq!(status_title(&payload), "🍅 01:19");
-        assert_eq!(header_text(&payload), "专注番茄 · 01:19");
+        assert_eq!(status_title(&payload, payload.remaining), "🍅 01:19");
+        assert_eq!(header_text(&payload, payload.remaining), "专注番茄 · 01:19");
         assert_eq!(task_text(&payload), "任务：梳理现有出口细分方案");
         assert_eq!(pomodoro_text(&payload), "番茄：6/3");
-        assert_eq!(progress_text(&payload), "计时进度：━━──────── 21%");
+        assert_eq!(
+            progress_text(&payload, payload.remaining),
+            "计时进度：━━──────── 21%"
+        );
         assert_eq!(toggle_text(&payload), "暂停");
     }
 
@@ -309,7 +351,7 @@ mod tests {
     fn labels_paused_and_prepared_timer_actions() {
         let mut payload = payload();
         payload.is_running = false;
-        assert_eq!(status_title(&payload), "⏸ 01:19");
+        assert_eq!(status_title(&payload, payload.remaining), "⏸ 01:19");
         assert_eq!(toggle_text(&payload), "继续");
         payload.prepared = Some(true);
         assert_eq!(toggle_text(&payload), "开始");
@@ -336,8 +378,11 @@ mod tests {
             assert_eq!(toggle_text(&payload), toggle);
         }
         payload.is_running = true;
-        assert_eq!(status_title(&payload), "☕ 01:19");
-        assert_eq!(header_text(&payload), "短休息 · 01:19");
-        assert_eq!(progress_text(&payload), "计时进度：━━──────── 21%");
+        assert_eq!(status_title(&payload, payload.remaining), "☕ 01:19");
+        assert_eq!(header_text(&payload, payload.remaining), "短休息 · 01:19");
+        assert_eq!(
+            progress_text(&payload, payload.remaining),
+            "计时进度：━━──────── 21%"
+        );
     }
 }

@@ -14,7 +14,6 @@ import type {
   ParsedQuickInput,
   ProjectInvitation,
   BackendDiagnosticResult,
-  ActiveTimer,
   Task,
   Workspace,
   WorkspaceInvitation,
@@ -39,7 +38,6 @@ export type AppShellView = {
   toggleWorkbenchProject: (projectId: string) => void;
   selectedTask?: Task;
   currentTask?: Task;
-  focusActiveTimer?: ActiveTimer;
   focusCommittedTasks: Task[];
   activeProjectId: string;
   projectDetailModel?: ProjectDetailModel;

@@ -1,6 +1,7 @@
 import {
   modeLabel,
   nowIso,
+  shouldFinishExpiredTimerInState,
   startTimerInState,
   today,
   toggleTimerInState,
@@ -113,7 +114,7 @@ export function createAppFocusActionsRuntime({
   const toggleTimer = () => {
     const source = getState();
     const active = source.activeTimer;
-    if (!active) return;
+    if (!active || shouldFinishExpiredTimerInState(source)) return;
     if (active.prepared) {
       void beginTimer(active.mode, active.taskId);
       return;
