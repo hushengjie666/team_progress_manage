@@ -1,0 +1,11 @@
+{
+  "status": "blocked",
+  "stage": "交接写入",
+  "command": "原子写入 .agent-run/handoff.json",
+  "summary": "「开始工作」今日任务按提交权限、任务状态与项目策略显示完成/提交验收，保留开始入口。卡片与当下清单共用 submit-review 和任务级保存状态。已保存的 completed 触发一次勾选和颜色过渡，pending_review 显示待验收，减少动态效果直接显示结果。失败提示原因并可重试，操作另一任务保留当前倒计时，提交当前任务沿用会话收尾。",
+  "tests": ".cache/venv/bin/python .agent-run/browser_probe.py --check-only 退出 2，返回 native_browser_approval_required。完整命令经原生 Auto-review 批准后，env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py 退出 0，localhost、桌面/手机点击和截图均通过。\n工作区 Node v24.22.3（CI 24），npm ci 退出 0；Python Playwright 1.59.0 和项目锁定的 Node Playwright 1.59.1 使用工作区 Chromium headless shell 1217。\nnpm test -- focusModel.test.ts teamStateRuntime.test.ts 退出 0（19 个测试）；npm run typecheck、npm run verify:fast、npm run audit:health、git diff --check 各退出 0，90 个单测文件共 381 测试通过，生产构建成功。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run node_modules/.bin/playwright test --config .cache/playwright.config.ts 退出 0，86 通过、6 个既有设备条件跳过。GH-20 的 5 项业务用例全部通过，包括桌面 1365×900 和窄屏触控 390×844、手工/自动验收、保存结果与页面策略不同、键盘、防重、失败重试、权限、当前及另一任务计时、会话与番茄、单次动画、刷新、重入和减少动态效果。完整回归另运行 iPhone SE/15 Pro/15 Pro Max WebKit 项目。见 .cache/e2e-final.log。\nenv PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review/check.py 退出 0；python3 .agent-run/review_preview.py start --route /review/focus -- .cache/toolchain/node_modules/node/bin/node .cache/review/server.mjs {bind} {port} 退出 0；env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review/check.py http://127.0.0.1:64286/review/focus 退出 0。实测免登录直达、两种状态、刷新与独立浏览器上下文的初始样例。",
+  "risks": "当前改动由宿主提交并推送 agent/issue-20，发布草稿 PR 后按实际 head SHA 核对 TimeManage CI 的 Frontend、Browser、Go backend、Tauri macOS。本轮未变更 CI、后端、数据库或持久化格式。既有工作台快速验收用例在上海凌晨出现日期边界差异（UTC completedAt 与本地今日日期），开发服务 UTC 环境通过；这项风险位于「我的任务」按日归集，GH-20 的今日任务卡片在上海凌晨亦已通过。人工入口连接本轮 loopback 样例服务，由宿主续期。",
+  "local_tests_passed": false,
+  "unverified": "宿主发布后的实际 head CI",
+  "resume": "如无有效 handoff，复核预览状态和证据，重写最终交接。"
+}

@@ -1,0 +1,70 @@
+{
+  "approval_comment_id": 7198202575,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/after.png",
+      "redacted": false,
+      "sha256": "1e035340bf720a9f62ccb51a1315836c3f77340d318c883ac8c4f5f5dcc097db",
+      "size": 358184,
+      "source_path": ".cache/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/after.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/before.png",
+      "redacted": false,
+      "sha256": "7a7abb918890bddefb8b7cc4581c3ccb3d2f640cd00ca4f2a3f4f0529c97799f",
+      "size": 372100,
+      "source_path": ".cache/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/before.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "142561676e526d5a1738ba891a2f1942d87b686beea1705cc57a05a11f1b2305",
+      "size": 2074
+    },
+    "artifacts/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/after.png": {
+      "sha256": "1e035340bf720a9f62ccb51a1315836c3f77340d318c883ac8c4f5f5dcc097db",
+      "size": 358184
+    },
+    "artifacts/browser-artifacts/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/before.png": {
+      "sha256": "7a7abb918890bddefb8b7cc4581c3ccb3d2f640cd00ca4f2a3f4f0529c97799f",
+      "size": 372100
+    },
+    "checkpoint.json": {
+      "sha256": "7f3b442bf9558993f75e25ac4a962ebdedf34e92afdcc5212239270d7b840c08",
+      "size": 3411
+    },
+    "context.json": {
+      "sha256": "79db260e3d3f4338f6d4d1963bbd8a5b89a0ce589f0aeaa3b9e0c239c1609eaa",
+      "size": 1022
+    },
+    "handoff.json": {
+      "sha256": "7be7d225263094540550a98e600e90472d35b4e116960112da74f89e22b6f447",
+      "size": 5765
+    },
+    "input.json": {
+      "sha256": "c86c321f8a69e482f9de9c7c9c887af8ff9a32f49b9a33c8f7f65570976f41c2",
+      "size": 943
+    }
+  },
+  "head_sha": "c7afd0f304bdc47e284e6048a49c36a8f02c72e5",
+  "issue_number": 20,
+  "omitted": [
+    {
+      "path": ".cache/browser-artifacts/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/after.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/before.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T17:07:50+00:00",
+  "revision": 1,
+  "run_id": "7198230930-5606729a9200",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "142561676e526d5a1738ba891a2f1942d87b686beea1705cc57a05a11f1b2305",
+  "start_comment_id": 7198230930,
+  "status": "ready_for_review"
+}
