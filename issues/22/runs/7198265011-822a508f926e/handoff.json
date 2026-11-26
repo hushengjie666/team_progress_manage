@@ -1,0 +1,95 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "打开独立 macOS 样例，在开始工作页启动后切换工作区筛选，从系统菜单和页面分别暂停、继续，比较两边的动作与余时。",
+      "在允许整机休眠的时段使用该样例，让 Mac 睡眠并唤醒，核对两处阶段、余时及到期后的单次结算。"
+    ],
+    "kind": "preview"
+  },
+  "base_sha": "ce6c49e0a2bc1b4b338e0d726852dd4eff4f6e79",
+  "blocker": "真实整机睡眠/唤醒为核验正文要求，当前缺少可中断宿主并唤醒的验收时段。",
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png",
+      ".agent-run/browser-smoke/result.json"
+    ],
+    "command": ".cache/browser-python/bin/python .agent-run/browser_probe.py",
+    "exit_code": 0,
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/focus-session-sync-desktop-492f5-side-the-selected-workspace-chrome/desktop.png",
+      ".cache/browser-artifacts/focus-session-sync-mobile--c9180-side-the-selected-workspace-chrome/mobile.png"
+    ],
+    "command": "env TZ=UTC PATH=\"$PWD/.cache/node24/node_modules/.bin:$PATH\" .cache/browser-python/bin/python .agent-run/browser_probe.py --retry-after-fix \"已补上卸载清理并用延迟首次 bootstrap 响应验证失效写入；WebKit 与样例生成器同为 UTC\" --run node_modules/.bin/playwright test --config=.cache/gh22.config.ts",
+    "desktop": "passed",
+    "mobile": "passed",
+    "report": ".agent-run/e2e-final.log",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "ci": "只读查看基线检查均成功；修复代码由宿主提交发布后才有相应检查。CI 无变更；Go 模块声明 1.22，CI 1.26.11，本轮未改 Go。Rust 声明 1.77.2，CI 无固定工具链版本。",
+  "command": "python3 .cache/native/open-review.py",
+  "files": [
+    "src-tauri/src/desktop_timer_tray.rs",
+    "src-tauri/src/lib.rs",
+    "src/App.tsx",
+    "src/appAuthenticatedShellModel.ts",
+    "src/appFocusActionsRuntime.test.ts",
+    "src/appFocusActionsRuntime.ts",
+    "src/appLifecycleHooks.ts",
+    "src/appLifecyclePersistenceHooks.ts",
+    "src/appLifecycleTimerHooks.test.ts",
+    "src/appLifecycleTimerHooks.ts",
+    "src/appWorkspaceViewModelHooks.ts",
+    "src/components/AppAuthenticatedShellTypes.ts",
+    "src/components/AppFocusRoute.tsx",
+    "src/components/focus/FocusTimerPanel.tsx",
+    "src/components/focus/FocusView.tsx",
+    "src/desktopTimerStatus.test.ts",
+    "src/desktopTimerStatus.ts",
+    "tests/e2e/focus-timer-layout.spec.ts",
+    "src-tauri/src/desktop_timer_tray/clock.rs",
+    "tests/e2e/focus-session-sync.spec.ts"
+  ],
+  "local_tests_passed": false,
+  "native_desktop": {
+    "app_path": ".cache/gh22-native-target/debug/bundle/macos/TimeManage GH22 Acceptance.app",
+    "artifacts": [
+      ".agent-run/baseline-comparison.txt",
+      ".agent-run/native-comparison.json",
+      ".agent-run/native-records.json",
+      ".agent-run/native-entry.txt",
+      ".agent-run/native-ready.json"
+    ],
+    "command": "python3 .cache/native/check.py",
+    "physical_wake": "not_run",
+    "platform": "macos",
+    "review": {
+      "app_path": ".cache/gh22-native-target/debug/bundle/macos/TimeManage GH22 Acceptance.app",
+      "entry_verified": true,
+      "open_command": [
+        "python3",
+        ".cache/native/open-review.py"
+      ],
+      "ready_file_protocol": "AUTODEV_REVIEW_READY_FILE + AUTODEV_REVIEW_REQUEST_ID",
+      "session_mode": "isolated_sample"
+    },
+    "status": "partial"
+  },
+  "preview": "http://127.0.0.1:57433/review",
+  "resume_point": "宿主续期或恢复已登记的 127.0.0.1:57433 样例服务，再用 python3 .cache/native/open-review.py 打开专用构建。在已获同意的整机睡眠窗口，比对唤醒后的阶段、余时和结算数；通过后交 ready_for_review。",
+  "risks": "整台 Mac 的真实睡眠与唤醒未执行。进程 SIGSTOP/SIGCONT 与墙钟恢复已测，两处均为 00:19。整机休眠会影响宿主其他工作，已请求可中断时段，目前未收到确认。macOS 原生窗口截图命令退出 1（could not create image from window），已保存原生可访问性控件文本和余时对照；桌面/手机业务截图齐全。亚洲上海凌晨首次全量还暴露非本 Issue 的今日已完成跨日用例差异；在 CI 使用的 UTC 下通过。宿主发布任务分支后须按实际 PR head SHA 查询 Frontend、Browser、Go backend、Tauri macOS；当前没有修复提交或其远端 CI 结果。",
+  "stage": "physical_sleep_wake",
+  "status": "blocked",
+  "summary": "修复工作区筛选让专注面板退回默认 25:00 的问题。菜单按当前会话截止时间与倍率独立刷新，暂停保留冻结余时，过期菜单动作和旧原生刷新会被丢弃。窗口恢复、原生到期和前端轮询复用同一结算路径及结束幂等键；失效的启动快照不能覆盖下一阶段。回归及原生双向操作已验证。",
+  "test_history": [
+    "初次 TS 聚焦 40/41，修正历史固定时间样例后全量通过。",
+    "浏览器原始 npm 参数路由退出 2，改为直接调用项目 Playwright。首次全量 81/89 通过、2 失败、6 跳过，第二次 79 过、4 失败、6 跳过。调用栈证实旧启动结果重复生效。补齐 effect 清理、增加延迟响应回归并对齐 Node/WebKit 与 CI 的 UTC 后，最终 83 过、6 跳过。",
+    "原生驱动首次等待 AX 树、整应用 hide 不可用；改用现有黄色按钮和菜单打开入口后通过。"
+  ],
+  "tests": "Node 24.22.3（与 CI 的 Node 24 一致）：npm run verify:fast 退出 0，90 个文件、382 项 Vitest 通过，TypeScript 与 Vite 生产构建通过；npm run verify:quality 退出 0，包含 audit:health。rustc/cargo 1.94.0：cargo check --locked --manifest-path src-tauri/Cargo.toml 与 cargo test --locked --manifest-path src-tauri/Cargo.toml --lib 均退出 0，Rust 6 项通过。隔离 Python 3.12 预检 --check-only 退出 2（native_browser_approval_required），获批原生执行 .cache/browser-python/bin/python .agent-run/browser_probe.py 退出 0，两个视口均点击和截图。业务 Playwright 全套最终 83 通过、6 按仓库条件跳过、退出 0。原生 python3 .cache/native/check.py 续跑退出 0，16 组真实窗口和菜单对照，每组时间相同。样例 3 次专注启动对应 3 条工作会话，1 次自然结束请求、1 个番茄。已复核本轮独立 .app 的目标进程、登录状态、计时页和就绪回执；网页预览检查退出 0。"
+}

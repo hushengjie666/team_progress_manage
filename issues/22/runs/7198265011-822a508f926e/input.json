@@ -1,0 +1,31 @@
+{
+  "allowed_actions": [
+    "implement",
+    "test",
+    "commit",
+    "push",
+    "draft_pr"
+  ],
+  "approval_comment_id": 7198251155,
+  "base_branch": "main",
+  "branch": "agent/issue-22",
+  "engineering_paths": [],
+  "initialization_paths": [],
+  "issue_number": 22,
+  "issue_url": "https://github.com/hushengjie666/team_progress_manage/issues/22",
+  "open_prs": [],
+  "protocol": "autodev.issue/v2",
+  "publisher_login": "hushengjie666",
+  "reopen_pr": null,
+  "review_preview_lan_host": null,
+  "revision": 1,
+  "run_id": "7198265011-822a508f926e",
+  "spec_sha256": "c729a540cedc0e86b4b603cc5eecd6c56d5297c2a7222b420fbb3a82dacfdaeb",
+  "start_comment_id": 7198265011,
+  "start_confirmation": "三项确认并开工",
+  "started_at": 1795713745,
+  "verification": {
+    "browser_required": true,
+    "reason": "Web 项目默认执行桌面/手机浏览器业务自动化验证；无浏览器界面的项目记录不适用原因。"
+  }
+}
