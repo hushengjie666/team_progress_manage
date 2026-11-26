@@ -1,0 +1,61 @@
+{
+  "approval_comment_id": 7198217064,
+  "archive_complete": true,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/desktop.png",
+      "redacted": false,
+      "sha256": "4dd3ebb5227d62c2b5a511c9cdce50e704a1e61db42bb27531321587703e2941",
+      "size": 197408,
+      "source_path": ".cache/browser-artifacts/desktop.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/mobile.png",
+      "redacted": false,
+      "sha256": "e393a7575859d15681e8965f8ecef42e4e327577adb72ec420ddb2478204f225",
+      "size": 108435,
+      "source_path": ".cache/browser-artifacts/mobile.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "346089b610d2be97cb9f871cbed30318339b3a25d24972298eba081326bb2591",
+      "size": 1855
+    },
+    "artifacts/browser-artifacts/desktop.png": {
+      "sha256": "4dd3ebb5227d62c2b5a511c9cdce50e704a1e61db42bb27531321587703e2941",
+      "size": 197408
+    },
+    "artifacts/browser-artifacts/mobile.png": {
+      "sha256": "e393a7575859d15681e8965f8ecef42e4e327577adb72ec420ddb2478204f225",
+      "size": 108435
+    },
+    "checkpoint.json": {
+      "sha256": "7050461c8bb33ca3150a1d321a92491544095943d6956a669dd7196c1b56f58f",
+      "size": 4300
+    },
+    "context.json": {
+      "sha256": "7946ee7493a7cd3a4c896f8cd9374270e9cc1a6b856055a4a5ec1019b67d2c90",
+      "size": 1022
+    },
+    "handoff.json": {
+      "sha256": "6ee29a2d36174e495fd45d48ec3dd5d6898878f07037805a6f9ecdc6b780af7a",
+      "size": 5581
+    },
+    "input.json": {
+      "sha256": "ca2eb9d860c003b4528199071d3e9dd4d987235d31120560fee9b1eebfa621a6",
+      "size": 943
+    }
+  },
+  "head_sha": "64c858a620bf446fff1f18da87db754c95450972",
+  "issue_number": 21,
+  "omitted": [],
+  "recorded_at": "2026-11-26T17:21:59+00:00",
+  "revision": 1,
+  "run_id": "7198281818-85949771da99",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "346089b610d2be97cb9f871cbed30318339b3a25d24972298eba081326bb2591",
+  "start_comment_id": 7198281818,
+  "status": "ready_for_review"
+}

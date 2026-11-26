@@ -1,0 +1,38 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "核对七个日期、折线点、每日时长和合计 2:40:00，使用 Tab 逐日查看。",
+      "切到私人工作区核对 0:25:00，再切到 E2E 工作区核对 2:15:00；观察窄屏文字是否易读。"
+    ],
+    "kind": "preview"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "command": "env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/desktop.png",
+      ".cache/browser-artifacts/mobile.png"
+    ],
+    "command": "env TZ=UTC PATH=\"$PWD/.cache/ci-tools/node_modules/.bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --run npm run test:e2e -- --config .cache/gh21/regression.config.ts",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "preview_url": "http://127.0.0.1:52064/workbench",
+  "risks": "远端查询本任务分支当前 0 个 GitHub Actions 运行、无开放 PR。宿主需将这 9 个业务/测试文件提交并推送 origin/agent/issue-21、发布草稿 PR，按新 head SHA 核对 TimeManage CI。已有任务队列的“今日已完成”在上海凌晨可能受 UTC 日期比较影响，建议另案跟进。生产构建有既有主包体积提示。临时预览服务及其隔离样例留在工作区，由宿主续期。",
+  "status": "ready_for_review",
+  "summary": "个人工作台「我的任务」展示本地今天及前六天的折线、键盘可读的每日时长与合计。按工作区选择、项目访问权限、本人已结束的工作会话统计，ID 去重，扣除暂停并排除休息。按有效区间拆分跨日记录，历史记录仅有累计暂停时长时将净时长归到结束日。空态、零值、结束会话、切换账号和工作区、午夜切日均有覆盖。",
+  "tests": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --check-only：退出 2，native_browser_approval_required。原生审批后的 env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py：退出 0，Chromium headless shell localhost、桌面/手机点击和截图通过。\n在 PATH=\"$PWD/.cache/ci-tools/node_modules/.bin:$PATH\" 下：npm test -- weeklyFocusTrend.test.ts 退出 0（6/6），npm run typecheck 退出 0，npm run verify:fast 退出 0（91 个文件、387 项单测、生产构建通过），npm run audit:health 退出 0（719 个文件），git diff --check 退出 0。\nGH-21 专项：env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"Use visible mobile top bar filter\" --run npm run test:e2e -- --config .cache/gh21/playwright.config.ts tests/e2e/weekly-focus-trend.spec.ts（Node 24.22.3），业务和 probe 均退出 0，两视口通过。首次手机用例误开遮挡顶部筛选的更多菜单，业务退出 1 / probe 2，已修正实际交互。\n最终全套：env TZ=UTC PATH=\"$PWD/.cache/ci-tools/node_modules/.bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --run npm run test:e2e -- --config .cache/gh21/regression.config.ts，业务与 probe 均退出 0，83 项通过、6 项按原项目设备条件跳过。含桌面和手机 GH-21 业务、三种手机 WebKit 配置。重点用例显式 Asia/Shanghai，核对七个日期、逐日值、合计、Tab、宽度、午夜刷新、工作区和真实登出后另一账号登录。\n回归环境调整：verify:e2e 的嵌套 npm 命令未传递 --config，No tests found（1 / probe 2）；改调其底层脚本。生产预览 + 本地时区初跑 81 通过、6 跳过、2 失败（1 / probe 2）：focus-timer-layout.spec.ts 的快速计时只在 DEV 生效；workbench-review.spec.ts:32 的旧队列用 UTC 日期前缀比较本地今天。将隔离配置对齐项目 Vite 开发服务器与 CI UTC，并以 --retry-after-fix 复验通过。最终代码的同配置全套亦通过。\n人工入口：前台参数先由 env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/gh21/check_preview.py 验证（0）。python3 .agent-run/review_preview.py start --route /workbench -- .cache/ci-tools/node_modules/.bin/node .cache/gh21/preview.mjs {bind} {port} 退出 0。env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/gh21/check_preview.py http://127.0.0.1:52064/workbench 退出 0，新桌面及手机上下文直接进入工作台、只访问隔离同源、工作区筛选通过。",
+  "toolchain": "项目 npm 锁定 Playwright 1.59.1，Python smoke 1.59.0，两者均使用 Chromium headless shell 1217；本轮前端测试与 CI 一致使用 Node 24（本地 24.22.3）。Go 模块声明 1.22、现有 CI 安装 1.26.11；Rust 最低 1.77.2，现有 CI 由 macOS runner 提供。未改动后端、Tauri、CI、存储或迁移。初始化/工程路径、依赖 SHA、CI 返工和合并冲突均未配置。"
+}
