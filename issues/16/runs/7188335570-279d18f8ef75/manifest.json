@@ -1,0 +1,78 @@
+{
+  "approval_comment_id": 7188302634,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-desktop-chromium/daily-quote-management.png",
+      "redacted": false,
+      "sha256": "8ba11fe0b4a97d679794251d1e674ac3b06e02dd6bc573703f058928b45b3689",
+      "size": 171135,
+      "source_path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-desktop-chromium/daily-quote-management.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-mobile-chromium/daily-quote-management.png",
+      "redacted": false,
+      "sha256": "8835b2e02484004e01908031ab27d18be4b6574b15f658c7cf046a6f1e953e3f",
+      "size": 424308,
+      "source_path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-mobile-chromium/daily-quote-management.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "7f908e751671b93e4c15b12cfe0aadf05b04ea1949025205c553f4e02fe8701b",
+      "size": 19076
+    },
+    "artifacts/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-desktop-chromium/daily-quote-management.png": {
+      "sha256": "8ba11fe0b4a97d679794251d1e674ac3b06e02dd6bc573703f058928b45b3689",
+      "size": 171135
+    },
+    "artifacts/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-mobile-chromium/daily-quote-management.png": {
+      "sha256": "8835b2e02484004e01908031ab27d18be4b6574b15f658c7cf046a6f1e953e3f",
+      "size": 424308
+    },
+    "checkpoint.json": {
+      "sha256": "34234fdd08c6b0fecc4a9bbecb386c780a5f8b7be6d76b7e4c8e6401efd05b89",
+      "size": 3823
+    },
+    "context.json": {
+      "sha256": "13e59408db0c3f7b7687b256a13dabceeb354cdee83715230c7e05dca4d1ab90",
+      "size": 1026
+    },
+    "handoff.json": {
+      "sha256": "3e2d090e12e55b1efce78eff67024b3ca1409a4b3325e2b94fcd202fed0cf4c0",
+      "size": 7718
+    },
+    "input.json": {
+      "sha256": "0d2eaf7a9bc7b096545b861f50f784f8a041466ac49c9590e44c7c43f6fb15cd",
+      "size": 947
+    }
+  },
+  "head_sha": "87d22e150592a2a51a830fab63a86061308040aa",
+  "issue_number": 16,
+  "omitted": [
+    {
+      "path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-shows-only-th-98bde-ninterrupted-focus-controls-desktop-chromium/daily-quote-focus.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-shows-only-th-98bde-ninterrupted-focus-controls-mobile-chromium/daily-quote-focus.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-truncates-an--03c3d--the-full-text-in-the-title-desktop-chromium/daily-quote-long.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-truncates-an--03c3d--the-full-text-in-the-title-mobile-chromium/daily-quote-long.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T09:57:15+00:00",
+  "revision": 2,
+  "run_id": "7188335570-279d18f8ef75",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "7f908e751671b93e4c15b12cfe0aadf05b04ea1949025205c553f4e02fe8701b",
+  "start_comment_id": 7188335570,
+  "status": "ready_for_review"
+}

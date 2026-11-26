@@ -1,0 +1,84 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "在隔离 Tauri 桌面窗口打开「开始工作」，检查 20px 粗体正文在横条上是否清楚、安静，开始和休息操作是否仍容易看到。用长句原生截图核对单行省略效果。",
+      "经「管理中心 → 名言警句」打开当天名言，检查完整正文和出处是否方便查阅。"
+    ],
+    "kind": "preview"
+  },
+  "base_sha": "8c0baefe0ccbb04975a8ec0260bd138347ff38a1",
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "command": "PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py",
+    "exit_code": 0,
+    "result": ".agent-run/browser-smoke/result.json",
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-shows-only-th-98bde-ninterrupted-focus-controls-desktop-chromium/daily-quote-focus.png",
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-truncates-an--03c3d--the-full-text-in-the-title-desktop-chromium/daily-quote-long.png",
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-desktop-chromium/daily-quote-management.png",
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-shows-only-th-98bde-ninterrupted-focus-controls-mobile-chromium/daily-quote-focus.png",
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-truncates-an--03c3d--the-full-text-in-the-title-mobile-chromium/daily-quote-long.png",
+      ".cache/browser-artifacts/gh16-r2-verified/daily-quotes-a-regular-mem-ed7ad--and-delete-personal-quotes-mobile-chromium/daily-quote-management.png"
+    ],
+    "command": "TM_GH16_BROWSER_OUTPUT=./browser-artifacts/gh16-r2-verified PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --retry-after-fix \"补齐模拟番茄暂停 API 并等待开始及暂停写入确认\" --run npm run verify:e2e -- -- --config .cache/playwright-gh16.config.ts --workers=4",
+    "desktop": "passed",
+    "exit_code": 0,
+    "log": ".cache/gh16-r2-e2e-verified.log",
+    "mobile": "passed",
+    "playwright_exit_code": 0,
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "changed_paths": [
+    "src/components/AppAuthenticatedShellRoutes.tsx",
+    "src/components/AppFocusRoute.tsx",
+    "src/components/focus/FocusDailyQuote.tsx",
+    "src/components/focus/FocusView.tsx",
+    "src/styles/daily-quotes.css",
+    "tests/e2e/daily-quotes.spec.ts"
+  ],
+  "local_tests_passed": true,
+  "native_desktop": {
+    "artifacts": [
+      ".cache/browser-artifacts/gh16-r2-native/tauri-focus.png",
+      ".cache/browser-artifacts/gh16-r2-native/tauri-focus-long.png",
+      ".cache/browser-artifacts/gh16-r2-native/tauri-management.png"
+    ],
+    "command": "sh .cache/gh16-r2-run-native.sh",
+    "exit_code": 0,
+    "log": ".cache/gh16-r2-native-verified.log",
+    "review": {
+      "backend": "http://127.0.0.1:18716",
+      "launch_command": "./.cache/gh16-r2-native-bin/timemanage-desktop",
+      "route": "登录隔离样例账号后点击「开始工作」。",
+      "sample_login": {
+        "email": "review@example.test",
+        "password": "gh16-review-sample"
+      },
+      "working_directory": "."
+    },
+    "status": "passed",
+    "window_size": "1280x820"
+  },
+  "review_preview": {
+    "artifact": ".cache/browser-artifacts/gh16-r2-review-preview.png",
+    "command": "python3 .agent-run/review_preview.py start --route /focus-review --port 18716 -- node .cache/gh16-preview.mjs '{bind}' '{port}' dist",
+    "exit_code": 0,
+    "route": "/focus-review",
+    "status": "ready",
+    "url": "http://127.0.0.1:18716/focus-review",
+    "verification_command": "PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --run node .cache/gh16-r2-verify-preview.mjs"
+  },
+  "risks": "iOS 原生设备尚未验收。手机 Chromium 和现有窄屏 WebKit 流程已通过。隔离验收样例的数据为内存数据，服务重启后恢复初始样例。当前改动待宿主提交，GitHub CI 未运行本轮改动。",
+  "source_review": "docs/daily-quotes-source-review.md",
+  "status": "ready_for_review",
+  "summary": "GH-16 第二版已在草稿 PR #17 基线上完成。开始工作页横条仅显示同一行的「每日一句」小标识与 20px / 700 名言正文，保留 78px 高度。长句单行省略，title 仅含纯正文。空库显示「暂无启用名言」。移除横条的管理快捷入口和详情按钮。管理中心 → 名言警句仍提供全文及来源、100 条内置库、个人编辑与启停、时区轮换和账号同步。",
+  "tests": ".cache/autodev-python/bin/python .agent-run/browser_probe.py --check-only 退出 2，原因为 native_browser_approval_required。原生 Auto-review 获批后运行 PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py，退出 0。隔离 localhost 桌面/手机加载、点击和截图通过。\nnpm test -- src/dailyQuotes 退出 0，13 项通过。npm run verify:fast 退出 0，371 项 Vitest 通过，Vite 构建通过。npm run typecheck、npm run typecheck:test、npm run audit:health、git diff --check 均退出 0。Vite 有分包大小提示，健康审计有行数提示。\nTM_GH16_BROWSER_OUTPUT=./browser-artifacts/gh16-r2-verified PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --retry-after-fix \"补齐模拟番茄暂停 API 并等待开始及暂停写入确认\" --run npm run verify:e2e -- -- --config .cache/playwright-gh16.config.ts --workers=4 退出 0，Playwright 退出 0，82 通过、6 按项目配置跳过。GH-16 桌面 Chromium 与手机 Chromium 各 4 项通过，覆盖开始工作、暂停、两类休息、长句及无任务、管理中心全文与来源、搜索筛选、编辑启停、配置失败与账号隔离。\nWeb 初轮探针退出 2 / Playwright 退出 1，记录在 .cache/gh16-r2-e2e.log。补齐任务开始响应、长句保存格式和手机换账号后的导航等待。第二轮退出 2 / 1，记录在 .cache/gh16-r2-e2e-retry.log，补齐暂停响应并等待开始和暂停确认。两轮失败证据均保留。\nVITE_WDIO_TAURI=1 VITE_TM_BACKEND_SERVER_URL=http://127.0.0.1:18716 npm exec -- vite build --outDir .cache/gh16-r2-native-dist && CARGO_HOME=\"$PWD/.cache/gh16-cargo\" CARGO_TARGET_DIR=\"$PWD/.cache/gh16-target\" TAURI_CONFIG=\"$(cat .cache/gh16-r2-native-config.json)\" cargo build --offline --locked --manifest-path src-tauri/Cargo.toml --bin timemanage-desktop --features tauri/custom-protocol 退出 0。sh .cache/gh16-r2-run-native.sh 最终退出 0，WebDriver 验证当前 Tauri 实窗，测得 78px 横条及 20px / 700 正文，支持 80 字省略及纯正文 title，计时控件在可视区。还验证管理页完整出处、保存、重新加载与模拟恢复后的轮换。原生首两次退出 1，诊断及日志保留。最终通过将 WebDriver 改为独立端口 18727，避开上一轮遗留的 18717 监听进程。\npython3 .agent-run/review_preview.py start --route /focus-review --port 18716 -- node .cache/gh16-preview.mjs '{bind}' '{port}' dist 退出 0；PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --run node .cache/gh16-r2-verify-preview.mjs 退出 0，确认入口页面和管理中心的 100 / 100 条隔离样例。"
+}
