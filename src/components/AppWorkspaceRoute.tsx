@@ -1,5 +1,6 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { mergeScopedProjectOrder } from "../workspaceScope";
+import { WeeklyFocusTrendPanel } from "./workspace/WeeklyFocusTrendPanel";
 import { WorkspaceView } from "./WorkspaceView";
 import { canReviewProjectTasks } from "../accessControl";
 
@@ -49,6 +50,7 @@ export function AppWorkspaceRoute({
     <WorkspaceView
       mode={workspaceMode}
       model={workspaceModel}
+      workbenchTrend={<WeeklyFocusTrendPanel state={state} workspaceId={shellState.selectedWorkspaceId} />}
       draft={taskDraft}
       setDraft={setTaskDraft}
       addTask={taskActions.addTask}

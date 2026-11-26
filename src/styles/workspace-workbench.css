@@ -154,3 +154,36 @@
 .risk-panel {
   grid-column: 1 / -1;
 }
+
+.weekly-focus-trend {
+  grid-column: 1 / -1;
+  padding: 14px clamp(6px, 2vw, 20px);
+  background: #fffdfa;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-focus-trend header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.weekly-focus-trend h2 { margin: 0; font-size: 16px; }
+.weekly-focus-trend header span { font-size: 13px; }
+.weekly-focus-trend header strong { font-size: 18px; color: #166c60; }
+.weekly-focus-trend > svg { display: block; margin-top: 6px; color: #197e70; }
+.weekly-focus-trend ol {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  text-align: center;
+  font-size: clamp(10px, 2.8vw, 13px);
+}
+.weekly-focus-trend li { display: grid; gap: 3px; padding: 3px 0; }
+.weekly-focus-trend li:focus-visible { outline: 2px solid #197e70; border-radius: 4px; }
+.weekly-focus-trend time, .weekly-focus-trend p { color: #52635e; }
+.weekly-focus-trend p { margin: 12px 0 0; font-size: 12px; line-height: 1.5; }

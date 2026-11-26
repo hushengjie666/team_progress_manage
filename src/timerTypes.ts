@@ -2,7 +2,7 @@ export type SessionMode = "focus" | "short_break" | "long_break";
 export type SessionOutcome = "completed" | "aborted" | "skipped";
 export type TimerSettlement = "pending" | "none";
 export type WorkSessionStatus = "active" | "paused" | "ended";
-export type ExecutionSignalType = "work_started" | "work_paused" | "work_resumed" | "work_ended";
+export type ExecutionSignalType = "work_started" | "work_paused" | "work_resumed" | "work_ended" | "work_reset";
 
 export interface FocusSession {
   id: string;

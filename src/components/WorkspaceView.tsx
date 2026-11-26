@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { type TaskDraft } from "../appModel";
 import type { WorkspaceViewModel } from "../workbenchModel";
 import type { ActiveTimer, Project, ProjectMember, Task } from "../types";
@@ -8,6 +9,7 @@ import { WorkspaceWorkbenchColumns } from "./workspace/WorkspaceWorkbenchColumns
 export function WorkspaceView(props: {
   mode: "board" | "workbench";
   model: WorkspaceViewModel;
+  workbenchTrend: ReactNode;
   draft: TaskDraft;
   setDraft: (draft: TaskDraft) => void;
   addTask: (projectId?: string) => void;
@@ -80,6 +82,7 @@ export function WorkspaceView(props: {
 
   return (
     <div className="content-grid workspace-grid">
+      {props.workbenchTrend}
       <WorkspaceWorkbenchColumns
         myProjectTaskCards={myProjectTaskCards}
         poolWorkbenchTasks={poolWorkbenchTasks}
