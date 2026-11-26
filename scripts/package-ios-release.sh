@@ -25,7 +25,25 @@ cd "${ROOT_DIR}"
 npm run verify:ios:release
 node scripts/validate-ios-store-metadata.mjs
 npm run build:ios
-cargo build --manifest-path src-tauri/Cargo.toml --target aarch64-apple-ios --release --lib
+
+SWIFT_PATH="${PATH}"
+XCODE_MAJOR="$(xcodebuild -version | awk 'NR == 1 { split($2, version, "."); print version[1] }')"
+if [ "${XCODE_MAJOR}" -ge 27 ]; then
+  # swift-rs relies on SwiftPM's native build system to use the iOS SDK for its Swift packages.
+  SWIFT_BIN="${TEMP_DIR}/swift-bin"
+  mkdir -p "${SWIFT_BIN}"
+  cat > "${SWIFT_BIN}/swift" <<'EOF'
+#!/bin/sh
+if [ "$1" = build ]; then
+  shift
+  exec /usr/bin/swift build --build-system native "$@"
+fi
+exec /usr/bin/swift "$@"
+EOF
+  chmod +x "${SWIFT_BIN}/swift"
+  SWIFT_PATH="${SWIFT_BIN}:${PATH}"
+fi
+PATH="${SWIFT_PATH}" cargo build --locked --manifest-path src-tauri/Cargo.toml --target aarch64-apple-ios --release --lib
 mkdir -p src-tauri/gen/apple/Externals/arm64/release
 cp src-tauri/target/aarch64-apple-ios/release/libtimemanage_desktop_lib.a \
   src-tauri/gen/apple/Externals/arm64/release/libapp.a

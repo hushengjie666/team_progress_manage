@@ -1,6 +1,6 @@
 {
-  "release_version": "0.2.17",
+  "release_version": "0.2.18",
   "api_protocol_version": 2,
-  "database_schema_version": 20,
-  "minimum_client_release": "0.2.17"
+  "database_schema_version": 21,
+  "minimum_client_release": "0.2.18"
 }

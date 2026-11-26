@@ -1,5 +1,5 @@
 import { today } from "./appModel";
-import { todayKey } from "./seed";
+import { localDateForTimestamp } from "./appClock";
 import {
   accessibleProjectIdsForCurrentUser,
   activeWorkspaceIdsForCurrentAccount,
@@ -35,12 +35,6 @@ const sourceTasksForMemberStatus = (state: AppState, sourceProjectIds: Set<strin
     task.status !== "archived" &&
     sourceProjectIds.has(task.projectId),
   );
-
-const localDateForTimestamp = (timestamp?: string) => {
-  if (!timestamp) return undefined;
-  const value = new Date(timestamp);
-  return Number.isFinite(value.getTime()) ? todayKey(value) : undefined;
-};
 
 const sessionTouchesDate = (session: WorkSession, date: string, currentDate: string) => {
   const start = localDateForTimestamp(session.startedAt);

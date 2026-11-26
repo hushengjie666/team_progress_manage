@@ -4345,7 +4345,7 @@ dependencies = [
 
 [[package]]
 name = "timemanage-desktop"
-version = "0.2.17"
+version = "0.2.18"
 dependencies = [
  "log",
  "objc2",
