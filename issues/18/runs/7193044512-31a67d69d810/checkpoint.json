@@ -1,0 +1,10 @@
+{
+  "status": "blocked",
+  "phase": "final_evidence",
+  "command": "核对 Playwright JSON/HTML、桌面和手机业务截图、工作树及补跑状态",
+  "summary": "新增 .github/workflows/ci.yml。原 PR 头已核对，隔离 Chromium 桌面和手机 smoke 均通过。",
+  "tests": "完整业务复测退出 0，74 通过、6 预期跳过；全部其他必要本地验证通过。",
+  "risks": "核对证据和写入交接。真实 Actions 推送检查和两次补跑需要宿主完成。",
+  "resume": "查阅 .cache/gh18-ci/logs/ 和浏览器报告，再继续未完成的验证。",
+  "local_tests_passed": false
+}

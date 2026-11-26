@@ -1,0 +1,28 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "核对 CI 修复分支实际提交及合入后的 main 各有真实前端、浏览器、Go 和 Tauri macOS 检查，worker PR 更新未重复执行整套检查。",
+      "核对两次 main 补跑将成功状态分别写到 PR #15 和 #17 的批准原 SHA，状态链接打开对应的实际 Actions 运行。"
+    ],
+    "kind": "file",
+    "path": ".github/workflows/ci.yml"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/desktop.png",
+      ".cache/browser-artifacts/mobile.png",
+      ".cache/browser-artifacts/report/index.html",
+      ".cache/browser-artifacts/results.json"
+    ],
+    "command": ".cache/gh18-browser-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"Manage the isolated Vite process directly to avoid Playwright webServer teardown hanging; forward reporter arguments through both npm scripts.\" --run npm run verify:e2e -- -- --reporter=line,json,html --output=.cache/browser-artifacts/test-results",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "risks": "真实 GitHub Actions 结果待宿主完成。只读 GitHub 核对显示暂无 workflow run，PR #15 的 a14839dbf0d3f691ea92cd70238532f8c5496130 与 PR #17 的 87d22e150592a2a51a830fab63a86061308040aa 仍为开放草稿 PR 的批准头，来源同仓库且目标为 main，两者均 0 条 commit status、0 条 check run（combined state pending），暂无 Actions 运行链接。宿主发布独立 CI PR 后核对修复分支实际提交的检查。CI 合入且 main 检查通过后，TimeManage 项目会话从 main 分别 dispatch pr_number=15 和 pr_number=17 及各自批准 SHA，记录每次实际 Actions 链接和原提交状态，再由 Symphony 依原验收流程继续。若头提交变化、冲突或检查失败，记录阻塞并按原交付流程核验；本地无未解决测试失败。",
+  "status": "ready_for_review",
+  "summary": "GH-18 / AD-003 仅新增 .github/workflows/ci.yml。main 推送和普通 main PR 运行四套检查，同仓库 agent/issue-* 使用推送实际 SHA 的检查，避免 PR 事件重复运行。main 手动补跑限于批准的 PR #15 / #17 和完整 SHA，检出前和发布前均核对 PR 开放、同仓库、目标 main 及头 SHA。测试作业为只读托管 runner 且不保留 checkout 凭证。独立发布作业不检出目标代码，仅在四项均通过时登记 success，失败登记 failure，取消跳过发布。状态上下文 TimeManage CI / approved backfill 带实际 Actions 链接。批准正文 SHA-256 已核对，任务 HEAD 和宿主取得的 origin/main 均为 fc81c806d7c22738a1b6fbb604b24614d409c193，运行上下文无 dependencies 或 merge_conflict。",
+  "tests": "npm ci → 0。CI=true npm run verify:fast → 0 / 1 / 0（正常和移除临时失败用例后均 358 项通过并完成构建，注入的 GH-18 intentionally fails the frontend CI command 保留 358 项通过且精确新增 1 项失败，临时用例已删除；日志 .cache/gh18-ci/logs/frontend-{baseline,controlled,restored}.log）。(cd team-server && go test ./...) → 0。CI=true npm run build → 0，cargo check --locked --manifest-path src-tauri/Cargo.toml → 0。.cache/gh18-ci/bin/actionlint .github/workflows/ci.yml → 0；node --test .cache/gh18-ci/verify-workflow.cjs → 0（5 项，含过期或错误 SHA、非 main、关闭或 fork PR、取消与跳过、状态链接和权限）。前述报告与命令日志保存在 .cache/gh18-ci/logs。浏览器 check-only → 2（native_browser_approval_required），原生批准。Python Playwright 1.59.1 无可安装发行版（pip → 1），改用 1.59.0 和工作区 Chromium headless shell，.cache/gh18-browser-venv/bin/python .agent-run/browser_probe.py → 0。桌面及手机 localhost 点击截图证据在 .agent-run/browser-smoke/。业务使用项目锁定的 Node Playwright 1.59.1。第一次全部用例输出后 Vite 收尾卡住，经核对结束本轮进程，内部命令 -15、探针退出 2，日志 .cache/gh18-ci/logs/browser-business.log。由 Python 直接管理独立 loopback Vite，并修正嵌套 npm 的报告参数转发后，.cache/gh18-browser-venv/bin/python .cache/gh18-ci/run_business.py → 0，探针与内部项目命令均退出 0。JSON/HTML 报告确认桌面 Chrome 65 通过，三种手机 WebKit 项目合计 9 通过、6 预期跳过，共 74 通过且无失败或 flaky。工作树范围及空白检查通过。"
+}

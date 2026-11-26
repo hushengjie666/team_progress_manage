@@ -1,0 +1,83 @@
+{
+  "approval_comment_id": 7192998794,
+  "archive_complete": true,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/report/index.html",
+      "redacted": false,
+      "sha256": "aa1c55c640f78c64f96cf6d3c5788898ff2efaf2b8910bb45de6c9aef301340e",
+      "size": 650116,
+      "source_path": ".cache/browser-artifacts/report/index.html"
+    },
+    {
+      "path": "artifacts/browser-artifacts/results.json",
+      "redacted": true,
+      "sha256": "97daa570b965b50640015224be02c26fb31e375a426315db4beaad32e3385a3b",
+      "size": 592639,
+      "source_path": ".cache/browser-artifacts/results.json"
+    },
+    {
+      "path": "artifacts/browser-artifacts/desktop.png",
+      "redacted": false,
+      "sha256": "358ec1447fa8cbc73f49a3ae448426b70d9ad8b715f4c6256f9b38137383c02d",
+      "size": 197500,
+      "source_path": ".cache/browser-artifacts/desktop.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/mobile.png",
+      "redacted": false,
+      "sha256": "30903f6a8489e01e0cc2cac25886f4617a5b52f504e4c29d64ca8a7de7ced819",
+      "size": 605765,
+      "source_path": ".cache/browser-artifacts/mobile.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "30a11ffdfc58ed31206c3bb6d6fddbaadff7d2a160664ac9b7eb097a224358c7",
+      "size": 2544
+    },
+    "artifacts/browser-artifacts/desktop.png": {
+      "sha256": "358ec1447fa8cbc73f49a3ae448426b70d9ad8b715f4c6256f9b38137383c02d",
+      "size": 197500
+    },
+    "artifacts/browser-artifacts/mobile.png": {
+      "sha256": "30903f6a8489e01e0cc2cac25886f4617a5b52f504e4c29d64ca8a7de7ced819",
+      "size": 605765
+    },
+    "artifacts/browser-artifacts/report/index.html": {
+      "sha256": "aa1c55c640f78c64f96cf6d3c5788898ff2efaf2b8910bb45de6c9aef301340e",
+      "size": 650116
+    },
+    "artifacts/browser-artifacts/results.json": {
+      "sha256": "97daa570b965b50640015224be02c26fb31e375a426315db4beaad32e3385a3b",
+      "size": 592639
+    },
+    "checkpoint.json": {
+      "sha256": "8cb7fae1c79fc2a97f612b643f8248739ab21e44372212d7a7277467f519170f",
+      "size": 625
+    },
+    "context.json": {
+      "sha256": "135bf6e041e2d220c618740fb9ec1771733f3e984cfb24e1f5727de3639e385b",
+      "size": 1058
+    },
+    "handoff.json": {
+      "sha256": "c6baef6a23f0057331a32e861a45859cfb1c1fb924be5239b945d35b53a72454",
+      "size": 4554
+    },
+    "input.json": {
+      "sha256": "2a1f0a8b3f1d9c2e33e1967f1570903ca168666353040a2e51d3b5e4b6d4d9b5",
+      "size": 979
+    }
+  },
+  "head_sha": "cfe54dbc45a03039edf02751a6f4743d6f1b00e1",
+  "issue_number": 18,
+  "omitted": [],
+  "recorded_at": "2026-11-26T13:28:19+00:00",
+  "revision": 1,
+  "run_id": "7193044512-31a67d69d810",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "30a11ffdfc58ed31206c3bb6d6fddbaadff7d2a160664ac9b7eb097a224358c7",
+  "start_comment_id": 7193044512,
+  "status": "ready_for_review"
+}
