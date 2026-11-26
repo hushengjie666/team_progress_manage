@@ -1,0 +1,63 @@
+{
+  "approval_comment_id": 7198202575,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "142561676e526d5a1738ba891a2f1942d87b686beea1705cc57a05a11f1b2305",
+      "size": 2074
+    },
+    "checkpoint.json": {
+      "sha256": "de2460e8b13d3072ed2ef8fd5d633cd966748d73d5e9698906fd28e39b37157c",
+      "size": 497
+    },
+    "context.json": {
+      "sha256": "c180ce935307149679bbc544be6f9406be07ea77cdbd6636c06fab6159140c69",
+      "size": 2297
+    },
+    "handoff.json": {
+      "sha256": "f06acf26b83bbca77b4293b52a50e1eba141e4e1ff1062a36b941f5426deb723",
+      "size": 7066
+    },
+    "input.json": {
+      "sha256": "c3aaf34339280672db30934af2a2e3c2fb126dad5bba1fd28848d2517246e100",
+      "size": 2218
+    }
+  },
+  "head_sha": "f183038fdde7dd5884c65a7667fa3ee65592def5",
+  "issue_number": 20,
+  "omitted": [
+    {
+      "path": ".cache/gh20-verified/desktop-comparison.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh20-verified/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/after.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh20-verified/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/before.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh20-verified/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/after.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh20-verified/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/before.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh20-verified/mobile-comparison.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T18:38:49+00:00",
+  "revision": 1,
+  "run_id": "7200523441-c477ef6b1f0d",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "142561676e526d5a1738ba891a2f1942d87b686beea1705cc57a05a11f1b2305",
+  "start_comment_id": 7200523441,
+  "status": "ready_for_review"
+}

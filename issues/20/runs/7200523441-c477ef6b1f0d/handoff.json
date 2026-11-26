@@ -1,0 +1,46 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "在待执行的长标题卡片上查看项目色标、主次按钮和键盘焦点，提交验收后确认其显示待验收，另一张卡片继续计时。",
+      "在执行中的卡片点击完成，观察一次短暂勾选与颜色反馈，刷新后两张卡片保持已完成、待验收。"
+    ],
+    "kind": "preview"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png",
+      ".agent-run/browser-smoke/result.json"
+    ],
+    "command": "env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py",
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/gh20-verified/desktop-comparison.png",
+      ".cache/gh20-verified/mobile-comparison.png",
+      ".cache/gh20-verified/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/before.png",
+      ".cache/gh20-verified/focus-quick-completion-des-fa47d-he-submitted-task-s-session-chrome/after.png",
+      ".cache/gh20-verified/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/before.png",
+      ".cache/gh20-verified/focus-quick-completion-nar-a58f9-he-submitted-task-s-session-chrome/after.png"
+    ],
+    "command": "env TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --retry-after-fix '恢复今日工作队列保存中的既有完整提示文案' --run node_modules/.bin/playwright test --config .cache/playwright.config.ts --output=.cache/gh20-verified",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "changed_files": [
+    "src/components/focus/FocusTaskList.tsx",
+    "src/styles/focus-task-list.css",
+    "tests/e2e/focus-quick-completion.spec.ts"
+  ],
+  "local_tests_passed": true,
+  "preview_url": "http://127.0.0.1:53607/review/focus",
+  "risks": "宿主将当前工作树发布到原 PR #23 后，按新 head SHA 核对 TimeManage CI 的 Frontend、Browser、Go backend、Tauri macOS。只读查询确认现有 head c7afd0f 的上述 4 项均通过。本地预览按本机日期建立今日样例；使用不同时区且跨日的浏览器，今日队列可能为空。预览由宿主续期。",
+  "status": "ready_for_review",
+  "summary": "接续 PR #23 的快捷完成流程，返工范围为「今日任务」卡片和完成反馈。项目名配小色标与数量，卡片优先显示长标题，番茄与进度为次要信息；开始作为主按钮，完成/提交验收为次操作。执行中、待验收、已完成用图标、文字及浅色区分。保存确认后单次勾选与颜色过渡；减少动态效果时直接显示结果。保留队列保存提示、重试、防重和计时收尾。测试补充长标题、横向溢出、主次按钮同行、Tab 焦点与截图。",
+  "tests": "env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --check-only → 2（native_browser_approval_required）；原生审批后 env PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py → 0。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run node_modules/.bin/playwright test --config .cache/playwright.config.ts tests/e2e/focus-quick-completion.spec.ts --output=.cache/design-baseline → 0，旧 UI 同样例 5/5；新版专项 --output=.cache/design-rework → 0，5/5。\nenv PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" npm test -- focusModel.test.ts teamStateRuntime.test.ts → 0，19 项。相同 PATH 的 npm run verify:fast → 0，90 个文件、381 项通过，TypeScript 与生产构建通过。npm run audit:health、git diff --check 各 0。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run node_modules/.bin/playwright test --config .cache/playwright.config.ts --output=.cache/gh20-final → 探针 2 / Playwright 1，85 通过、6 跳过、1 失败。focus-quick-task.spec.ts:155 期待可见「今日工作 · 保存中…」；恢复完整队列保存文案。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --retry-after-fix '恢复今日工作队列保存中的既有完整提示文案' --run node_modules/.bin/playwright test --config .cache/playwright.config.ts --output=.cache/gh20-verified → 探针与 Playwright 均为 0，86 通过、6 个既有设备条件跳过。桌面与触控窄屏均覆盖两种保存结果、计时收尾、刷新/重入和键盘。其他专项覆盖重复提交、失败重试、权限、保存时策略变化和减少动态效果。全量另含 3 个 iPhone WebKit 项目。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review/compare.py → 0，同样例改版前后对比图。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review/check.py → 0，前台参数试跑。python3 .agent-run/review_preview.py start --route /review/focus -- .cache/toolchain/node_modules/node/bin/node .cache/review/server.mjs {bind} {port} → 0。\nenv TZ=UTC PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review/check.py http://127.0.0.1:53607/review/focus → 探针 2 / 子进程 1，UTC 浏览器与上海样例服务午夜日期不同，未显示执行中。env TZ=Asia/Shanghai PATH=\"$PWD/.cache/toolchain/node_modules/node/bin:$PATH\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/venv/bin/python .agent-run/browser_probe.py --retry-after-fix '将验收浏览器日期与原生样例服务的上海本地日期对齐' --run .cache/venv/bin/python .cache/review/check.py http://127.0.0.1:53607/review/focus → 0，本机时区实测免登录、提交、刷新及新的独立样例。",
+  "toolchains": "前端使用工作区 Node v24.22.3，与 CI Node 24 主版本一致。工作区 Python 3.12.14、项目 Chromium headless shell 1217、WebKit 2272。本次范围无 CI、新依赖、Go 或 Rust 源码更改。Go 项目 go 1.22、CI 1.26.11；Tauri rust-version 1.77.2，CI 使用 macOS runner 工具链。"
+}

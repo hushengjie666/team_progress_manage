@@ -1,0 +1,11 @@
+{
+  "status": "blocked",
+  "stage": "写入最终交接",
+  "command": "校验截图与预览状态并原子写入 .agent-run/handoff.json",
+  "summary": "本轮实现、全量回归、对照图和本机免登录预览均已完成",
+  "tests": "校验截图与预览状态并原子写入 .agent-run/handoff.json",
+  "risks": "宿主发布新提交并核对新 head CI",
+  "unverified": "宿主发布新提交并核对新 head CI",
+  "resume": "写入最终交接",
+  "local_tests_passed": false
+}

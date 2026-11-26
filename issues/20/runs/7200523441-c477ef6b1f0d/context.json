@@ -1,0 +1,35 @@
+{
+  "allowed_actions": [
+    "implement",
+    "test",
+    "commit",
+    "push",
+    "draft_pr"
+  ],
+  "approval_comment_id": 7198202575,
+  "base_branch": "main",
+  "branch": "agent/issue-20",
+  "completed": true,
+  "engineering_paths": [],
+  "head_sha": "f183038fdde7dd5884c65a7667fa3ee65592def5",
+  "initialization_paths": [],
+  "issue_number": 20,
+  "issue_url": "https://github.com/hushengjie666/team_progress_manage/issues/20",
+  "open_prs": [
+    23
+  ],
+  "protocol": "autodev.issue/v2",
+  "publisher_login": "hushengjie666",
+  "reopen_pr": null,
+  "review_preview_lan_host": null,
+  "revision": 1,
+  "run_id": "7200523441-c477ef6b1f0d",
+  "spec_sha256": "142561676e526d5a1738ba891a2f1942d87b686beea1705cc57a05a11f1b2305",
+  "start_comment_id": 7200523441,
+  "start_confirmation": "用户原话「AD-005样式太难看了 请优化 国际一流设计美学」\n\n同范围返工说明（依据当前验收截图整理）\n基于 PR #23 当前版本，优化「开始工作」左侧「今日任务」的项目分组、任务卡片、快捷操作和完成反馈。当前全宽饱和色块、嵌套描边和两层同等视觉重量的按钮互相竞争。目标是同现有主题相容的清晰层级、平衡留白和轻量反馈。\n项目名和数量用克制的标题与小色标，统一卡片内间距和对齐。任务标题优先，番茄数与进度做次级文字；统一按钮的尺度和焦点样式，以「开始」为主操作，「完成／提交验收」为次操作。宽度足够时同排，窄屏自然换行。执行中、待验收、已完成使用一致且可辨的状态样式。\n保存后实际完成时只播放一次短勾选和颜色过渡，遵循系统减少动态效果；沿用已有权限、提交失败重试和计时收尾规则。范围仅今日任务区域及完成反馈。\n对照同一隔离样例提供前后截图，覆盖待执行、执行中、待验收及已完成。验证长任务名、桌面及窄屏、无溢出、键盘和减少动态效果。重跑原业务验收和 CI，原 PR 新版本提供可操作验收入口。",
+  "started_at": 1795717841,
+  "verification": {
+    "browser_required": true,
+    "reason": "Web 项目默认执行桌面/手机浏览器业务自动化验证；无浏览器界面的项目记录不适用原因。"
+  }
+}
