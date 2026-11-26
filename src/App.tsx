@@ -9,7 +9,7 @@ import { BootScreen } from "./components/BootScreen";
 import { AppCompatibilityGate } from "./components/AppCompatibilityGate";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
-import { useDesktopTimerStatus } from "./desktopTimerStatus";
+import { startDesktopShortBreak, useDesktopTimerStatus } from "./desktopTimerStatus";
 import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
 import { createTeamDataRuntime } from "./teamStateRuntime";
@@ -103,11 +103,15 @@ export function App() {
   const abortDesktopTimerStatus = useCallback(() => {
     void loadedRuntimesRef.current?.focusActions.finishTimer("aborted");
   }, []);
+  const startDesktopShortBreakFromMenu = useCallback((sessionId: string) => (
+    startDesktopShortBreak(stateRef.current, sessionId, loadedRuntimesRef.current?.focusActions.beginTimer)
+  ), [stateRef]);
   useDesktopTimerStatus({
     state,
     currentTask: activeTimerTask,
     toggleTimer: toggleDesktopTimerStatus,
     abortTimer: abortDesktopTimerStatus,
+    startShortBreak: startDesktopShortBreakFromMenu,
   });
   useNativeTimerSync(state, activeTimerTask);
   useIOSDeepLinks(appShell.setTab);

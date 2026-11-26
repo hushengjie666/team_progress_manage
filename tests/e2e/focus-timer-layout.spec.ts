@@ -232,21 +232,23 @@ test("keeps the focus timer geometry stable while the countdown changes", async 
   });
 });
 
-test("keeps a short break running after the team data refresh interval", async ({ page }) => {
-  await openApp(page);
+test("keeps a configured short break running after the team data refresh interval", async ({ page }, testInfo) => {
+  const state = authenticatedState();
+  state.settings.shortBreakMinutes = 7;
+  await openApp(page, state);
   await page.getByLabel("页面导航").getByRole("button", { name: "开始工作" }).click();
   await page.locator(".mode-switcher").getByRole("button", { name: "短休息" }).click();
 
   const timerFace = page.locator(".timer-face");
   const countdown = timerFace.locator(".timer-countdown");
   await expect(timerFace).toContainText("短休息");
-  await expect(countdown).toHaveText(/04:5\d/);
+  await expect(countdown).toHaveText(/06:5\d|07:00/);
 
   await page.waitForTimeout(6_000);
 
   await expect(timerFace).toContainText("短休息");
-  await expect(countdown).toHaveText(/04:[45]\d/);
-  await expect(countdown).not.toHaveText("25:00");
+  await expect(countdown).toHaveText(/06:[45]\d/);
+  await page.screenshot({ path: testInfo.outputPath("short-break-desktop.png") });
 });
 
 test("prepares the next stage at full duration and waits for the user to start", async ({ page }) => {
