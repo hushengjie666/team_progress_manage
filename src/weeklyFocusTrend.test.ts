@@ -7,7 +7,14 @@ import { finishWorkSessionInState } from "./workSessionFinish";
 const day = "2026-04-02";
 const base = createTestState();
 const project = base.projects[0];
-const account = { id: "mine", name: "本人", email: "me@example.test", createdAt: base.updatedAt, updatedAt: base.updatedAt };
+const account = {
+  id: "mine",
+  workspaceId: "workspace_private",
+  name: "本人",
+  email: "me@example.test",
+  createdAt: base.updatedAt,
+  updatedAt: base.updatedAt,
+};
 const state = {
   ...base,
   auth: { ...base.auth, account },
