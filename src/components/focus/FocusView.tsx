@@ -7,7 +7,6 @@ import { buildFocusTaskList, focusProgressPercent, groupFocusTasksByProject, upc
 
 export function FocusView(props: {
   state: AppState;
-  openQuoteSettings: () => void;
   activeTimer?: ActiveTimer;
   currentTask?: Task;
   committedTasks: Task[];
@@ -31,7 +30,7 @@ export function FocusView(props: {
     <div className="focus-layout">
       <section className="focus-stage">
         <div className="focus-stage-inner">
-          <FocusDailyQuote openSettings={props.openQuoteSettings} />
+          <FocusDailyQuote />
           <FocusCurrentTaskPanel
             currentTask={currentTask}
             outsideTodayList={currentTaskOutsideTodayList}

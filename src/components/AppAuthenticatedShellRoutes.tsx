@@ -123,7 +123,6 @@ function AppRoutes({
         shellState={shellState}
         taskActions={taskActions}
         focusActions={focusActions}
-        openQuoteSettings={() => openAdmin("quotes")}
       />
     );
   }

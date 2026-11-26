@@ -1,13 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
+import { startTimerInState, toggleTimerInState } from "../../src/appModel";
 import { builtInQuotes } from "../../src/dailyQuotes/builtInQuotes";
 import { defaultQuoteSettings, type DailyQuoteSettings } from "../../src/dailyQuotes/library";
 import { authenticatedState } from "./support/authenticatedState";
 import { MOCK_SERVER } from "./support/constants";
+import { rowsFromState } from "./support/mockTeamBackendState";
 import { openApp } from "./support/openApp";
 import { projectInviteeScenario } from "./support/scenarioStates";
 
 const quoteBar = (page: Page) => page.getByRole("region", { name: "每日一句" });
-const quoteText = (page: Page) => quoteBar(page).locator("strong");
+const quoteText = (page: Page) => quoteBar(page).locator(".focus-quote-body");
 const quotePanel = (page: Page) => page.getByRole("region", { name: "个人名言" });
 const nav = (page: Page) => page.getByRole("navigation", { name: "页面导航" });
 const mobileNav = (page: Page) => page.getByRole("navigation", { name: "手机页面导航" });
@@ -21,58 +23,147 @@ const openAdmin = async (page: Page) => {
   await entry.click();
   if (await mobileMore.isVisible()) await page.getByRole("dialog", { name: "更多功能" }).getByRole("button", { name: "管理中心" }).click();
 };
-const openQuotes = (page: Page) => quoteBar(page).getByRole("button", { name: "管理名言" }).click();
+const openQuotes = async (page: Page) => {
+  await openAdmin(page);
+  await page.locator(".settings-section-tabs").getByRole("button", { name: "名言警句", exact: true }).click();
+};
 const entries = (page: Page) => quotePanel(page).getByRole("list", { name: "名言列表" }).getByRole("listitem");
 
-test("lays out the daily quote above focus controls and opens its full source by keyboard", async ({ page, isMobile }, testInfo) => {
+test("shows only the daily quote in one line above uninterrupted focus controls", async ({ page, isMobile }, testInfo) => {
   if (!isMobile) await page.setViewportSize({ width: 1280, height: 820 });
   const state = authenticatedState();
+  state.settings.longBreakEvery = 1;
+  state.focusSessions = [{
+    id: "completed_quote_test_session",
+    taskId: state.tasks[0].id,
+    mode: "focus",
+    duration: 1500,
+    startedAt: new Date(Date.now() - 1500_000).toISOString(),
+    endedAt: new Date().toISOString(),
+    outcome: "completed",
+    interruptionCounts: { internal: 0, external: 0 },
+  }];
   await openApp(page, state);
+  const task = state.tasks[0];
+  let runningState = state;
+  await page.route(`${MOCK_SERVER}/tasks/${task.id}/start*`, (route) => {
+    const request = route.request();
+    const { focus_session_id, work_session_id } = request.postDataJSON();
+    const startedAt = new Date().toISOString();
+    runningState = startTimerInState(state, "focus", task.id, startedAt, focus_session_id, { workSessionId: work_session_id });
+    return route.fulfill({ json: {
+      delta: true, mutation_id: request.headers()["x-timemanage-mutation-id"],
+      rows: rowsFromState(runningState), deleted: [], server_time: startedAt,
+    } });
+  });
+  await page.route(`${MOCK_SERVER}/work-sessions/*/pause*`, (route) => {
+    const pausedAt = new Date().toISOString();
+    const paused = toggleTimerInState(runningState, pausedAt);
+    return route.fulfill({ json: {
+      delta: true, mutation_id: route.request().headers()["x-timemanage-mutation-id"],
+      rows: rowsFromState(paused), deleted: [], server_time: pausedAt,
+    } });
+  });
   await startWork(page);
   const bar = quoteBar(page);
-  await expect(quoteText(page)).toHaveCount(1);
-  await expect(bar.locator(".focus-quote-body span")).toHaveText(/.+ · .+/);
+  const text = quoteText(page);
+  await expect(text).toBeVisible();
+  const initial = await text.innerText();
+  expect(builtInQuotes.some(({ text }) => text === initial)).toBe(true);
+  await expect(bar.locator(":scope > *")).toHaveText(["每日一句", initial]);
+  await expect(bar.locator("button, a, [tabindex]")).toHaveCount(0);
+  await expect(text).toHaveAttribute("title", initial);
+  await expect(text).toHaveCSS("white-space", "nowrap");
   if (!isMobile) {
-    const [quote, task, orbit, controls, sidebar] = await Promise.all(
-      [bar, page.locator(".focus-current-panel"), page.locator(".focus-orbit"), page.locator(".timer-controls"), page.locator(".focus-side")]
+    await expect(text).toHaveCSS("font-size", "20px");
+    await expect(text).toHaveCSS("font-weight", "700");
+    const [quote, body, label, task, orbit, controls, modes, sidebar] = await Promise.all(
+      [bar, text, bar.locator(".focus-quote-label"), page.locator(".focus-current-panel"), page.locator(".focus-orbit"),
+        page.locator(".timer-controls"), page.locator(".mode-switcher"), page.locator(".focus-side")]
         .map((locator) => locator.boundingBox()),
     );
     expect(quote!.height).toBeGreaterThanOrEqual(72);
     expect(quote!.height).toBeLessThanOrEqual(96);
+    expect(Math.abs(body!.y + body!.height / 2 - (quote!.y + quote!.height / 2))).toBeLessThanOrEqual(1);
+    expect(Math.abs(label!.y + label!.height / 2 - (body!.y + body!.height / 2))).toBeLessThanOrEqual(1);
     expect(quote!.x).toBeGreaterThanOrEqual(sidebar!.x + sidebar!.width);
     expect(quote!.y + quote!.height).toBeLessThanOrEqual(Math.min(task!.y, orbit!.y) + 1);
     expect(quote!.x + quote!.width).toBeGreaterThanOrEqual(orbit!.x + orbit!.width);
     expect(orbit!.width).toBe(orbit!.height);
     expect(controls!.y + controls!.height).toBeLessThanOrEqual(820);
+    expect(modes!.y + modes!.height).toBeLessThanOrEqual(820);
   }
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
-  const fullQuote = bar.getByRole("button", { name: "查看每日名言全文" });
-  await fullQuote.press("Enter");
-  const dialog = page.getByRole("dialog", { name: "名言全文与出处" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole("link", { name: "打开参考来源" })).toHaveAttribute("href", /^https:\/\//);
-  await page.keyboard.press("Escape");
-  await expect(dialog).toHaveCount(0);
-  await expect(fullQuote).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath("daily-quote-focus.png"), fullPage: isMobile });
-  const initial = await quoteText(page).innerText();
+  const started = page.waitForResponse((response) => new URL(response.url()).pathname === `/tasks/${task.id}/start`);
+  await page.locator(".timer-controls").getByRole("button", { name: "开始工作" }).click();
+  expect((await started).ok()).toBe(true);
+  await expect(page.locator(".timer-face")).toContainText("专注番茄");
+  await expect(text).toHaveText(initial);
+  const paused = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith("/pause"));
+  await page.locator(".timer-controls").getByRole("button", { name: "暂停" }).click();
+  expect((await paused).ok()).toBe(true);
+  await expect(page.locator(".timer-controls").getByRole("button", { name: "继续" })).toBeVisible();
+  await expect(text).toHaveText(initial);
   await page.locator(".mode-switcher").getByRole("button", { name: "短休息" }).click();
   await expect(page.locator(".timer-face")).toContainText("短休息");
-  await page.locator(".timer-controls").getByRole("button", { name: "暂停" }).click();
-  await expect(page.locator(".timer-controls").getByRole("button", { name: "继续" })).toBeVisible();
-  await expect(quoteText(page)).toHaveText(initial);
+  await expect(text).toHaveText(initial);
+  await page.locator(".mode-switcher").getByRole("button", { name: "阶段休息" }).click();
+  await expect(page.locator(".timer-face")).toContainText("长休息");
+  await expect(text).toHaveText(initial);
+});
+
+test("truncates an 80-character quote without a current task and keeps the full text in the title", async ({ page, isMobile }, testInfo) => {
+  if (!isMobile) await page.setViewportSize({ width: 1280, height: 820 });
+  const state = authenticatedState();
+  state.tasks = [];
+  state.dailyPlans = [];
+  const longText = "专注做好眼前的事".repeat(10);
+  const dailyQuotes: DailyQuoteSettings = {
+    ...defaultQuoteSettings("UTC"),
+    disabled: builtInQuotes.map(({ id }) => id),
+    custom: [{ id: "custom-long-sample", text: longText, author: "验收作者", source: "验收出处", url: "" }],
+  };
+  await openApp(page, state);
+  await page.route(`${MOCK_SERVER}/settings`, (route) => route.fulfill({ json: { settings: { dailyQuotes } } }));
+  await page.reload();
+  await startWork(page);
+
+  const bar = quoteBar(page);
+  const text = quoteText(page);
+  await expect(page.locator(".focus-current-panel")).toContainText("工作队列为空");
+  await expect(bar.locator(":scope > *")).toHaveText(["每日一句", longText]);
+  await expect(bar.locator("button, a, [tabindex]")).toHaveCount(0);
+  await expect(text).toHaveAttribute("title", longText);
+  await expect(text).toHaveCSS("text-overflow", "ellipsis");
+  await expect(text).toHaveCSS("overflow", "hidden");
+  expect(await text.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+  expect((await bar.boundingBox())!.height).toBe(78);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.screenshot({ path: testInfo.outputPath("daily-quote-long.png"), fullPage: isMobile });
 });
 
 test("a regular member can find, edit, disable, restore and delete personal quotes", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   await openApp(page, projectInviteeScenario().initialState);
   await startWork(page);
-  await expect(quoteText(page)).toHaveCount(1);
+  await expect(quoteText(page)).toBeVisible();
+  const dailyText = await quoteText(page).innerText();
   await openQuotes(page);
   const panel = quotePanel(page);
   await expect(panel.getByText("100 / 100")).toBeVisible();
   await expect(page.getByRole("button", { name: "成员管理", exact: true })).toHaveCount(0);
   await expect(entries(page)).toHaveCount(100);
+  const preview = panel.locator(".quote-preview").getByRole("button", { name: dailyText, exact: true });
+  await preview.press("Enter");
+  const details = page.getByRole("dialog", { name: "名言全文与出处" });
+  const source = builtInQuotes.find(({ text }) => text === dailyText)!;
+  await expect(details.locator("blockquote")).toHaveText(dailyText);
+  await expect(details).toContainText(`${source.author} · ${source.source}`);
+  await expect(details.getByRole("link", { name: "打开参考来源" })).toHaveAttribute("href", source.url);
+  await page.keyboard.press("Escape");
+  await expect(details).toHaveCount(0);
+  await expect(preview).toBeFocused();
   const search = panel.getByRole("searchbox");
   await search.fill("论语·学而");
   await expect(entries(page).first()).toContainText(builtInQuotes[0].text);
@@ -187,8 +278,7 @@ test("persists only confirmed settings and rotates through offline, refresh and 
     await openApp(secondPage, account);
     await mockSettings(secondPage);
     await secondPage.reload();
-    await openAdmin(secondPage);
-    await secondPage.getByRole("button", { name: "名言警句", exact: true }).click();
+    await openQuotes(secondPage);
     const other = quotePanel(secondPage);
     await expect(other.getByText("101 / 101")).toBeVisible();
     await expect(other.getByText("当前每天 08:00 · Asia/Shanghai")).toBeVisible();
@@ -218,7 +308,8 @@ test("persists only confirmed settings and rotates through offline, refresh and 
   await panel.getByRole("button", { name: "刷新名言配置" }).click();
   await expect(panel.getByText("0 / 101")).toBeVisible();
   await startWork(page);
-  await expect(quoteBar(page)).toContainText("暂无启用名言");
+  await expect(quoteBar(page).locator(":scope > *")).toHaveText(["每日一句", "暂无启用名言"]);
+  await expect(quoteBar(page).locator("button, a, [tabindex], [title]")).toHaveCount(0);
   await openQuotes(page);
   await panel.getByRole("searchbox").fill(builtInQuotes[0].text);
   await entries(page).getByRole("button", { name: "启用", exact: true }).click();
@@ -233,7 +324,8 @@ test("persists only confirmed settings and rotates through offline, refresh and 
   await openApp(nextAccountPage, otherAccount);
   await mockSettings(nextAccountPage);
   await nextAccountPage.reload();
-  await startWork(nextAccountPage);
+  await expect(nav(nextAccountPage).getByRole("button", { name: "项目总览", exact: true })
+    .or(mobileNav(nextAccountPage).getByRole("button", { name: "总览", exact: true }))).toHaveClass(/active/);
   await openQuotes(nextAccountPage);
   await expect(quotePanel(nextAccountPage).getByText("100 / 100")).toBeVisible();
   await expect(quotePanel(nextAccountPage).getByText("多端共用一份个人名言")).toHaveCount(0);

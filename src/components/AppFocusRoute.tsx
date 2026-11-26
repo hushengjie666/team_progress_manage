@@ -4,9 +4,9 @@ import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { FocusView } from "./focus/FocusView";
 import { FocusQuickTaskDialog, type FocusQuickTaskRecovery } from "./focus/FocusQuickTaskDialog";
 
-type AppFocusRouteProps = Pick<AppAuthenticatedShellProps, "view" | "shellState" | "taskActions" | "focusActions"> & { openQuoteSettings: () => void };
+type AppFocusRouteProps = Pick<AppAuthenticatedShellProps, "view" | "shellState" | "taskActions" | "focusActions">;
 
-export function AppFocusRoute({ view, shellState, taskActions, focusActions, openQuoteSettings }: AppFocusRouteProps) {
+export function AppFocusRoute({ view, shellState, taskActions, focusActions }: AppFocusRouteProps) {
   const { state, currentTask, focusCommittedTasks, focusActiveTimer } = view;
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [recovery, setRecovery] = useState<FocusQuickTaskRecovery>();
@@ -20,7 +20,6 @@ export function AppFocusRoute({ view, shellState, taskActions, focusActions, ope
     <>
       <FocusView
         state={state}
-        openQuoteSettings={openQuoteSettings}
         activeTimer={focusActiveTimer}
         currentTask={currentTask}
         committedTasks={focusCommittedTasks}
