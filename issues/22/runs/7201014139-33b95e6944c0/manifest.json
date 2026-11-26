@@ -1,0 +1,47 @@
+{
+  "approval_comment_id": 7200971842,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "8d4d31490328a4a6e81a0f8851fc5340e9b09a571a1122e2d1a3c7eddae71fc4",
+      "size": 1918
+    },
+    "checkpoint.json": {
+      "sha256": "fca257ecaf2c8dfc8c733a6190f3ac0c0db96b6b55a53c7927538dfe8529217e",
+      "size": 6413
+    },
+    "context.json": {
+      "sha256": "b26f70d4260a4927cafd7bc922e5cdbf2a3d1cd00b254a0b880e66ec77c52073",
+      "size": 1059
+    },
+    "handoff.json": {
+      "sha256": "7eaeac93180a6210f71272905aed73c65d48da9876e5776fc4ad93f2d8d59cbd",
+      "size": 6413
+    },
+    "input.json": {
+      "sha256": "d9cb658b3d9ae6e72c70bb078f6a2973459f69505a040dbb156756a45108fe10",
+      "size": 980
+    }
+  },
+  "head_sha": "0377db9dd7f0fab5b45d00235bb3e511206dbd1d",
+  "issue_number": 22,
+  "omitted": [
+    {
+      "path": ".cache/r2/fixed/.cache/browser-artifacts/focus-session-sync-desktop-492f5-side-the-selected-workspace-chrome/desktop.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/r2/fixed/.cache/browser-artifacts/focus-session-sync-mobile--c9180-side-the-selected-workspace-chrome/mobile.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T19:05:16+00:00",
+  "revision": 2,
+  "run_id": "7201014139-33b95e6944c0",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "8d4d31490328a4a6e81a0f8851fc5340e9b09a571a1122e2d1a3c7eddae71fc4",
+  "start_comment_id": 7201014139,
+  "status": "ready_for_review"
+}

@@ -1,0 +1,31 @@
+{
+  "allowed_actions": [
+    "implement",
+    "test",
+    "commit",
+    "push",
+    "draft_pr"
+  ],
+  "approval_comment_id": 7200971842,
+  "base_branch": "main",
+  "branch": "agent/issue-22",
+  "engineering_paths": [],
+  "initialization_paths": [],
+  "issue_number": 22,
+  "issue_url": "https://github.com/hushengjie666/team_progress_manage/issues/22",
+  "open_prs": [],
+  "protocol": "autodev.issue/v2",
+  "publisher_login": "hushengjie666",
+  "reopen_pr": null,
+  "review_preview_lan_host": null,
+  "revision": 2,
+  "run_id": "7201014139-33b95e6944c0",
+  "spec_sha256": "8d4d31490328a4a6e81a0f8851fc5340e9b09a571a1122e2d1a3c7eddae71fc4",
+  "start_comment_id": 7201014139,
+  "start_confirmation": "004不需要考虑睡眠与唤醒问题 没有这个场景",
+  "started_at": 1795719406,
+  "verification": {
+    "browser_required": true,
+    "reason": "Web 项目默认执行桌面/手机浏览器业务自动化验证；无浏览器界面的项目记录不适用原因。"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "status": "ready_for_review",
+  "local_tests_passed": true,
+  "stage": "ready_for_review",
+  "run_id": "7201014139-33b95e6944c0",
+  "spec_revision": 2,
+  "summary": "接续并核验 GH-22 的 20 个源文件及测试改动。当前 main 的隔离 macOS 构建复现私人筛选使页面停在 25:00、菜单倒数到 24:58。修复后，两处使用同一活动会话、截止时间和暂停余时，原生计时可随窗口隐藏继续刷新；恢复、到期和前端轮询共用一次结算，旧启动快照及过期动作受到校验。修复版共有 15 组双端对照，最大余时差 0 秒，另有 1 组窗口隐藏期间的菜单采样。3 次专注启动对应 3 条工作会话，1 次自然专注结束对应 1 个番茄和 1 次 finish。",
+  "tests": "当前 main 29c3a55 与 GH-22 合入副本 .cache/r2/fixed：Node 24.22.3 / TZ=UTC，npm run verify:fast 退出 0（91 个文件，388 项 Vitest、类型检查及构建），npm run verify:quality 退出 0（含 audit:health）。cargo check --locked --manifest-path src-tauri/Cargo.toml 退出 0；cargo test --locked --manifest-path src-tauri/Cargo.toml --lib 退出 0（6 通过）。git diff --check 退出 0。浏览器预检 --check-only 退出 2，原生审批后环境 smoke 退出 0，业务套件退出 0（90 通过、6 条件跳过）。python3 .cache/r2/prep-sample.py main 和 fixed 均退出 0；python3 .cache/r2/native-test.py main 和 fixed 均退出 0。专用样例前台服务、网页直达检查和 python3 .cache/r2/check-entry.py 均退出 0，原生应用回执已与目标 PID 及真实窗口核对。",
+  "risks": "宿主负责提交、推送并在草稿 PR 的实际 head SHA 核对 Frontend、Browser、Go backend、Tauri macOS 四项 CI。当前任务 HEAD ce6c49e，已在固定 main 29c3a55 的独立源副本三方合入并重测；工作区保留单一 GH-22 补丁，Git 历史和索引由宿主管理。原生验收样例绑定 127.0.0.1:57433，请宿主按该端口续期。整机睡眠与唤醒按 revision 2 排除。",
+  "files": [
+    "src-tauri/src/desktop_timer_tray.rs",
+    "src-tauri/src/lib.rs",
+    "src/App.tsx",
+    "src/appAuthenticatedShellModel.ts",
+    "src/appFocusActionsRuntime.test.ts",
+    "src/appFocusActionsRuntime.ts",
+    "src/appLifecycleHooks.ts",
+    "src/appLifecyclePersistenceHooks.ts",
+    "src/appLifecycleTimerHooks.test.ts",
+    "src/appLifecycleTimerHooks.ts",
+    "src/appWorkspaceViewModelHooks.ts",
+    "src/components/AppAuthenticatedShellTypes.ts",
+    "src/components/AppFocusRoute.tsx",
+    "src/components/focus/FocusTimerPanel.tsx",
+    "src/components/focus/FocusView.tsx",
+    "src/desktopTimerStatus.test.ts",
+    "src/desktopTimerStatus.ts",
+    "tests/e2e/focus-timer-layout.spec.ts",
+    "src-tauri/src/desktop_timer_tray/clock.rs",
+    "tests/e2e/focus-session-sync.spec.ts"
+  ],
+  "task_head": "ce6c49e0a2bc1b4b338e0d726852dd4eff4f6e79",
+  "tested_main_sha": "29c3a5521b44df263362db8d69d2f801f17f63f7",
+  "base_sha": "ce6c49e0a2bc1b4b338e0d726852dd4eff4f6e79",
+  "dependencies": [],
+  "ci": "已只读核对 main 29c3a55 的 Frontend、Browser、Go backend、Tauri macOS 均为 success。未创建或修改 CI；尚无本任务修复提交对应的远端检查。Node 与 CI 同为 24；Rust 本机 rustc/cargo 1.94.0，Cargo 声明最低 1.77.2，CI 使用 macOS Intel runner 自带工具链。Go 模块 1.22，CI 使用 1.26.11；本次未更改 Go。",
+  "browser_smoke": {
+    "scope": "environment_smoke",
+    "status": "passed",
+    "command": ".cache/browser-python/bin/python .agent-run/browser_probe.py",
+    "desktop": "passed",
+    "mobile": "passed",
+    "exit_code": 0,
+    "artifacts": [
+      ".agent-run/browser-smoke/result.json",
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ]
+  },
+  "browser_tests": {
+    "scope": "business_acceptance",
+    "status": "passed",
+    "command": "env TZ=UTC PATH=\"$PWD/.cache/node24/node_modules/.bin:$PATH\" .cache/browser-python/bin/python .agent-run/browser_probe.py --run node_modules/.bin/playwright test --config=.cache/r2/fixed/.cache/gh22.config.ts",
+    "exit_code": 0,
+    "desktop": "passed",
+    "mobile": "passed",
+    "artifacts": [
+      ".cache/r2/fixed/.cache/browser-artifacts/focus-session-sync-desktop-492f5-side-the-selected-workspace-chrome/desktop.png",
+      ".cache/r2/fixed/.cache/browser-artifacts/focus-session-sync-mobile--c9180-side-the-selected-workspace-chrome/mobile.png"
+    ],
+    "report": ".agent-run/r2-browser.log"
+  },
+  "native_desktop": {
+    "platform": "macos",
+    "status": "passed",
+    "command": "python3 .cache/r2/native-test.py fixed",
+    "exit_code": 0,
+    "app_path": ".cache/gh22-native-target/debug/bundle/macos/TimeManage GH22 Acceptance.app",
+    "artifacts": [
+      ".agent-run/r2-main-comparison.json",
+      ".agent-run/r2-fixed-comparison.json",
+      ".agent-run/r2-native-records.json",
+      ".agent-run/r2-native-entry.txt",
+      ".agent-run/r2-entry-ready.json"
+    ],
+    "review": {
+      "session_mode": "isolated_sample",
+      "entry_verified": true,
+      "app_path": ".cache/gh22-native-target/debug/bundle/macos/TimeManage GH22 Acceptance.app",
+      "open_command": [
+        "python3",
+        ".cache/r2/open-review.py"
+      ],
+      "ready_file_protocol": "AUTODEV_REVIEW_READY_FILE + AUTODEV_REVIEW_REQUEST_ID"
+    }
+  },
+  "acceptance_entry": {
+    "kind": "preview",
+    "checks": [
+      "打开独立 macOS 样例，在「开始工作」启动任务后切到私人筛选，分别用页面和系统菜单暂停、继续，核对阶段、余时与可用动作。",
+      "最小化窗口，观察菜单栏继续倒数，再从菜单打开窗口并切到短休息，核对两处阶段和时间。"
+    ]
+  },
+  "preview": "http://127.0.0.1:57433/review",
+  "preview_command": "python3 .agent-run/review_preview.py start --route /review --port 57433 -- .cache/node24/node_modules/.bin/node .cache/r2/fixed-fixture.mjs '{bind}' '{port}'",
+  "preview_history": "首次登记退出 1（OSError: [Errno 48] Address already in use）；原生业务测试服务已退出，等待同端口释放后重新登记。",
+  "logs": [
+    ".agent-run/r2-fast.log",
+    ".agent-run/r2-quality.log",
+    ".agent-run/r2-check.log",
+    ".agent-run/r2-rust-test.log",
+    ".agent-run/r2-browser.log",
+    ".agent-run/r2-fixed-native.log",
+    ".agent-run/r2-web-entry.log"
+  ]
+}
