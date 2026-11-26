@@ -1,0 +1,55 @@
+{
+  "approval_comment_id": 7192998794,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "30a11ffdfc58ed31206c3bb6d6fddbaadff7d2a160664ac9b7eb097a224358c7",
+      "size": 2544
+    },
+    "checkpoint.json": {
+      "sha256": "e42f2c2c12d9d31497e40c6c692615187bfcf61b65bd2e5ddfd4b276408682e9",
+      "size": 771
+    },
+    "context.json": {
+      "sha256": "9b5d4f50f6aba0d8106adbc05c643579a683a1cb0c8ef16588c96c71379662cb",
+      "size": 1320
+    },
+    "handoff.json": {
+      "sha256": "34c1040a71b11b033a1d01f5f68ef7ca8192445d178d270628b7dc03a2434201",
+      "size": 4906
+    },
+    "input.json": {
+      "sha256": "fa1a27893854e09c679c08a264840f2243346e09e32c07867562cbfe734ca033",
+      "size": 1241
+    }
+  },
+  "head_sha": "93f14b96d9bb48d438f6f50039e8b8c88693da13",
+  "issue_number": 18,
+  "omitted": [
+    {
+      "path": ".cache/gh18-ci/rework/browser-artifacts-retry/report/index.html",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh18-ci/rework/browser-artifacts-retry/results.json",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh18-ci/rework/browser-artifacts-retry/desktop.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh18-ci/rework/browser-artifacts-retry/mobile.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T15:07:01+00:00",
+  "revision": 1,
+  "run_id": "7195386387-62093b58cbd7",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "30a11ffdfc58ed31206c3bb6d6fddbaadff7d2a160664ac9b7eb097a224358c7",
+  "start_comment_id": 7195386387,
+  "status": "ready_for_review"
+}

@@ -1,0 +1,40 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "核对 PR #19 的新头是否关联实际 push 运行，前端、浏览器、Go 和 Tauri macOS 四项均通过，且同仓库 PR 事件跳过重复执行。",
+      "审阅此 PR 的补跑约束，确认只允许批准的 PR/SHA 组合，发布作业独立于只读测试作业并在写状态前再次核对 PR 头。"
+    ],
+    "kind": "file",
+    "path": ".github/workflows/ci.yml"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/result.json",
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "command": ".cache/gh18-browser-venv/bin/python .agent-run/browser_probe.py",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "environment_smoke",
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/gh18-ci/rework/browser-artifacts-retry/desktop.png",
+      ".cache/gh18-ci/rework/browser-artifacts-retry/mobile.png",
+      ".cache/gh18-ci/rework/browser-artifacts-retry/report/index.html",
+      ".cache/gh18-ci/rework/browser-artifacts-retry/results.json"
+    ],
+    "command": ".cache/gh18-browser-venv/bin/python .cache/gh18-ci/rework/run_business_retry.py",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "risks": "真实检查需要宿主提交并推送现有 draft PR #19 的新头，随后核对新头 push 运行的四个必需作业。Cargo 本地验证覆盖 Intel 目标，GitHub 托管 Intel runner 的领取和执行仍以新运行确认。原失败运行 https://github.com/hushengjie666/team_progress_manage/actions/runs/45829438074 保留。GitHub 只读核对时 main 仍在 fc81c806d7c22738a1b6fbb604b24614d409c193。PR #15（a14839dbf0d3f691ea92cd70238532f8c5496130）和 #17（87d22e150592a2a51a830fab63a86061308040aa）仍开放、同仓库且目标 main，原 SHA 均为 pending、0 commit status、0 check run，目前无补跑链接。PR #19 合并且 main 检查通过后，TimeManage 项目会话从 main 触发 ci.yml 两次，参数分别为 pr_number=15、sha=a14839dbf0d3f691ea92cd70238532f8c5496130 和 pr_number=17、sha=87d22e150592a2a51a830fab63a86061308040aa。记录各次 Actions 真实链接及原提交的 TimeManage CI / approved backfill 状态。两份原提交满足合并条件后由 Symphony 继续原流程并检查 main。若头变化、冲突或检查失败，保留结果并走原核验流程。",
+  "status": "ready_for_review",
+  "summary": "GH-18 / AD-003 在原 agent/issue-18 分支修复 PR #19。保留失败头 cfe54dbc45a03039edf02751a6f4743d6f1b00e1，仅修改 .github/workflows/ci.yml。真实 push 运行 45829438074 的 Go 1.22.12 在 mysql_member_account_test.go:45 因 testing.T.Context 编译失败，Go 作业改用 1.26.11。macOS ARM 作业没有被托管 runner 领取且零步骤，改用 macos-15-intel，并记录执行时的 Rust/Cargo 版本。前端和浏览器在同一失败头的 push 运行通过，PR 事件 45829442355 跳过重复检查。main 是当前 HEAD 的祖先，批准正文哈希一致，运行上下文无 dependencies 或 merge_conflict。",
+  "tests": "Node 24.22.3 / npm 11.19.1（匹配旧真实 CI）npm ci 退出 0，CI=true npm run verify:fast 退出 0（358 项通过及构建）。在 team-server/ 用 GOTOOLCHAIN=go1.22.12 go test ./... 退出 1，复现 t.Context 编译错误。GOTOOLCHAIN=go1.26.11 go test ./... 正常、注入 TestGH18ControlledCIFailure、移除临时用例后依次退出 0、1、0，失败日志精确命中该用例。Go 1.26.11 go test -count=1 ./... 对 PR #15 相同后端树、PR #17 按批准 SHA 提取的隔离后端树均退出 0。Node 24.22.3 npm run build 退出 0。使用 runner 镜像文档列出的 Rust/Cargo 1.98.0，本机 SDK 26.5 下 CARGO_BUILD_TARGET=x86_64-apple-darwin cargo check --locked --manifest-path src-tauri/Cargo.toml 退出 0。.cache/gh18-ci/bin/actionlint .github/workflows/ci.yml 退出 0。node --test .cache/gh18-ci/verify-workflow.cjs 退出 0（5 项，包括错误 SHA 拒绝、发布前复核和发布隔离）。git diff --check origin/main 退出 0。浏览器 check-only 退出 2，返回 native_browser_approval_required，原生批准后隔离 Chromium headless shell localhost 桌面和手机点击及截图 smoke 退出 0。业务首轮经 probe 执行 CI=true npm run verify:e2e，80 项列完后未完成收尾，外层等待 300 秒超时退出 1。复测仍用 Node 24.22.3 和锁定 Playwright 1.59.1，通过 probe --retry-after-fix 直接执行 node node_modules/@playwright/test/cli.js test --workers=2 --reporter=line,json,html 并设置独立 Vite、进程组和输出路径。命令与 probe 均退出 0，桌面 Chrome 65 通过，手机 WebKit 9 通过、6 预期跳过，失败和 flaky 均为 0。日志在 .cache/gh18-ci/rework/logs/。"
+}

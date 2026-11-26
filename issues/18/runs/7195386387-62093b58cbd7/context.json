@@ -1,0 +1,44 @@
+{
+  "allowed_actions": [
+    "commit",
+    "draft_pr",
+    "implement",
+    "push",
+    "test"
+  ],
+  "approval_comment_id": 7192998794,
+  "base_branch": "main",
+  "branch": "agent/issue-18",
+  "ci_rework": {
+    "attempt": 1,
+    "failure_sha256": "acca76557a67a56361980c37cc1ece2047e3716dd0955f740804d5c3bfd258de",
+    "head_sha": "cfe54dbc45a03039edf02751a6f4743d6f1b00e1",
+    "pr_number": 19,
+    "prior_start_comment_id": 7193044512
+  },
+  "completed": true,
+  "engineering_paths": [],
+  "head_sha": "93f14b96d9bb48d438f6f50039e8b8c88693da13",
+  "initialization_paths": [
+    ".github/workflows/ci.yml"
+  ],
+  "issue_number": 18,
+  "issue_url": "https://github.com/hushengjie666/team_progress_manage/issues/18",
+  "open_prs": [
+    19
+  ],
+  "protocol": "autodev.issue/v2",
+  "publisher_login": "hushengjie666",
+  "reopen_pr": null,
+  "review_preview_lan_host": null,
+  "revision": 1,
+  "run_id": "7195386387-62093b58cbd7",
+  "spec_sha256": "30a11ffdfc58ed31206c3bb6d6fddbaadff7d2a160664ac9b7eb097a224358c7",
+  "start_comment_id": 7195386387,
+  "start_confirmation": "确认 AD-003 并开工",
+  "started_at": 1795704735,
+  "verification": {
+    "browser_required": true,
+    "reason": "Web 项目默认执行桌面/手机浏览器业务自动化验证；无浏览器界面的项目记录不适用原因。"
+  }
+}

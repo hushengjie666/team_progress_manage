@@ -1,0 +1,10 @@
+{
+  "status": "blocked",
+  "phase": "final_evidence",
+  "command": "inspect_browser.py、git diff --check origin/main、证据存在性和交接 JSON 核对",
+  "summary": "保留 PR #19 失败提交 cfe54dbc。Go 1.22.12 的 t.Context 编译失败和 macOS ARM runner 取消分别核对，原生 Chromium smoke 已通过。本地 CI 修复限定于 .github/workflows/ci.yml。",
+  "tests": "原生 smoke 0。Node 24 Playwright 首轮超时退出 1，直接 CLI 复测退出 0，输出 74 通过、6 跳过。前端、Go、Rust Intel、工作流契约均通过。",
+  "risks": "需核对分端报告、截图和交接。远端需宿主提交及复验。",
+  "resume": "核对浏览器业务报告和范围后原子写入 handoff.json。",
+  "local_tests_passed": false
+}
