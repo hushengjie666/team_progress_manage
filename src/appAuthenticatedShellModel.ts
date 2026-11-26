@@ -54,7 +54,6 @@ export function buildAppShellView({
     toggleWorkbenchProject: viewModel.toggleWorkbenchProject,
     selectedTask: viewModel.selectedTask,
     currentTask: viewModel.currentTask,
-    focusActiveTimer: viewModel.focusActiveTimer,
     focusCommittedTasks: viewModel.focusCommittedTasks,
     activeProjectId: viewModel.activeProjectId,
     projectDetailModel: viewModel.projectDetailModel,

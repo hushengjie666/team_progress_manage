@@ -9,7 +9,7 @@ import { BootScreen } from "./components/BootScreen";
 import { AppCompatibilityGate } from "./components/AppCompatibilityGate";
 import { AppUnauthenticatedGate } from "./components/AppUnauthenticatedGate";
 import { useAppShellState } from "./appShellState";
-import { startDesktopShortBreak, useDesktopTimerStatus } from "./desktopTimerStatus";
+import { matchesDesktopTimerAction, startDesktopShortBreak, useDesktopTimerStatus, type DesktopTimerActionSource } from "./desktopTimerStatus";
 import { useNativeTimerSync } from "./useNativeTimerSync";
 import { useIOSDeepLinks } from "./useIOSDeepLinks";
 import { createTeamDataRuntime } from "./teamStateRuntime";
@@ -97,12 +97,14 @@ export function App() {
   const { workspaceModel } = appViewModel;
   const activeTimerTask = state ? taskById(state, state.activeTimer?.taskId) : undefined;
   const todayPlan = appViewModel.todayPlan ?? (state ? createDailyPlanForDate(state, today(), nowIso()) : undefined);
-  const toggleDesktopTimerStatus = useCallback(() => {
+  const toggleDesktopTimerStatus = useCallback((source: DesktopTimerActionSource) => {
+    if (!matchesDesktopTimerAction(stateRef.current, source)) return;
     loadedRuntimesRef.current?.focusActions.toggleTimer();
-  }, []);
-  const abortDesktopTimerStatus = useCallback(() => {
+  }, [stateRef]);
+  const abortDesktopTimerStatus = useCallback((source: DesktopTimerActionSource) => {
+    if (!matchesDesktopTimerAction(stateRef.current, source)) return;
     void loadedRuntimesRef.current?.focusActions.finishTimer("aborted");
-  }, []);
+  }, [stateRef]);
   const startDesktopShortBreakFromMenu = useCallback((sessionId: string) => (
     startDesktopShortBreak(stateRef.current, sessionId, loadedRuntimesRef.current?.focusActions.beginTimer)
   ), [stateRef]);

@@ -49,7 +49,7 @@ export function FocusTimerPanel(props: {
         <div className="timer-face">
           <p>{active ? modeLabel[active.mode] : "准备开始"}</p>
           <strong className="timer-countdown">{active ? formatTime(displayRemaining) : `${props.focusMinutes}:00`}</strong>
-          <span>{currentTask?.title ?? "从我的任务选择一个任务"}</span>
+          <span>{currentTask?.title ?? (active ? active.taskId ? "当前计时任务" : "无任务计时" : "从我的任务选择一个任务")}</span>
           {currentTask && <PomodoroProgress actual={currentTask.actualPomodoros} estimate={currentTask.estimatePomodoros} compact />}
         </div>
       </div>
