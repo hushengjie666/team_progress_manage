@@ -1,0 +1,192 @@
+name: TimeManage CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'agent/issue-**'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Approved pull request number (15 or 17)
+        required: true
+        type: string
+      sha:
+        description: Full SHA of the approved pull request head
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  target:
+    name: Select test commit
+    # Same-repository worker branches already get checks on their actual push SHA.
+    if: >-
+      (github.event_name != 'push' || !github.event.deleted) &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name != github.repository ||
+       !startsWith(github.event.pull_request.head.ref, 'agent/issue-'))
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    outputs:
+      sha: ${{ steps.approved.outputs.sha || github.sha }}
+    steps:
+      - &verify_approved_pr
+        name: Verify approved pull request head
+        id: approved
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          APPROVED_SHA: ${{ inputs.sha }}
+        with:
+          script: |
+            if (context.ref !== 'refs/heads/main') {
+              throw new Error('Dispatch this backfill from main.');
+            }
+
+            const number = process.env.PR_NUMBER;
+            const sha = process.env.APPROVED_SHA;
+            const approvedHeads = {
+              '15': 'a14839dbf0d3f691ea92cd70238532f8c5496130',
+              '17': '87d22e150592a2a51a830fab63a86061308040aa',
+            };
+            if (!/^[0-9a-f]{40}$/.test(sha) || approvedHeads[number] !== sha) {
+              throw new Error('Supply an approved PR number and its full approved SHA.');
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: Number(number),
+            });
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            if (pr.state !== 'open' || pr.base.ref !== 'main' ||
+                pr.base.repo?.full_name !== repository ||
+                pr.head.repo?.full_name !== repository || pr.head.sha !== sha) {
+              throw new Error('The approved PR must still be open, from this repository, and target main at the approved head.');
+            }
+            core.setOutput('sha', sha);
+
+  frontend:
+    name: Frontend
+    needs: target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - &checkout_test_commit
+        name: Check out test commit
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.target.outputs.sha }}
+          persist-credentials: false
+      - &setup_node
+        name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - &install_npm_dependencies
+        name: Install locked npm dependencies
+        run: npm ci
+      - name: Verify frontend
+        run: npm run verify:fast
+
+  browser:
+    name: Browser
+    needs: target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - *checkout_test_commit
+      - *setup_node
+      - *install_npm_dependencies
+      - name: Install Chrome and WebKit
+        run: npx --no-install playwright install --with-deps chrome webkit
+      - name: Verify browser workflows
+        run: npm run verify:e2e
+
+  backend:
+    name: Go backend
+    needs: target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - *checkout_test_commit
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: team-server/go.mod
+          cache: false
+      - name: Test Go backend
+        working-directory: team-server
+        run: go test ./...
+
+  tauri:
+    name: Tauri macOS
+    needs: target
+    runs-on: macos-15
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - *checkout_test_commit
+      - *setup_node
+      - *install_npm_dependencies
+      - name: Build frontend for Tauri
+        run: npm run build
+      - name: Check Tauri on macOS
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+
+  publish-backfill:
+    name: Publish approved commit status
+    needs: [target, frontend, browser, backend, tauri]
+    if: >-
+      !cancelled() && github.event_name == 'workflow_dispatch' &&
+      github.ref == 'refs/heads/main' && needs.target.result == 'success' &&
+      !contains(needs.*.result, 'cancelled') && !contains(needs.*.result, 'skipped')
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+      statuses: write
+    steps:
+      - *verify_approved_pr
+      - name: Link test result to approved SHA
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          VERIFIED_SHA: ${{ steps.approved.outputs.sha }}
+          TESTED_SHA: ${{ needs.target.outputs.sha }}
+          CHECKS_RESULT: >-
+            ${{ needs.frontend.result == 'success' && needs.browser.result == 'success' &&
+                needs.backend.result == 'success' && needs.tauri.result == 'success' &&
+                'success' || 'failure' }}
+        with:
+          script: |
+            const sha = process.env.VERIFIED_SHA;
+            const result = process.env.CHECKS_RESULT;
+            if (!sha || sha !== process.env.TESTED_SHA ||
+                !['success', 'failure'].includes(result)) {
+              throw new Error('A verified SHA and a completed test result are required.');
+            }
+
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${context.runId}`;
+            await github.rest.repos.createCommitStatus({
+              ...context.repo,
+              sha,
+              state: result,
+              context: 'TimeManage CI / approved backfill',
+              description: result === 'success'
+                ? 'All required TimeManage tests passed'
+                : 'One or more required TimeManage tests failed',
+              target_url: runUrl,
+            });
