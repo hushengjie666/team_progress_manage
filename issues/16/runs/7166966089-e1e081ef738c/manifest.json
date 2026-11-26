@@ -1,0 +1,70 @@
+{
+  "approval_comment_id": 7166929408,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/gh16-acceptance/desktop-focus.png",
+      "redacted": false,
+      "sha256": "4999746071a6a1d972a9343f30c5c11ffcd24548d6f4cbb53d0fe7cb20a48d0d",
+      "size": 349357,
+      "source_path": ".cache/browser-artifacts/gh16-acceptance/desktop-focus.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/gh16-acceptance/desktop-management.png",
+      "redacted": false,
+      "sha256": "dee1b4dc8b994b0e40f4ab1f7228790acbc902a9020f3daeffd5852f6360b584",
+      "size": 176869,
+      "source_path": ".cache/browser-artifacts/gh16-acceptance/desktop-management.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "d0992d4b0edae1e56ccf913880e379ad6fdf374d152ac6ff1cc815fab42d6214",
+      "size": 17127
+    },
+    "artifacts/browser-artifacts/gh16-acceptance/desktop-focus.png": {
+      "sha256": "4999746071a6a1d972a9343f30c5c11ffcd24548d6f4cbb53d0fe7cb20a48d0d",
+      "size": 349357
+    },
+    "artifacts/browser-artifacts/gh16-acceptance/desktop-management.png": {
+      "sha256": "dee1b4dc8b994b0e40f4ab1f7228790acbc902a9020f3daeffd5852f6360b584",
+      "size": 176869
+    },
+    "checkpoint.json": {
+      "sha256": "9c602a0042cf80fc676fd3cb24fa284cce1ab4103d2094029d760f610d805d94",
+      "size": 2910
+    },
+    "context.json": {
+      "sha256": "254e8a04b5c298970fe5aba404038345b30b36f866131e49b7e82e687fdd3644",
+      "size": 1016
+    },
+    "handoff.json": {
+      "sha256": "3e46f4e093062f667a26053a397a32dad2784755bc5a1ce2b9ab1478d78748cd",
+      "size": 4840
+    },
+    "input.json": {
+      "sha256": "418abd8da04a3d28bfcf673e4f5bed130af5f8deffd6bd95a5ada4345c4e98ee",
+      "size": 937
+    }
+  },
+  "head_sha": "8c0baefe0ccbb04975a8ec0260bd138347ff38a1",
+  "issue_number": 16,
+  "omitted": [
+    {
+      "path": ".cache/browser-artifacts/gh16-acceptance/mobile-focus.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/gh16-acceptance/mobile-management.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-26T08:42:28+00:00",
+  "revision": 1,
+  "run_id": "7166966089-e1e081ef738c",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "d0992d4b0edae1e56ccf913880e379ad6fdf374d152ac6ff1cc815fab42d6214",
+  "start_comment_id": 7166966089,
+  "status": "ready_for_review"
+}

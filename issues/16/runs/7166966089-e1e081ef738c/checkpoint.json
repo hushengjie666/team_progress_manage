@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "stage": "verified",
+  "command": "原子写入 .agent-run/handoff.json",
+  "summary": "GH-16 已实现。开始工作页在任务说明与计时器上方展示每日一句，可键盘打开全文和出处。管理中心的个人名言分页提供检索、筛选、新增、编辑、启停、确认后恢复内置或删除自定义，以及固定 IANA 时区和每天轮换时间。100 条内置引文逐条核对原文，详见 docs/daily-quotes-source-review.md。账号设置复用 /settings，按服务地址及账号隔离缓存，写入成功后才生效。后端以事务合并各设置键，独立设置不互相覆盖。",
+  "tests": "python3 .agent-run/browser_probe.py --check-only 退出 2，给出 native_browser_approval_required。原生审批获准后，PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py 退出 0，localhost 桌面和手机加载、点击与截图通过。\nnpm test -- src/dailyQuotes 退出 0，13 项通过，包含跨年、闰日、夏令时跳变与跨日期回拨、循环、空库和缓存验证。\nnpm run verify:fast 退出 0，371 项 Vitest 通过并成功构建。npm run typecheck:test、npm run typecheck:unused、npm run audit:health、git diff --check 均退出 0。\nTM_GH16_BROWSER_OUTPUT=./browser-artifacts/gh16-verified PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/autodev-browsers\" .cache/autodev-python/bin/python .agent-run/browser_probe.py --run npm run verify:e2e -- -- --config .cache/playwright-gh16.config.ts --workers=4 退出 0，底层 Playwright 退出 0，80 项通过，6 项按项目配置跳过。GH-16 Chromium 桌面与手机各 3 项通过。\nsh .cache/gh16-check-mysql.sh 退出 0，在项目已有 MySQL 8.0 镜像的临时内存库中执行 npm run verify:backend 全集并通过，包括名言和计时设置的并发更新、账号隔离。首轮退出 1 的日志已保留，按项目配置补齐测试 DSN 的 parseTime=true 与 charset=utf8mb4 后通过。\n隔离配置下 Vite 与 cargo build --locked --manifest-path src-tauri/Cargo.toml --bin timemanage-desktop --features tauri/custom-protocol 均退出 0。sh .cache/gh16-run-native.sh 退出 0，实窗详情、管理、保存、重新加载和模拟焦点恢复通过，截图 1280×820。\npython3 .agent-run/review_preview.py start --route /focus-review -- node .cache/gh16-preview.mjs '{bind}' '{port}' dist 退出 0；隔离 Chromium 验证预览首页和名言管理入口，读到 100 / 100 条样例，退出 0。",
+  "risks": "iOS 原生设备未验收。已验证共用前端的手机 Chromium 和既有窄屏 WebKit 流程。macOS Tauri 已在真实窗口验收，跨日恢复使用受控时钟和窗口焦点事件验证。",
+  "resume": "宿主从 handoff.json 读取验收入口，续期预览并处理 Git 与草稿 PR。",
+  "local_tests_passed": true
+}
