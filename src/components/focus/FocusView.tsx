@@ -1,4 +1,5 @@
 import type { ActiveTimer, AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../../types";
+import { FocusDailyQuote } from "./FocusDailyQuote";
 import { FocusCurrentTaskPanel } from "./FocusCurrentTaskPanel";
 import { FocusTaskList } from "./FocusTaskList";
 import { FocusTimerPanel } from "./FocusTimerPanel";
@@ -29,6 +30,7 @@ export function FocusView(props: {
     <div className="focus-layout">
       <section className="focus-stage">
         <div className="focus-stage-inner">
+          <FocusDailyQuote />
           <FocusCurrentTaskPanel
             currentTask={currentTask}
             outsideTodayList={currentTaskOutsideTodayList}

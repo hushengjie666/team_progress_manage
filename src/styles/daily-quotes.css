@@ -1,0 +1,165 @@
+.focus-stage-inner {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.focus-quote {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  min-height: 78px;
+  padding: 12px clamp(16px, 2vw, 30px);
+  border-bottom: 1px solid #dce7e0;
+  background: #f4f8f4;
+}
+
+.focus-quote p,
+.quote-settings p,
+.quote-settings h2,
+.quote-settings h3 {
+  margin: 0;
+}
+
+.focus-quote-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 750;
+  color: #35695b;
+}
+
+.quote-link-button {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #235b50;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.quote-link-button:hover {
+  text-decoration: underline;
+}
+
+.focus-quote-body {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #263c35;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.quote-details {
+  width: min(520px, calc(100% - 32px));
+  border: 1px solid #d8e0dc;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.quote-details blockquote {
+  margin: 14px 0;
+  padding: 6px 14px;
+  border-left: 3px solid #1f9d8a;
+  font-size: 1.1em;
+  white-space: pre-wrap;
+}
+
+.quote-settings,
+.quote-schedule,
+.quote-editor,
+.quote-list li > div:first-child {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.quote-preview,
+.quote-editor {
+  padding: 16px;
+  border: 1px solid #dce7e0;
+  border-radius: 8px;
+  background: #f4f8f4;
+}
+
+.quote-preview,
+.quote-form-row,
+.quote-list li {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  overflow-wrap: anywhere;
+}
+
+.quote-preview > div {
+  display: grid;
+  gap: 6px;
+}
+
+.quote-preview > div:first-child {
+  flex: 1 1 280px;
+}
+
+.quote-form-row {
+  justify-content: start;
+  align-items: end;
+}
+
+.quote-form-row label,
+.quote-editor label {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quote-form-row input,
+.quote-form-row select,
+.quote-editor input,
+.quote-editor textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #cbd9d3;
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+
+.quote-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.quote-list li {
+  padding: 14px 0;
+  border-top: 1px solid #e1e7e1;
+}
+
+.quote-list li > div:first-child {
+  flex: 1 1 260px;
+  gap: 4px;
+}
+
+.quote-list .quote-link-button,
+.quote-preview .quote-link-button {
+  font-weight: 700;
+}
+
+.quote-list small {
+  color: #536662;
+}
+
+@media (max-width: 1180px) {
+  .focus-stage-inner {
+    grid-template-rows: auto;
+  }
+}

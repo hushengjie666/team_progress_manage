@@ -1,3 +1,4 @@
+import { withoutDailyQuoteSettings } from "./dailyQuotes/accountSettingKey";
 import { useEffect } from "react";
 import type { AppLifecycleHooksOptions } from "./appLifecycleTypes";
 import { preserveLocalUnpersistedTimer } from "./teamActiveRuntimePreservation";
@@ -166,9 +167,11 @@ export function useTeamBusinessRefresh({
       }
       setState((value) => {
         if (!value) return value;
+        const settings = withoutDailyQuoteSettings(delta.settings ?? {});
+        if (!Object.keys(settings).length && !delta.rows.length && !delta.deleted.length) return value;
         const merged = mergeBusinessRowChangesIntoState(value, delta.rows, delta.deleted, delta.server_time);
-        return Object.keys(delta.settings ?? {}).length > 0
-          ? { ...merged, settings: { ...merged.settings, ...delta.settings } as Settings }
+        return Object.keys(settings).length > 0
+          ? { ...merged, settings: { ...merged.settings, ...settings } as Settings }
           : merged;
       });
     };

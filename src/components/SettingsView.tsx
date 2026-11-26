@@ -2,6 +2,7 @@ import { SettingsMembersSection } from "./settings/SettingsMembersSection";
 import { SettingsDemoPanel } from "./settings/SettingsDemoPanel";
 import { effectiveSettingsSection, SettingsSectionTabs } from "./settings/SettingsSectionTabs";
 import { SettingsTeamBackendPanel } from "./settings/SettingsTeamBackendPanel";
+import { SettingsQuotesPanel } from "./settings/SettingsQuotesPanel";
 import { SettingsTimerPanel } from "./settings/SettingsTimerPanel";
 import type { SettingsViewProps } from "./settings/settingsViewTypes";
 
@@ -39,7 +40,7 @@ export function SettingsView(props: SettingsViewProps) {
         <div>
           <p className="eyebrow">管理中心</p>
           <h2>成员库、偏好与系统能力</h2>
-          <p className="muted compact-copy">工作区和项目已经移到“工作区”主菜单，这里只保留平台成员库、个人计时、团队后台和演示数据。</p>
+          <p className="muted compact-copy">工作区和项目已经移到“工作区”主菜单，这里只保留平台成员库、个人计时、名言警句、团队后台和演示数据。</p>
         </div>
         <SettingsSectionTabs
           activeSection={activeSection}
@@ -67,6 +68,8 @@ export function SettingsView(props: SettingsViewProps) {
           askNotificationPermissions={askNotificationPermissions}
         />
       )}
+
+      {effectiveSection === "quotes" && <SettingsQuotesPanel />}
 
       {effectiveSection === "backend" && (
         <SettingsTeamBackendPanel
