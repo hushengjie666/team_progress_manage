@@ -3,7 +3,7 @@ import { FocusDailyQuote } from "./FocusDailyQuote";
 import { FocusCurrentTaskPanel } from "./FocusCurrentTaskPanel";
 import { FocusTaskList } from "./FocusTaskList";
 import { FocusTimerPanel } from "./FocusTimerPanel";
-import { buildFocusTaskList, focusProgressPercent, groupFocusTasksByProject, upcomingBreakMode } from "./focusModel";
+import { buildFocusTaskList, focusCompletionLabel, focusProgressPercent, groupFocusTasksByProject, upcomingBreakMode } from "./focusModel";
 
 export function FocusView(props: {
   state: AppState;
@@ -15,7 +15,7 @@ export function FocusView(props: {
   resetTimer: () => void;
   finishTimer: (outcome: SessionOutcome) => Promise<void>;
   addInterruption: (type: InterruptionType, action?: InterruptionAction) => void;
-  completeTask: (taskId: string) => void;
+  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
   openCreateTask: () => void;
   canCreateTask: boolean;
 }) {
@@ -34,7 +34,8 @@ export function FocusView(props: {
           <FocusCurrentTaskPanel
             currentTask={currentTask}
             outsideTodayList={currentTaskOutsideTodayList}
-            autoAcceptCompletedTasks={state.projects.find((project) => project.id === currentTask?.projectId)?.autoAcceptCompletedTasks !== false}
+            completionLabel={currentTask && focusCompletionLabel(state, currentTask)}
+            saving={state.backend.pendingResourceKeys?.includes(`task:${currentTask?.id}`) ?? false}
             completeTask={props.completeTask}
           />
           <FocusTimerPanel
@@ -56,6 +57,9 @@ export function FocusView(props: {
       <aside className="focus-side">
         <FocusTaskList
           groups={groupedWorkTasks}
+          completionLabel={(task) => focusCompletionLabel(state, task)}
+          completeTask={props.completeTask}
+          pendingResourceKeys={state.backend.pendingResourceKeys}
           taskCount={todayWorkTasks.length}
           activeTaskId={activeTaskId}
           beginTimer={props.beginTimer}

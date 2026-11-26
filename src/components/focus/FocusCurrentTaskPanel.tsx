@@ -5,7 +5,8 @@ import { PomodoroProgress } from "./PomodoroProgress";
 export function FocusCurrentTaskPanel(props: {
   currentTask?: Task;
   outsideTodayList: boolean;
-  autoAcceptCompletedTasks: boolean;
+  completionLabel?: string;
+  saving: boolean;
   completeTask: (taskId: string) => void;
 }) {
   const { currentTask } = props;
@@ -36,10 +37,10 @@ export function FocusCurrentTaskPanel(props: {
               <Check size={15} />
               已提交验收
             </button>
-          ) : (
-            <button className="small-button" onClick={() => props.completeTask(currentTask.id)}>
+          ) : props.completionLabel && (
+            <button className="small-button" disabled={props.saving} onClick={() => props.completeTask(currentTask.id)}>
               <Check size={15} />
-              {props.autoAcceptCompletedTasks ? "完成任务" : "提交验收"}
+              {props.completionLabel === "完成" ? "完成任务" : props.completionLabel}
             </button>
           )}
         </div>

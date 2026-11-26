@@ -1,3 +1,4 @@
+import { canManageWorkspace, workspaceIdForProject } from "../../workspaceAccess";
 import { calculateRemaining, completedFocusSessions } from "../../domain";
 import type { ActiveTimer, AppState, SessionMode, Task } from "../../types";
 
@@ -49,3 +50,18 @@ export const groupFocusTasksByProject = (tasks: Task[]) =>
   }, []).sort((left, right) =>
     Math.min(...left.tasks.map((task) => task.sortOrder)) - Math.min(...right.tasks.map((task) => task.sortOrder)) ||
     left.projectId.localeCompare(right.projectId));
+
+export function focusCompletionLabel(state: AppState, task: Task) {
+  if (task.status !== "committed" && task.status !== "in_progress") return;
+  const project = state.projects.find((item) => item.id === task.projectId);
+  const account = state.auth.account;
+  if (!project || !account) return;
+  const workspaceId = task.workspaceId ?? workspaceIdForProject(state, project);
+  const canSubmit = (workspaceId && canManageWorkspace(state, workspaceId)) || state.projectMembers.some((member) => {
+    if (member.projectId !== project.id || member.accountId !== account.id || member.status !== "active") return false;
+    const assigned = task.primaryExecutorMemberId === member.id || task.collaboratorMemberIds?.includes(member.id);
+    return member.roles.includes("project_owner") || (member.roles.includes("executor") && assigned);
+  });
+  if (!canSubmit) return;
+  return project.autoAcceptCompletedTasks === false ? "提交验收" : "完成";
+}
