@@ -173,3 +173,30 @@
   font-size: 12px;
   font-weight: 800;
 }
+
+.focus-todo-actions {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .focus-todo-item .just-completed {
+    animation: focus-completion 420ms ease-out;
+  }
+
+  .just-completed svg path {
+    stroke-dasharray: 24;
+    animation: focus-completion-check 320ms ease-out;
+  }
+
+  @keyframes focus-completion {
+    from { background-color: #b7e3da; }
+    to { background-color: #e8f7f3; }
+  }
+
+  @keyframes focus-completion-check {
+    from { stroke-dashoffset: 24; }
+    to { stroke-dashoffset: 0; }
+  }
+}

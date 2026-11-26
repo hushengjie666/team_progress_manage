@@ -1,10 +1,14 @@
-import { CheckCircle2, Play, Plus } from "lucide-react";
+import { useState } from "react";
+import { Check, CheckCircle2, Play, Plus } from "lucide-react";
 import { projectToneClassName } from "../../projectVisuals";
-import type { SessionMode } from "../../types";
+import type { SessionMode, Task } from "../../types";
 import type { FocusTaskGroup } from "./focusModel";
 
 export function FocusTaskList(props: {
   groups: FocusTaskGroup[];
+  completionLabel: (task: Task) => string | undefined;
+  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  pendingResourceKeys?: string[];
   taskCount: number;
   activeTaskId?: string;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
@@ -32,38 +36,71 @@ export function FocusTaskList(props: {
               <span>{group.tasks.length}</span>
             </div>
             <div className="focus-project-tasks">
-              {group.tasks.map((task) => {
-                const isActive = task.id === props.activeTaskId;
-                const isPendingReview = task.status === "pending_review";
-                const isCompleted = task.status === "completed";
-                return (
-                  <article className={isActive ? "focus-todo-item active" : "focus-todo-item"} key={task.id}>
-                    <div>
-                      <strong>{task.title}</strong>
-                      <span>{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
-                    </div>
-                    {isCompleted ? (
-                      <span className="completed-pill">
-                        <CheckCircle2 size={14} />
-                        已完成
-                      </span>
-                    ) : isPendingReview ? (
-                      <span className="review-pill">待验收</span>
-                    ) : isActive ? (
-                      <span className="running-pill">执行中</span>
-                    ) : (
-                      <button className="small-button" onClick={() => void props.beginTimer("focus", task.id)}>
-                        <Play size={14} />
-                        开始
-                      </button>
-                    )}
-                  </article>
-                );
-              })}
+              {group.tasks.map((task) => (
+                <FocusTaskCard
+                  key={task.id}
+                  task={task}
+                  active={task.id === props.activeTaskId}
+                  pending={props.pendingResourceKeys?.includes(`task:${task.id}`) ?? false}
+                  completionLabel={props.completionLabel(task)}
+                  completeTask={props.completeTask}
+                  start={() => void props.beginTimer("focus", task.id)}
+                />
+              ))}
             </div>
           </section>
         ))}
       </div>
     </section>
+  );
+}
+
+function FocusTaskCard({ task, active, pending, completionLabel, completeTask, start }: {
+  task: Task;
+  active: boolean;
+  pending: boolean;
+  completionLabel?: string;
+  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  start: () => void;
+}) {
+  const [showFeedback, setShowFeedback] = useState(false);
+  const submit = async () => {
+    const status = await completeTask(task.id);
+    if (status === "completed" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setShowFeedback(true);
+    }
+  };
+
+  return (
+    <article className={active ? "focus-todo-item active" : "focus-todo-item"}>
+      <div>
+        <strong>{task.title}</strong>
+        <span>{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
+      </div>
+      <div className="focus-todo-actions" aria-live="polite" onKeyDown={(event) => {
+        if (event.key === " ") event.stopPropagation();
+      }}>
+        {task.status === "completed" ? (
+          <span className={showFeedback ? "completed-pill just-completed" : "completed-pill"} onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget) setShowFeedback(false);
+          }}>
+            <CheckCircle2 size={14} aria-hidden="true" />已完成
+          </span>
+        ) : task.status === "pending_review" ? (
+          <span className="review-pill">待验收</span>
+        ) : (
+          <>
+            {active ? <span className="running-pill">执行中</span> : (
+              <button className="small-button" disabled={pending} onClick={start}><Play size={14} />开始</button>
+            )}
+            {completionLabel && (
+              <button className="small-button" disabled={pending} onClick={() => void submit()}>
+                <Check size={14} />{completionLabel}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </article>
   );
 }
