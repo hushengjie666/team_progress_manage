@@ -29,7 +29,7 @@ for (const mobile of [false, true]) {
       initial.projects.push(project);
       initial.projectMembers.push({ ...initial.projectMembers[0], projectId: project.id, id: "member_manual" });
       const other = { ...activeTask, id: "task_manual", projectId: project.id, project: project.name,
-        title: "核对验收清单", primaryExecutorMemberId: "member_manual" };
+        title: "核对交付验收清单与跨团队评审意见，整理下一轮发布前的回归测试记录", primaryExecutorMemberId: "member_manual" };
       initial.tasks.push(other);
       initial.dailyPlans[0].committedTaskIds.push(other.id);
       const state = startTimerInState(initial, "focus", activeTask.id, new Date().toISOString(), "focus_current", { workSessionId: "work_current" });
@@ -40,12 +40,25 @@ for (const mobile of [false, true]) {
       const current = list.getByRole("article").filter({ hasText: activeTask.title });
       const manual = list.getByRole("article").filter({ hasText: other.title });
       const capture = async (name: string) => {
-        await list.scrollIntoViewIfNeeded();
+        await list.evaluate((panel) => panel.scrollIntoView({ block: "center", behavior: "instant" }));
+        for (const element of [list, manual, current, manual.locator("strong")]) {
+          expect(await element.evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
+        }
         await page.screenshot({ path: testInfo.outputPath(name + ".png") });
+        await list.screenshot({ path: testInfo.outputPath(name + "-panel.png") });
       };
       await expect(current.getByRole("button", { name: "完成", exact: true })).toBeVisible();
       await expect(manual.getByRole("button", { name: "开始", exact: true })).toBeVisible();
       await capture("before");
+      const start = manual.getByRole("button", { name: "开始", exact: true });
+      const submit = manual.getByRole("button", { name: "提交验收" });
+      const startBox = await start.boundingBox();
+      const submitBox = await submit.boundingBox();
+      expect(submitBox?.y).toBe(startBox?.y);
+      await start.focus();
+      await page.keyboard.press("Tab");
+      await expect(submit).toBeFocused();
+      await expect(submit).toHaveCSS("outline-style", "solid");
       const submitAndReadRows = async (action: () => Promise<void>) => {
         const response = page.waitForResponse((item) => item.url().includes("/submit-review") && item.request().method() === "POST");
         await action();
@@ -53,7 +66,7 @@ for (const mobile of [false, true]) {
         expect(saved.ok()).toBe(true);
         return (await saved.json()).rows as BusinessRow[];
       };
-      const otherRows = await submitAndReadRows(() => manual.getByRole("button", { name: "提交验收" }).click());
+      const otherRows = await submitAndReadRows(() => submit.press("Enter"));
       await expect(manual).toContainText("待验收");
       await expect(current).toContainText("执行中");
       await expect(page.locator(".timer-face")).toContainText(activeTask.title);

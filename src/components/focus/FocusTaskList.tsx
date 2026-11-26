@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, CheckCircle2, Play, Plus } from "lucide-react";
+import { Check, CircleCheck, Clock3, Play, Plus, Timer } from "lucide-react";
 import { projectToneClassName } from "../../projectVisuals";
 import type { SessionMode, Task } from "../../types";
 import type { FocusTaskGroup } from "./focusModel";
@@ -19,10 +19,8 @@ export function FocusTaskList(props: {
   return (
     <section className="band focus-todo-panel">
       <div className="section-title">
-        <div>
-          <p className="eyebrow" aria-live="polite">{props.saving ? "今日工作 · 保存中…" : "今日工作"}</p>
-          <h2>今日任务</h2>
-        </div>
+        <h2>今日任务</h2>
+        <span className="focus-save-status" role="status">{props.saving && "今日工作 · 保存中…"}</span>
         <button className="icon-button small" title={props.canCreateTask ? "快捷新增今日任务" : "暂无可用项目，请先创建项目"} aria-label="快捷新增今日任务" disabled={!props.canCreateTask} onClick={props.openCreateTask}>
           <Plus size={20} />
         </button>
@@ -73,10 +71,8 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
 
   return (
     <article className={active ? "focus-todo-item active" : "focus-todo-item"}>
-      <div>
-        <strong>{task.title}</strong>
-        <span>{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
-      </div>
+      <strong>{task.title}</strong>
+      <span className="focus-todo-meta">{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
       <div className="focus-todo-actions" aria-live="polite" onKeyDown={(event) => {
         if (event.key === " ") event.stopPropagation();
       }}>
@@ -84,18 +80,18 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
           <span className={showFeedback ? "completed-pill just-completed" : "completed-pill"} onAnimationEnd={(event) => {
             if (event.target === event.currentTarget) setShowFeedback(false);
           }}>
-            <CheckCircle2 size={14} aria-hidden="true" />已完成
+            <CircleCheck size={14} aria-hidden="true" />已完成
           </span>
         ) : task.status === "pending_review" ? (
-          <span className="review-pill">待验收</span>
+          <span className="review-pill"><Clock3 size={14} aria-hidden="true" />待验收</span>
         ) : (
           <>
-            {active ? <span className="running-pill">执行中</span> : (
-              <button className="small-button" disabled={pending} onClick={start}><Play size={14} />开始</button>
+            {active ? <span className="running-pill"><Timer size={14} aria-hidden="true" />执行中</span> : (
+              <button className="small-button focus-start" disabled={pending} onClick={start}><Play size={14} aria-hidden="true" />开始</button>
             )}
             {completionLabel && (
               <button className="small-button" disabled={pending} onClick={() => void submit()}>
-                <Check size={14} />{completionLabel}
+                <Check size={14} aria-hidden="true" />{completionLabel}
               </button>
             )}
           </>
