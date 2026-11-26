@@ -5,6 +5,7 @@ import {
   workspaceForProject,
   workspaceIdForProject,
 } from "./accessControl";
+import { localDateForTimestamp } from "./appClock";
 import { buildProgressBoard } from "./progressBoard";
 import type { MyProjectTaskCard } from "./projectOverviewTypes";
 import type { AppState, ProjectMember, Task } from "./types";
@@ -50,7 +51,7 @@ export const filterTodayCompletedTasksForMember = (
   return state.tasks.filter(
     (task) =>
       task.status === "completed" &&
-      task.completedAt?.slice(0, 10) === date &&
+      localDateForTimestamp(task.completedAt) === date &&
       taskBelongsToMemberIdentity(state, task, memberIds, options),
   );
 };

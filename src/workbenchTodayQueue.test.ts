@@ -39,16 +39,17 @@ describe("workbench today queue", () => {
     expect(model.committedWorkbenchTasks.map((item) => item.id)).toEqual(["task_completed_today", "task_committed_today"]);
   });
 
-  it("keeps completed tasks visible when they are no longer in today's committed ids", () => {
+  it("shows tasks completed just after local midnight even when they are outside today's plan", () => {
     const state = createInitialState();
     const projectId = state.projects[0].id;
+    const completedAt = new Date(2026, 5, 30, 0, 30);
     const completedTask = starterTask(state, "task_completed_removed_from_plan", "completed", 10, {
       primaryExecutorMemberId: state.projectMembers[0].id,
-      completedAt: `${todayKey()}T09:30:00.000Z`,
+      completedAt: completedAt.toISOString(),
     });
     const model = deriveWorkspaceModel(
       { ...state, tasks: [completedTask] },
-      workbenchTodayPlan([], { completedPomodoros: 1 }),
+      workbenchTodayPlan([], { date: todayKey(completedAt), completedPomodoros: 1 }),
       0,
       [],
       [],
