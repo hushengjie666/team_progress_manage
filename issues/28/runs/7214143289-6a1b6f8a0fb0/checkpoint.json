@@ -1,0 +1,9 @@
+{
+  "status": "blocked",
+  "stage": "handoff",
+  "command": "python3 .cache/finish-review.py",
+  "summary": "三入口完成反馈与全清已验证；smoke 桌面/手机通过，399 单测、类型、构建、健康审计及完整浏览器 104 通过（6 条条件跳过）。隔离预览在 49676 ready，临时测试服务 14282 已退出。",
+  "tests": "工作区本轮验证完成；远端 PR/CI 由宿主发布后核对。",
+  "risks": "核对完整业务日志、4 张截图及已验证的预览入口，原子写入 ready_for_review。",
+  "local_tests_passed": false
+}

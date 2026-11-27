@@ -1,0 +1,70 @@
+{
+  "approval_comment_id": 7214130186,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/all-clear.png",
+      "redacted": false,
+      "sha256": "3f563cb02187c696c709eedccd833d36919158737753b52e7f17583291374678",
+      "size": 230608,
+      "source_path": ".cache/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/all-clear.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/task-completed.png",
+      "redacted": false,
+      "sha256": "00200f88b71b33aeeab57e3889238624df169265a5ddcf2be04e144a922200f9",
+      "size": 420227,
+      "source_path": ".cache/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/task-completed.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "e937cf932985c7923462e5bfd14f9964327f84478375e4d6592fae733668a4d3",
+      "size": 9302
+    },
+    "artifacts/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/all-clear.png": {
+      "sha256": "3f563cb02187c696c709eedccd833d36919158737753b52e7f17583291374678",
+      "size": 230608
+    },
+    "artifacts/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/task-completed.png": {
+      "sha256": "00200f88b71b33aeeab57e3889238624df169265a5ddcf2be04e144a922200f9",
+      "size": 420227
+    },
+    "checkpoint.json": {
+      "sha256": "d05d0f2f6d48c395a23022ad0c27dcfc6566912db77e5f56b405b3870d218375",
+      "size": 578
+    },
+    "context.json": {
+      "sha256": "4aecb50f82a5c102fd07e4dea62daf368494996a21db8f49d75577f77018d26a",
+      "size": 1171
+    },
+    "handoff.json": {
+      "sha256": "fe47437b5390069ba3ea3d9a0ea03392edfecec73bdfe411fc3684424bd85d33",
+      "size": 5108
+    },
+    "input.json": {
+      "sha256": "b9a0ed37ee90b0986e44ce903e4ffb494b3d5782c2ffac2d1ca4a1eade9c9725",
+      "size": 1092
+    }
+  },
+  "head_sha": "990a780ebd494780dc498230553c6d202930de34",
+  "issue_number": 28,
+  "omitted": [
+    {
+      "path": ".cache/browser-artifacts/completion-feedback-mobile-4e353-rough-the-last-planned-task-chrome/all-clear.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/completion-feedback-mobile-4e353-rough-the-last-planned-task-chrome/task-completed.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T14:46:03+00:00",
+  "revision": 1,
+  "run_id": "7214143289-6a1b6f8a0fb0",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "e937cf932985c7923462e5bfd14f9964327f84478375e4d6592fae733668a4d3",
+  "start_comment_id": 7214143289,
+  "status": "ready_for_review"
+}

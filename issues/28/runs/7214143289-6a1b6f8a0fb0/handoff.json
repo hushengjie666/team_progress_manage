@@ -1,0 +1,35 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "先点击左侧一项「完成」，再用键盘激活「当下清单」的「完成任务」。观察纸屑与光环的起点、卡片回弹，以及浮标计数能否清晰跟上连续操作。",
+      "切到「我的任务」完成最后一项，观察双侧礼花和全清浮标是否明显区别于单项完成，并在退场后继续操作。"
+    ],
+    "kind": "preview"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/all-clear.png",
+      ".cache/browser-artifacts/completion-feedback-deskto-d15cc-rough-the-last-planned-task-chrome/task-completed.png",
+      ".cache/browser-artifacts/completion-feedback-mobile-4e353-rough-the-last-planned-task-chrome/all-clear.png",
+      ".cache/browser-artifacts/completion-feedback-mobile-4e353-rough-the-last-planned-task-chrome/task-completed.png"
+    ],
+    "command": "PATH=\"$PWD/.cache/node-runtime/node_modules/node/bin:$PATH\" .cache/browser-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"在启动样例计时器后设定计划外任务；补测双次连击，串行执行避免并发构建和浏览器测量争用\" --run node_modules/.bin/playwright test --config .cache/playwright.config.ts --workers=1",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "environment_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "preview_url": "http://127.0.0.1:49676/focus",
+  "risks": "既有手机宠物位置用例在并发首跑时于 focus-pet.spec.ts:104 读到展开前的位置（332 与 298），最终串行全套通过；若宿主 CI 复现可按该断言检查 ResizeObserver 的测量时机。本轮无后端、数据库、持久化格式或 CI 配置改动。远端 CI 待宿主发布草稿 PR 后按实际 head 核对，预览由宿主续期。",
+  "status": "ready_for_review",
+  "summary": "今日任务卡片、当下清单、我的任务这三处完成按钮仅在原保存操作确认 completed 后触发纸屑与光环；指针使用点击坐标，键盘使用按钮中心，无法定位时回退到安全位置。保留左侧勾选动画并增加卡片扫光、回弹。浮标显示今日达成计数，最后一条可见计划任务完成时升级为双侧礼花。覆盖层可穿透点击，支持连击和自动清理。减少动态效果时仅显示静态提示，人工验收、失败及历史任务不播放。已核验 #27 合并提交属于 HEAD 历史。",
+  "tests": "环境 smoke：.cache/browser-venv/bin/python .agent-run/browser_probe.py --check-only 退出 2，返回 native_browser_approval_required；原生审批后 .cache/browser-venv/bin/python .agent-run/browser_probe.py 退出 0。localhost 桌面 1365×900、手机 390×844 点击及截图均通过，证据 .agent-run/browser-smoke/result.json 和同目录 PNG。\n前端在 CI 同主版本 Node 24.22.3 下执行：npm test -- completionModel.test.ts（2 项），npm run typecheck，npm run verify:fast（94 文件、399 测试通过，生产构建成功），npm run typecheck:unused，npm run audit:health（741 文件）及 git diff --check 均退出 0。\n最终业务测试：PATH=\"$PWD/.cache/node-runtime/node_modules/node/bin:$PATH\" .cache/browser-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"在启动样例计时器后设定计划外任务；补测双次连击，串行执行避免并发构建和浏览器测量争用\" --run node_modules/.bin/playwright test --config .cache/playwright.config.ts --workers=1；探针与 Playwright 均退出 0，104 通过，仓库 WebKit 项目按视口条件跳过 6 条。完整日志 .cache/e2e-final.log。验证三入口、真实及键盘坐标、静音、连击、动效清理、全清、计划外、人工验收、失败/重试、历史不重播、减少动态效果、番茄钟几何、手机布局。\n过程记录：初次 npm 双横线参数透传被 argparse 拒绝（2，业务未启动），改为项目 Playwright 可执行文件。定向首次 5 通过/2 失败（业务 1，探针 2），静音探针曾计入进入专注页时已有的番茄钟音频解锁；现从完成动作前监测构造及音源启动。首轮全套 101 通过/6 跳过/2 失败（业务 1，探针 2）；修正计时器自动加入计划的样例顺序，单 worker 独占复测。\n人工入口：.cache/browser-venv/bin/python .agent-run/browser_probe.py --run .cache/browser-venv/bin/python .cache/verify-preview.py 退出 0；python3 .agent-run/review_preview.py start --route /focus -- .cache/node-runtime/node_modules/node/bin/node .cache/review-server.mjs '{bind}' '{port}' 退出 0；.cache/browser-venv/bin/python .agent-run/browser_probe.py --run .cache/browser-venv/bin/python .cache/verify-preview.py http://127.0.0.1:49676/focus 退出 0，桌面、手机分别实测已登录样例、连续完成 3 项及全清。"
+}
