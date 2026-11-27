@@ -1,0 +1,82 @@
+{
+  "approval_comment_id": 7213963418,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png",
+      "redacted": false,
+      "sha256": "dbc31807fee653e4ae2aec0cd6362b79c92f0a42c68f3c32588709fd7fed3ce3",
+      "size": 354709,
+      "source_path": ".cache/browser-artifacts/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png",
+      "redacted": false,
+      "sha256": "8acbbe928e92797ddd76d29197b09e9356d10440064be48e2b2ba09b8da2e92a",
+      "size": 562961,
+      "source_path": ".cache/browser-artifacts/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "2bf52104b07eb21c257c7cb40974790ecd47759084f5d517f58e3c5793d39e81",
+      "size": 7461
+    },
+    "artifacts/browser-artifacts/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png": {
+      "sha256": "dbc31807fee653e4ae2aec0cd6362b79c92f0a42c68f3c32588709fd7fed3ce3",
+      "size": 354709
+    },
+    "artifacts/browser-artifacts/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png": {
+      "sha256": "8acbbe928e92797ddd76d29197b09e9356d10440064be48e2b2ba09b8da2e92a",
+      "size": 562961
+    },
+    "checkpoint.json": {
+      "sha256": "238789571a5629017246d76e29791b3b9462cd5e9f232d57a3faf16f21c2ab75",
+      "size": 2799
+    },
+    "context.json": {
+      "sha256": "7c27d3db6b427e014d045cdceb51093b495db476d29cd39d52b14d14f94353ed",
+      "size": 1016
+    },
+    "handoff.json": {
+      "sha256": "2297441182b4cd1bf1df365ed517709e04464e22003ae1a54b3cab40f3884215",
+      "size": 5668
+    },
+    "input.json": {
+      "sha256": "75762a71a05f43cbf33b21ee1726d3f595e128e0ab6bbb60714fedba2d5a6703",
+      "size": 937
+    }
+  },
+  "head_sha": "24d132e4cd308911a5b69cb87dd2dae389f95ad1",
+  "issue_number": 27,
+  "omitted": [
+    {
+      "path": ".cache/browser-suite-dev.log",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-panel-layout-focus-p-5381f-e-beside-or-below-the-timer-chrome/focus-panel-390.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-panel-layout-focus-p-7a6a2-e-beside-or-below-the-timer-chrome/focus-panel-1440.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-panel-layout-focus-p-9def7-e-beside-or-below-the-timer-chrome/focus-panel-1365.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-panel-layout-focus-p-d3892-e-beside-or-below-the-timer-chrome/focus-panel-1180.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T09:04:46+00:00",
+  "revision": 1,
+  "run_id": "7213977208-66efb5ec041c",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "2bf52104b07eb21c257c7cb40974790ecd47759084f5d517f58e3c5793d39e81",
+  "start_comment_id": 7213977208,
+  "status": "ready_for_review"
+}

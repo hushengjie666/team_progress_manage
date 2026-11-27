@@ -1,0 +1,65 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "桌面打开专注页，检查四种状态是否容易区分，滚动时卡片与滚动条的留白是否舒适，圆环是否居中。",
+      "在 390px 宽度检查长标题换行和按钮同行，点击「完成」后观察计数更新和卡片在原项目分组内变紧凑。"
+    ],
+    "kind": "preview"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png",
+      ".agent-run/browser-smoke/result.json"
+    ],
+    "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py",
+    "exit_code": 0,
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png",
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-9def7-e-beside-or-below-the-timer-chrome/focus-panel-1365.png",
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-7a6a2-e-beside-or-below-the-timer-chrome/focus-panel-1440.png",
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png",
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-d3892-e-beside-or-below-the-timer-chrome/focus-panel-1180.png",
+      ".cache/browser-artifacts/focus-panel-layout-focus-p-5381f-e-beside-or-below-the-timer-chrome/focus-panel-390.png",
+      ".cache/browser-suite-dev.log"
+    ],
+    "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix '已改用仓库 Vite 开发服务，恢复计时器测试依赖的开发版加速设置' --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "changed_files": [
+    "src/components/focus/FocusTaskList.tsx",
+    "src/styles/focus.css",
+    "src/styles/focus-task-list.css",
+    "tests/e2e/focus-panel-layout.spec.ts",
+    "tests/e2e/support/focusPanelSample.ts"
+  ],
+  "local_tests_passed": true,
+  "preview": {
+    "artifacts": [
+      ".cache/review-evidence/1280.png",
+      ".cache/review-evidence/1365.png",
+      ".cache/review-evidence/1440.png",
+      ".cache/review-evidence/390.png",
+      ".cache/review-evidence/measurements.json"
+    ],
+    "command": "python3 .agent-run/review_preview.py start --route /focus -- .cache/node-runtime/node_modules/node/bin/node .cache/review-server.mjs '{bind}' '{port}'",
+    "route": "/focus",
+    "url": "http://127.0.0.1:51181/focus",
+    "verified": true
+  },
+  "risks": "人工预览使用工作区隔离样例，实时事件票据接口返回 404，使用已有刷新路径。原生 smoke、专注页业务和规定的前端检查均通过。宿主负责从 agent/issue-27 发布草稿 PR、续期 loopback 预览，并用实际发布的 head SHA 核对远端 CI。",
+  "status": "ready_for_review",
+  "summary": "「开始工作」左列按主布局的 32.5% 在 380～440px 范围内自适应，收紧当前工作区左右边距。1280×820、1365×900、1440×900 实测为 400.39、428.02、440px。列表预留滚动槽和 10px 右内边距。头部显示总数和完成数，空态省略计数。执行中有强调线和徽章，已完成项以紧凑低对比样式留在原分组。任务标题可折行，主次按钮在手机与桌面同行。增加布局回归与隔离多状态样例。",
+  "tests": "Node v24.22.3（与 CI 的 Node 24 主版本一致）。npm test -- focusModel.test.ts 退出 0，12 项通过。npm run typecheck、npm run audit:health、npm run verify:fast 均退出 0，健康审计扫描 723 个文件，完整单测 91 个文件、388 项通过且生产构建成功。git diff --check 退出 0。桌面/手机环境 smoke：.cache/probe-venv/bin/python .agent-run/browser_probe.py --check-only 退出 2，返回 native_browser_approval_required；原生批准后 .cache/probe-venv/bin/python .agent-run/browser_probe.py 退出 0，两种视口完成 localhost 点击与截图。项目业务：.cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix '已改用仓库 Vite 开发服务，恢复计时器测试依赖的开发版加速设置' --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts，退出 0，97 项通过、6 项按设备配置跳过，其中包含 6 个布局视口、空态、滚动、圆环几何、分组、快捷完成/提交验收、权限、保存中、减弱动态、移出列表及跨会话同步。使用与项目锁相符的 Chromium headless shell 1217 和 WebKit 2272。隔离验收地址：.cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/verify-preview.py http://127.0.0.1:51181/focus，退出 0，四个新会话自动进入样例，点击开始/完成后进度从 9/13 变为 10/13。",
+  "verification_notes": [
+    "初次用 npm 的 -- 分隔参数调用探针时解析失败（退出 2），已直接使用项目 Playwright CLI。",
+    "生产预览首跑完整回归得到 96 通过、6 跳过、1 失败（业务命令 1，探针 2）。focus-timer-layout.spec.ts 的自然结束用例依赖开发版百倍速。切回项目 Vite 开发服务后全套通过，保留日志 .cache/browser-suite.log、.cache/browser-suite-dev.log。",
+    "验收样例首轮会话脚本 HTTP 500（业务命令 1，探针 2）。修复临时服务缺少的运行选项后，测试前台服务与受管预览地址均通过。"
+  ]
+}

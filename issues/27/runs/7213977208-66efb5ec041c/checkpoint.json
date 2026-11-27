@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "stage": "交接",
+  "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix '已改用仓库 Vite 开发服务，恢复计时器测试依赖的开发版加速设置' --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts",
+  "summary": "「开始工作」左列按主布局的 32.5% 在 380～440px 范围内自适应，收紧当前工作区左右边距。1280×820、1365×900、1440×900 实测为 400.39、428.02、440px。列表预留滚动槽和 10px 右内边距。头部显示总数和完成数，空态省略计数。执行中有强调线和徽章，已完成项以紧凑低对比样式留在原分组。任务标题可折行，主次按钮在手机与桌面同行。增加布局回归与隔离多状态样例。",
+  "tests": "Node v24.22.3（与 CI 的 Node 24 主版本一致）。npm test -- focusModel.test.ts 退出 0，12 项通过。npm run typecheck、npm run audit:health、npm run verify:fast 均退出 0，健康审计扫描 723 个文件，完整单测 91 个文件、388 项通过且生产构建成功。git diff --check 退出 0。桌面/手机环境 smoke：.cache/probe-venv/bin/python .agent-run/browser_probe.py --check-only 退出 2，返回 native_browser_approval_required；原生批准后 .cache/probe-venv/bin/python .agent-run/browser_probe.py 退出 0，两种视口完成 localhost 点击与截图。项目业务：.cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix '已改用仓库 Vite 开发服务，恢复计时器测试依赖的开发版加速设置' --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts，退出 0，97 项通过、6 项按设备配置跳过，其中包含 6 个布局视口、空态、滚动、圆环几何、分组、快捷完成/提交验收、权限、保存中、减弱动态、移出列表及跨会话同步。使用与项目锁相符的 Chromium headless shell 1217 和 WebKit 2272。隔离验收地址：.cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/verify-preview.py http://127.0.0.1:51181/focus，退出 0，四个新会话自动进入样例，点击开始/完成后进度从 9/13 变为 10/13。",
+  "risks": "人工预览使用工作区隔离样例，实时事件票据接口返回 404，使用已有刷新路径。原生 smoke、专注页业务和规定的前端检查均通过。宿主负责从 agent/issue-27 发布草稿 PR、续期 loopback 预览，并用实际发布的 head SHA 核对远端 CI。",
+  "local_tests_passed": true,
+  "resume": "工作区证据与受管预览就绪，由宿主提交并发布草稿 PR。"
+}
