@@ -1,4 +1,5 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
+import { CompletionFeedback } from "./completion/CompletionFeedback";
 import { DailyQuotesProvider } from "../dailyQuotes/DailyQuotesProvider";
 import { FocusPet } from "../focusPet/FocusPet";
 import { AppFocusRoute } from "./AppFocusRoute";
@@ -36,7 +37,10 @@ export function AppAuthenticatedShellRoutes(props: AppAuthenticatedShellRoutesPr
       token={auth.token}
       backend={backend}
     >
-      <AppRoutes {...props} />
+      <CompletionFeedback key={props.view.tab}
+        workspaceId={props.shellState.selectedWorkspaceId} todayTasks={props.view.focusCommittedTasks}>
+        <AppRoutes {...props} />
+      </CompletionFeedback>
       <FocusPet key={auth.token} app={props.view.state} visible={props.view.tab === "focus"}/>
     </DailyQuotesProvider>
   );

@@ -1,3 +1,4 @@
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import type React from "react";
 import type { ActiveTimer, Task } from "../../types";
 import { WorkbenchTaskActions } from "./WorkbenchTaskActions";
@@ -38,7 +39,7 @@ export function WorkbenchTaskCard({
   onAction: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
-  onComplete?: (taskId: string) => void;
+  onComplete?: CompleteTask;
   onAccept?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;

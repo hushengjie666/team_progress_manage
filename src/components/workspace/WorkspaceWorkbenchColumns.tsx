@@ -1,3 +1,4 @@
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import { useState } from "react";
 import { ChevronRight, Play } from "lucide-react";
 import type { WorkspaceViewModel } from "../../workbenchModel";
@@ -14,7 +15,7 @@ type WorkspaceWorkbenchColumnsProps = {
   activeTimer?: ActiveTimer;
   commitTask: (taskId: string) => void;
   removeCommittedTask: (taskId: string) => void;
-  completeTask: (taskId: string) => void;
+  completeTask: CompleteTask;
   acceptTask: (taskId: string) => void;
   canReviewTask: (task: Task) => boolean;
   deleteTask: (taskId: string) => void;

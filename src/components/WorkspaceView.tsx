@@ -1,3 +1,4 @@
+import type { CompleteTask } from "../appTaskActionsTypes";
 import type { ReactNode } from "react";
 import { type TaskDraft } from "../appModel";
 import type { WorkspaceViewModel } from "../workbenchModel";
@@ -21,7 +22,7 @@ export function WorkspaceView(props: {
   selectedTask?: Task;
   commitTask: (taskId: string) => void;
   removeCommittedTask: (taskId: string) => void;
-  completeTask: (taskId: string) => void;
+  completeTask: CompleteTask;
   deleteTask: (taskId: string) => void;
   selectTask: (taskId: string | null) => void;
   updateTask: (taskId: string, updater: Partial<Task> | ((task: Task) => Task)) => void;
