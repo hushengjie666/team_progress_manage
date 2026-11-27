@@ -1,0 +1,41 @@
+{
+  "allowed_actions": [
+    "commit",
+    "draft_pr",
+    "implement",
+    "push",
+    "test"
+  ],
+  "approval_comment_id": 7213963418,
+  "base_branch": "main",
+  "branch": "agent/issue-27",
+  "ci_rework": {
+    "attempt": 1,
+    "failure_sha256": "acced50686aac6171fc4270df6c3c8946966f42df89d23e32f87e97a00a7f9fa",
+    "head_sha": "24d132e4cd308911a5b69cb87dd2dae389f95ad1",
+    "pr_number": 29,
+    "prior_start_comment_id": 7213977208
+  },
+  "engineering_paths": [],
+  "head_sha": "24d132e4cd308911a5b69cb87dd2dae389f95ad1",
+  "initialization_paths": [],
+  "issue_number": 27,
+  "issue_url": "https://github.com/hushengjie666/team_progress_manage/issues/27",
+  "open_prs": [
+    29
+  ],
+  "protocol": "autodev.issue/v2",
+  "publisher_login": "hushengjie666",
+  "reopen_pr": null,
+  "review_preview_lan_host": null,
+  "revision": 1,
+  "run_id": "7214364073-fa3d4a264860",
+  "spec_sha256": "2bf52104b07eb21c257c7cb40974790ecd47759084f5d517f58e3c5793d39e81",
+  "start_comment_id": 7214364073,
+  "start_confirmation": "确认并开工",
+  "started_at": 1795770673,
+  "verification": {
+    "browser_required": true,
+    "reason": "Web 项目默认执行桌面/手机浏览器业务自动化验证；无浏览器界面的项目记录不适用原因。"
+  }
+}

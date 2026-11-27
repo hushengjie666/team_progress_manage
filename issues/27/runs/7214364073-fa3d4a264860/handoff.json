@@ -1,0 +1,74 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "桌面检查任务状态层级、滚动留白与右侧圆环是否平衡。",
+      "390px 宽度下检查长标题和同行按钮，点击完成后查看分组位置与顶部计数。"
+    ],
+    "kind": "preview"
+  },
+  "browser_smoke": {
+    "artifacts": [
+      ".agent-run/browser-smoke/result.json",
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ],
+    "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py",
+    "exit_code": 0,
+    "status": "passed"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png",
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png",
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-5381f-e-beside-or-below-the-timer-chrome/focus-panel-390.png",
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-7a6a2-e-beside-or-below-the-timer-chrome/focus-panel-1440.png",
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-9def7-e-beside-or-below-the-timer-chrome/focus-panel-1365.png",
+      ".cache/gh27-rework/browser/focus-panel-layout-focus-p-d3892-e-beside-or-below-the-timer-chrome/focus-panel-1180.png",
+      ".cache/gh27-rework/browser.log"
+    ],
+    "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts --output .cache/gh27-rework/browser",
+    "desktop": "passed",
+    "exit_code": 0,
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "changed_files": [],
+  "ci_rework": {
+    "classification": "测试断言失败；runner 正常结束。",
+    "failed_step": "Verify browser workflows",
+    "head_sha": "24d132e4cd308911a5b69cb87dd2dae389f95ad1",
+    "job_id": 140410096624,
+    "log": ".cache/gh27-rework/ci-failure.log",
+    "pr_number": 29,
+    "run_id": 45970665056,
+    "status": "failure",
+    "url": "https://github.com/hushengjie666/team_progress_manage/actions/runs/45970665056/job/140410096624"
+  },
+  "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts --output .cache/gh27-rework/browser",
+  "local_tests_passed": false,
+  "next_step": "由宿主对原分支固定 HEAD 24d132e4cd308911a5b69cb87dd2dae389f95ad1 重跑 Actions run 45970665056 的失败 Browser 作业并核对实际结论。若再次失败，保存该次失败 trace 并另行批准诊断或修复跨账号名言设置流程。",
+  "preview": {
+    "artifacts": [
+      ".cache/review-evidence/measurements.json",
+      ".cache/gh27-rework/preview.log"
+    ],
+    "command": "python3 .agent-run/review_preview.py start --route /focus -- .cache/node-runtime/node_modules/node/bin/node .cache/review-server.mjs '{bind}' '{port}'",
+    "exit_code": 0,
+    "route": "/focus",
+    "url": "http://127.0.0.1:53753/focus",
+    "verification_command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/verify-preview.py http://127.0.0.1:53753/focus",
+    "verified": true
+  },
+  "raw_reason": "Browser 作业实际退出 1。tests/e2e/daily-quotes.spec.ts:330:68 在另一账号的管理中心「个人名言」区域等待 100 / 100 超时。用例和设置流程未被 PR 修改。当前证据无法判定根因，批准范围仅涵盖专注页今日任务布局，本地未复现。",
+  "resume": "由宿主对原分支固定 HEAD 24d132e4cd308911a5b69cb87dd2dae389f95ad1 重跑 Actions run 45970665056 的失败 Browser 作业并核对实际结论。若再次失败，保存该次失败 trace 并另行批准诊断或修复跨账号名言设置流程。",
+  "risks": "Browser 作业实际退出 1。tests/e2e/daily-quotes.spec.ts:330:68 在另一账号的管理中心「个人名言」区域等待 100 / 100 超时。用例和设置流程未被 PR 修改。当前证据无法判定根因，批准范围仅涵盖专注页今日任务布局，本地未复现。 由宿主对原分支固定 HEAD 24d132e4cd308911a5b69cb87dd2dae389f95ad1 重跑 Actions run 45970665056 的失败 Browser 作业并核对实际结论。若再次失败，保存该次失败 trace 并另行批准诊断或修复跨账号名言设置流程。 本地为 macOS Chromium headless shell 和 WebKit，远端 Browser 为 Ubuntu 24.04 上的 Chrome 和 WebKit。隔离样例的实时事件票据端点返回 404，样例走既有刷新路径。",
+  "stage": "CI 返工交接",
+  "status": "blocked",
+  "summary": "已保留原草稿 PR #29 的五个布局与测试文件；本轮无新增源码改动。自适应左栏、滚动留白、四种状态、圆环和手机同行按钮均已重新验证。远端 CI 仍为失败。",
+  "tests": "本轮 Node v24.22.3 对齐 CI Node 24；.cache/probe-venv/bin/python .agent-run/browser_probe.py --check-only 退出 2（native_browser_approval_required），原生批准后 smoke 退出 0。npm run typecheck、npm test -- focusModel.test.ts（12 项）、npm run audit:health（723 文件）、git diff --check origin/main...HEAD 均退出 0。.cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/node-runtime/node_modules/node/bin/node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts --output .cache/gh27-rework/browser 退出 0，97 通过、6 跳过，含原失败用例。预览验证退出 0。远端 Browser 退出 1，96 通过、6 跳过、1 失败；远端同 HEAD 的 Frontend、Go backend、Tauri macOS 均通过。",
+  "unverified": [
+    "原 SHA 的远端 Browser 恢复为通过",
+    "跨账号名言计数超时的根因"
+  ]
+}

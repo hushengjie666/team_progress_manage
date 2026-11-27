@@ -1,0 +1,67 @@
+{
+  "approval_comment_id": 7213963418,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "2bf52104b07eb21c257c7cb40974790ecd47759084f5d517f58e3c5793d39e81",
+      "size": 7461
+    },
+    "checkpoint.json": {
+      "sha256": "709b30634b3426d659544e2eff077da6e897d0d2644263cbf1dab1e3e5ec3a27",
+      "size": 5929
+    },
+    "context.json": {
+      "sha256": "6f8f5c1fd8a06bff2b33e2684fa056b07be54546426ee0725a79c230fab02481",
+      "size": 1257
+    },
+    "handoff.json": {
+      "sha256": "4a17e9d3a1a76421c5b8ec039f2ba0854a5fe3bc34b2aba76ab70baa5d29ed1f",
+      "size": 5929
+    },
+    "input.json": {
+      "sha256": "342c8e046aa77695f729631ad5bd2ffc131489bbc533ee78ea050a14c5621833",
+      "size": 1199
+    }
+  },
+  "head_sha": "24d132e4cd308911a5b69cb87dd2dae389f95ad1",
+  "issue_number": 27,
+  "omitted": [
+    {
+      "path": ".cache/gh27-rework/browser.log",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-12de6-e-beside-or-below-the-timer-chrome/focus-panel-1280.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-31e53-e-beside-or-below-the-timer-chrome/focus-panel-1920.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-5381f-e-beside-or-below-the-timer-chrome/focus-panel-390.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-7a6a2-e-beside-or-below-the-timer-chrome/focus-panel-1440.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-9def7-e-beside-or-below-the-timer-chrome/focus-panel-1365.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/gh27-rework/browser/focus-panel-layout-focus-p-d3892-e-beside-or-below-the-timer-chrome/focus-panel-1180.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T09:15:21+00:00",
+  "revision": 1,
+  "run_id": "7214364073-fa3d4a264860",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "2bf52104b07eb21c257c7cb40974790ecd47759084f5d517f58e3c5793d39e81",
+  "start_comment_id": 7214364073,
+  "status": "blocked"
+}
