@@ -38,4 +38,5 @@ export const mockTeamBackend = async (page: Page, initialState: AppState, option
     if (await handleMockBusinessRoute(route, url, runtime)) return;
     await fulfillError(route, 404, `unhandled mock route: ${url.pathname}`);
   });
+  return runtime;
 };

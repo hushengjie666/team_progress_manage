@@ -37,7 +37,7 @@ const storedRuntimeForState = (state: AppState) => ({
 });
 
 export const openApp = async (page: Page, state = authenticatedState(), backendOptions: MockTeamBackendOptions = {}) => {
-  await mockTeamBackend(page, state, backendOptions);
+  const runtime = await mockTeamBackend(page, state, backendOptions);
   await page.addInitScript(
     ({ key, value }) => {
       localStorage.setItem(key, JSON.stringify(value));
@@ -45,4 +45,5 @@ export const openApp = async (page: Page, state = authenticatedState(), backendO
     { key: STORAGE_KEY, value: storedRuntimeForState(state) },
   );
   await page.goto("/");
+  return runtime;
 };

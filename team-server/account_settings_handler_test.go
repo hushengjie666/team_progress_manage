@@ -91,4 +91,41 @@ func TestMySQLAccountSettingsKeepConcurrentNamespacesAndAccountsSeparate(t *test
 	if otherSettings := get(authContext{AccountID: other.Account.ID, WorkspaceID: ownerAuth.WorkspaceID}); len(otherSettings) != 0 {
 		t.Fatalf("other account received settings: %v", otherSettings)
 	}
+	// Two devices initially see the same empty pet slot. Only one may spend that revision.
+	var writes [2]chan int
+	for i := range writes {
+		writes[i] = make(chan int, 1)
+		go func(result chan<- int) {
+			response := httptest.NewRecorder()
+			api.handleAccountSettings(response, httptest.NewRequest(http.MethodPatch, "/settings",
+				strings.NewReader(`{"focusPet":{"revision":1,"coins":0}}`)), ownerAuth)
+			result <- response.Code
+		}(writes[i])
+	}
+	statuses := map[int]int{}
+	for _, result := range writes {
+		statuses[<-result]++
+	}
+	if statuses[http.StatusOK] != 1 || statuses[http.StatusConflict] != 1 {
+		t.Fatalf("expected one accepted pet revision and one conflict, got %v", statuses)
+	}
+	after := get(ownerAuth)
+	if !bytes.Equal(after["dailyQuotes"], saved["dailyQuotes"]) || !bytes.Equal(after["focusMinutes"], saved["focusMinutes"]) {
+		t.Fatal("pet transaction changed unrelated settings")
+	}
+	if other := get(authContext{AccountID: other.Account.ID, WorkspaceID: ownerAuth.WorkspaceID}); other["focusPet"] != nil {
+		t.Fatal("pet settings leaked into another account")
+	}
+}
+
+func TestFocusPetRevisionRejectsConcurrentStaleSnapshot(t *testing.T) {
+	state := func(n float64) any { return map[string]any{"revision": n} }
+	if !nextPetRevision(nil, state(1)) || !nextPetRevision(state(1), state(2)) {
+		t.Fatal("expected initial and successor revisions to pass")
+	}
+	for _, next := range []any{nil, state(1), state(1.5), state(3)} {
+		if nextPetRevision(state(1), next) {
+			t.Fatalf("accepted invalid successor %v", next)
+		}
+	}
 }

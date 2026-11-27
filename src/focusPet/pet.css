@@ -1,0 +1,55 @@
+.pet-widget, .pet-house { position: fixed; box-sizing: border-box; color: #263e38; }
+.pet-widget { z-index: 23; width: 74px; }
+.pet-widget.compact { width: 40px; }
+.pet-launch { display: grid; justify-items: center; width: 100%; padding: 0; border: 0; background: transparent; cursor: grab; touch-action: none; user-select: none; }
+.pet-launch:active { cursor: grabbing; }
+.pet-launch span { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #324a40; background: #fffff4; border: 1px solid #cad9bb; border-radius: 999px; padding: 2px 9px; }
+.pet-portrait { display: block; width: 100%; height: auto; }
+.pet-figure { transform-origin: 50% 90%; }
+.pet-launch .pet-figure { animation: pet-breathe 3s ease-in-out infinite; }
+.pet-launch .mood-focus .pet-figure { animation-duration: 4s; }
+.pet-launch .mood-eating .pet-figure { animation: pet-breathe .35s ease-in-out infinite; }
+.pet-launch .mood-crisis { filter: saturate(.55); }
+.pet-launch .mood-dead { filter: grayscale(1); }
+.pet-launch .mood-dead .pet-figure { animation: none; }
+.pet-fold { position: absolute; top: 0; right: -4px; min-width: 22px; height: 22px; padding: 0; border: 1px solid #c8d3be; background: #fbfbef; color: #425847; border-radius: 50%; cursor: pointer; }
+.pet-coin { position: absolute; left: 3px; top: 2px; font-weight: bold; background: #ffe59e; color: #815717; border-radius: 100%; padding: 5px; pointer-events: none; animation: pet-coin-rise 1.3s both; }
+@keyframes pet-breathe { 50% { transform: translateY(-1.5px) scale(1.018,.984); } }
+@keyframes pet-coin-rise { to { transform: translateY(-24px); opacity: 0; } }
+.pet-house { z-index: 24; width: min(348px, calc(100vw - 16px)); overflow: auto; overscroll-behavior: contain; padding: 15px; background: #fffdf7; border: 1px solid #d7d7bf; border-radius: 18px; box-shadow: 0 10px 32px #33423829; font-size: 13px; }
+.pet-house header, .pet-profile, .pet-wallet, .pet-meter, .pet-item, .pet-rename { display: flex; align-items: center; gap: 10px; }
+.pet-house header, .pet-meter, .pet-wallet { justify-content: space-between; }
+.pet-house h2, .pet-house h3, .pet-house p { margin: 0; }
+.pet-house h2 { font-size: 17px; }
+.pet-house h3 { font-size: 18px; overflow-wrap: anywhere; }
+.pet-house p { margin-block: 8px; line-height: 1.5; }
+.pet-house button, .pet-house input { font: inherit; }
+.pet-house button { cursor: pointer; color: #314d40; background: #f7f7ed; border: 1px solid #d4ddc8; border-radius: 8px; padding: 5px 8px; }
+.pet-house button:disabled { opacity: .58; cursor: default; }
+.pet-house header button { border: 0; background: transparent; font-size: 20px; }
+.pet-house label { display: block; }
+.pet-house input:not([type=radio]) { width: 100%; box-sizing: border-box; display: block; margin: 5px 0; padding: 8px 10px; border: 1px solid #c8d1be; border-radius: 8px; }
+.pet-house fieldset { border: 0; padding: 0; margin: 12px 0; }
+.pet-breeds { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 6px; }
+.pet-breeds label { position: relative; text-align: center; padding: 7px; border: 1px solid #e2e3d4; border-radius: 12px; cursor: pointer; }
+.pet-breeds label:has(:checked) { border-color: #567e69; background: #edf3e5; }
+.pet-breeds input { position: absolute; top: 3px; left: 3px; accent-color: #476d59; }
+.pet-house .pet-primary, .pet-tabs button[aria-pressed=true] { background: #395e4d; color: white; }
+.pet-primary { width: 100%; margin-top: 8px; }
+.pet-profile .pet-portrait { width: 68px; flex: none; }
+.pet-profile strong { color: #5b7046; }
+.pet-house .pet-meter { display: flex; flex-wrap: wrap; gap: 3px; margin: 8px 0; }
+.pet-meter progress { width: 100%; height: 8px; accent-color: #629469; }
+.pet-wallet { border-block: 1px solid #e1e3d4; padding: 9px 0; }
+.pet-wallet b { color: #836028; }
+.pet-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 12px 0; }
+.pet-tabs button { padding: 5px; font-size: 12px; }
+.pet-item { padding: 9px 0; border-top: 1px solid #eaebde; }
+.pet-item > :last-child { margin-left: auto; text-align: right; }
+.pet-item small { display: block; color: #626d61; margin-top: 2px; }
+.pet-item .pet-portrait { width: 32px; }
+.pet-item button + button { margin-left: 3px; }
+.pet-crisis, .pet-memorial { color: #884632; }
+@media (prefers-reduced-motion: reduce) {
+  .pet-launch .pet-figure, .pet-coin { animation: none; }
+}

@@ -1,5 +1,6 @@
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { DailyQuotesProvider } from "../dailyQuotes/DailyQuotesProvider";
+import { FocusPet } from "../focusPet/FocusPet";
 import { AppFocusRoute } from "./AppFocusRoute";
 import { AppMemberStatusRoute } from "./AppMemberStatusRoute";
 import { AppProjectDetailRoute } from "./AppProjectDetailRoute";
@@ -36,6 +37,7 @@ export function AppAuthenticatedShellRoutes(props: AppAuthenticatedShellRoutesPr
       backend={backend}
     >
       <AppRoutes {...props} />
+      <FocusPet key={auth.token} app={props.view.state} visible={props.view.tab === "focus"}/>
     </DailyQuotesProvider>
   );
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"time"
 )
@@ -69,6 +70,10 @@ func (a *app) handleAccountSettings(w http.ResponseWriter, r *http.Request, auth
 		writeError(w, http.StatusInternalServerError, "load settings failed")
 		return
 	}
+	if next, ok := patch["focusPet"]; ok && !nextPetRevision(current["focusPet"], next) {
+		writeError(w, http.StatusConflict, "宠物状态已在其他设备更新")
+		return
+	}
 	for key, value := range patch {
 		current[key] = value
 	}
@@ -80,4 +85,21 @@ func (a *app) handleAccountSettings(w http.ResponseWriter, r *http.Request, auth
 	}
 	recorder.recordSettings(patch)
 	a.commitMutation(w, r, tx, auth, http.StatusOK, recorder)
+}
+
+// Called with the account settings row locked inside the PATCH transaction.
+func nextPetRevision(current, next any) bool {
+	revision := func(value any) float64 {
+		object, _ := value.(map[string]any)
+		number, ok := object["revision"].(float64)
+		if !ok || number < 1 || number > 9007199254740991 || number != math.Trunc(number) {
+			return -1
+		}
+		return number
+	}
+	if current == nil {
+		return revision(next) == 1
+	}
+	before := revision(current)
+	return before > 0 && revision(next) == before+1
 }
