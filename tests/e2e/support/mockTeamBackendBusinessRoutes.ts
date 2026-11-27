@@ -193,10 +193,14 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
       const nextStatus = action === "add-task" && taskPayload.status === "pool"
         ? "committed"
         : action === "remove-task" && taskPayload.status === "committed" ? "pool" : taskPayload.status;
+      const removed = { ...(taskPayload.dailyRemovedDates as Record<string, string>) };
+      const accountId = runtime.initialState.auth.account!.id;
+      if (taskPayload.isDaily && action === "remove-task") removed[accountId] = String(planPayload.date);
+      if (taskPayload.isDaily && action === "add-task" && removed[accountId] === planPayload.date) delete removed[accountId];
       const taskRow: BusinessRow = {
         ...taskEntry[1],
         updated_at: timestamp,
-        payload: { ...taskPayload, status: nextStatus, updatedAt: timestamp } as never,
+        payload: { ...taskPayload, ...(taskPayload.isDaily ? { dailyRemovedDates: removed } : {}), status: nextStatus, updatedAt: timestamp } as never,
       };
       rowsByKey.set(taskEntry[0], taskRow);
       changedRows.push(taskRow);
@@ -213,7 +217,7 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
   if (request.method() === "POST" && entity === "task" && parts[2] === "submit-review") {
     const state = runtime.workspaceStates[workspaceId];
     const next = submitTaskForReviewInState(state, id,
-      resolveMemberIdForProject(state, String((current.payload as Record<string, unknown>).projectId)));
+      resolveMemberIdForProject(state, String((current.payload as Record<string, unknown>).projectId)), undefined, body.date as string | undefined);
     runtime.workspaceStates[workspaceId] = next;
     await fulfillJson(route, mutationDelta(request, rowsFromState(next)));
     return true;
@@ -270,6 +274,9 @@ export const handleMockBusinessRoute = async (route: Route, url: URL, runtime: M
   }
   if (request.method() === "PATCH") {
     const payload = mergePayload(current.payload as Record<string, unknown>, body);
+    if (entity === "task" && body.isDaily === true && isObject(payload.dailyRemovedDates)) {
+      delete payload.dailyRemovedDates[runtime.initialState.auth.account!.id];
+    }
     const targetWorkspace = typeof payload.workspaceId === "string" ? payload.workspaceId : current.workspace_id;
     const row = { ...current, workspace_id: targetWorkspace, updated_at: new Date().toISOString(), payload: payload as never };
     rowsByKey.delete(currentKey);

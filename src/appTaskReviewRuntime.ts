@@ -1,3 +1,5 @@
+import { today } from "./appClock";
+import { dailyTaskForDate } from "./dailyTasks";
 import type { AppTaskActionsRuntime, AppTaskActionsRuntimeOptions } from "./appTaskActionsTypes";
 
 type AppTaskReviewRuntime = Pick<
@@ -19,7 +21,9 @@ export function createAppTaskReviewRuntime({
 }: AppTaskReviewRuntimeOptions): AppTaskReviewRuntime {
   const completeTask: AppTaskReviewRuntime["completeTask"] = async (taskId, onCompleted) => {
     const state = getState();
-    const task = state.tasks.find((item) => item.id === taskId);
+    const date = today();
+    const record = state.tasks.find((item) => item.id === taskId);
+    const task = record && dailyTaskForDate(record, date);
     if (!task || state.backend.pendingResourceKeys?.includes(`task:${taskId}`)) return;
     if (task.status === "pending_review") {
       setToast("该任务已提交验收，等待项目负责人确认");
@@ -37,14 +41,15 @@ export function createAppTaskReviewRuntime({
       setToast("当前状态不能提交验收");
       return;
     }
-    const saved = await runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: task.workspaceId });
-    const status = saved?.tasks.find((item) => item.id === taskId)?.status;
+    const saved = await runTeamCommand({ kind: "action", resource: "tasks", id: taskId, action: "submit-review", workspaceId: task.workspaceId, ...(task.isDaily ? { payload: { date } } : {}) });
+    const result = saved?.tasks.find((item) => item.id === taskId);
+    const status = result && dailyTaskForDate(result, date).status;
     if (status !== "completed" && status !== "pending_review") return;
     setPreferredFocusTaskId(status === "completed" ? null : taskId);
     if (status === "completed" && onCompleted && saved) {
       onCompleted(saved);
     } else {
-      setToast(status === "completed" ? "任务已完成并自动验收通过" : "已提交验收，等待项目负责人确认");
+      setToast(status === "completed" ? (task.isDaily ? "今日打卡已完成" : "任务已完成并自动验收通过") : "已提交验收，等待项目负责人确认");
     }
     return status;
   };

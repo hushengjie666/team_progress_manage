@@ -5,6 +5,7 @@ import {
   workspaceForProject,
   workspaceIdForProject,
 } from "./accessControl";
+import { dailyTaskBelongsToAccount, dailyTaskForDate } from "./dailyTasks";
 import { localDateForTimestamp } from "./appClock";
 import { buildProgressBoard } from "./progressBoard";
 import type { MyProjectTaskCard } from "./projectOverviewTypes";
@@ -36,8 +37,8 @@ export const filterTodayCommittedTasksForMember = (
   options: { includeProjectOwnerUnassigned?: boolean; includeUnassigned?: boolean } = {},
 ) => {
   const memberIds = projectMemberIdentityIds(state, currentMember);
-  if (memberIds.size === 0) return [];
-  return tasks.filter((task) => taskBelongsToMemberIdentity(state, task, memberIds, options));
+  return tasks.filter((task) => task.isDaily ? dailyTaskBelongsToAccount(state, task) :
+    memberIds.size > 0 && taskBelongsToMemberIdentity(state, task, memberIds, options));
 };
 
 export const filterTodayCompletedTasksForMember = (
@@ -47,13 +48,14 @@ export const filterTodayCompletedTasksForMember = (
   options: { includeProjectOwnerUnassigned?: boolean; includeUnassigned?: boolean } = {},
 ) => {
   const memberIds = projectMemberIdentityIds(state, currentMember);
-  if (memberIds.size === 0) return [];
   return state.tasks.filter(
-    (task) =>
+    (task) => task.isDaily
+      ? task.dailyCompletedDates?.includes(date) && dailyTaskBelongsToAccount(state, task) && task.dailyRemovedDates?.[state.auth.account!.id] !== date
+      : memberIds.size > 0 &&
       task.status === "completed" &&
       localDateForTimestamp(task.completedAt) === date &&
       taskBelongsToMemberIdentity(state, task, memberIds, options),
-  );
+  ).map((task) => dailyTaskForDate(task, date));
 };
 
 export const quickAddProjectIdForSelection = (selectedProjectIds: string[]) =>

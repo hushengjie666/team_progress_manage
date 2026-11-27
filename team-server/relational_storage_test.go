@@ -131,8 +131,9 @@ func TestRelationalSchemaCoversEditableDomainFields(t *testing.T) {
 			covered[relation.Field] = true
 		}
 		for name := range resource.patchFields {
-			// estimateHours is converted to estimatePomodoros before persistence.
-			if resource.entity == "task" && name == "estimateHours" {
+			// estimateHours becomes estimatePomodoros. isDaily round-trips through the
+			// extension JSON (TestDailyTaskCheckInAndRemovalRoundTrip).
+			if resource.entity == "task" && (name == "estimateHours" || name == "isDaily") {
 				continue
 			}
 			if !covered[name] {

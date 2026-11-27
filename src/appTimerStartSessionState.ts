@@ -81,7 +81,9 @@ export const startTimerInState = (
   if (
     mode === "focus" &&
     task &&
-    (task.status === "pending_review" || task.status === "completed" || task.status === "split" || task.status === "archived")
+    (task.status === "split" || task.status === "archived" || (task.isDaily
+      ? task.dailyCompletedDates?.includes(todayKey(new Date(timestamp)))
+      : task.status === "pending_review" || task.status === "completed"))
   ) {
     return state;
   }

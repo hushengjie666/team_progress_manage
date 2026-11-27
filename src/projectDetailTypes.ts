@@ -31,6 +31,7 @@ export type ProjectTaskInput = {
   expectedFinishAt?: string;
   dueAt?: string;
   reminderAt?: string;
+  isDaily?: boolean;
   repeatRule?: RepeatRule;
   repeatIntervalDays?: number;
   subtasks?: string[];

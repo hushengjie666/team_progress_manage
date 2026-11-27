@@ -3,7 +3,7 @@ import type { Task } from "./types";
 
 export const generateRecurringTask = (task: Task, timestamp: string): Task | null => {
   const rule = task.repeatRule ?? "none";
-  if (rule === "none") return null;
+  if (task.isDaily || rule === "none") return null;
   const base = rule === "after_completion" ? timestamp : task.dueAt ?? task.completedAt ?? timestamp;
   const next = new Date(base);
   if (rule === "daily") next.setDate(next.getDate() + 1);

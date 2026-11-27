@@ -53,6 +53,7 @@ export function ProjectOverviewTaskBoard(props: {
       >
         <div className="project-stage-task-main">
           <strong>{task.title}</strong>
+          {task.isDaily && <span className="task-inline-chip">日常</span>}
           <span>{statusLabel} · {labelPriority[task.priority]} · {task.progressPercent ?? 0}% · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
         </div>
         {showsActiveState && (

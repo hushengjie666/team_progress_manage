@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useLocalDate } from "./useLocalDate";
 import { getTodayPlan, type TaskFilters } from "./appModel";
 import type { AppState } from "./types";
 import { workspacesForState } from "./accessControl";
@@ -37,7 +38,8 @@ export function useAppWorkspaceViewModelHooks({
   setPreferredFocusTaskId,
 }: AppWorkspaceViewModelHooksOptions) {
   const restoredWorkspaceAccountRef = useRef<string | null>(null);
-  const todayPlan = state ? getTodayPlan(state) : null;
+  const localDate = useLocalDate();
+  const todayPlan = state ? getTodayPlan(state, localDate) : null;
   const selectedWorkspaceProjectIds = useMemo(() => {
     if (!state || !selectedWorkspaceId) return undefined;
     return projectIdsForWorkspace(state, selectedWorkspaceId);

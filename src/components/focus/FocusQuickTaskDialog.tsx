@@ -79,6 +79,10 @@ export function FocusQuickTaskDialog({ state, projects, defaultWorkspaceId, defa
         taskId = task.id;
         setCreatedTaskId(taskId);
       }
+      if (draft.isDaily) {
+        onClose();
+        return;
+      }
       const savingQueue = taskActions.commitTask(taskId);
       onClose();
       const queued = await savingQueue;

@@ -232,6 +232,7 @@ const taskFromRow = (row: BusinessRow): Task => {
   const task = row.payload as Task;
   return {
     ...task,
+    creatorAccountId: task.creatorAccountId ?? row.account_id,
     tags: Array.isArray(task.tags) ? task.tags : [],
     subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
     estimateHistory: Array.isArray(task.estimateHistory) ? task.estimateHistory : [],

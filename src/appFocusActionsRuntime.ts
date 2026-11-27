@@ -1,3 +1,4 @@
+import { dailyTaskForDate } from "./dailyTasks";
 import {
   modeLabel,
   nowIso,
@@ -52,12 +53,13 @@ export function createAppFocusActionsRuntime({
       const source = getState();
       const task = source.tasks.find((item) => item.id === taskId);
       if (!task) return;
-      if (task.status !== "pool" && task.status !== "committed" && task.status !== "in_progress") {
+      const date = today();
+      const status = dailyTaskForDate(task, date).status;
+      if (status !== "pool" && status !== "committed" && status !== "in_progress") {
         setToast("当前任务状态不能开始执行");
         return;
       }
       const taskWorkspaceId = workspaceIdForTask(source, task);
-      const date = today();
       const workSessionId = uid("work_session");
       const previousTask = task;
       const previousTimer = source.activeTimer;

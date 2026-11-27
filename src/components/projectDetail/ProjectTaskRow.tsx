@@ -26,6 +26,7 @@ export function ProjectTaskRow(props: {
     <article className="project-task-row">
       <div>
         <strong>{props.task.title}</strong>
+        {props.task.isDaily && <span className="task-inline-chip">日常</span>}
         <span>{labelTaskStage[props.task.stage]} · {props.task.tags.slice(0, 3).join("、") || "无标签"}</span>
       </div>
       <select

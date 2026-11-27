@@ -11,6 +11,7 @@ export function WorkspaceView(props: {
   mode: "board" | "workbench";
   model: WorkspaceViewModel;
   workbenchTrend: ReactNode;
+  quickTaskButton: ReactNode;
   draft: TaskDraft;
   setDraft: (draft: TaskDraft) => void;
   addTask: (projectId?: string) => void;
@@ -85,6 +86,7 @@ export function WorkspaceView(props: {
     <div className="content-grid workspace-grid">
       {props.workbenchTrend}
       <WorkspaceWorkbenchColumns
+        quickTaskButton={props.quickTaskButton}
         myProjectTaskCards={myProjectTaskCards}
         poolWorkbenchTasks={poolWorkbenchTasks}
         committedWorkbenchTasks={committedWorkbenchTasks}

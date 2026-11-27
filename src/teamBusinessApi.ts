@@ -1,3 +1,4 @@
+import { hydrateCachedDailyTaskFields } from "./storage";
 import { withoutAccountOwnedSettings } from "./accountSettingKeys";
 import { applyTeamStateLoadFailure } from "./appBoot";
 import { mergeBusinessRowsIntoState, type BusinessRow } from "./teamBusinessRows";
@@ -40,6 +41,7 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
   const account = mapAccount(payload.account);
   const mergedWithAccount: AppState = {
     ...merged,
+    tasks: hydrateCachedDailyTaskFields(merged, account.id),
     auth: { ...merged.auth, account },
   };
   const recoveredTimer = recoverTeamActiveTimer(mergedWithAccount, settings, local, payload.loaded_at);

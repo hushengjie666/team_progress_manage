@@ -17,7 +17,7 @@ type domainResourceSpec struct {
 var domainResourceSpecs = []domainResourceSpec{
 	{path: "projects", entity: "project", patchFields: fields("name", "description", "taskStageMode", "autoAcceptCompletedTasks", "defaultExpectedStartHours", "archivedAt", "sortOrder")},
 	{path: "project-members", entity: "project_member", patchFields: fields("name", "email", "roles", "status", "accountId")},
-	{path: "tasks", entity: "task", patchFields: fields("title", "notes", "tags", "projectId", "project", "priority", "severity", "stage", "estimateHours", "estimatePomodoros", "expectedStartAt", "expectedFinishAt", "dueAt", "reminderAt", "lastReminderSentAt", "repeatRule", "repeatIntervalDays", "primaryExecutorMemberId", "collaboratorMemberIds", "status", "progressPercent", "progressNote", "subtasks", "sortOrder", "reviewSubmittedAt", "reviewSubmittedByMemberId", "reviewAcceptedAt", "reviewAcceptedByMemberId", "reviewReturnedAt", "reviewReturnedByMemberId", "reviewReturnReason")},
+	{path: "tasks", entity: "task", patchFields: fields("title", "notes", "tags", "projectId", "project", "priority", "severity", "stage", "estimateHours", "estimatePomodoros", "expectedStartAt", "expectedFinishAt", "dueAt", "reminderAt", "lastReminderSentAt", "isDaily", "repeatRule", "repeatIntervalDays", "primaryExecutorMemberId", "collaboratorMemberIds", "status", "progressPercent", "progressNote", "subtasks", "sortOrder", "reviewSubmittedAt", "reviewSubmittedByMemberId", "reviewAcceptedAt", "reviewAcceptedByMemberId", "reviewReturnedAt", "reviewReturnedByMemberId", "reviewReturnReason")},
 	{path: "daily-plans", entity: "daily_plan", patchFields: fields("capacityPomodoros", "recommendedCapacityPomodoros", "suggestedCapacityPomodoros", "overloadAcknowledged", "committedTaskIds", "suggestedTaskIds", "completedPomodoros", "reflection", "review")},
 	{path: "focus-sessions", entity: "focus_session", patchFields: fields("endedAt", "outcome", "interruptionCounts")},
 	{path: "work-sessions", entity: "work_session", patchFields: fields("status", "pausedAt", "resumedAt", "endedAt", "outcome", "totalPausedSeconds")},
@@ -285,18 +285,14 @@ func (a *app) createBusinessResource(w http.ResponseWriter, r *http.Request, aut
 	a.commitMutation(w, r, tx, auth, http.StatusCreated, recorder)
 }
 
-func filteredPatch(payload map[string]any, allowed map[string]bool, now string) (json.RawMessage, bool) {
+func filteredPatch(payload map[string]any, allowed map[string]bool, now string) map[string]any {
 	result := map[string]any{"updatedAt": now}
 	for key, value := range payload {
 		if allowed[key] {
 			result[key] = value
 		}
 	}
-	if len(result) == 1 {
-		return nil, false
-	}
-	raw, _ := json.Marshal(result)
-	return raw, true
+	return result
 }
 
 func (a *app) patchBusinessResource(w http.ResponseWriter, r *http.Request, auth authContext, spec domainResourceSpec, id string) {
@@ -305,8 +301,8 @@ func (a *app) patchBusinessResource(w http.ResponseWriter, r *http.Request, auth
 		return
 	}
 	now := time.Now().UTC().Format(time.RFC3339Nano)
-	patch, ok := filteredPatch(payload, spec.patchFields, now)
-	if !ok {
+	changes := filteredPatch(payload, spec.patchFields, now)
+	if len(changes) == 1 {
 		writeError(w, http.StatusBadRequest, "no mutable fields supplied")
 		return
 	}
@@ -322,6 +318,20 @@ func (a *app) patchBusinessResource(w http.ResponseWriter, r *http.Request, auth
 	if !a.claimIdempotencyOrRespond(w, r, tx, auth) {
 		return
 	}
+	if spec.entity == "task" && changes["isDaily"] == true {
+		changes["repeatRule"] = "none"
+		task, found, err := businessExistingRowForUpdate(r.Context(), tx, workspaceID, "task", id)
+		if err != nil || !found {
+			writeError(w, http.StatusNotFound, "task not found")
+			return
+		}
+		fields, _ := rowPayloadObject(task)
+		removed, _ := fields["dailyRemovedDates"].(map[string]any)
+		if fields["isDaily"] != true && removed[auth.AccountID] != nil {
+			changes["dailyRemovedDates"] = map[string]any{auth.AccountID: nil}
+		}
+	}
+	patch, _ := json.Marshal(changes)
 	failure := applyBusinessOperation(r.Context(), tx, auth, businessOperation{Operation: "patch", WorkspaceID: workspaceID, Entity: spec.entity, ID: id, UpdatedAt: now, Patch: patch})
 	if failure.status != 0 {
 		writeError(w, failure.status, failure.message)

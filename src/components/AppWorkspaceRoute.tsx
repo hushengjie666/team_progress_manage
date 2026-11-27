@@ -1,3 +1,5 @@
+import { QuickTodayTaskButton } from "./QuickTodayTaskButton";
+import { quickAddProjectIdForSelection } from "../projectOverview";
 import type { AppAuthenticatedShellProps } from "./AppAuthenticatedShellTypes";
 import { mergeScopedProjectOrder } from "../workspaceScope";
 import { WeeklyFocusTrendPanel } from "./workspace/WeeklyFocusTrendPanel";
@@ -50,6 +52,8 @@ export function AppWorkspaceRoute({
     <WorkspaceView
       mode={workspaceMode}
       model={workspaceModel}
+      quickTaskButton={<QuickTodayTaskButton state={state} taskActions={taskActions}
+        defaultWorkspaceId={shellState.selectedWorkspaceId ?? undefined} defaultProjectId={quickAddProjectIdForSelection(selectedWorkbenchProjectIds)} />}
       workbenchTrend={<WeeklyFocusTrendPanel state={state} workspaceId={shellState.selectedWorkspaceId} />}
       draft={taskDraft}
       setDraft={setTaskDraft}

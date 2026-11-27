@@ -1,3 +1,4 @@
+import { dailyTaskCache, restoreDailyTaskFields } from "./dailyTaskCache";
 import { withoutAccountOwnedSettings } from "./accountSettingKeys";
 import { createInitialState } from "./seed";
 import type {
@@ -14,6 +15,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 type StoredAppRuntime = {
   version: 4 | 5;
+  dailyTaskCache?: ReturnType<typeof dailyTaskCache>;
   settings: Partial<Settings>;
   auth: Partial<AuthState>;
   backend: Pick<BackendConnectionState, "serverUrl" | "username" | "deviceId" | "token">;
@@ -76,9 +78,20 @@ export async function loadState(): Promise<AppState> {
   }
 }
 
+export function hydrateCachedDailyTaskFields(state: AppState, accountId: string) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const cached: StoredAppRuntime | null = raw && JSON.parse(raw);
+    return restoreDailyTaskFields(state.tasks, cached?.dailyTaskCache, accountId, state.backend.serverUrl);
+  } catch {
+    return state.tasks;
+  }
+}
+
 export async function saveState(state: AppState): Promise<void> {
   const payload: StoredAppRuntime = {
     version: 5,
+    dailyTaskCache: dailyTaskCache(state),
     settings: withoutAccountOwnedSettings(state.settings),
     auth: {
       status: state.auth.status,

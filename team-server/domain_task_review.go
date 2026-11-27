@@ -14,9 +14,12 @@ type taskReviewFailure struct {
 	message string
 }
 
-func applyTaskReviewActionInTx(ctx context.Context, tx *sql.Tx, task businessRow, payload map[string]any, action string, reason string, memberID string, now string) *taskReviewFailure {
+func applyTaskReviewActionInTx(ctx context.Context, tx *sql.Tx, task businessRow, payload map[string]any, action string, reason string, memberID string, now string, date string) *taskReviewFailure {
 	switch action {
 	case "submit-review":
+		if payload["isDaily"] == true {
+			return completeDailyTaskInTx(ctx, tx, task, payload, date, now)
+		}
 		if status := stringField(task.Payload, "status"); status != "committed" && status != "in_progress" {
 			return &taskReviewFailure{status: http.StatusConflict, message: "task is not ready for review"}
 		}
@@ -46,7 +49,7 @@ func applyTaskReviewActionInTx(ctx context.Context, tx *sql.Tx, task businessRow
 				return &taskReviewFailure{status: http.StatusInternalServerError, message: "invalid task payload"}
 			}
 			task.Payload = raw
-			return applyTaskReviewActionInTx(ctx, tx, task, payload, "accept-review", "", memberID, now)
+			return applyTaskReviewActionInTx(ctx, tx, task, payload, "accept-review", "", memberID, now, date)
 		}
 	case "accept-review":
 		if stringField(task.Payload, "status") != "pending_review" {
@@ -79,7 +82,7 @@ func applyTaskReviewActionInTx(ctx context.Context, tx *sql.Tx, task businessRow
 	return nil
 }
 
-func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, task businessRow) (string, bool, bool, error) {
+func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, task businessRow, daily bool) (string, bool, bool, error) {
 	projectID := businessProjectID(task)
 	canManageWorkspace, err := teamAccountCanManageWorkspace(ctx, q, auth, task.WorkspaceID)
 	if err != nil {
@@ -112,15 +115,20 @@ func taskReviewPermissions(ctx context.Context, q sqlRunner, auth authContext, t
 	collaboratorIDs := stringSliceField(task.Payload, "collaboratorMemberIds")
 	memberID := ""
 	isExecutor := false
+	creator := stringField(task.Payload, "creatorMemberId")
+	unassigned := primaryExecutorID == "" && len(collaboratorIDs) == 0
 	for _, member := range members {
 		if memberID == "" {
 			memberID = member.ID
 		}
 		assigned := member.ID == primaryExecutorID || containsString(collaboratorIDs, member.ID)
-		if assigned && hasRole(member.Payload, "executor") {
+		if (assigned && (daily || hasRole(member.Payload, "executor"))) || (daily && unassigned && member.ID == creator) {
 			isExecutor = true
 			memberID = member.ID
 		}
+	}
+	if daily && unassigned && creator == "" && task.AccountID == auth.AccountID {
+		isExecutor = true
 	}
 	canReview := canManageWorkspace || canManageProject
 	return memberID, canReview || isExecutor, canReview, nil
@@ -185,7 +193,7 @@ func endTaskWorkSessionsInTx(ctx context.Context, tx *sql.Tx, task businessRow, 
 
 func createNextRecurringTaskInTx(ctx context.Context, tx *sql.Tx, task businessRow, completedPayload map[string]any, now string) error {
 	rule := stringField(task.Payload, "repeatRule")
-	if rule == "" || rule == "none" {
+	if completedPayload["isDaily"] == true || rule == "" || rule == "none" {
 		return nil
 	}
 	baseText := now

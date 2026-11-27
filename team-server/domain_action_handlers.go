@@ -81,7 +81,7 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	reviewMemberID := ""
 	if action == "submit-review" || action == "accept-review" || action == "return-review" {
-		memberID, canSubmit, canReview, accessErr := taskReviewPermissions(r.Context(), tx, auth, task)
+		memberID, canSubmit, canReview, accessErr := taskReviewPermissions(r.Context(), tx, auth, task, payload["isDaily"] == true)
 		if accessErr != nil {
 			writeError(w, http.StatusInternalServerError, "review permission check failed")
 			return
@@ -94,7 +94,7 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 	}
 	switch action {
 	case "submit-review", "accept-review", "return-review":
-		if failure := applyTaskReviewActionInTx(r.Context(), tx, task, payload, action, req.Reason, reviewMemberID, now); failure != nil {
+		if failure := applyTaskReviewActionInTx(r.Context(), tx, task, payload, action, req.Reason, reviewMemberID, now, req.Date); failure != nil {
 			writeError(w, failure.status, failure.message)
 			return
 		}
@@ -134,7 +134,13 @@ func (a *app) handleTaskAction(w http.ResponseWriter, r *http.Request, auth auth
 			}
 		}
 	case "start":
-		if status := stringField(task.Payload, "status"); status != "pool" && status != "committed" && status != "in_progress" {
+		status := stringField(task.Payload, "status")
+		ready := status == "pool" || status == "committed" || status == "in_progress"
+		if payload["isDaily"] == true {
+			_, err := time.Parse(time.DateOnly, req.Date)
+			ready = err == nil && status != "archived" && status != "split" && !containsString(stringSliceField(task.Payload, "dailyCompletedDates"), req.Date)
+		}
+		if !ready {
 			writeError(w, http.StatusConflict, "task cannot be started in its current status")
 			return
 		}
