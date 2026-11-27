@@ -1,0 +1,29 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "打开后直接进入「我的任务」，查看「核对每日工作计划」的日常标识，再到「开始工作」确认同一任务的展示。",
+      "在人工验收项目中启动该任务并完成今日打卡，判断已完成提示是否清楚，刷新确认结果仍在。"
+    ],
+    "kind": "preview"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/desktop.png",
+      ".cache/browser-artifacts/mobile.png",
+      ".cache/acceptance/daily-tasks-desktop-daily--34780-oval-disabling-and-deletion-chrome/completed.png",
+      ".cache/acceptance/daily-tasks-desktop-daily--34780-oval-disabling-and-deletion-chrome/restored.png",
+      ".cache/acceptance/daily-tasks-mobile-daily-t-9c5b6-oval-disabling-and-deletion-chrome/completed.png",
+      ".cache/acceptance/daily-tasks-mobile-daily-t-9c5b6-oval-disabling-and-deletion-chrome/restored.png"
+    ],
+    "command": "source .cache/env && GH32_OUTPUT=./acceptance .cache/venv/bin/python .agent-run/browser_probe.py --run python3 .cache/e2e.py --project=chrome daily-tasks.spec.ts",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "risks": "无已知业务验收阻塞。沿用数据库扩展 JSON，无 schema 迁移。当前工作区未改 CI、Rust 或发布配置；CI 的 Rust 未固定版本，Cargo 最低版本 1.77.2。本轮验证 Web 桌面和手机视口，未制作原生安装包。远端 CI 须由宿主发布草稿 PR 后在新提交 SHA 上核对，预览由宿主续期。",
+  "status": "ready_for_review",
+  "summary": "项目新建、我的任务及开始工作的快捷新增、任务详情均支持日常开关与重复规则互斥，三处任务列表展示日常标识。按账号归属和本地日期派生今日队列，跨午夜及刷新自动更新；协作成员共享同一任务的每日打卡，移出仅影响本人当日。完成直接返回 completed，关闭相关工作与番茄会话并保留历史，不再克隆。新增字段保存在 MySQL 扩展 JSON 与按账号、服务、任务版本匹配的前端缓存中。已有任务字段缺省时继续走普通任务流程。",
+  "tests": "Node v24.22.3（CI 24），Go go1.26.11（CI 1.26.11，go.mod 1.22），私有 MySQL 8.4.11。TZ=Asia/Shanghai npm test -- dailyTasks.test.ts 初次 3 项通过，新增缓存用例后包含在全量。npm run verify:fast 退出 0，95 个文件、403 项通过并完成生产构建；npm run typecheck、typecheck:unused、typecheck:test、audit:health、audit:data-safety 及 git diff --check 均为 0。go test -run TestDailyTaskCheckInAndRemovalRoundTrip -count=1 退出 0，动态 TCP DSN 下 npm run verify:backend 退出 0。环境预检 --check-only 退出 2（native_browser_approval_required），原生批准后的 .cache/venv/bin/python .agent-run/browser_probe.py 退出 0，桌面与手机 smoke 均通过。source .cache/env && GH32_OUTPUT=./acceptance .cache/venv/bin/python .agent-run/browser_probe.py --run python3 .cache/e2e.py --project=chrome daily-tasks.spec.ts 退出 0（3 项）。source .cache/env && GH32_OUTPUT=./final-regression .cache/venv/bin/python .agent-run/browser_probe.py --run python3 .cache/e2e.py 退出 0，109 项通过，6 项按项目视口和截图条件跳过。source .cache/env && .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/review-check.py 及追加 --entry-only 均退出 0，两个视口用真实 API 创建任务、启动计时、完成打卡并检查会话结束，刷新后仍已完成，入口直接显示我的任务。首次业务运行退出 1，修正重复规则选择器后通过；Unix socket 复验时备份测试因要求 TCP DSN 退出 1，已改回动态 TCP 并完成完整回归。"
+}

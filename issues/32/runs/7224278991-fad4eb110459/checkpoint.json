@@ -1,0 +1,7 @@
+{
+  "status": "blocked",
+  "summary": "浏览器业务命令退出 0；业务证据待核对。",
+  "tests": "命令退出码不代替业务截图、报告和验收项核对。",
+  "risks": "若原生审批拒绝或进程中断，保留成果与原始理由。",
+  "local_tests_passed": false
+}

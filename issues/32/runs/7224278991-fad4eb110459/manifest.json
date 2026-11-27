@@ -1,0 +1,78 @@
+{
+  "approval_comment_id": 7220109340,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/desktop.png",
+      "redacted": false,
+      "sha256": "0e99a905a5f41b1cd6f0287f8f747904fe8377c4710f589246804655d7d39b6d",
+      "size": 177040,
+      "source_path": ".cache/browser-artifacts/desktop.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/mobile.png",
+      "redacted": false,
+      "sha256": "ffbe8cd330512d371dc0090cdeccca396dbfc27101b3218658c172b8b7ef9bbe",
+      "size": 92303,
+      "source_path": ".cache/browser-artifacts/mobile.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "994f74363d44a9e8e016d900147b11644fb27df0597cc3a3bbb2b57d7f80b9b4",
+      "size": 10751
+    },
+    "artifacts/browser-artifacts/desktop.png": {
+      "sha256": "0e99a905a5f41b1cd6f0287f8f747904fe8377c4710f589246804655d7d39b6d",
+      "size": 177040
+    },
+    "artifacts/browser-artifacts/mobile.png": {
+      "sha256": "ffbe8cd330512d371dc0090cdeccca396dbfc27101b3218658c172b8b7ef9bbe",
+      "size": 92303
+    },
+    "checkpoint.json": {
+      "sha256": "db8d04fb7e3493e7f3f765e5e9873cefabc7e61d6ef89cb6e6e870e5ef3492e6",
+      "size": 294
+    },
+    "context.json": {
+      "sha256": "b36ab94933c80c68d508a306d76c385492a2207c39d6a1bc48d236881edbfe7f",
+      "size": 1020
+    },
+    "handoff.json": {
+      "sha256": "f92608366666a1e2478165ec91787bd0f1f95478702d76d3741af09efbd777ec",
+      "size": 3861
+    },
+    "input.json": {
+      "sha256": "41ff14fa30d998f38b8f67a0d44ee16e828fd67aa79f000e7780d992f29457b4",
+      "size": 941
+    }
+  },
+  "head_sha": "46a802da66a3dacb18bdd049a2a7c9e866de3b3c",
+  "issue_number": 32,
+  "omitted": [
+    {
+      "path": ".cache/acceptance/daily-tasks-desktop-daily--34780-oval-disabling-and-deletion-chrome/completed.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/acceptance/daily-tasks-desktop-daily--34780-oval-disabling-and-deletion-chrome/restored.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/acceptance/daily-tasks-mobile-daily-t-9c5b6-oval-disabling-and-deletion-chrome/completed.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/acceptance/daily-tasks-mobile-daily-t-9c5b6-oval-disabling-and-deletion-chrome/restored.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T17:43:15+00:00",
+  "revision": 1,
+  "run_id": "7224278991-fad4eb110459",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "994f74363d44a9e8e016d900147b11644fb27df0597cc3a3bbb2b57d7f80b9b4",
+  "start_comment_id": 7224278991,
+  "status": "ready_for_review"
+}
