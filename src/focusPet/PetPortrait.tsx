@@ -45,10 +45,10 @@ export function PetPortrait({ animal, mood, wearing = {} }: {
       {animal === "cat" && <path stroke="#bd7747" strokeWidth="3" d="m39 24 2 6m7-7v8m9-7-2 6"/>}
       {animal === "shiba" && <g fill="#ffe6c5" stroke="none"><ellipse cx="34" cy="37" rx="4" ry="2"/><ellipse cx="62" cy="37" rx="4" ry="2"/></g>}
       <g fill="none" stroke="#453e38" strokeWidth="2.6">
-        {mood === "dead" ? <path d="m32 41 6 6m0-6-6 6m26-6 6 6m0-6-6 6"/> :
+        {mood === "dead" ? <path d="M31 44q4 5 8 0m18 0q4 5 8 0"/> :
           mood === "eating" ? <path d="M31 46q4-7 8 0m18 0q4-7 8 0"/> :
           mood === "focus" ? <path d="m32 44 7 1m18 0 7-1"/> :
-          <g fill="#453e38"><ellipse cx="35" cy="44" rx="1.5" ry={mood === "crisis" ? 1 : 2.2}/><ellipse cx="61" cy="44" rx="1.5" ry={mood === "crisis" ? 1 : 2.2}/></g>}
+          <g className="pet-eyes" fill="#453e38"><ellipse cx="35" cy="44" rx="1.5" ry={mood === "crisis" ? 1 : 2.2}/><ellipse cx="61" cy="44" rx="1.5" ry={mood === "crisis" ? 1 : 2.2}/></g>}
         {(mood === "hungry" || mood === "crisis") && <path d="m31 39 6-2m22 0 6 2"/>}
       </g>
       <g fill="#e99883" opacity=".62" stroke="none"><ellipse cx="29" cy="51" rx="5" ry="2"/><ellipse cx="67" cy="51" rx="5" ry="2"/></g>

@@ -26,3 +26,30 @@ export function placePet(point: Position, width: number, height: number, vw: num
   }
   return best;
 }
+
+// Find the tallest available vertical gap at the pet's side or along a control's edge.
+export function placeHouse(anchor: Position, vw: number, vh: number, obstacles: Obstacle[]) {
+  const width = Math.min(402, vw - 20);
+  const edge = 10;
+  const limit = 552;
+  const preferred = anchor.x + 37 - width / 2;
+  const candidates = [preferred, edge, vw - width - edge, ...obstacles.flatMap(r => [r.right + 5, r.left - width - 5])];
+  let best = { left: edge, top: edge, width, maxHeight: 0 };
+  let score = -Infinity;
+  for (const candidate of candidates) {
+    const left = Math.max(edge, Math.min(candidate, vw - width - edge));
+    const blockers = obstacles.filter(r => r.right > left && r.left < left + width).sort((a, b) => a.top - b.top);
+    let start = edge;
+    for (const end of [...blockers, { top: vh - edge + 5, bottom: vh }]) {
+      const height = Math.min(limit, end.top - 5 - start);
+      if (height > 0) {
+        const top = Math.max(start, Math.min(anchor.y - height / 2, end.top - 5 - height));
+        const distance = Math.hypot(left - preferred, top + height / 2 - anchor.y);
+        const rank = height * 10 - distance * 0.1;
+        if (rank > score) { best = { left, top, width, maxHeight: height }; score = rank; }
+      }
+      start = Math.max(start, end.bottom + 5);
+    }
+  }
+  return best;
+}
