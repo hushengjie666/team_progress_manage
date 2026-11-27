@@ -1,73 +1,66 @@
 import { useState } from "react";
+import { Coins, Pencil } from "lucide-react";
 import { todayKey } from "../seed";
-import { foods, outfits, slots, species, type Species } from "./catalog";
+import { foods, outfits, species, type Outfit } from "./catalog";
 import { condition, type PetAction, type PetState } from "./model";
 import { PetPortrait, type Mood } from "./PetPortrait";
+import { PetAdoption } from "./PetAdoption";
+import { PetInventory, type Section, type Shelf } from "./PetInventory";
+import { RoomArt } from "./PetArtwork";
+import { EnergyBar, PetEffects, usePetReaction } from "./PetInteraction";
 
 export type PetHouseProps = {
   state: PetState; time: number; mood: Mood; busy: boolean;
   send: (action: PetAction) => Promise<boolean>;
 };
 
-function Adoption({ send, busy, again }: Pick<PetHouseProps, "send" | "busy"> & { again: boolean }) {
-  const [animal, setAnimal] = useState<Species>("penguin");
-  const [name, setName] = useState("");
-  return <form className="pet-adoption" onSubmit={event => { event.preventDefault(); void send({ kind: "adopt", species: animal, name }); }}>
-    <fieldset><legend>选择你的专注伙伴</legend><div className="pet-breeds">
-      {(Object.keys(species) as Species[]).map(id => <label key={id}>
-        <input type="radio" name="pet-breed" checked={animal === id} onChange={() => setAnimal(id)}/>
-        <PetPortrait animal={id} mood="happy"/>{species[id]}</label>)}
-    </div></fieldset>
-    <label>宠物昵称<input maxLength={24} required value={name} onChange={event => setName(event.target.value)} placeholder="给伙伴起个名字"/></label>
-    <button className="pet-primary" disabled={busy || !name.trim()}>{again ? "重新申领新宠物" : "领养伙伴"}</button>
-  </form>;
-}
-
-const tabs = ["喂食背包", "食物商店", "衣服商店", "衣橱换装", "改名"] as const;
-export function PetHouse({ state, time, mood, busy, send }: PetHouseProps) {
-  const [tab, setTab] = useState<typeof tabs[number]>("喂食背包");
-  const [name, setName] = useState("");
+export function PetHouse({ state, time, mood, busy, send, initialTab }: PetHouseProps & { initialTab: Section }) {
+  const [tab, setTab] = useState<Section>(initialTab);
+  const [shelf, setShelf] = useState<Shelf>("food");
+  const [preview, tryOn] = useState<Outfit>();
+  const [rename, setRename] = useState<string>();
+  const { reaction, play } = usePetReaction();
   const { pet } = state;
   const { fullness, dead, days, left } = condition(state, time);
-  if (!pet) return <Adoption send={send} busy={busy} again={false}/>;
-  if (dead) return <><p className="pet-memorial">{pet.name} 已饿死。谢谢你们一起度过的 {days} 天。</p>
-    <p>重新申领后保留衣橱，金币与食物背包清零。</p><Adoption send={send} busy={busy} again/></>;
-  const full = fullness >= 100;
+  if (!pet || dead) return <PetAdoption {...{ state, busy, send, days }}/>;
+  const select = (next: Section, section: Shelf = "food") => { tryOn(undefined); setTab(next); setShelf(section); };
+  const fit = outfits.find(item => item.id === preview);
+  const wearing = fit ? { ...state.wearing, [fit.slot]: fit.id } : state.wearing;
+  const perform = async (action: PetAction) => {
+    const saved = await send(action);
+    if (!saved) return false;
+    if (action.kind === "wear") {
+      tryOn(undefined);
+      play({ kind: "dress", text: "闪亮登场！" });
+    } else if (action.kind === "feed" || (action.kind === "buyFood" && action.serve)) {
+      const points = foods.find(item => item.id === action.food)!.points;
+      play({ kind: "feed", food: action.food, text: "+" + Math.min(points, 100 - Math.ceil(fullness)) + " 饱食度" });
+    }
+    return true;
+  };
   const seconds = Math.ceil(left / 1000);
   const countdown = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
     .map(value => String(value).padStart(2, "0")).join(":");
   return <>
-    <div className="pet-profile"><PetPortrait animal={pet.species} mood={mood} wearing={state.wearing}/>
-      <div><h3>{pet.name}</h3><p>{species[pet.species]} · 已陪伴 {days} 天</p>
-        <strong>{({ happy: "健康饱腹", eating: "吃得好开心", focus: "专注陪伴中", hungry: "有点饿了", crisis: "饥饿危机", dead: "陪伴纪念" })[mood]}</strong></div></div>
-    <label className="pet-meter">饱食度 <b>{Math.ceil(fullness)} / 100</b><progress max={100} value={fullness}/></label>
+    <div className="pet-hud"><div className="pet-wallet"><Coins size={17}/><span aria-label="金币余额"><b>{state.coins}</b></span><small>今日 +<b>{state.earnedDay === todayKey(new Date(time)) ? state.earned : 0}</b></small></div>
+      <div className="pet-meter"><small>饱食度 <b>{Math.ceil(fullness)} / 100</b></small><EnergyBar value={fullness}/></div></div>
     {fullness === 0 && <p className="pet-crisis">饥饿危机 · 距饿死 {countdown}</p>}
-    <div className="pet-wallet"><span>金币余额 <b>{state.coins}</b></span><span>今日产金 <b>{state.earnedDay === todayKey(new Date(time)) ? state.earned : 0}</b></span></div>
-    {state.past > 0 && <p>曾陪伴 {state.past} 位伙伴 · 最长 {state.longest} 天</p>}
-    <div className="pet-tabs">{tabs.map(item => <button key={item} aria-pressed={tab === item} onClick={() => setTab(item)}>{item}</button>)}</div>
-    {tab === "改名" ? <form className="pet-rename" onSubmit={e => { e.preventDefault(); void send({ kind: "rename", name }); }}>
-      <label>新昵称<input value={name} maxLength={24} onChange={e => setName(e.target.value)}/></label>
-      <button disabled={busy || !name.trim()}>保存昵称</button></form> :
-      tab === "喂食背包" || tab === "食物商店" ? <>
-        {tab === "喂食背包" && !foods.some(f => state.bag[f.id]) && <p>背包里还没有食物。专注每满一分钟可获得一枚金币。</p>}
-        {foods.filter(f => tab === "食物商店" || state.bag[f.id]).map(f => <div className="pet-item" key={f.id}>
-          <div><b>{f.name}</b><small>+{f.points} 饱食度 · {tab === "食物商店" ? f.price + " 金币" : "剩余 " + state.bag[f.id] + " 份"}</small></div>
-          {tab === "食物商店" ? <div><button disabled={busy || state.coins < f.price} onClick={() => void send({ kind: "buyFood", food: f.id, serve: false })}>存入背包</button>
-            <button disabled={busy || state.coins < f.price || full} onClick={() => void send({ kind: "buyFood", food: f.id, serve: true })}>买下喂食</button>
-            {state.coins < f.price && <small>还差 {f.price - state.coins} 金币</small>}</div> :
-            <button disabled={busy || full} onClick={() => void send({ kind: "feed", food: f.id })}>喂食</button>}</div>)}
-        {full && <p>饱食度已满，稍后再喂食。</p>}
-      </> : <>
-        {tab === "衣橱换装" && !state.wardrobe.length && <p>衣橱还是空的，去衣服商店看看吧。</p>}
-        {outfits.filter(item => tab === "衣服商店" || state.wardrobe.includes(item.id)).map(item => {
-          const owned = state.wardrobe.includes(item.id);
-          const shop = tab === "衣服商店";
-          return <div className="pet-item" key={item.id}><PetPortrait animal={pet.species} mood="happy" wearing={{ [item.slot]: item.id }}/>
-            <div><b>{item.name}</b><small>{slots[item.slot]} · {item.price} 金币</small></div><div>
-              <button disabled={busy || (shop && (owned || state.coins < item.price))}
-                onClick={() => void send({ kind: shop ? "buyOutfit" : "wear", outfit: item.id })}>
-                {shop ? owned ? "已购买" : "购买" : state.wearing[item.slot] === item.id ? "卸下" : "穿戴"}</button>
-              {shop && !owned && state.coins < item.price && <small>还差 {item.price - state.coins} 金币</small>}</div></div>;
-        })}</>}
+    <div className={'pet-stage stage-' + mood}>
+      <RoomArt mood={mood}/>
+      <span className="pet-stage-label">{fit ? "试穿 · " + fit.name : ({ happy: "晴日小憩", focus: "专注陪伴中", hungry: "肚子有点饿", crisis: "等待投喂", eating: "吃得好开心", dead: "" })[mood]}</span>
+      <button className={'pet-stage-actor action-' + reaction?.kind} aria-label={'摸摸' + pet.name}
+        onClick={() => play({ kind: "pat", text: "最喜欢你啦！" })}>
+        <span key={reaction?.id}><PetPortrait animal={pet.species} mood={reaction?.kind === "pat" ? "eating" : mood} wearing={wearing}/></span>
+      </button><PetEffects reaction={reaction}/>
+    </div>
+    <div className="pet-identity">{rename !== undefined ? <form className="pet-rename" onSubmit={async e => {
+      e.preventDefault(); if (await send({ kind: "rename", name: rename })) setRename(undefined);
+    }}><input autoFocus aria-label="新昵称" maxLength={24} value={rename} onChange={e => setRename(e.target.value)}/>
+      <button disabled={busy || !rename.trim()}>保存昵称</button><button type="button" onClick={() => setRename(undefined)}>取消</button></form> :
+      <><h3>{pet.name}</h3><button aria-label="修改昵称" onClick={() => setRename(pet.name)}><Pencil size={13}/></button>
+        <small>{species[pet.species]} · 陪伴 {days} 天</small></>}
+    </div>
+    {state.past > 0 && <small>曾陪伴 {state.past} 位伙伴 · 最长 {state.longest} 天</small>}
+    <PetInventory {...{ state, busy, tab, shelf, select, preview, tryOn }} send={perform} full={Math.ceil(fullness) >= 100}/>
   </>;
 }
