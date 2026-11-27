@@ -1,0 +1,90 @@
+{
+  "approval_comment_id": 7220361562,
+  "archive_complete": false,
+  "artifacts": [
+    {
+      "path": "artifacts/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-memorial.png",
+      "redacted": false,
+      "sha256": "c4f6c9bbf362d508d95254f4a74f79a0a330ecac3194554d78074331c073112b",
+      "size": 429586,
+      "source_path": ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-memorial.png"
+    },
+    {
+      "path": "artifacts/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-outfits.png",
+      "redacted": false,
+      "sha256": "824c4b9ab33251b8e0bfc06bfaf45ec8cd51473bf95d04e6259db9869305a007",
+      "size": 410856,
+      "source_path": ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-outfits.png"
+    }
+  ],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "4d6c1c0548d6e2ffce63cbb3faffa9b391418a67b2b512ceff954e8d2dfa6e7f",
+      "size": 10294
+    },
+    "artifacts/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-memorial.png": {
+      "sha256": "c4f6c9bbf362d508d95254f4a74f79a0a330ecac3194554d78074331c073112b",
+      "size": 429586
+    },
+    "artifacts/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-outfits.png": {
+      "sha256": "824c4b9ab33251b8e0bfc06bfaf45ec8cd51473bf95d04e6259db9869305a007",
+      "size": 410856
+    },
+    "checkpoint.json": {
+      "sha256": "db8d04fb7e3493e7f3f765e5e9873cefabc7e61d6ef89cb6e6e870e5ef3492e6",
+      "size": 294
+    },
+    "context.json": {
+      "sha256": "c8b8c851fb3be7bc9bc6aa67ae1939ab7e596426bbc7546fc6ffb64471906098",
+      "size": 1023
+    },
+    "handoff.json": {
+      "sha256": "d78e2c95e639141c9eae5fcec296f9e1443f474a6949b40d3d865deba2c5e53c",
+      "size": 5349
+    },
+    "input.json": {
+      "sha256": "4a64ac9f590c4e96cf90ab9e2372e8833ac9aa5116c68595a2ab0102da3ae2b3",
+      "size": 944
+    }
+  },
+  "head_sha": "10f327bea748abf880bc931f9ff2914b3a3f67f0",
+  "issue_number": 33,
+  "omitted": [
+    {
+      "path": ".agent-run/business-results.json",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-readopted.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-ring.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-memorial.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-outfits.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-readopted.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-ring.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T14:29:37+00:00",
+  "revision": 1,
+  "run_id": "7220378900-174d15db8976",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "4d6c1c0548d6e2ffce63cbb3faffa9b391418a67b2b512ceff954e8d2dfa6e7f",
+  "start_comment_id": 7220378900,
+  "status": "ready_for_review"
+}

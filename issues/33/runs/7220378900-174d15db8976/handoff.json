@@ -1,0 +1,32 @@
+{
+  "acceptance_entry": {
+    "checks": [
+      "在柚子的小屋点击舞台宠物，进商店试穿服饰后切回背包，观察表情、试穿还原与投喂反馈。",
+      "关闭小屋，点悬浮宠物唤出轮盘，试用摸摸和快捷喂食，检查气泡、能量槽及按钮是否顺手。"
+    ],
+    "kind": "preview"
+  },
+  "browser_tests": {
+    "artifacts": [
+      ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-memorial.png",
+      ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-outfits.png",
+      ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-readopted.png",
+      ".cache/browser-artifacts/focus-pet-desktop-adopts-e-66058-s-and-inherits-the-wardrobe-chrome/desktop-ring.png",
+      ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-memorial.png",
+      ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-outfits.png",
+      ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-readopted.png",
+      ".cache/browser-artifacts/focus-pet-mobile-adopts-ea-7f1d3-s-and-inherits-the-wardrobe-chrome/mobile-ring.png",
+      ".agent-run/business-results.json"
+    ],
+    "command": ".cache/pw312/bin/python .agent-run/browser_probe.py --retry-after-fix \"收起状态变更时同步测量挂件，消除展开位置的一帧滞后\" --run sh .agent-run/test-browser.sh",
+    "desktop": "passed",
+    "mobile": "passed",
+    "scope": "business_acceptance",
+    "status": "passed"
+  },
+  "local_tests_passed": true,
+  "risks": "验证覆盖隔离 Web 构建和项目模拟后台。现有 CI 定义未变更，真实 GitHub Checks 待宿主发布草稿 PR 后按本次 head SHA 核对。宿主负责提交、推送、草稿 PR 及预览续期。没有数据库及旧存档迁移。未发现尚待修复的范围内缺陷。",
+  "status": "ready_for_review",
+  "summary": "开始工作页新增可拖拽的宠物动作轮盘、迷你饱食/金币 HUD、即时摸头与快捷投喂；空背包直接进入美食商店。宠物小屋采用原创矢量房间、动态表情与互动舞台、定制能量条和三分区道具格，支持原地改名、临时试穿和正式换装反馈。更新领养聚光灯、饥饿倒计时和纪念继承。双端测试覆盖四角视口、顶部导航及任务/计时控件避让、键盘焦点、减少动态效果、旧存档恢复和跨账号隔离。核心领域规则、账号存档格式、后端与数据库沿用 AD-010。",
+  "tests": "环境使用工作区 Node v24.22.3（现有 CI 指定 24）、项目 Playwright JS 1.59.1、Python 3.12 测试环境与 Playwright Python 1.59.0，Chromium headless shell revision 1217、WebKit revision 2272。\n.cache/pw312/bin/python .agent-run/browser_probe.py --check-only 退出 2，native_browser_approval_required。完整命令获批后，.cache/pw312/bin/python .agent-run/browser_probe.py 退出 0。localhost 独立 smoke 的桌面 1365×900、手机 390×844 点击及截图均通过，见 .agent-run/browser-smoke/result.json。\nnpm test -- src/focusPet/model.test.ts src/focusPet/store.test.ts 退出 0，9 项经济、生存、继承和存储回归通过。npm run typecheck、npm run audit:health、npm run verify:fast 均退出 0；738 个文件通过健康审计，93 个单测文件共 397 项通过，Vite 正式构建成功。\n首次临时 npm 包装丢失 --config 已中止（130），改为 npm run test:e2e 直接传参。随后的宠物实点测试暴露手机顶部导航截获关闭按钮（测试命令 1，probe 2）。修正避让区域后以 --retry-after-fix 重跑专测退出 0（5/5）。\n最终布局复核时手机展开挂件后，前一帧的收起宽度造成刷新位置断言失败（focus-pet.spec.ts:141，332 对 298，命令退出 1，probe 2）。现在切换收起状态即在绘制前同步测量。\n.cache/pw312/bin/python .agent-run/browser_probe.py --retry-after-fix \"收起状态变更时同步测量挂件，消除展开位置的一帧滞后\" --run sh .agent-run/test-browser.sh 退出 0。内部命令 npm run test:e2e -- --config .agent-run/pw.config.ts。复用项目测试/设备配置，在工作区独立 localhost 和默认 headless shell 执行。95 项通过、0 失败、0 不稳定，6 项按项目既有设备条件跳过。包含宠物桌面及手机流程、四角、跨设备/账号、专注页稳定性、快捷完成、每日名言和三种 WebKit 手机规格。见 .agent-run/business-results.json。\n.cache/pw312/bin/python .agent-run/browser_probe.py --run .cache/pw312/bin/python .cache/pet-review/check.py 退出 0。python3 .agent-run/review_preview.py start --route /pet-house -- .cache/ci-runtime/node_modules/.bin/node .cache/pet-review/serve.mjs '{bind}' '{port}' 退出 0，复用项目测试会话/后台样例与实际构建。\n.cache/pw312/bin/python .agent-run/browser_probe.py --run .cache/pw312/bin/python .cache/pet-review/check.py --url http://127.0.0.1:59420/pet-house 退出 0。干净上下文直接打开专注页小屋、展示样例余额并成功试穿，悬浮本体保留真实装扮。截图 .cache/pet-review/preview.png。"
+}
