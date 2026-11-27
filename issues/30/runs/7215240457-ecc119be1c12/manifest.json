@@ -1,0 +1,55 @@
+{
+  "approval_comment_id": 7215233057,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "779aae27fa293972c97461b5bf77815322ce6c1824939a1a2b8c5919f2bef565",
+      "size": 10195
+    },
+    "checkpoint.json": {
+      "sha256": "1dbdf9e2f13727d075512e21d660d824aa9dff4b177c9043ad205aa53ddf6857",
+      "size": 5289
+    },
+    "context.json": {
+      "sha256": "ddd26937987b178daf71ded0d60bd153e695faa0dd6b429150e78b18e0de6ef5",
+      "size": 1023
+    },
+    "handoff.json": {
+      "sha256": "c507cdeba72587db0ce2e1f84790321fae27d0677ac0942d2269e3e380bfb019",
+      "size": 4789
+    },
+    "input.json": {
+      "sha256": "da0f4382063368ee30a13e6ec0e8770b8d65f8ab1b98a570665e13273db3b9a6",
+      "size": 944
+    }
+  },
+  "head_sha": "3fba446f5b7f85098440cfd2facdff27930aa02d",
+  "issue_number": 30,
+  "omitted": [
+    {
+      "path": ".cache/pet-evidence/desktop-outfits.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/pet-evidence/desktop-readopted.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/pet-evidence/mobile-outfits.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/pet-evidence/mobile-readopted.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-27T10:18:51+00:00",
+  "revision": 1,
+  "run_id": "7215240457-ecc119be1c12",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "779aae27fa293972c97461b5bf77815322ce6c1824939a1a2b8c5919f2bef565",
+  "start_comment_id": 7215240457,
+  "status": "ready_for_review"
+}

@@ -1,0 +1,53 @@
+{
+  "status": "ready_for_review",
+  "summary": "完成 GH-30 批准正文的 5 组验收。开始工作页提供企鹅、橘猫、柴犬的申领、拖拽避让、收展、改名和宠物小屋。按真实专注时间每 60 秒产 1 金币，保留余毫秒；暂停、休息期间停止。24 小时消耗 100 饱食度，持续为零超过 48 小时死亡；可在危机内喂食恢复。提供 4 种食物、3 个槽位共 9 件原创 SVG 装扮。重新申领清空金币和食物、继承衣橱、记录历史。复用 account_settings 和按服务器、账号区分的缓存，使用事务内版本检查防止覆盖并发交易。未新增数据库迁移。",
+  "tests": "Node 24.22.3（CI 24）：npm test -- src/focusPet（9 项）、npm run typecheck、npm run typecheck:unused、npm run verify:fast（93 个文件、397 项通过并构建成功）、npm run audit:health（733 个文件）、git diff --check 均退出 0。Go 模块声明 1.22，实际使用 Go 1.22.12 在 team-server 执行 go build -o ../.cache/team-server-go122 .，退出 0。匹配 CI 的 Go 1.26.11 在 team-server 执行 go test ./...，退出 0，默认未指定 DSN 的数据库用例按仓库条件跳过。python3 .cache/verify-mysql.py 单独在临时 MySQL 8.0 上执行 go test -count=1 -v -run \"TestMySQLAccountSettingsKeepConcurrentNamespacesAndAccountsSeparate|TestFocusPetRevision\" ./...，退出 0；并发同版本写入一个成功、一个 409、其他字段与账号隔离，测试后已停止并移除容器。浏览器预检 --check-only 按设计退出 2，原生获批 smoke 退出 0。最终完整 Playwright 命令见 browser_tests，退出 0；93 通过，6 项横屏/文字缩放/截图按既有的设备筛选跳过。预览 .cache/probe-venv/bin/python .agent-run/browser_probe.py --run .cache/probe-venv/bin/python .cache/verify-preview.py http://127.0.0.1:63400/focus 退出 0；桌面及手机的新隔离会话直达宠物小屋，购买、穿戴、刷新恢复成功，所有 HTTP 请求均为预览同源。",
+  "risks": "前后端应一起发布以启用宠物旧版本写入的 409 检查，数据库无需迁移。本次验证针对 Web 业务和共享 Go 接口。没有新增或改动 CI；远端 CI 由宿主发布草稿 PR 后针对该 PR 的 head SHA 核对。人工入口为 loopback 隔离样例，由宿主续期。正式账号和生产数据未参与测试。",
+  "local_tests_passed": true,
+  "browser_smoke": {
+    "scope": "environment_smoke",
+    "status": "passed",
+    "command": ".cache/probe-venv/bin/python .agent-run/browser_probe.py",
+    "exit_code": 0,
+    "desktop": "passed",
+    "mobile": "passed",
+    "artifacts": [
+      ".agent-run/browser-smoke/desktop.png",
+      ".agent-run/browser-smoke/mobile.png"
+    ]
+  },
+  "browser_tests": {
+    "scope": "business_acceptance",
+    "status": "passed",
+    "command": "env PATH=\"$PWD/.cache/node-runtime/node_modules/node/bin:$PATH\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"拖拽到刷新前后均空闲位置，同时独立断言计时和任务控件无重叠\" --run node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts",
+    "desktop": "passed",
+    "mobile": "passed",
+    "exit_code": 0,
+    "artifacts": [
+      ".cache/pet-evidence/desktop-outfits.png",
+      ".cache/pet-evidence/desktop-readopted.png",
+      ".cache/pet-evidence/mobile-outfits.png",
+      ".cache/pet-evidence/mobile-readopted.png"
+    ],
+    "report": ".cache/e2e-accepted.log"
+  },
+  "acceptance_entry": {
+    "kind": "preview",
+    "url": "http://127.0.0.1:63400/focus",
+    "checks": [
+      "拖动、收起并展开挂件，观察它与番茄钟、任务操作之间的距离，以及窄屏小屋的可读性。",
+      "用样例金币购买一件装扮，在衣橱穿戴后查看挂件外观；喂一份食物，观察进食表情和饱食度反馈。"
+    ]
+  },
+  "preview_command": "python3 .agent-run/review_preview.py start --route /focus -- .cache/node-runtime/node_modules/node/bin/node .cache/review-server.mjs '{bind}' '{port}'",
+  "resolved_verification_issues": [
+    "第一次 Go 编译因 GOROOT 1.26.3 与 1.26.11 不同而退出 1。固定匹配的 GOROOT 后通过。",
+    "第一次健康审计因提示文案命中旧数据流标记而退出 1。调整为后台连接状态提示，审计通过。",
+    "首次带 npm 分隔符的业务 probe 参数解析退出 2，改为直接执行项目 Playwright CLI。",
+    "早期测试夹具在 bootstrap 返回未开始的任务快照，双视口长专注断言退出 1。夹具保留工作时段后通过。",
+    "加入控件避让后，桌面测试要求刷新后停在新布局已被占用的位置，退出 1。最终测试分别验证空闲位置持久化与核心控件无重叠，完整套件通过。"
+  ],
+  "stage": "completed",
+  "command": "env PATH=\"$PWD/.cache/node-runtime/node_modules/node/bin:$PATH\" .cache/probe-venv/bin/python .agent-run/browser_probe.py --retry-after-fix \"拖拽到刷新前后均空闲位置，同时独立断言计时和任务控件无重叠\" --run node node_modules/@playwright/test/cli.js test --config .cache/playwright.config.ts",
+  "resume_point": "交给宿主续期预览、暂存任务范围文件和发布草稿 PR。"
+}
