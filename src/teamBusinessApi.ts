@@ -1,4 +1,4 @@
-import { withoutDailyQuoteSettings } from "./dailyQuotes/accountSettingKey";
+import { withoutAccountOwnedSettings } from "./accountSettingKeys";
 import { applyTeamStateLoadFailure } from "./appBoot";
 import { mergeBusinessRowsIntoState, type BusinessRow } from "./teamBusinessRows";
 import type { AppState } from "./types";
@@ -36,7 +36,7 @@ export async function loadTeamData(local: AppState): Promise<AppState> {
     throw error;
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
-  const settings = { ...merged.settings, ...withoutDailyQuoteSettings(payload.settings ?? {}) };
+  const settings = { ...merged.settings, ...withoutAccountOwnedSettings(payload.settings ?? {}) };
   const account = mapAccount(payload.account);
   const mergedWithAccount: AppState = {
     ...merged,

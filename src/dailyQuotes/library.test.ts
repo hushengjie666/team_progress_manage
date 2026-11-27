@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cacheQuoteSettings, readCachedQuoteSettings } from "./accountSettings";
-import { withoutDailyQuoteSettings } from "./accountSettingKey";
+import { withoutAccountOwnedSettings } from "../accountSettingKeys";
 import { builtInQuotes } from "./builtInQuotes";
 import { defaultQuoteSettings, normalizeQuoteText, quoteLibrary, readQuoteSettings, validateQuoteFields } from "./library";
 
@@ -58,7 +58,7 @@ describe("daily quote library", () => {
       { ...defaults, custom: [{ ...fields, id: "custom-1", text: builtInQuotes[0].text }] }]) {
       expect(readQuoteSettings(raw)).toBeUndefined();
     }
-    expect(withoutDailyQuoteSettings({ dailyQuotes: defaults, focusMinutes: 25 })).toEqual({ focusMinutes: 25 });
+    expect(withoutAccountOwnedSettings({ dailyQuotes: defaults, focusMinutes: 25 })).toEqual({ focusMinutes: 25 });
   });
 
   it("keys cached settings by backend and account, with separate invalid and missing states", () => {

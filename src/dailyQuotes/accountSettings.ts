@@ -1,7 +1,7 @@
 import type { BackendConnectionState } from "../types";
 import { apiUrl, authHeaders, requestJson } from "../teamBackendHttp";
 import { submitTeamDomainCommand } from "../teamDomainCommands";
-import { DAILY_QUOTES_SETTING } from "./accountSettingKey";
+import { DAILY_QUOTES_SETTING } from "../accountSettingKeys";
 import { readQuoteSettings, type DailyQuoteSettings } from "./library";
 
 const cacheKey = (serverUrl: string, accountId: string) =>
