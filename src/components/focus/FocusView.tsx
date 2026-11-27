@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CompleteTask } from "../../appTaskActionsTypes";
 import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../../types";
 import { FocusDailyQuote } from "./FocusDailyQuote";
@@ -16,8 +17,7 @@ export function FocusView(props: {
   finishTimer: (outcome: SessionOutcome) => Promise<void>;
   addInterruption: (type: InterruptionType, action?: InterruptionAction) => void;
   completeTask: CompleteTask;
-  openCreateTask: () => void;
-  canCreateTask: boolean;
+  quickTaskButton: ReactNode;
 }) {
   const { state, currentTask, committedTasks } = props;
   const active = state.activeTimer;
@@ -63,8 +63,7 @@ export function FocusView(props: {
           taskCount={todayWorkTasks.length}
           activeTaskId={activeTaskId}
           beginTimer={props.beginTimer}
-          openCreateTask={props.openCreateTask}
-          canCreateTask={props.canCreateTask}
+          quickTaskButton={props.quickTaskButton}
           saving={state.backend.pendingResourceKeys?.some((key) => key.startsWith("daily-plan:")) ?? false}
         />
       </aside>

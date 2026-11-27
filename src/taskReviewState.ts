@@ -1,3 +1,4 @@
+import { localDateForTimestamp } from "./appClock";
 import { uid } from "./seed";
 import { endActiveWorkSessionsForTaskInState } from "./workSessionTransitions";
 import type { AppState, Task } from "./types";
@@ -12,7 +13,20 @@ export function submitTaskForReviewInState(
   taskId: string,
   submitterMemberId: string | undefined,
   timestamp = new Date().toISOString(),
+  date = localDateForTimestamp(timestamp),
 ): AppState {
+  const daily = state.tasks.find((item) => item.id === taskId && item.isDaily);
+  if (daily) {
+    if (!date || daily.status === "archived" || daily.status === "split" || daily.dailyCompletedDates?.includes(date)) return state;
+    const ended = endActiveWorkSessionsForTaskInState(state, taskId, timestamp, {
+      reason: "daily_check_in", clearActiveTimer: true,
+      activeTimerWorkSessionId: state.activeTimer?.workSessionId,
+      activeTimerTotalPausedSeconds: state.activeTimer?.totalPausedSeconds,
+    });
+    return { ...ended, updatedAt: timestamp, tasks: ended.tasks.map((item) => item.id === taskId
+      ? { ...item, status: "pool", dailyCompletedDates: [...(item.dailyCompletedDates ?? []), date], updatedAt: timestamp }
+      : item) };
+  }
   const canSubmitForReview = (task: Task) => task.status === "committed" || task.status === "in_progress";
   const shouldEndActiveWork = state.tasks.some((task) => task.id === taskId && canSubmitForReview(task));
   const submitted = {

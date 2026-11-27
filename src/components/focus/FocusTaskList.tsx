@@ -1,7 +1,7 @@
 import { useCompletionFeedback } from "../completion/CompletionFeedback";
 import type { CompleteTask } from "../../appTaskActionsTypes";
-import { useEffect, useState, type MouseEvent } from "react";
-import { Check, CircleCheck, Clock3, Play, Plus, Timer } from "lucide-react";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { Check, CircleCheck, Clock3, Play, Timer } from "lucide-react";
 import { projectToneClassName } from "../../projectVisuals";
 import type { SessionMode, Task } from "../../types";
 import type { FocusTaskGroup } from "./focusModel";
@@ -14,8 +14,7 @@ export function FocusTaskList(props: {
   taskCount: number;
   activeTaskId?: string;
   beginTimer: (mode: SessionMode, taskId?: string) => Promise<void>;
-  openCreateTask: () => void;
-  canCreateTask: boolean;
+  quickTaskButton: ReactNode;
   saving: boolean;
 }) {
   const completedCount = props.groups.reduce((count, group) =>
@@ -30,9 +29,7 @@ export function FocusTaskList(props: {
           )}
         </div>
         <span className="focus-save-status" role="status">{props.saving && "今日工作 · 保存中…"}</span>
-        <button className="icon-button small" title={props.canCreateTask ? "快捷新增今日任务" : "暂无可用项目，请先创建项目"} aria-label="快捷新增今日任务" disabled={!props.canCreateTask} onClick={props.openCreateTask}>
-          <Plus size={20} />
-        </button>
+        {props.quickTaskButton}
       </div>
       <div className="focus-todo-list">
         {props.taskCount === 0 && <p className="empty">今日任务为空，可点击右上角新增任务，或去我的任务选择要推进的任务。</p>}
@@ -91,7 +88,7 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
   return (
     <article className={active ? "focus-todo-item active" : "focus-todo-item"} data-status={task.status}>
       <strong>{task.title}</strong>
-      <span className="focus-todo-meta">{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
+      <span className="focus-todo-meta">{task.isDaily && <span className="task-inline-chip">日常</span>} {task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
       <div className="focus-todo-actions" aria-live="polite" onKeyDown={(event) => {
         if (event.key === " ") event.stopPropagation();
       }}>

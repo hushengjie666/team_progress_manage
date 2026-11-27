@@ -29,6 +29,7 @@ export const createProjectTaskInState = (
     tags: input.tags ?? [],
     projectId: project.id,
     project: project.name,
+    creatorAccountId: state.auth.account?.id,
     creatorMemberId: resolveMemberIdForProject(state, project.id),
     primaryExecutorMemberId: input.primaryExecutorMemberId || undefined,
     collaboratorMemberIds: input.collaboratorMemberIds?.filter((id) => id !== input.primaryExecutorMemberId) ?? [],
@@ -44,7 +45,8 @@ export const createProjectTaskInState = (
     ...emptyTaskDefaults(timestamp, Date.now()),
     dueAt: input.dueAt,
     reminderAt: input.reminderAt,
-    repeatRule: input.repeatRule ?? "none",
+    isDaily: input.isDaily,
+    repeatRule: input.isDaily ? "none" : input.repeatRule ?? "none",
     repeatIntervalDays: input.repeatIntervalDays,
     subtasks: (input.subtasks ?? [])
       .map((title) => title.trim())

@@ -1,3 +1,4 @@
+import { withDailyTasks } from "./dailyTasks";
 import { defaultReview, suggestedTasks } from "./domain";
 import type { AppState, DailyPlan } from "./types";
 import { nowIso, today } from "./appClock";
@@ -29,9 +30,7 @@ export const createDailyPlanForDate = (
   updatedAt: timestamp,
 });
 
-export const getTodayPlan = (state: AppState): DailyPlan => {
-  const todayDate = today();
+export const getTodayPlan = (state: AppState, todayDate = today()): DailyPlan => {
   const existing = combinedCurrentAccountDailyPlanForDate(state, todayDate) ?? currentAccountDailyPlanForDate(state, todayDate);
-  if (existing) return existing;
-  return createDailyPlanForDate(state, todayDate);
+  return withDailyTasks(state, existing ?? createDailyPlanForDate(state, todayDate));
 };

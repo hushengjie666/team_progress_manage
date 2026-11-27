@@ -39,6 +39,7 @@ export interface Task {
   tags: string[];
   projectId: string;
   project: string;
+  creatorAccountId?: string;
   creatorMemberId?: string;
   primaryExecutorMemberId?: string;
   collaboratorMemberIds?: string[];
@@ -53,6 +54,9 @@ export interface Task {
   status: TaskStatus;
   dueAt?: string;
   reminderAt?: string;
+  isDaily?: boolean;
+  dailyCompletedDates?: string[];
+  dailyRemovedDates?: Record<string, string>;
   repeatRule?: RepeatRule;
   repeatIntervalDays?: number;
   repeatWeekdays?: number[];

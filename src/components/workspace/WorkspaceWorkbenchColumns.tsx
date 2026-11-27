@@ -1,5 +1,5 @@
 import type { CompleteTask } from "../../appTaskActionsTypes";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronRight, Play } from "lucide-react";
 import type { WorkspaceViewModel } from "../../workbenchModel";
 import type { ActiveTimer, Task } from "../../types";
@@ -7,6 +7,7 @@ import { MyProjectTaskFilterPanel } from "./MyProjectTaskFilterPanel";
 import { TaskColumn } from "./WorkbenchTaskColumns";
 
 type WorkspaceWorkbenchColumnsProps = {
+  quickTaskButton: ReactNode;
   myProjectTaskCards: WorkspaceViewModel["myProjectTaskCards"];
   poolWorkbenchTasks: Task[];
   committedWorkbenchTasks: Task[];
@@ -29,6 +30,7 @@ const isUnassignedTask = (task: Task) =>
   !task.primaryExecutorMemberId && (task.collaboratorMemberIds ?? []).length === 0;
 
 export function WorkspaceWorkbenchColumns({
+  quickTaskButton,
   myProjectTaskCards,
   poolWorkbenchTasks,
   committedWorkbenchTasks,
@@ -100,6 +102,7 @@ export function WorkspaceWorkbenchColumns({
 
       <TaskColumn
         title="工作队列"
+        titleAccessory={quickTaskButton}
         eyebrow="今日准备执行"
         tasks={committedWorkbenchTasks}
         empty={selectedWorkbenchProjectIds.length > 0 ? "所选项目里暂无今日准备执行的任务。" : "暂无今日准备执行的任务。"}

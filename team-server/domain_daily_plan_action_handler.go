@@ -54,7 +54,13 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 		writeError(w, http.StatusNotFound, "daily plan not found")
 		return
 	}
-	if !found && action == "add-task" {
+	taskPayload, payloadErr := rowPayloadObject(task)
+	if taskFound && payloadErr != nil {
+		writeError(w, http.StatusBadRequest, "invalid task payload")
+		return
+	}
+	daily := taskPayload["isDaily"] == true
+	if !found && (action == "add-task" || (daily && action == "remove-task")) {
 		now := time.Now().UTC().Format(time.RFC3339Nano)
 		date := strings.TrimSpace(req.Date)
 		if date == "" && len(planID) >= 10 {
@@ -111,15 +117,23 @@ func (a *app) handleDailyPlanAction(w http.ResponseWriter, r *http.Request, auth
 	payload["committedTaskIds"] = ids
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	if taskFound {
-		taskPayload, err := rowPayloadObject(task)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, "invalid task payload")
-			return
-		}
 		if action == "add-task" && stringField(task.Payload, "status") == "pool" {
 			taskPayload["status"] = "committed"
 		}
-		if action == "remove-task" && stringField(task.Payload, "status") == "committed" {
+		if daily {
+			removed, _ := taskPayload["dailyRemovedDates"].(map[string]any)
+			if removed == nil {
+				removed = map[string]any{}
+			}
+			date := stringField(row.Payload, "date")
+			if action == "remove-task" {
+				removed[auth.AccountID] = date
+			} else if action == "add-task" && removed[auth.AccountID] == date {
+				delete(removed, auth.AccountID)
+			}
+			taskPayload["dailyRemovedDates"] = removed
+		}
+		if !daily && action == "remove-task" && stringField(task.Payload, "status") == "committed" {
 			taskPayload["status"] = "pool"
 		}
 		if err := savePayloadObject(r.Context(), tx, task, taskPayload, now); err != nil {

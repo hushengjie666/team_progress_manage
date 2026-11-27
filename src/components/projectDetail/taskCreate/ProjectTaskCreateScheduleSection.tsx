@@ -51,10 +51,15 @@ export function ProjectTaskCreateScheduleSection({
           />
         </label>
         <label>
+          <input type="checkbox" checked={Boolean(draft.isDaily)} disabled={!canEdit}
+            onChange={(event) => setDraft({ ...draft, isDaily: event.target.checked, repeatRule: "none" })} />
+          日常任务
+        </label>
+        <label>
           重复
           <select
             value={repeatRule}
-            disabled={!canEdit}
+            disabled={!canEdit || draft.isDaily}
             onChange={(event) => setDraft({ ...draft, repeatRule: event.target.value as RepeatRule })}
           >
             <option value="none">不重复</option>

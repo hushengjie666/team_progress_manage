@@ -1,3 +1,4 @@
+import { dailyTaskForDate } from "./dailyTasks";
 import { resolveCurrentMember } from "./memberIdentity";
 import { filterTodayCommittedTasksForMember } from "./projectOverview";
 import type { ActiveTimer, AppState, DailyPlan, ProjectMember, Task } from "./types";
@@ -5,7 +6,8 @@ import type { ActiveTimer, AppState, DailyPlan, ProjectMember, Task } from "./ty
 export const committedTasksForPlan = (state: AppState, todayPlan: DailyPlan): Task[] =>
   todayPlan.committedTaskIds
     .map((id) => state.tasks.find((task) => task.id === id))
-    .filter((task): task is Task => task !== undefined && task.status !== "split" && task.status !== "archived");
+    .filter((task): task is Task => task !== undefined && task.status !== "split" && task.status !== "archived")
+    .map((task) => dailyTaskForDate(task, todayPlan.date));
 
 export const currentMemberForState = (state: AppState): ProjectMember | undefined => resolveCurrentMember(state);
 

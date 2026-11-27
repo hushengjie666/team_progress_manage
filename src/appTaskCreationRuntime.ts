@@ -124,10 +124,12 @@ export function createAppTaskCreationRuntime({
     const task = source.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const workspaceId = workspaceIdForTask(source, task);
-    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, today());
+    const date = today();
+    const plan = currentAccountDailyPlanForWorkspaceDate(source, workspaceId, date) ??
+      (task.isDaily ? createDailyPlanForDate(source, date, nowIso(), workspaceId) : undefined);
     if (plan) {
       const timestamp = nowIso();
-      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId } }, {
+      void runTeamCommand({ kind: "action", resource: "daily-plans", id: plan.id, action: "remove-task", workspaceId, payload: { task_id: taskId, date } }, {
         resourceKey: `daily-plan:${plan.id}`,
         pendingMode: "background",
         optimistic: (current) => ({
@@ -136,9 +138,13 @@ export function createAppTaskCreationRuntime({
             dailyPlans: current.dailyPlans.map((item) => item.id === plan.id
               ? { ...item, committedTaskIds: item.committedTaskIds.filter((id) => id !== taskId), updatedAt: timestamp }
               : item),
-            tasks: current.tasks.map((item) => item.id === taskId && item.status === "committed"
-              ? { ...item, status: "pool", updatedAt: timestamp }
-              : item),
+            tasks: current.tasks.map((item) => {
+              if (item.id !== taskId) return item;
+              if (item.isDaily && source.auth.account) return {
+                ...item, dailyRemovedDates: { ...item.dailyRemovedDates, [source.auth.account.id]: date }, updatedAt: timestamp,
+              };
+              return item.status === "committed" ? { ...item, status: "pool", updatedAt: timestamp } : item;
+            }),
           },
           rollback: (latest) => ({
             ...latest,

@@ -106,7 +106,7 @@ export const claimTodayPlanTasksForCurrentMemberInState = (state: AppState, plan
   let changed = false;
   for (const taskId of plan.committedTaskIds) {
     const task = nextState.tasks.find((item) => item.id === taskId);
-    if (!task || taskHasAssignee(task)) continue;
+    if (!task || task.isDaily || taskHasAssignee(task)) continue;
     const withMember = ensureCurrentProjectMemberForTask(nextState, task, timestamp);
     if (!withMember.memberId) continue;
     nextState = {

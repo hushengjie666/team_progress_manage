@@ -52,8 +52,13 @@ export function TaskDetailScheduleSection({ task, canEdit, updateTask }: TaskDet
           />
         </label>
         <label>
+          <input type="checkbox" checked={Boolean(task.isDaily)} disabled={!canEdit}
+            onChange={(event) => updateTask(task.id, { isDaily: event.target.checked, repeatRule: "none" })} />
+          日常任务
+        </label>
+        <label>
           重复
-          <select value={task.repeatRule ?? "none"} disabled={!canEdit} onChange={(event) => updateTask(task.id, { repeatRule: event.target.value as RepeatRule })}>
+          <select value={task.repeatRule ?? "none"} disabled={!canEdit || task.isDaily} onChange={(event) => updateTask(task.id, { repeatRule: event.target.value as RepeatRule })}>
             <option value="none">不重复</option>
             <option value="daily">每天</option>
             <option value="weekly">每周</option>

@@ -1,3 +1,4 @@
+import { dailyTaskBelongsToAccount } from "../../dailyTasks";
 import { canManageWorkspace, workspaceIdForProject } from "../../workspaceAccess";
 import { calculateRemaining, completedFocusSessions } from "../../domain";
 import type { ActiveTimer, AppState, SessionMode, Task } from "../../types";
@@ -56,6 +57,7 @@ export function focusCompletionLabel(state: AppState, task: Task) {
   const project = state.projects.find((item) => item.id === task.projectId);
   const account = state.auth.account;
   if (!project || !account) return;
+  if (task.isDaily && dailyTaskBelongsToAccount(state, task)) return "完成";
   const workspaceId = task.workspaceId ?? workspaceIdForProject(state, project);
   const canSubmit = (workspaceId && canManageWorkspace(state, workspaceId)) || state.projectMembers.some((member) => {
     if (member.projectId !== project.id || member.accountId !== account.id || member.status !== "active") return false;
@@ -63,5 +65,5 @@ export function focusCompletionLabel(state: AppState, task: Task) {
     return member.roles.includes("project_owner") || (member.roles.includes("executor") && assigned);
   });
   if (!canSubmit) return;
-  return project.autoAcceptCompletedTasks === false ? "提交验收" : "完成";
+  return !task.isDaily && project.autoAcceptCompletedTasks === false ? "提交验收" : "完成";
 }

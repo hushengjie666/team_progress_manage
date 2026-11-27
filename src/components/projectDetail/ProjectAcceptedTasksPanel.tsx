@@ -42,6 +42,7 @@ export function ProjectAcceptedTasksPanel(props: {
                 </span>
                 <div className="project-accepted-main">
                   <strong>{task.title}</strong>
+                  {task.isDaily && <span className="task-inline-chip">日常</span>}
                   <span>{executorName} · {labelTaskStage[task.stage]} · {labelPriority[task.priority]} · {task.actualPomodoros}/{task.estimatePomodoros} 番茄</span>
                 </div>
                 <div className="project-accepted-time">

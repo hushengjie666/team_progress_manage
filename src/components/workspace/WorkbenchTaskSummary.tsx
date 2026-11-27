@@ -19,6 +19,7 @@ export function WorkbenchTaskSummary({
           <strong>{task.title}</strong>
         </div>
         <div className="task-title-badges">
+          {task.isDaily && <span className="task-inline-chip">日常</span>}
           {task.status === "pending_review" && (
             <span className="task-state-chip review-state">
               <Check size={13} />
