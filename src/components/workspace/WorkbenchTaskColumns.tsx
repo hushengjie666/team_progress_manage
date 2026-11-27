@@ -1,3 +1,4 @@
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import type React from "react";
 import { useState } from "react";
 import type { ActiveTimer, Task } from "../../types";
@@ -14,7 +15,7 @@ export function TaskColumn(props: {
   onAction: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
-  onComplete?: (taskId: string) => void;
+  onComplete?: CompleteTask;
   onAccept?: (taskId: string) => void;
   canReviewTask?: (task: Task) => boolean;
   onSelect?: (taskId: string) => void;

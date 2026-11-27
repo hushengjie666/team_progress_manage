@@ -211,7 +211,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .focus-todo-actions .just-completed {
-    animation: focus-completion 380ms ease-out;
+    animation: focus-completion 510ms ease-out;
   }
 
   .focus-todo-actions .just-completed svg path {
@@ -219,9 +219,34 @@
     animation: focus-completion-check 260ms ease-out;
   }
 
+  .focus-todo-item:has(.just-completed) {
+    position: relative;
+    overflow: hidden;
+    animation: focus-card-settle 450ms ease-out;
+  }
+
+  .focus-todo-item:has(.just-completed)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 20%, #fff9 48%, transparent 72%);
+    animation: focus-card-shine 480ms ease-out both;
+  }
+
+  @keyframes focus-card-settle {
+    0% { transform: scale(0.985); }
+    42% { transform: translateY(-1px); }
+    100% { transform: none; }
+  }
+  @keyframes focus-card-shine {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(100%); }
+  }
   @keyframes focus-completion {
-    from { background-color: #b8dfc7; }
-    to { background-color: #e6f2ea; }
+    0% { background-color: #b8dfc7; transform: scale(0.9); }
+    40% { transform: scale(1.07); }
+    100% { background-color: #e8efe8; transform: scale(1); }
   }
 
   @keyframes focus-completion-check {

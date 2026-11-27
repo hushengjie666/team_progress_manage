@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useCompletionFeedback } from "../completion/CompletionFeedback";
+import type { CompleteTask } from "../../appTaskActionsTypes";
+import { useEffect, useState, type MouseEvent } from "react";
 import { Check, CircleCheck, Clock3, Play, Plus, Timer } from "lucide-react";
 import { projectToneClassName } from "../../projectVisuals";
 import type { SessionMode, Task } from "../../types";
@@ -7,7 +9,7 @@ import type { FocusTaskGroup } from "./focusModel";
 export function FocusTaskList(props: {
   groups: FocusTaskGroup[];
   completionLabel: (task: Task) => string | undefined;
-  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  completeTask: CompleteTask;
   pendingResourceKeys?: string[];
   taskCount: number;
   activeTaskId?: string;
@@ -65,12 +67,22 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
   active: boolean;
   pending: boolean;
   completionLabel?: string;
-  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  completeTask: CompleteTask;
   start: () => void;
 }) {
+  const prepareFeedback = useCompletionFeedback();
   const [showFeedback, setShowFeedback] = useState(false);
-  const submit = async () => {
-    const status = await completeTask(task.id);
+  useEffect(() => {
+    if (!showFeedback) return;
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const clearIfReduced = () => { if (motion.matches) setShowFeedback(false); };
+    clearIfReduced();
+    motion.addEventListener("change", clearIfReduced);
+    return () => motion.removeEventListener("change", clearIfReduced);
+  }, [showFeedback]);
+
+  const submit = async (event: MouseEvent<HTMLButtonElement>) => {
+    const status = await completeTask(task.id, prepareFeedback(task.id, event));
     if (status === "completed" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       setShowFeedback(true);
     }
@@ -97,7 +109,7 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
               <button className="small-button focus-start" disabled={pending} onClick={start}><Play size={14} aria-hidden="true" />开始</button>
             )}
             {completionLabel && (
-              <button className="small-button" disabled={pending} onClick={() => void submit()}>
+              <button className="small-button" disabled={pending} onClick={submit}>
                 <Check size={14} aria-hidden="true" />{completionLabel}
               </button>
             )}

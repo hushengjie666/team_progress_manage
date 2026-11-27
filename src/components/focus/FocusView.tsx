@@ -1,3 +1,4 @@
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import type { AppState, InterruptionAction, InterruptionType, SessionMode, SessionOutcome, Task } from "../../types";
 import { FocusDailyQuote } from "./FocusDailyQuote";
 import { FocusCurrentTaskPanel } from "./FocusCurrentTaskPanel";
@@ -14,7 +15,7 @@ export function FocusView(props: {
   resetTimer: () => void;
   finishTimer: (outcome: SessionOutcome) => Promise<void>;
   addInterruption: (type: InterruptionType, action?: InterruptionAction) => void;
-  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  completeTask: CompleteTask;
   openCreateTask: () => void;
   canCreateTask: boolean;
 }) {

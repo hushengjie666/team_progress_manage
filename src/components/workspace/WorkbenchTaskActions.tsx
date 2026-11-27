@@ -1,3 +1,5 @@
+import { useCompletionFeedback } from "../completion/CompletionFeedback";
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import type React from "react";
 import { Activity, ArrowDown, ArrowUp, Check, CircleCheck, PanelRight, Split, Trash2, X } from "lucide-react";
 import type { Task } from "../../types";
@@ -13,7 +15,7 @@ type WorkbenchTaskActionsProps = {
   onAction: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
   onRemove?: (taskId: string) => void;
-  onComplete?: (taskId: string) => void;
+  onComplete?: CompleteTask;
   onAccept?: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
   onSplit?: (taskId: string) => void;
@@ -41,6 +43,7 @@ export function WorkbenchTaskActions({
   canMoveUp,
   canMoveDown,
 }: WorkbenchTaskActionsProps) {
+  const prepareFeedback = useCompletionFeedback();
   const canSplitTask = task.status !== "completed" && task.status !== "split" && task.status !== "archived";
 
   return (
@@ -72,7 +75,7 @@ export function WorkbenchTaskActions({
           </button>
         )}
         {onComplete && canSubmitReview && (
-          <button className="icon-button small" title="完成任务" onClick={() => onComplete(task.id)}>
+          <button className="icon-button small" title="完成任务" onClick={(event) => onComplete(task.id, prepareFeedback(task.id, event))}>
             <Check size={16} />
           </button>
         )}

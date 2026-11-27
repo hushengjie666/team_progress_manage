@@ -68,6 +68,7 @@ for (const mobile of [false, true]) {
       };
       const otherRows = await submitAndReadRows(() => submit.press("Enter"));
       await expect(manual).toContainText("待验收");
+      await expect(page.locator(".completion-overlay")).toHaveCount(0);
       await expect(current).toContainText("执行中");
       await expect(page.locator(".timer-face")).toContainText(activeTask.title);
       await expect(page.locator(".timer-controls").getByRole("button", { name: "暂停" })).toBeVisible();
@@ -128,9 +129,13 @@ test("blocks repeated submission, retries a failure and respects reduced motion"
   await expect(page.getByRole("alert")).toContainText("保存被拒绝");
   await expect(button).toBeEnabled();
   expect(requests).toBe(1);
+  await expect(page.locator(".completion-overlay")).toHaveCount(0);
   await button.press("Space");
   await expect(card).toContainText("已完成");
   expect(requests).toBe(2);
+  await expect(page.locator(".completion-banner")).toContainText("今日任务全部达成");
+  await expect(page.locator(".completion-banner")).toHaveCSS("animation-name", "none");
+  await expect(page.locator(".completion-paper, .completion-ring, .completion-salute")).toHaveCount(0);
   await expect(card.locator(".completed-pill")).toHaveCSS("animation-name", "none");
   await expect(page.locator("body")).not.toHaveAttribute("data-completions", /.+/);
 });

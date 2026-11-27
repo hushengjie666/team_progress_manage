@@ -1,3 +1,5 @@
+import { useCompletionFeedback } from "../completion/CompletionFeedback";
+import type { CompleteTask } from "../../appTaskActionsTypes";
 import { Check, Target } from "lucide-react";
 import type { Task } from "../../types";
 import { PomodoroProgress } from "./PomodoroProgress";
@@ -7,8 +9,9 @@ export function FocusCurrentTaskPanel(props: {
   outsideTodayList: boolean;
   completionLabel?: string;
   saving: boolean;
-  completeTask: (taskId: string) => void;
+  completeTask: CompleteTask;
 }) {
+  const prepareFeedback = useCompletionFeedback();
   const { currentTask } = props;
   const isPendingReview = currentTask?.status === "pending_review";
 
@@ -38,7 +41,7 @@ export function FocusCurrentTaskPanel(props: {
               已提交验收
             </button>
           ) : props.completionLabel && (
-            <button className="small-button" disabled={props.saving} onClick={() => props.completeTask(currentTask.id)}>
+            <button className="small-button" disabled={props.saving} onClick={(event) => props.completeTask(currentTask.id, prepareFeedback(currentTask.id, event))}>
               <Check size={15} />
               {props.completionLabel === "完成" ? "完成任务" : props.completionLabel}
             </button>

@@ -26,12 +26,14 @@ export type AppTaskActionsRuntimeOptions = {
   undoTimerRef: { current: number | null };
 };
 
+export type CompleteTask = (taskId: string, onCompleted?: (saved: AppState) => void) => Promise<Task["status"] | undefined>;
+
 export type AppTaskActionsRuntime = {
   addTask: (projectId?: string) => void;
   createProjectTask: (projectId: string, input: ProjectTaskInput, options?: { notify?: boolean }) => Promise<Task | undefined>;
   commitTask: (taskId: string) => Promise<boolean>;
   removeCommittedTask: (taskId: string) => void;
-  completeTask: (taskId: string) => Promise<Task["status"] | undefined>;
+  completeTask: CompleteTask;
   acceptTask: (taskId: string) => void;
   returnTaskForReview: (taskId: string, reason: string) => void;
   deleteTask: (taskId: string) => void;
