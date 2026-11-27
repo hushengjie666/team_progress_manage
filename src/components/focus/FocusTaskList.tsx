@@ -16,10 +16,17 @@ export function FocusTaskList(props: {
   canCreateTask: boolean;
   saving: boolean;
 }) {
+  const completedCount = props.groups.reduce((count, group) =>
+    count + group.tasks.filter((task) => task.status === "completed").length, 0);
   return (
     <section className="band focus-todo-panel">
       <div className="section-title">
-        <h2>今日任务</h2>
+        <div>
+          <h2>今日任务</h2>
+          {props.taskCount > 0 && (
+            <span className="focus-todo-summary">共 {props.taskCount} 项 · 已完成 {completedCount} 项</span>
+          )}
+        </div>
         <span className="focus-save-status" role="status">{props.saving && "今日工作 · 保存中…"}</span>
         <button className="icon-button small" title={props.canCreateTask ? "快捷新增今日任务" : "暂无可用项目，请先创建项目"} aria-label="快捷新增今日任务" disabled={!props.canCreateTask} onClick={props.openCreateTask}>
           <Plus size={20} />
@@ -70,7 +77,7 @@ function FocusTaskCard({ task, active, pending, completionLabel, completeTask, s
   };
 
   return (
-    <article className={active ? "focus-todo-item active" : "focus-todo-item"}>
+    <article className={active ? "focus-todo-item active" : "focus-todo-item"} data-status={task.status}>
       <strong>{task.title}</strong>
       <span className="focus-todo-meta">{task.actualPomodoros}/{task.estimatePomodoros} 番茄 · {task.progressPercent ?? 0}%</span>
       <div className="focus-todo-actions" aria-live="polite" onKeyDown={(event) => {
