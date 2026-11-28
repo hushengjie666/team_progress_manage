@@ -1,0 +1,43 @@
+{
+  "status": "ready_for_review",
+  "summary": "宠物本体使用独立锚点。常规点击、面板和页面变化不会写位置，主动拖动超过 9px 才保存。默认靠边放置，窄屏首次放在左侧避开任务操作列。快捷栏展示金币、饱食度、已有食品与装扮、库存、槽位和空态商店入口。快捷栏与小屋复用 Pointer Events 拖放与物品按钮。支持命中光环、满饱食提示、试穿、成功动画、取消回退及点击/键盘使用。保存期间防止重复操作。沿用已有账号设置、API 和经济规则。",
+  "tests": "Node v24.22.3，与 CI Node 24 对齐。npm test -- src/focusPet 退出 0，11 项通过。npm run typecheck、npm run typecheck:test、npm run audit:health、npm run verify:fast 和 git diff --check 均退出 0；96 个单测文件、405 项通过，生产构建成功。静态日志 .cache/toolbar-static.log。编码前 .cache/venv/bin/python .agent-run/browser_probe.py --check-only 退出 2，原因 native_browser_approval_required。原生审批后 env TMPDIR=\"$PWD/.cache/tmp\" PLAYWRIGHT_BROWSERS_PATH=\"$PWD/.cache/pw\" .cache/venv/bin/python .agent-run/browser_probe.py 退出 0；桌面与 390×844 手机的 localhost 点击、截图 smoke 均通过，结果 .agent-run/browser-smoke/result.json。source .cache/env && .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/e2e.py --output=.cache/verified-browser 退出 0，完整 Playwright 113 通过、6 项按仓库设备条件跳过。宠物 9 项全通过，含桌面鼠标、390×844 Chromium 真实触摸事件、键盘、两处拖放、三种中断、区域外取消、全饱拒喂、防重、保存失败、拖后刷新、跨设备账号同步隔离及四角零漂移。专注计时器几何、任务完成反馈和移动 WebKit 布局回归通过。日志 .cache/verified-suite.log。实际预览由 .cache/verify-preview.py 在两个新上下文验证默认已登录、有宠物和库存，退出 0，日志 .cache/verified-entry.log。",
+  "risks": "本地验证使用隔离样例账号和浏览器设备模拟。6 个条件跳过属于仓库仅在指定 iPhone 型号执行的横屏、文字缩放与截图用例，对应目标设备已执行。无已知未解决的本轮功能缺陷。宿主负责在 agent/issue-38 提交和发布草稿 PR，按本次提交 SHA 跟踪 GitHub CI。未修改 CI、服务端、原生工程或存档结构。",
+  "local_tests_passed": true,
+  "browser_tests": {
+    "scope": "business_acceptance",
+    "status": "passed",
+    "command": "source .cache/env && .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/e2e.py --output=.cache/verified-browser",
+    "desktop": "passed",
+    "mobile": "passed",
+    "artifacts": [
+      ".cache/verified-browser/focus-pet-desktop-drops-ow-11afc-ted-gestures-in-both-scenes-chrome/desktop-dock-try-on.png",
+      ".cache/verified-browser/focus-pet-desktop-drops-ow-11afc-ted-gestures-in-both-scenes-chrome/desktop-house-try-on.png",
+      ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-0-0.png",
+      ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-0-5000.png",
+      ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-5000-0.png",
+      ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-5000-5000.png",
+      ".cache/verified-browser/focus-pet-mobile-drops-own-9ee72-ted-gestures-in-both-scenes-chrome/mobile-dock-try-on.png",
+      ".cache/verified-browser/focus-pet-mobile-drops-own-9ee72-ted-gestures-in-both-scenes-chrome/mobile-house-try-on.png",
+      ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-0-0.png",
+      ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-0-5000.png",
+      ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-5000-0.png",
+      ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-5000-5000.png"
+    ]
+  },
+  "acceptance_entry": {
+    "kind": "preview",
+    "checks": [
+      "把团团拖到屏幕边缘，反复点开快捷栏、摸摸和小屋，观察宠物是否保持原位、按钮是否完整可点。",
+      "在快捷栏和小屋把点心、装扮拖到团团身上，观察命中反馈和试穿；再拖出松手，核对库存与外观。"
+    ]
+  },
+  "preview_url": "http://127.0.0.1:58780/focus-pet",
+  "preview_artifacts": [
+    ".cache/preview-desktop.png",
+    ".cache/preview-mobile.png"
+  ],
+  "stage": "verified",
+  "command": "source .cache/env && .cache/venv/bin/python .agent-run/browser_probe.py --run .cache/venv/bin/python .cache/e2e.py --output=.cache/verified-browser",
+  "resume_point": "由宿主发布草稿 PR 并续期预览。"
+}

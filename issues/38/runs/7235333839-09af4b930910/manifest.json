@@ -1,0 +1,87 @@
+{
+  "approval_comment_id": 7235326860,
+  "archive_complete": false,
+  "artifacts": [],
+  "files": {
+    "approved-issue.md": {
+      "sha256": "b7ed156c237c8ea4d18ba048875423b5ed3dfffc5098dc7c76b5afae89553a95",
+      "size": 10330
+    },
+    "checkpoint.json": {
+      "sha256": "b25fe964a9062865765a1aad81f1f152de76a8116628b4b3a1876dff4941b15d",
+      "size": 5080
+    },
+    "context.json": {
+      "sha256": "104fc875e224d364233dfd4f27cc0a5cd03a7998222c72af87755882d1dbb967",
+      "size": 1016
+    },
+    "handoff.json": {
+      "sha256": "4f946dde10d2354996fb8c52f253597175b2eab4923fed4712e25b5286e37f78",
+      "size": 4828
+    },
+    "input.json": {
+      "sha256": "bf258b6398918426739dfe539454eb3b8b1519c023981a045c0b13ee0c9f15e6",
+      "size": 937
+    }
+  },
+  "head_sha": "ad00f240a34b91abd402e4894da71e76c4e38005",
+  "issue_number": 38,
+  "omitted": [
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-drops-ow-11afc-ted-gestures-in-both-scenes-chrome/desktop-dock-try-on.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-drops-ow-11afc-ted-gestures-in-both-scenes-chrome/desktop-house-try-on.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-0-0.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-0-5000.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-5000-0.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-desktop-keeps-th-c78d2-s-at-the-four-saved-corners-chrome/desktop-corner-5000-5000.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-drops-own-9ee72-ted-gestures-in-both-scenes-chrome/mobile-dock-try-on.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-drops-own-9ee72-ted-gestures-in-both-scenes-chrome/mobile-house-try-on.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-0-0.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-0-5000.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-5000-0.png",
+      "reason": "not_selected_or_over_limit"
+    },
+    {
+      "path": ".cache/verified-browser/focus-pet-mobile-keeps-the-28a02-s-at-the-four-saved-corners-chrome/mobile-corner-5000-5000.png",
+      "reason": "not_selected_or_over_limit"
+    }
+  ],
+  "recorded_at": "2026-11-28T06:49:59+00:00",
+  "revision": 1,
+  "run_id": "7235333839-09af4b930910",
+  "schema": "AutoDevSkill records v1",
+  "source": "symphony_worker",
+  "spec_sha256": "b7ed156c237c8ea4d18ba048875423b5ed3dfffc5098dc7c76b5afae89553a95",
+  "start_comment_id": 7235333839,
+  "status": "ready_for_review"
+}
