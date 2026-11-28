@@ -3593,6 +3593,12 @@ var createInitialState = () => ({
 // src/appClock.ts
 var nowIso = () => (/* @__PURE__ */ new Date()).toISOString();
 var today = () => todayKey();
+var localDateForTimestamp = (timestamp) => {
+  if (!timestamp) return void 0;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) return timestamp;
+  const value = new Date(timestamp);
+  return Number.isFinite(value.getTime()) ? todayKey(value) : void 0;
+};
 
 // src/appTaskMetadata.ts
 var regularTaskStageOptions = [
@@ -3730,6 +3736,145 @@ function updateProjectMemberInState(state, member, timestamp = (/* @__PURE__ */ 
     ),
     updatedAt: timestamp
   };
+}
+
+// src/accessIdentity.ts
+var normalizedEmail3 = (email) => email?.trim().toLowerCase();
+var memberAccessIdentityKey = (member) => {
+  if (member.accountId) return `account:${member.accountId}`;
+  if (member.email) return `email:${normalizedEmail3(member.email)}`;
+  return `member:${member.id ?? ""}`;
+};
+var memberAccessIdentityAliases = (member) => {
+  const aliases = [];
+  if (member.accountId) aliases.push(`account:${member.accountId}`);
+  const email = normalizedEmail3(member.email);
+  if (email) aliases.push(`email:${email}`);
+  if (member.id) aliases.push(`member:${member.id}`);
+  return Array.from(new Set(aliases.length ? aliases : [memberAccessIdentityKey(member)]));
+};
+var addMemberAccessIdentity = (identities, identityAliasToKey, member) => {
+  const aliases = memberAccessIdentityAliases(member);
+  const existingKey = aliases.map((alias) => identityAliasToKey.get(alias)).find((key) => Boolean(key && identities.has(key)));
+  const identityKey = existingKey ?? memberAccessIdentityKey(member);
+  aliases.forEach((alias) => identityAliasToKey.set(alias, identityKey));
+  identities.add(identityKey);
+};
+var memberIdentityForProjectMember = (member) => ({
+  id: member.id,
+  accountId: member.accountId,
+  email: member.email
+});
+
+// src/workspaceStateAccess.ts
+var workspaceMembershipsForState = (state) => {
+  const memberships = state.auth.workspaceMemberships ?? [];
+  const currentMembership = state.auth.membership;
+  if (!currentMembership || memberships.some(
+    (membership) => membership.id === currentMembership.id || membership.workspaceId === currentMembership.workspaceId && membership.accountId === currentMembership.accountId
+  )) {
+    return memberships;
+  }
+  return [...memberships, currentMembership];
+};
+var workspacesForState = (state) => state.auth.workspaces ?? (state.auth.workspace ? [state.auth.workspace] : []);
+var workspaceForProject = (state, project) => project.workspaceId ? workspacesForState(state).find((item) => item.id === project.workspaceId) ?? (state.auth.workspace?.id === project.workspaceId ? state.auth.workspace : void 0) : state.auth.workspace;
+var workspaceIdForProject = (state, project) => project.workspaceId ?? workspaceForProject(state, project)?.id;
+
+// src/workspaceMemberVisibility.ts
+var activeWorkspaceIdsForAccount = (state, account) => {
+  if (!account?.id) return /* @__PURE__ */ new Set();
+  const workspaceMemberships = workspaceMembershipsForState(state);
+  const workspaceIds = new Set(
+    workspaceMemberships.filter((membership) => membership.accountId === account.id && membership.status === "active").map((membership) => membership.workspaceId)
+  );
+  workspacesForState(state).filter((workspace) => workspace.ownerAccountId === account.id).forEach((workspace) => workspaceIds.add(workspace.id));
+  if (state.auth.workspace?.ownerAccountId === account.id) workspaceIds.add(state.auth.workspace.id);
+  return workspaceIds;
+};
+var activeWorkspaceIdsForCurrentAccount = (state) => activeWorkspaceIdsForAccount(state, state.auth.account);
+
+// src/projectAccessMemberCount.ts
+var countProjectAccessibleMembers = (state, project, workspaceId) => {
+  const identities = /* @__PURE__ */ new Set();
+  const identityAliasToKey = /* @__PURE__ */ new Map();
+  if (workspaceId) {
+    const workspace = workspacesForState(state).find((item) => item.id === workspaceId);
+    if (workspace?.ownerAccountId) addMemberAccessIdentity(identities, identityAliasToKey, { accountId: workspace.ownerAccountId });
+    const activeMemberships = workspaceMembershipsForState(state).filter((membership) => membership.workspaceId === workspaceId && membership.status === "active");
+    activeMemberships.forEach((membership) => addMemberAccessIdentity(identities, identityAliasToKey, membership));
+  }
+  state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").forEach((member) => addMemberAccessIdentity(identities, identityAliasToKey, member));
+  return identities.size;
+};
+
+// src/projectAccessIdentity.ts
+var projectMemberMatchesIdentity = (member, identity) => {
+  const identityEmail = normalizedEmail3(identity.email);
+  return Boolean(
+    identity.accountId && member.accountId === identity.accountId || identityEmail && normalizedEmail3(member.email) === identityEmail
+  );
+};
+var accountIdentity = (account) => ({
+  id: account.id,
+  accountId: account.id,
+  email: account.email
+});
+
+// src/projectAccessVisibility.ts
+var accountProjectMemberIds = (state, account, currentMember) => {
+  if (currentMember) return projectMemberIdentityIds(state, currentMember);
+  if (!account) return projectMemberIdentityIds(state, resolveCurrentMember(state));
+  return new Set(
+    state.projectMembers.filter((member) => member.status !== "disabled" && projectMemberMatchesIdentity(member, accountIdentity(account))).map((member) => member.id)
+  );
+};
+var accessibleProjectIdsForAccount = (state, account, currentMember) => {
+  const memberIds = accountProjectMemberIds(state, account, currentMember);
+  const workspaceIds = activeWorkspaceIdsForAccount(state, account);
+  const projectIds = /* @__PURE__ */ new Set();
+  state.projectMembers.filter((member) => member.status !== "disabled" && memberIds.has(member.id)).forEach((member) => projectIds.add(member.projectId));
+  state.projects.filter((project) => {
+    const workspaceId = workspaceIdForProject(state, project);
+    return workspaceId ? workspaceIds.has(workspaceId) : false;
+  }).forEach((project) => projectIds.add(project.id));
+  return projectIds;
+};
+var accessibleProjectIdsForCurrentUser = (state, currentMember) => accessibleProjectIdsForAccount(state, state.auth.account, currentMember);
+var resolveProjectMemberForAccount = (state, projectId, account = state.auth.account) => {
+  if (!account) return void 0;
+  return state.projectMembers.find(
+    (member) => member.projectId === projectId && member.status !== "disabled" && projectMemberMatchesIdentity(member, accountIdentity(account))
+  );
+};
+
+// src/dailyTasks.ts
+function dailyTaskBelongsToAccount(state, task, accessible = accessibleProjectIdsForCurrentUser(state)) {
+  const account = state.auth.account;
+  if (!account || !task.isDaily || task.status === "archived" || task.status === "split" || !accessible.has(task.projectId)) return false;
+  const project = state.projects.find((item) => item.id === task.projectId);
+  if (!project || project.archivedAt) return false;
+  const member = resolveProjectMemberForAccount(state, project.id);
+  if (task.primaryExecutorMemberId || task.collaboratorMemberIds?.length) {
+    return Boolean(member && (member.id === task.primaryExecutorMemberId || task.collaboratorMemberIds?.includes(member.id)));
+  }
+  const workspace = workspaceForProject(state, project);
+  return (task.creatorMemberId ? member?.id === task.creatorMemberId : task.creatorAccountId === account.id) || workspace?.type === "private" && workspace.ownerAccountId === account.id;
+}
+function withDailyTasks(state, plan) {
+  const daily = state.tasks.filter((task) => task.isDaily);
+  if (!daily.length) return plan;
+  const accessible = accessibleProjectIdsForCurrentUser(state);
+  const accountId = state.auth.account?.id;
+  const ids = new Set(plan.committedTaskIds);
+  for (const task of daily) {
+    if (accountId && dailyTaskBelongsToAccount(state, task, accessible) && task.dailyRemovedDates?.[accountId] !== plan.date) {
+      ids.add(task.id);
+    } else {
+      ids.delete(task.id);
+    }
+  }
+  return { ...plan, committedTaskIds: [...ids] };
 }
 
 // src/dailyPlanScope.ts
@@ -4006,116 +4151,10 @@ var createDailyPlanForDate = (state, date, timestamp = nowIso(), workspaceId = c
   createdAt: timestamp,
   updatedAt: timestamp
 });
-var getTodayPlan = (state) => {
-  const todayDate = today();
+var getTodayPlan = (state, todayDate = today()) => {
   const existing = combinedCurrentAccountDailyPlanForDate(state, todayDate) ?? currentAccountDailyPlanForDate(state, todayDate);
-  if (existing) return existing;
-  return createDailyPlanForDate(state, todayDate);
+  return withDailyTasks(state, existing ?? createDailyPlanForDate(state, todayDate));
 };
-
-// src/accessIdentity.ts
-var normalizedEmail3 = (email) => email?.trim().toLowerCase();
-var memberAccessIdentityKey = (member) => {
-  if (member.accountId) return `account:${member.accountId}`;
-  if (member.email) return `email:${normalizedEmail3(member.email)}`;
-  return `member:${member.id ?? ""}`;
-};
-var memberAccessIdentityAliases = (member) => {
-  const aliases = [];
-  if (member.accountId) aliases.push(`account:${member.accountId}`);
-  const email = normalizedEmail3(member.email);
-  if (email) aliases.push(`email:${email}`);
-  if (member.id) aliases.push(`member:${member.id}`);
-  return Array.from(new Set(aliases.length ? aliases : [memberAccessIdentityKey(member)]));
-};
-var addMemberAccessIdentity = (identities, identityAliasToKey, member) => {
-  const aliases = memberAccessIdentityAliases(member);
-  const existingKey = aliases.map((alias) => identityAliasToKey.get(alias)).find((key) => Boolean(key && identities.has(key)));
-  const identityKey = existingKey ?? memberAccessIdentityKey(member);
-  aliases.forEach((alias) => identityAliasToKey.set(alias, identityKey));
-  identities.add(identityKey);
-};
-var memberIdentityForProjectMember = (member) => ({
-  id: member.id,
-  accountId: member.accountId,
-  email: member.email
-});
-
-// src/workspaceStateAccess.ts
-var workspaceMembershipsForState = (state) => {
-  const memberships = state.auth.workspaceMemberships ?? [];
-  const currentMembership = state.auth.membership;
-  if (!currentMembership || memberships.some(
-    (membership) => membership.id === currentMembership.id || membership.workspaceId === currentMembership.workspaceId && membership.accountId === currentMembership.accountId
-  )) {
-    return memberships;
-  }
-  return [...memberships, currentMembership];
-};
-var workspacesForState = (state) => state.auth.workspaces ?? (state.auth.workspace ? [state.auth.workspace] : []);
-var workspaceForProject = (state, project) => project.workspaceId ? workspacesForState(state).find((item) => item.id === project.workspaceId) ?? (state.auth.workspace?.id === project.workspaceId ? state.auth.workspace : void 0) : state.auth.workspace;
-var workspaceIdForProject = (state, project) => project.workspaceId ?? workspaceForProject(state, project)?.id;
-
-// src/workspaceMemberVisibility.ts
-var activeWorkspaceIdsForAccount = (state, account) => {
-  if (!account?.id) return /* @__PURE__ */ new Set();
-  const workspaceMemberships = workspaceMembershipsForState(state);
-  const workspaceIds = new Set(
-    workspaceMemberships.filter((membership) => membership.accountId === account.id && membership.status === "active").map((membership) => membership.workspaceId)
-  );
-  workspacesForState(state).filter((workspace) => workspace.ownerAccountId === account.id).forEach((workspace) => workspaceIds.add(workspace.id));
-  if (state.auth.workspace?.ownerAccountId === account.id) workspaceIds.add(state.auth.workspace.id);
-  return workspaceIds;
-};
-var activeWorkspaceIdsForCurrentAccount = (state) => activeWorkspaceIdsForAccount(state, state.auth.account);
-
-// src/projectAccessMemberCount.ts
-var countProjectAccessibleMembers = (state, project, workspaceId) => {
-  const identities = /* @__PURE__ */ new Set();
-  const identityAliasToKey = /* @__PURE__ */ new Map();
-  if (workspaceId) {
-    const workspace = workspacesForState(state).find((item) => item.id === workspaceId);
-    if (workspace?.ownerAccountId) addMemberAccessIdentity(identities, identityAliasToKey, { accountId: workspace.ownerAccountId });
-    const activeMemberships = workspaceMembershipsForState(state).filter((membership) => membership.workspaceId === workspaceId && membership.status === "active");
-    activeMemberships.forEach((membership) => addMemberAccessIdentity(identities, identityAliasToKey, membership));
-  }
-  state.projectMembers.filter((member) => member.projectId === project.id && member.status !== "disabled").forEach((member) => addMemberAccessIdentity(identities, identityAliasToKey, member));
-  return identities.size;
-};
-
-// src/projectAccessIdentity.ts
-var projectMemberMatchesIdentity = (member, identity) => {
-  const identityEmail = normalizedEmail3(identity.email);
-  return Boolean(
-    identity.accountId && member.accountId === identity.accountId || identityEmail && normalizedEmail3(member.email) === identityEmail
-  );
-};
-var accountIdentity = (account) => ({
-  id: account.id,
-  accountId: account.id,
-  email: account.email
-});
-
-// src/projectAccessVisibility.ts
-var accountProjectMemberIds = (state, account, currentMember) => {
-  if (currentMember) return projectMemberIdentityIds(state, currentMember);
-  if (!account) return projectMemberIdentityIds(state, resolveCurrentMember(state));
-  return new Set(
-    state.projectMembers.filter((member) => member.status !== "disabled" && projectMemberMatchesIdentity(member, accountIdentity(account))).map((member) => member.id)
-  );
-};
-var accessibleProjectIdsForAccount = (state, account, currentMember) => {
-  const memberIds = accountProjectMemberIds(state, account, currentMember);
-  const workspaceIds = activeWorkspaceIdsForAccount(state, account);
-  const projectIds = /* @__PURE__ */ new Set();
-  state.projectMembers.filter((member) => member.status !== "disabled" && memberIds.has(member.id)).forEach((member) => projectIds.add(member.projectId));
-  state.projects.filter((project) => {
-    const workspaceId = workspaceIdForProject(state, project);
-    return workspaceId ? workspaceIds.has(workspaceId) : false;
-  }).forEach((project) => projectIds.add(project.id));
-  return projectIds;
-};
-var accessibleProjectIdsForCurrentUser = (state, currentMember) => accessibleProjectIdsForAccount(state, state.auth.account, currentMember);
 
 // src/projectDetailTaskCreation.ts
 var estimateHoursToPomodoros = (estimateHours, focusMinutes = 25) => {
@@ -4135,6 +4174,7 @@ var createProjectTaskInState = (state, projectId, input, timestamp = nowIso(), i
     tags: input.tags ?? [],
     projectId: project.id,
     project: project.name,
+    creatorAccountId: state.auth.account?.id,
     creatorMemberId: resolveMemberIdForProject(state, project.id),
     primaryExecutorMemberId: input.primaryExecutorMemberId || void 0,
     collaboratorMemberIds: input.collaboratorMemberIds?.filter((id) => id !== input.primaryExecutorMemberId) ?? [],
@@ -4148,7 +4188,8 @@ var createProjectTaskInState = (state, projectId, input, timestamp = nowIso(), i
     ...emptyTaskDefaults(timestamp, Date.now()),
     dueAt: input.dueAt,
     reminderAt: input.reminderAt,
-    repeatRule: input.repeatRule ?? "none",
+    isDaily: input.isDaily,
+    repeatRule: input.isDaily ? "none" : input.repeatRule ?? "none",
     repeatIntervalDays: input.repeatIntervalDays,
     subtasks: (input.subtasks ?? []).map((title2) => title2.trim()).filter(Boolean).map((title2) => ({
       id: idFactory("subtask"),
@@ -4449,10 +4490,10 @@ var bindAccountToMembers = (value, auth, timestamp = (/* @__PURE__ */ new Date()
 
 // src/releaseContract.ts
 var releaseContract = {
-  releaseVersion: "0.2.18",
+  releaseVersion: "0.2.19",
   apiProtocolVersion: 2,
-  databaseSchemaVersion: 21,
-  minimumClientRelease: "0.2.18"
+  databaseSchemaVersion: 22,
+  minimumClientRelease: "0.2.19"
 };
 
 // src/teamBackendHttp.ts
@@ -4824,13 +4865,44 @@ async function updateMemberAccount(backend, token, memberId, payload) {
   return result.member.payload;
 }
 
-// src/dailyQuotes/accountSettingKey.ts
+// src/dailyTaskCache.ts
+function restoreDailyTaskFields(tasks, cache, accountId, serverUrl) {
+  if (!cache || cache.accountId !== accountId || cache.serverUrl !== serverUrl || !Array.isArray(cache.tasks)) return tasks;
+  const cached = new Map(cache.tasks.filter((row) => row && typeof row.id === "string").map((row) => [row.id, row]));
+  return tasks.map((task) => {
+    const row = cached.get(task.id);
+    if (!row || row.workspaceId !== task.workspaceId || row.updatedAt !== task.updatedAt || task.isDaily !== void 0) return task;
+    if (typeof row.isDaily !== "boolean" || row.dailyCompletedDates && !Array.isArray(row.dailyCompletedDates)) return task;
+    return {
+      ...task,
+      isDaily: row.isDaily,
+      dailyCompletedDates: task.dailyCompletedDates ?? row.dailyCompletedDates,
+      dailyRemovedDates: task.dailyRemovedDates ?? row.dailyRemovedDates
+    };
+  });
+}
+
+// src/accountSettingKeys.ts
 var DAILY_QUOTES_SETTING = "dailyQuotes";
-function withoutDailyQuoteSettings(settings) {
-  if (!Object.prototype.hasOwnProperty.call(settings, DAILY_QUOTES_SETTING)) return settings;
+var PET_SETTING = "focusPet";
+function withoutAccountOwnedSettings(settings) {
+  if (!(DAILY_QUOTES_SETTING in settings || PET_SETTING in settings)) return settings;
   const rest = { ...settings };
   Reflect.deleteProperty(rest, DAILY_QUOTES_SETTING);
+  Reflect.deleteProperty(rest, PET_SETTING);
   return rest;
+}
+
+// src/storage.ts
+var STORAGE_KEY = "timemanage.app_state.v4";
+function hydrateCachedDailyTaskFields(state, accountId) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const cached = raw && JSON.parse(raw);
+    return restoreDailyTaskFields(state.tasks, cached?.dailyTaskCache, accountId, state.backend.serverUrl);
+  } catch {
+    return state.tasks;
+  }
 }
 
 // src/teamBackendCompatibility.ts
@@ -5019,6 +5091,7 @@ var taskFromRow = (row) => {
   const task = row.payload;
   return {
     ...task,
+    creatorAccountId: task.creatorAccountId ?? row.account_id,
     tags: Array.isArray(task.tags) ? task.tags : [],
     subtasks: Array.isArray(task.subtasks) ? task.subtasks : [],
     estimateHistory: Array.isArray(task.estimateHistory) ? task.estimateHistory : []
@@ -5125,10 +5198,11 @@ async function loadTeamData(local) {
     throw error;
   }
   const merged = mergeBusinessRowsIntoState(local, payload.rows);
-  const settings = { ...merged.settings, ...withoutDailyQuoteSettings(payload.settings ?? {}) };
+  const settings = { ...merged.settings, ...withoutAccountOwnedSettings(payload.settings ?? {}) };
   const account = mapAccount(payload.account);
   const mergedWithAccount = {
     ...merged,
+    tasks: hydrateCachedDailyTaskFields(merged, account.id),
     auth: { ...merged.auth, account }
   };
   const recoveredTimer = recoverTeamActiveTimer(mergedWithAccount, settings, local, payload.loaded_at);
@@ -5611,11 +5685,6 @@ var sourceProjectIdsForMemberStatus = (state, projectId, workspaceId) => {
 var sourceTasksForMemberStatus = (state, sourceProjectIds) => state.tasks.filter(
   (task) => task.status !== "split" && task.status !== "archived" && sourceProjectIds.has(task.projectId)
 );
-var localDateForTimestamp = (timestamp) => {
-  if (!timestamp) return void 0;
-  const value = new Date(timestamp);
-  return Number.isFinite(value.getTime()) ? todayKey(value) : void 0;
-};
 var sessionTouchesDate = (session, date, currentDate) => {
   const start = localDateForTimestamp(session.startedAt);
   const end = localDateForTimestamp(session.endedAt ?? (session.status === "paused" ? session.pausedAt : void 0)) ?? (session.status === "active" ? currentDate : start);
@@ -6778,7 +6847,7 @@ function registerWorkflowCommands(program2, runtime) {
 // cli/src/program.ts
 function createCliProgram(options = {}) {
   const program2 = new Command();
-  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.18").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
+  program2.name("timemanage").description("TimeManage CLI\uFF1A\u4E00\u6B21\u547D\u4EE4\u4E00\u6B21\u8FDE\u63A5\uFF0C\u4E0D\u542F\u52A8\u5E38\u9A7B\u670D\u52A1\u3002").version("0.2.19").option("--config <path>", "\u914D\u7F6E\u6587\u4EF6\u8DEF\u5F84").option("--server-url <url>", "\u8986\u76D6\u670D\u52A1\u5668\u5730\u5740").option("--email <account>", "\u8986\u76D6\u767B\u5F55\u8D26\u53F7").option("--password <password>", "\u8986\u76D6\u767B\u5F55\u5BC6\u7801").option("--device-id <id>", "\u8986\u76D6\u8BBE\u5907 ID").option("--json", "\u8F93\u51FA\u5B8C\u6574 JSON").showHelpAfterError();
   let client = options.client;
   const runtime = {
     client: () => {
