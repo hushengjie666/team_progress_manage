@@ -3,7 +3,7 @@ import type { Position } from "./model";
 
 export type Obstacle = Pick<DOMRect, "top" | "bottom" | "left" | "right">;
 
-/** Keep the nearest available spot to the saved position when the focus layout changes. */
+/** Choose an unobstructed initial spot before the user has positioned the pet. */
 export function placePet(point: Position, width: number, height: number, vw: number, vh: number, obstacles: Obstacle[]) {
   const clamp = (p: Position) => clampMiniTimerPosition(p, width, height, vw, vh);
   const origin = clamp(point);
@@ -28,10 +28,9 @@ export function placePet(point: Position, width: number, height: number, vw: num
 }
 
 // Find the tallest available vertical gap at the pet's side or along a control's edge.
-export function placeHouse(anchor: Position, vw: number, vh: number, obstacles: Obstacle[]) {
-  const width = Math.min(402, vw - 20);
+export function placeHouse(anchor: Position, vw: number, vh: number, obstacles: Obstacle[], preferredWidth = 402, limit = 552, usableHeight = limit) {
+  const width = Math.min(preferredWidth, vw - 20);
   const edge = 10;
-  const limit = 552;
   const preferred = anchor.x + 37 - width / 2;
   const candidates = [preferred, edge, vw - width - edge, ...obstacles.flatMap(r => [r.right + 5, r.left - width - 5])];
   let best = { left: edge, top: edge, width, maxHeight: 0 };
@@ -45,11 +44,18 @@ export function placeHouse(anchor: Position, vw: number, vh: number, obstacles: 
       if (height > 0) {
         const top = Math.max(start, Math.min(anchor.y - height / 2, end.top - 5 - height));
         const distance = Math.hypot(left - preferred, top + height / 2 - anchor.y);
-        const rank = height * 10 - distance * 0.1;
+        const rank = Math.min(height, usableHeight) * 10 + height * 0.1 - distance * 0.1;
         if (rank > score) { best = { left, top, width, maxHeight: height }; score = rank; }
       }
       start = Math.max(start, end.bottom + 5);
     }
   }
   return best;
+}
+
+export function placeDock(anchor: Position, width: number, height: number, vw: number, vh: number, controls: Obstacle[]) {
+  const pet = { left: anchor.x, right: anchor.x + width, top: anchor.y, bottom: anchor.y + height };
+  const beside = (obstacles: Obstacle[]) => placeHouse(anchor, vw, vh, [pet, ...obstacles], 244, 234, 158);
+  const clear = beside(controls);
+  return clear.maxHeight >= 160 ? clear : beside([]);
 }

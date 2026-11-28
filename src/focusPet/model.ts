@@ -62,7 +62,7 @@ export function act(state: PetState, action: PetAction, time: number): PetState 
     const buy = action.kind === "buyFood";
     const feed = !buy || action.serve;
     const count = state.bag[food.id] ?? 0;
-    if ((buy ? state.coins < food.price : count < 1) || (feed && fullness >= 100)) return state;
+    if ((buy ? state.coins < food.price : count < 1) || (feed && Math.ceil(fullness) >= 100)) return state;
     return { ...state, observedAt: now, coins: state.coins - (buy ? food.price : 0),
       bag: { ...state.bag, [food.id]: count + Number(buy) - Number(feed) },
       pet: feed ? { ...pet, hungryAt: now + Math.min(100, fullness + food.points) * DAY / 100 } : pet };

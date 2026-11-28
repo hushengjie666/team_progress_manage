@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Coins, Pencil } from "lucide-react";
 import { todayKey } from "../seed";
 import { foods, outfits, species, type Outfit } from "./catalog";
@@ -6,6 +6,7 @@ import { condition, type PetAction, type PetState } from "./model";
 import { PetPortrait, type Mood } from "./PetPortrait";
 import { PetAdoption } from "./PetAdoption";
 import { PetInventory, type Section, type Shelf } from "./PetInventory";
+import { DragGhost, dropHint, useItemDrag } from "./useItemDrag";
 import { RoomArt } from "./PetArtwork";
 import { EnergyBar, PetEffects, usePetReaction } from "./PetInteraction";
 
@@ -14,18 +15,14 @@ export type PetHouseProps = {
   send: (action: PetAction) => Promise<boolean>;
 };
 
-export function PetHouse({ state, time, mood, busy, send, initialTab }: PetHouseProps & { initialTab: Section }) {
+export function PetHouse({ state, time, mood, busy, send, initialTab, initialShelf }: PetHouseProps & { initialTab: Section; initialShelf: Shelf }) {
   const [tab, setTab] = useState<Section>(initialTab);
-  const [shelf, setShelf] = useState<Shelf>("food");
+  const [shelf, setShelf] = useState<Shelf>(initialShelf);
   const [preview, tryOn] = useState<Outfit>();
   const [rename, setRename] = useState<string>();
   const { reaction, play } = usePetReaction();
   const { pet } = state;
   const { fullness, dead, days, left } = condition(state, time);
-  if (!pet || dead) return <PetAdoption {...{ state, busy, send, days }}/>;
-  const select = (next: Section, section: Shelf = "food") => { tryOn(undefined); setTab(next); setShelf(section); };
-  const fit = outfits.find(item => item.id === preview);
-  const wearing = fit ? { ...state.wearing, [fit.slot]: fit.id } : state.wearing;
   const perform = async (action: PetAction) => {
     const saved = await send(action);
     if (!saved) return false;
@@ -38,6 +35,16 @@ export function PetHouse({ state, time, mood, busy, send, initialTab }: PetHouse
     }
     return true;
   };
+  const target = useRef<HTMLButtonElement>(null);
+  const full = Math.ceil(fullness) >= 100;
+  const { bind, drag } = useItemDrag(target, Boolean(pet && !dead && !busy), item => {
+    if (item.kind !== "feed" || !full) void perform(item);
+  });
+  if (!pet || dead) return <PetAdoption {...{ state, busy, send, days }}/>;
+  const select = (next: Section, section: Shelf = "food") => { tryOn(undefined); setTab(next); setShelf(section); };
+  const hover = drag?.hit ? drag.item : undefined;
+  const fit = outfits.find(item => item.id === (hover?.kind === "wear" ? hover.outfit : preview));
+  const wearing = fit ? { ...state.wearing, [fit.slot]: fit.id } : state.wearing;
   const seconds = Math.ceil(left / 1000);
   const countdown = [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
     .map(value => String(value).padStart(2, "0")).join(":");
@@ -47,11 +54,12 @@ export function PetHouse({ state, time, mood, busy, send, initialTab }: PetHouse
     {fullness === 0 && <p className="pet-crisis">饥饿危机 · 距饿死 {countdown}</p>}
     <div className={'pet-stage stage-' + mood}>
       <RoomArt mood={mood}/>
-      <span className="pet-stage-label">{fit ? "试穿 · " + fit.name : ({ happy: "晴日小憩", focus: "专注陪伴中", hungry: "肚子有点饿", crisis: "等待投喂", eating: "吃得好开心", dead: "" })[mood]}</span>
-      <button className={'pet-stage-actor action-' + reaction?.kind} aria-label={'摸摸' + pet.name}
+      <DragGhost drag={drag}/>
+      <span className="pet-stage-label">{(hover?.kind === "feed" && dropHint(hover, full)) || (fit ? "试穿 · " + fit.name : ({ happy: "晴日小憩", focus: "专注陪伴中", hungry: "肚子有点饿", crisis: "等待投喂", eating: "吃得好开心", dead: "" })[mood])}</span>
+      <button ref={target} data-drop-target={Boolean(hover)} className={'pet-stage-actor action-' + reaction?.kind} aria-label={'摸摸' + pet.name}
         onClick={() => play({ kind: "pat", text: "最喜欢你啦！" })}>
-        <span key={reaction?.id}><PetPortrait animal={pet.species} mood={reaction?.kind === "pat" ? "eating" : mood} wearing={wearing}/></span>
-      </button><PetEffects reaction={reaction}/>
+        <span key={reaction?.id}><PetPortrait animal={pet.species} mood={(reaction?.kind === "pat" || (hover?.kind === "feed" && !full)) ? "eating" : mood} wearing={wearing}/></span>
+      </button>{!hover && <PetEffects reaction={reaction}/>}
     </div>
     <div className="pet-identity">{rename !== undefined ? <form className="pet-rename" onSubmit={async e => {
       e.preventDefault(); if (await send({ kind: "rename", name: rename })) setRename(undefined);
@@ -61,6 +69,6 @@ export function PetHouse({ state, time, mood, busy, send, initialTab }: PetHouse
         <small>{species[pet.species]} · 陪伴 {days} 天</small></>}
     </div>
     {state.past > 0 && <small>曾陪伴 {state.past} 位伙伴 · 最长 {state.longest} 天</small>}
-    <PetInventory {...{ state, busy, tab, shelf, select, preview, tryOn }} send={perform} full={Math.ceil(fullness) >= 100}/>
+    <PetInventory {...{ state, busy, tab, shelf, bind, select, preview, tryOn }} send={perform} full={full}/>
   </>;
 }

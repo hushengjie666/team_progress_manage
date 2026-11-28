@@ -76,6 +76,7 @@ describe("宠物照料", () => {
       expect(act(s, buy, start)).toBe(s);
       const stored = act(s, { ...buy, serve: false }, start);
       expect(stored.bag[food.id]).toBe(1);
+      expect(act(stored, { kind: "feed", food: food.id }, start + 1000)).toBe(stored);
       expect(act(stored, buy, start + DAY)).toBe(stored);
       const fed = act(stored, { kind: "feed", food: food.id }, start + DAY);
       expect(condition(fed, start + DAY).fullness).toBe(food.points);

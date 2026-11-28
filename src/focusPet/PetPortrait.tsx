@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { species, type Species, type Slot, type Outfit } from "./catalog";
+import { outfits, species, type Species, type Slot, type Outfit } from "./catalog";
 
 const clothing: Record<Outfit, ReactNode> = {
   leaf: <g><path fill="#67ac77" d="M46 23Q28 23 27 10Q41 7 46 23Z"/><path fill="#b1ca70" d="M45 22Q43 7 57 5Q60 17 45 22Z"/></g>,
@@ -12,6 +12,13 @@ const clothing: Record<Outfit, ReactNode> = {
   bell: <g><path fill="none" stroke="#a88b4f" d="M31 62q16 19 34 0"/><path fill="#f9c85d" d="M43 77q0-9 6-9t6 9l2 2H41Z"/><circle cx="49" cy="81" r="1"/></g>,
   satchel: <g><path fill="none" stroke="#995d3f" strokeWidth="3" d="M33 61l30 24"/><rect x="54" y="76" width="16" height="13" rx="3" fill="#d39762"/><path fill="none" d="m54 78 8 5 8-5"/></g>,
 };
+
+export function OutfitArt({ outfit }: { outfit: typeof outfits[number] }) {
+  const view = { head: "14 -2 64 42", body: "16 54 65 46", charm: "24 56 52 38" }[outfit.slot];
+  return <svg viewBox={view} role="img" aria-label={outfit.name} className="pet-outfit-art">
+    <g stroke="#564b40" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{clothing[outfit.id]}</g>
+  </svg>;
+}
 
 const ears: Record<Species, ReactNode> = {
   cat: <g fill="#e7a165"><path d="M20 36l1-24q12 3 20 13m17 0q8-10 18-13l1 24"/><path fill="#e9a099" d="m25 28 1-10 9 8m28 0 9-8 1 11"/></g>,
