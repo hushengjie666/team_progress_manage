@@ -25,7 +25,7 @@ export function PetEffects({ reaction }: { reaction: ActiveReaction }) {
   if (!reaction) return null;
   return <div key={reaction.id} className={'pet-effects effect-' + reaction.kind} role="status">
     {reaction.kind === "feed" && <i className="pet-flying-food"><FoodArt food={reaction.food}/></i>}
-    {(reaction.kind === "pat" || reaction.kind === "dress") && <i className="pet-sparks" aria-hidden="true">{reaction.kind === "pat" ? "♥　♡　♥" : "✦　✧　✦"}</i>}
+    {(reaction.kind === "pat" || reaction.kind === "dress" || reaction.kind === "feed") && <i className="pet-sparks" aria-hidden="true">{reaction.kind !== "dress" ? "♥　♡　♥" : "✦　✧　✦"}</i>}
     <span className="pet-speech">{reaction.text}</span>
   </div>;
 }

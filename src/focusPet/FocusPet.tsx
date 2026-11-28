@@ -11,6 +11,7 @@ export function FocusPet({ app, visible }: { app: AppState; visible: boolean }) 
   const [store] = useState(() => new PetStore(app.backend, app.auth.account?.id ?? "", app.auth.token ?? "", changed));
   const [time, setTime] = useState(Date.now);
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const [warning, setWarning] = useState("");
   const [fedAt, setFedAt] = useState(0);
   const [coinFlash, setCoinFlash] = useState(false);
@@ -18,6 +19,8 @@ export function FocusPet({ app, visible }: { app: AppState; visible: boolean }) 
   const timer = useRef(app.activeTimer);
   const at = Date.now();
   const send = useCallback(async (action: PetAction) => {
+    if (pending.current) return false;
+    pending.current = true;
     setBusy(true);
     try {
       const saved = await store.action(action, Date.now());
@@ -28,7 +31,7 @@ export function FocusPet({ app, visible }: { app: AppState; visible: boolean }) 
     } catch {
       setWarning("未能确认保存，请检查连接后重试。");
       return false;
-    } finally { setBusy(false); }
+    } finally { pending.current = false; setBusy(false); }
   }, [store]);
   useEffect(() => {
     let live = true;
